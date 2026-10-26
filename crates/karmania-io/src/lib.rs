@@ -15,7 +15,8 @@ pub mod csv_import;
 pub mod delimited;
 #[cfg(test)]
 mod fixtures;
-pub mod geojson_properties;
+pub mod geojson;
+mod geojson_properties;
 pub mod infer;
 pub mod mapping;
 pub mod nodata;

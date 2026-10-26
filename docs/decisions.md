@@ -484,3 +484,23 @@ was chosen, why.
   property with a blank name is left out with `geojson.property.unnamed`, because
   a table cannot hold a column without a name and one odd key should not block
   the whole file.
+- Step 3.12c: `read_geojson(text, file_name)` has no column mapping; the shape of
+  the data decides the kind of dataset. The whole file is parsed into a JSON tree
+  first (memory is a small multiple of the file size, which suits the element
+  limit; streaming would only be worth it if real files prove too big). A
+  FeatureCollection, a single Feature and a bare geometry are all read. Features
+  that cannot be used are left out and counted by reason, each with its own
+  warning: not a feature, no geometry, a geometry type that cannot be imported
+  (one finding per type), and malformed coordinates. A MultiPoint with one bad
+  position is left out whole, so a feature is never half imported. Findings point
+  at features by their position in the file counting from 0 (`element`), since a
+  JSON file has no useful line per feature; anything shown to a user adds 1.
+  Positions with more than three values use the first three (info, counted). If
+  only some points have an elevation all elevations are ignored, with a warning,
+  because a missing elevation cannot be filled in honestly. Until the line and
+  polygon steps (3.13 and 3.14), those features are reported as unsupported. A
+  file with no coordinate system gets EPSG:4326 as RFC 7946 says, with an info
+  finding; validation then catches projected coordinates that are not valid
+  longitudes and latitudes. Truncated or malformed JSON is `geojson.json.invalid`
+  with serde_json's line; very deep nesting hits its recursion limit and gives the
+  same error rather than a crash.

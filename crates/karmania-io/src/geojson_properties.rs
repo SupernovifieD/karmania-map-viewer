@@ -24,11 +24,11 @@ use crate::infer::is_category;
 
 /// The properties of one feature, and where the feature is in the file.
 #[derive(Debug, Clone, Copy)]
-pub struct Properties<'a> {
+pub(crate) struct Properties<'a> {
     /// The position of the feature in the file, counting from 0.
-    pub index: u64,
+    pub(crate) index: u64,
     /// The `properties` member, if the feature has an object there.
-    pub values: Option<&'a Map<String, Value>>,
+    pub(crate) values: Option<&'a Map<String, Value>>,
 }
 
 /// What a JSON value is, for deciding a column's type.
@@ -79,7 +79,7 @@ enum Shape {
 /// in `features` of the feature that row `r` belongs to (a feature with several
 /// parts has several rows). Columns come in alphabetical order of property name.
 /// Properties with a blank name are left out, with a warning.
-pub fn property_columns(
+pub(crate) fn property_columns(
     features: &[Properties<'_>],
     rows: &[usize],
     findings: &mut Findings,
