@@ -22,7 +22,7 @@ brief says to stop.
   an empty library with one passing test.
 - [x] 0.4 `rustfmt.toml` and clippy settings; workspace lints; forbid
   `unsafe_code` in core.
-- [ ] 0.5 pnpm workspace root, `.nvmrc`, base tsconfig (strict options from
+- [x] 0.5 pnpm workspace root, `.nvmrc`, base tsconfig (strict options from
   section 6).
 - [ ] 0.6 ESLint (typescript-eslint, strict) and Prettier configs, with root
   lint and format scripts.
