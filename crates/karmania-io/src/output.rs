@@ -13,6 +13,15 @@ pub struct ReadOutput {
     pub findings: Findings,
 }
 
+/// Words as a list for a message: "a", "a and b", "a, b and c".
+pub(crate) fn join_and(words: &[&str]) -> String {
+    match words {
+        [] => String::new(),
+        [only] => (*only).to_string(),
+        [init @ .., last] => format!("{} and {last}", init.join(", ")),
+    }
+}
+
 /// One finding being counted as rows go by.
 pub(crate) struct Tally(Finding);
 
@@ -40,6 +49,14 @@ impl Tally {
 mod tests {
     use super::*;
     use karmania_core::{FindingCode, MAX_EXAMPLES};
+
+    #[test]
+    fn words_are_joined_with_commas_and_a_final_and() {
+        assert_eq!(join_and(&[]), "");
+        assert_eq!(join_and(&["a"]), "a");
+        assert_eq!(join_and(&["a", "b"]), "a and b");
+        assert_eq!(join_and(&["a", "b", "c"]), "a, b and c");
+    }
 
     #[test]
     fn a_tally_counts_everything_and_keeps_a_limited_number_of_examples() {

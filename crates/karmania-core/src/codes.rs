@@ -118,6 +118,10 @@ finding_codes! {
     GeojsonPropertyAsText => "geojson.property.as_text", Warning, Some(WizardStep::Mapping);
     /// Some GeoJSON features have a property with no name.
     GeojsonPropertyUnnamed => "geojson.property.unnamed", Warning, Some(WizardStep::Mapping);
+    /// The header of an ASCII grid has a line or a number that cannot be used.
+    AscHeaderInvalid => "asc.header.invalid", Error, Some(WizardStep::File);
+    /// The header of an ASCII grid lacks something that is needed.
+    AscHeaderMissing => "asc.header.missing", Error, Some(WizardStep::File);
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.

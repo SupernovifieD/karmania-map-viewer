@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod asc;
 pub mod csv_blocks;
 pub mod csv_import;
 pub mod delimited;
