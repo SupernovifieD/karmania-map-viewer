@@ -15,6 +15,8 @@ mod sparse_blocks;
 mod structure;
 #[cfg(test)]
 mod testutil;
+#[cfg(test)]
+mod timing;
 mod values;
 
 use serde::Serialize;

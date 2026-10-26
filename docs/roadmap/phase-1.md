@@ -125,7 +125,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   out-of-range results give a warning.
 - [x] 2.21 Report snapshot tests: one full report per kind, fixed and
   deterministic.
-- [ ] 2.22 Ignored-by-default timing test: validate 1M points; record the result
+- [x] 2.22 Ignored-by-default timing test: validate 1M points; record the result
   in `docs/perf.md`.
 
 ## M3: Readers (karmania-io)
