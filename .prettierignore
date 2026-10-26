@@ -1,0 +1,16 @@
+# Generated or vendored
+node_modules/
+dist/
+target/
+pkg/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+
+# Hand-written sample files must stay byte-exact
+fixtures/
+
+# Markdown is written by hand and not reflowed
+*.md
+
+.claude/
