@@ -429,3 +429,16 @@ was chosen, why.
   area `csv` is in `docs/conventions.md`. For now a mapping whose kind is not
   points gets an error; steps 3.9 to 3.11 add lines and blocks and remove that
   guard.
+- Step 3.9: for lines, rows are grouped by the line-identifier column (trimmed
+  text): lines come in order of first appearance and vertices keep file order
+  within a line. If a line's rows are interrupted by another line's, they are
+  gathered (vertices and their attributes reordered together) and one info finding,
+  `csv.lines.scattered`, counts the lines affected with the line where each first
+  reappears. A row with no identifier is left out with the warning
+  `csv.line_id.missing` (a stray blank-ID row should not block the import); it is
+  not also counted as a missing coordinate. The dataset's own attribute table has
+  one row per line holding the identifiers, in a column named after the
+  line-identifier column (or its rename); every attribute column of the file
+  becomes a per-vertex attribute, since the file gives no way to know which values
+  are constant along a line. With no attribute columns there is no vertex table.
+  Lines with fewer than two vertices are left to validation (`lines.line.too_short`).

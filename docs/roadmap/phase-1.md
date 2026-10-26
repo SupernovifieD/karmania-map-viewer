@@ -159,7 +159,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   - [x] 3.7b Mapping validation.
 - [x] 3.8 CSV -> points: full parse with mapping; bad numbers become null with a
   warning; empty-coordinate policy (error or skip with a warning count).
-- [ ] 3.9 CSV -> lines: group by line ID in order of first appearance; vertices
+- [x] 3.9 CSV -> lines: group by line ID in order of first appearance; vertices
   in row order; info finding if IDs are not contiguous.
 - [ ] 3.10 CSV -> blocks, part 1: centroid columns plus block size give the
   lattice origin and dims (rotation 0).
