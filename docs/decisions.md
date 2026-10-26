@@ -709,3 +709,15 @@ was chosen, why.
   where the file's own CRS came from, with no name, kind or units shown; the
   dataset summary (9.3) shows the code, or Local with its units. When definitions
   are added later, those are the places to extend.
+- Step 4.1: `karmania-wasm` is built with `wasm-pack build --target web` (a module
+  that a module Web Worker can load), as the brief says. `wasm-pack` 0.15.0 was
+  already installed in `~/.cargo/bin`; it is still being released, which settled the
+  question of whether the tool is maintained (the `rustwasm` GitHub organization was
+  wound down in 2025, but `wasm-pack` and `wasm-bindgen` continue). On first use it
+  downloads a matching `wasm-bindgen` command-line tool and `wasm-opt`, so a first
+  build needs network access; this is recorded with the tools in
+  `docs/dependencies.md`. The crate is both a `cdylib` (the module) and an `rlib` (so
+  unit tests run natively). `unsafe_code` is not forbidden here, unlike in the core
+  and io crates, because the generated bindings contain `unsafe`; the crate's own code
+  writes none. The build output `pkg/` stays out of git. Loaded in Node with
+  `initSync`, the built module returns its version; the empty module is 13.7 KB.

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Builds the WebAssembly kernel into crates/karmania-wasm/pkg (not committed).
+#
+# Needs wasm-pack (cargo install wasm-pack) and the wasm32-unknown-unknown target,
+# which rust-toolchain.toml installs. Pass --dev for a faster, unoptimised build.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+profile="--release"
+if [[ "${1:-}" == "--dev" ]]; then
+  profile="--dev"
+fi
+
+if ! command -v wasm-pack >/dev/null 2>&1; then
+  echo "wasm-pack is not installed. Install it with: cargo install wasm-pack" >&2
+  exit 1
+fi
+
+cd "$root"
+# --target web gives an ES module that a module Web Worker can load.
+wasm-pack build crates/karmania-wasm --target web "$profile" --out-dir pkg --out-name karmania_wasm

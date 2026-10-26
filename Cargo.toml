@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/karmania-core", "crates/karmania-io"]
+members = ["crates/karmania-core", "crates/karmania-io", "crates/karmania-wasm"]
 
 [workspace.package]
 version = "0.0.0"
@@ -14,7 +14,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 libm = "0.2.16"
 csv = "1.4.0"
-# Default features off: "aeqd" compiles a C file, which a pure-Rust wasm32 build must avoid.
+wasm-bindgen = "0.2.129"
 
 # `unsafe_code` is forbidden per crate (`#![forbid(unsafe_code)]` in karmania-core
 # and karmania-io), not here, because wasm-bindgen generates unsafe code.

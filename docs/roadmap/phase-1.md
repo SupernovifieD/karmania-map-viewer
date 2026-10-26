@@ -223,7 +223,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 ## M4: WebAssembly bridge (karmania-wasm)
 
-- [ ] 4.1 Crate with wasm-bindgen and an exported `version()`; scripts/
+- [x] 4.1 Crate with wasm-bindgen and an exported `version()`; scripts/
   build-wasm script; output gitignored; root `pnpm build:wasm`.
 - [ ] 4.2 Serialize findings, report and preview to JS with serde-wasm-bindgen;
   matching TS types in `packages/engine`.
