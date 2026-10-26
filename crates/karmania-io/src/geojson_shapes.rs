@@ -6,7 +6,7 @@
 
 use karmania_core::{
     Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry,
-    Lines, Location, Positions, Provenance, Table, check_size,
+    Lines, Location, Polygons, Positions, Provenance, Table, check_size,
 };
 use serde_json::Value;
 
@@ -28,6 +28,7 @@ pub(crate) const GEOMETRY_TYPES: [&str; 7] = [
 ];
 
 /// One position of a geometry.
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) struct Position {
     x: f64,
     y: f64,
@@ -57,11 +58,19 @@ fn line(value: &Value) -> Option<Vec<Position>> {
     value.as_array()?.iter().map(position).collect()
 }
 
+/// The rings of one polygon: the exterior ring first, then any holes.
+fn polygon(value: &Value) -> Option<Vec<Vec<Position>>> {
+    value.as_array()?.iter().map(line).collect()
+}
+
 /// What a geometry turned out to be.
 pub(crate) enum Parsed {
     Points(Vec<Position>),
     /// One line for a LineString, one per part for a MultiLineString.
     Lines(Vec<Vec<Position>>),
+    /// One polygon for a Polygon, one per part for a MultiPolygon. Each polygon is
+    /// a list of rings.
+    Polygons(Vec<Vec<Vec<Position>>>),
     /// A valid GeoJSON type this reader does not import.
     Unsupported(&'static str),
     Invalid,
@@ -87,6 +96,13 @@ pub(crate) fn parse_geometry(geometry: &Value) -> Parsed {
             .and_then(Value::as_array)
             .and_then(|parts| parts.iter().map(line).collect::<Option<Vec<_>>>())
             .map_or(Parsed::Invalid, Parsed::Lines),
+        "Polygon" => coordinates
+            .and_then(polygon)
+            .map_or(Parsed::Invalid, |p| Parsed::Polygons(vec![p])),
+        "MultiPolygon" => coordinates
+            .and_then(Value::as_array)
+            .and_then(|parts| parts.iter().map(polygon).collect::<Option<Vec<_>>>())
+            .map_or(Parsed::Invalid, Parsed::Polygons),
         other => GEOMETRY_TYPES
             .iter()
             .find(|known| **known == other)
@@ -320,6 +336,95 @@ impl<'a> LinesAcc<'a> {
             file_name,
             "lines",
             Geometry::Lines(lines),
+            attributes,
+        ))
+    }
+}
+
+/// The polygons of a file, with the features they came from.
+pub(crate) struct PolygonsAcc<'a> {
+    coords: Coords,
+    /// Where each ring starts in the vertex list, plus the end.
+    ring_offsets: Vec<u32>,
+    /// Where each polygon starts in the ring list, plus the end.
+    polygon_offsets: Vec<u32>,
+    /// For each polygon, the position in `features` of the feature it belongs to.
+    rows: Vec<usize>,
+    features: Vec<Properties<'a>>,
+    not_closed: Tally,
+}
+
+impl<'a> PolygonsAcc<'a> {
+    pub(crate) fn new() -> Self {
+        Self {
+            coords: Coords::new(),
+            ring_offsets: vec![0],
+            polygon_offsets: vec![0],
+            rows: Vec::new(),
+            features: Vec::new(),
+            not_closed: Tally::new(
+                Finding::new(
+                    FindingCode::GeojsonRingNotClosed,
+                    "Some polygon rings do not end where they start; they were closed.",
+                )
+                .with_hint("In GeoJSON the last position of a ring repeats the first."),
+            ),
+        }
+    }
+
+    /// Adds the polygons of a feature. A ring is stored without its closing
+    /// position, which is dropped only when it repeats the first one exactly.
+    pub(crate) fn add(&mut self, feature: Properties<'a>, polygons: &[Vec<Vec<Position>>]) {
+        let polygons: Vec<_> = polygons.iter().filter(|rings| !rings.is_empty()).collect();
+        if polygons.is_empty() {
+            return;
+        }
+        let at = Location::default().with_element(feature.index);
+        let slot = self.features.len();
+        self.features.push(feature);
+        for rings in polygons {
+            for ring in rings {
+                let kept = match (ring.first(), ring.last()) {
+                    (Some(first), Some(last)) if ring.len() > 1 && first == last => ring.len() - 1,
+                    (Some(_), _) => {
+                        self.not_closed.hit(at.clone());
+                        ring.len()
+                    }
+                    _ => 0,
+                };
+                for p in ring.iter().take(kept) {
+                    self.coords.push(p, &at);
+                }
+                self.ring_offsets
+                    .push(u32::try_from(self.coords.len()).unwrap_or(u32::MAX));
+            }
+            self.polygon_offsets
+                .push(u32::try_from(self.ring_offsets.len() - 1).unwrap_or(u32::MAX));
+            self.rows.push(slot);
+        }
+    }
+
+    pub(crate) fn finish(
+        self,
+        file_name: Option<&str>,
+        findings: &mut Findings,
+    ) -> Option<Dataset> {
+        let positions = self.coords.finish("vertices", findings)?;
+        if let Some(finding) = self.not_closed.into_finding() {
+            findings.add(finding);
+        }
+        let mut columns = property_columns(&self.features, &self.rows, findings);
+        columns.insert(0, feature_id_column(&self.features, &self.rows, &columns));
+        let attributes = Table::from_columns(columns, findings)?;
+        let polygons = Polygons {
+            positions,
+            ring_offsets: self.ring_offsets,
+            polygon_offsets: self.polygon_offsets,
+        };
+        Some(dataset(
+            file_name,
+            "polygons",
+            Geometry::Polygons(polygons),
             attributes,
         ))
     }

@@ -102,6 +102,8 @@ finding_codes! {
     GeojsonGeometryUnsupported => "geojson.geometry.unsupported", Warning, Some(WizardStep::File);
     /// Features have a geometry that could not be read.
     GeojsonGeometryInvalid => "geojson.geometry.invalid", Warning, Some(WizardStep::File);
+    /// Polygon rings do not end where they start and were closed.
+    GeojsonRingNotClosed => "geojson.ring.not_closed", Warning, Some(WizardStep::File);
     /// Only some positions have an elevation, so the elevations were ignored.
     GeojsonZPartial => "geojson.z.partial", Warning, Some(WizardStep::File);
     /// Positions have more than three values and the extra ones were ignored.

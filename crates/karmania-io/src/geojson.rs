@@ -25,7 +25,9 @@ use serde_json::error::Category;
 use serde_json::{Map, Value};
 
 use crate::geojson_properties::Properties;
-use crate::geojson_shapes::{GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, parse_geometry};
+use crate::geojson_shapes::{
+    GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, PolygonsAcc, parse_geometry,
+};
 use crate::output::{ReadOutput, Tally};
 
 /// One feature (or a bare geometry): where it is in the file, its geometry and
@@ -138,6 +140,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
     };
     let mut points = PointsAcc::new();
     let mut lines = LinesAcc::new();
+    let mut polygons = PolygonsAcc::new();
     for item in &items {
         let Some(geometry) = item.geometry.filter(|g| !g.is_null()) else {
             skips.no_geometry.hit(item.at());
@@ -146,6 +149,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
         match parse_geometry(geometry) {
             Parsed::Points(positions) => points.add(item.properties(), &positions),
             Parsed::Lines(parts) => lines.add(item.properties(), &parts),
+            Parsed::Polygons(parts) => polygons.add(item.properties(), &parts),
             Parsed::Unsupported(kind) => skips.unsupported(kind, item.at()),
             Parsed::Invalid => skips.invalid_geometry.hit(item.at()),
         }
@@ -155,6 +159,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
     let mut datasets: Vec<Dataset> = [
         points.finish(file_name, findings),
         lines.finish(file_name, findings),
+        polygons.finish(file_name, findings),
     ]
     .into_iter()
     .flatten()
@@ -326,22 +331,11 @@ mod tests {
     }
 
     #[test]
-    fn the_points_and_lines_of_the_mixed_sample_are_imported_and_the_polygon_is_reported() {
+    fn the_mixed_sample_gives_points_lines_and_polygons() {
         let out = read_geojson(&fixtures::text("mixed.geojson"), Some("mixed.geojson"));
-        // The lease is not imported yet; one well has no elevation.
-        assert_eq!(
-            codes(&out),
-            [
-                "geojson.geometry.unsupported",
-                "geojson.z.partial",
-                "geojson.crs.assumed"
-            ]
-        );
-        assert_eq!(
-            out.findings.as_slice()[0].message,
-            "Features of type Polygon cannot be imported, so they were left out."
-        );
-        assert_eq!(out.datasets.len(), 2);
+        // One well has no elevation.
+        assert_eq!(codes(&out), ["geojson.z.partial", "geojson.crs.assumed"]);
+        assert_eq!(out.datasets.len(), 3);
         let d = &out.datasets[0];
         assert_eq!(
             (d.name.as_str(), d.kind(), d.has_z(), d.element_count()),
@@ -382,6 +376,13 @@ mod tests {
             ("mixed.geojson (lines)", Kind::Lines, Some(1))
         );
         assert!(karmania_core::validate(road).is_loadable());
+
+        let lease = &out.datasets[2];
+        assert_eq!(
+            (lease.name.as_str(), lease.kind(), lease.element_count()),
+            ("mixed.geojson (polygons)", Kind::Polygons, Some(1))
+        );
+        assert!(karmania_core::validate(lease).is_loadable());
     }
 
     #[test]
@@ -847,5 +848,196 @@ mod tests {
         let out = read_geojson(&text, None);
         let names: Vec<_> = out.datasets.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ["points", "lines"]);
+    }
+
+    fn polygons(d: &Dataset) -> &karmania_core::Polygons {
+        let Geometry::Polygons(p) = &d.geometry else {
+            panic!("not polygons")
+        };
+        p
+    }
+
+    fn polygon_feature(
+        kind: &str,
+        coordinates: serde_json::Value,
+        properties: serde_json::Value,
+    ) -> serde_json::Value {
+        json!({
+            "type": "Feature",
+            "properties": properties,
+            "geometry": {"type": kind, "coordinates": coordinates}
+        })
+    }
+
+    const SQUARE: [[i32; 2]; 5] = [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]];
+    const HOLE: [[i32; 2]; 5] = [[1, 1], [1, 3], [3, 3], [3, 1], [1, 1]];
+
+    #[test]
+    fn the_lease_of_the_sample_is_one_polygon_with_a_hole_and_no_closing_vertices() {
+        let out = read_geojson(&fixtures::text("mixed.geojson"), None);
+        let lease = &out.datasets[2];
+        let p = polygons(lease);
+        assert_eq!(p.ring_offsets, [0, 4, 8]);
+        assert_eq!(p.polygon_offsets, [0, 2]);
+        assert_eq!(p.positions.len(), 8);
+        // The exterior ring starts and ends at different places once the closing
+        // position is gone.
+        assert_eq!(p.positions.get(0), Some([55.30, 25.20, 0.0]));
+        assert_eq!(p.positions.get(3), Some([55.30, 25.30, 0.0]));
+        let names: Vec<_> = lease
+            .attributes
+            .columns()
+            .iter()
+            .map(Column::name)
+            .collect();
+        assert_eq!(names, ["feature_id", "area_ha", "name"]);
+        assert_eq!(
+            lease.attributes.column("feature_id").unwrap().get(0),
+            Some(Cell::Int64(4))
+        );
+    }
+
+    #[test]
+    fn a_multipolygon_gives_a_polygon_per_part_sharing_the_features_values() {
+        let out = read(&collection(vec![
+            polygon_feature(
+                "MultiPolygon",
+                json!([[SQUARE, HOLE], [[[10, 10], [12, 10], [12, 12], [10, 10]]]]),
+                json!({"name": "Two parts"}),
+            ),
+            polygon_feature("Polygon", json!([SQUARE]), json!({"name": "One"})),
+        ]));
+        assert_eq!(codes(&out), ["geojson.crs.assumed"]);
+        let d = only(&out);
+        assert_eq!(d.element_count(), Some(3));
+        let p = polygons(d);
+        assert_eq!(p.ring_offsets, [0, 4, 8, 11, 15]);
+        assert_eq!(p.polygon_offsets, [0, 2, 3, 4]);
+        let ids = d.attributes.column("feature_id").unwrap();
+        let name = d.attributes.column("name").unwrap();
+        let rows: Vec<_> = (0..3).map(|i| (ids.get(i), name.get(i))).collect();
+        assert_eq!(
+            rows,
+            [
+                (Some(Cell::Int64(1)), Some(Cell::Utf8("Two parts"))),
+                (Some(Cell::Int64(1)), Some(Cell::Utf8("Two parts"))),
+                (Some(Cell::Int64(2)), Some(Cell::Utf8("One")))
+            ]
+        );
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn a_ring_that_is_not_closed_is_kept_whole_and_counted() {
+        let out = read(&collection(vec![
+            polygon_feature(
+                "Polygon",
+                json!([[[0, 0], [4, 0], [4, 4], [0, 4]]]),
+                json!({}),
+            ),
+            polygon_feature(
+                "Polygon",
+                json!([SQUARE, [[1, 1], [2, 1], [2, 2]]]),
+                json!({}),
+            ),
+        ]));
+        assert_eq!(
+            codes(&out),
+            ["geojson.ring.not_closed", "geojson.crs.assumed"]
+        );
+        let f = &out.findings.as_slice()[0];
+        let at: Vec<_> = f.examples.iter().map(|l| l.element).collect();
+        assert_eq!((f.count, at), (2, vec![Some(0), Some(1)]));
+        let p = polygons(only(&out));
+        // 4 + 4 + 3 vertices: the closed square lost its last position, the others kept theirs.
+        assert_eq!(p.ring_offsets, [0, 4, 8, 11]);
+    }
+
+    #[test]
+    fn a_closing_position_must_match_the_first_in_every_value_to_be_dropped() {
+        // The last position has an elevation the first one lacks.
+        let out = read(&collection(vec![polygon_feature(
+            "Polygon",
+            json!([[[0, 0], [4, 0], [4, 4], [0, 0, 5]]]),
+            json!({}),
+        )]));
+        assert_eq!(
+            codes(&out),
+            [
+                "geojson.z.partial",
+                "geojson.ring.not_closed",
+                "geojson.crs.assumed"
+            ]
+        );
+        assert_eq!(polygons(only(&out)).positions.len(), 4);
+    }
+
+    #[test]
+    fn elevations_are_kept_when_every_position_has_one() {
+        let out = read(&collection(vec![polygon_feature(
+            "Polygon",
+            json!([[[0, 0, 1], [4, 0, 2], [4, 4, 3], [0, 0, 1]]]),
+            json!({}),
+        )]));
+        let d = only(&out);
+        assert!(d.has_z());
+        assert_eq!(polygons(d).positions.get(2), Some([4.0, 4.0, 3.0]));
+        assert_eq!(polygons(d).positions.len(), 3);
+    }
+
+    #[test]
+    fn empty_polygons_give_nothing_and_a_bad_ring_leaves_the_feature_out() {
+        assert_eq!(
+            codes(&read(&polygon_feature("Polygon", json!([]), json!({})))),
+            ["geojson.features.none"]
+        );
+        assert_eq!(
+            codes(&read(&polygon_feature(
+                "MultiPolygon",
+                json!([[], []]),
+                json!({})
+            ))),
+            ["geojson.features.none"]
+        );
+        let out = read(&collection(vec![
+            polygon_feature("Polygon", json!([SQUARE, [[1, 1], "x", [3, 3]]]), json!({})),
+            polygon_feature("MultiPolygon", json!([[SQUARE], 5]), json!({})),
+            polygon_feature("Polygon", json!([SQUARE]), json!({})),
+        ]));
+        assert_eq!(
+            codes(&out),
+            ["geojson.geometry.invalid", "geojson.crs.assumed"]
+        );
+        assert_eq!(out.findings.as_slice()[0].count, 2);
+        assert_eq!(only(&out).element_count(), Some(1));
+    }
+
+    #[test]
+    fn degenerate_rings_are_read_as_they_are_and_left_to_validation() {
+        let out = read(&collection(vec![
+            polygon_feature("Polygon", json!([[[1, 1]]]), json!({})),
+            polygon_feature("Polygon", json!([[]]), json!({})),
+            polygon_feature("Polygon", json!([[[1, 1], [1, 1]]]), json!({})),
+        ]));
+        let d = only(&out);
+        // One position kept as it is, none, and a doubled position reduced to one.
+        assert_eq!(polygons(d).ring_offsets, [0, 1, 1, 2]);
+        let report = karmania_core::validate(d);
+        assert!(!report.is_loadable());
+    }
+
+    #[test]
+    fn a_bare_polygon_is_read_and_three_kinds_make_three_names() {
+        let out = read(&json!({"type": "Polygon", "coordinates": [SQUARE]}));
+        assert_eq!(only(&out).kind(), Kind::Polygons);
+        let text = collection(vec![
+            polygon_feature("Polygon", json!([SQUARE]), json!({})),
+            point(json!([1, 2]), json!({})),
+            line_feature(json!([[0, 0], [1, 1]]), json!({})),
+        ])
+        .to_string();
+        let out = read_geojson(&text, None);
+        let names: Vec<_> = out.datasets.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["points", "lines", "polygons"]);
     }
 }
