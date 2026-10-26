@@ -26,6 +26,7 @@ import {
   type LoadResult,
   type Location,
   type NodataSuggestions,
+  type Page,
   type Preview,
   type RoleSuggestion,
   type Summary,
@@ -357,4 +358,46 @@ export function checkedImportStatus(value: unknown, path = 'status'): ImportStat
     return o as unknown as ImportStatus;
   }
   throw new ContractError(`${path}.status`, 'expected progress or done');
+}
+
+/** A page of rows, as the kernel hands it over: typed arrays of the right sizes. */
+export function checkedPage(value: unknown, path = 'page'): Page {
+  const o = checkedObject(value, path, ['start', 'count', 'columns']);
+  checkedCount(o['start'], `${path}.start`);
+  const count = checkedCount(o['count'], `${path}.count`);
+  if (count > 100_000) throw new ContractError(`${path}.count`, 'more than 100,000');
+  const names = new Set<string>();
+  checkedArray(o['columns'], `${path}.columns`).forEach((column, i) => {
+    const cpath = `${path}.columns[${String(i)}]`;
+    const c = checkedObject(column, cpath, ['name', 'values', 'nulls']);
+    const name = checkedString(c['name'], `${cpath}.name`);
+    if (names.has(name)) throw new ContractError(`${cpath}.name`, `"${name}" is used twice`);
+    names.add(name);
+    const values = c['values'];
+    const length =
+      values instanceof Float64Array || values instanceof Int32Array || values instanceof Uint8Array
+        ? values.length
+        : checkedArray(values, `${cpath}.values`).length;
+    if (!(
+      values instanceof Float64Array ||
+      values instanceof Int32Array ||
+      values instanceof Uint8Array
+    )) {
+      checkedArray(values, `${cpath}.values`).forEach((text, j) => {
+        checkedString(text, `${cpath}.values[${String(j)}]`);
+      });
+    }
+    if (length !== count)
+      throw new ContractError(
+        `${cpath}.values`,
+        `${String(length)} values for ${String(count)} rows`,
+      );
+    const nulls = c['nulls'];
+    if (!(nulls instanceof Uint8Array) || nulls.length !== count) {
+      throw new ContractError(`${cpath}.nulls`, 'expected a Uint8Array with a byte for each row');
+    }
+    if (nulls.some((byte) => byte > 1))
+      throw new ContractError(`${cpath}.nulls`, 'holds more than 0 and 1');
+  });
+  return o as unknown as Page;
 }

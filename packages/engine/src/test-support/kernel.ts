@@ -45,6 +45,9 @@ export interface TestKernelInstance {
   readonly cancelImport: (importId: number) => boolean;
   readonly datasets: () => unknown;
   readonly load: (input: unknown) => unknown;
+  readonly rows: (datasetId: number, start: number, count: number) => unknown;
+  readonly summary: (datasetId: number) => unknown;
+  readonly remove: (datasetId: number) => boolean;
   readonly free: () => void;
 }
 
@@ -58,6 +61,9 @@ export function createKernel(): TestKernelInstance {
     cancelImport: (importId) => kernel.cancelImport(importId),
     datasets: () => kernel.datasets() as unknown,
     load: (input) => kernel.load(input) as unknown,
+    rows: (datasetId, start, count) => kernel.rows(datasetId, start, count) as unknown,
+    summary: (datasetId) => kernel.summary(datasetId) as unknown,
+    remove: (datasetId) => kernel.remove(datasetId),
     free: () => {
       kernel.free();
     },

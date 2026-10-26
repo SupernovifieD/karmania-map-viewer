@@ -378,3 +378,35 @@ export interface KernelBlocks extends KernelLattice {
 /** A dataset made from arrays, as the kernel takes it. */
 export type KernelDataset =
   KernelPoints | KernelLines | KernelPolygons | KernelMesh | KernelGrid | KernelBlocks;
+
+/** The values of one column of a page. */
+export type PageValues = Float64Array | Int32Array | Uint8Array | readonly string[];
+
+/** One column of a page of rows. */
+export interface PageColumn {
+  readonly name: string;
+  /**
+   * `Float64Array` for decimals and for whole-number attributes (digits beyond 2^53 are
+   * lost), `Int32Array` for counts and indices (counting from 0), `Uint8Array` for
+   * true and false (1 and 0), and an array of strings for text and categories. A null
+   * has a placeholder here and a 1 in `nulls`.
+   */
+  readonly values: PageValues;
+  /** A byte for each row: 1 for a null, 0 otherwise. */
+  readonly nulls: Uint8Array;
+}
+
+/**
+ * A window of rows of a dataset. The columns that say what each row is come first (for
+ * points `X`, `Y` and `Z`; for lines `line #` and `vertex count`; for polygons `polygon #`,
+ * `ring count` and `vertex count`; for a mesh `triangle #`, `v1`, `v2` and `v3`; for a
+ * grid `i`, `j`, `k` if it has layers and `cell centre X` and `Y`; for blocks `i`, `j`,
+ * `k` and `centre X`, `Y` and `Z`), then the attribute columns.
+ */
+export interface Page {
+  /** The first row, counting from 0. */
+  readonly start: number;
+  /** How many rows came back: fewer than asked for at the end, and at most 100,000. */
+  readonly count: number;
+  readonly columns: readonly PageColumn[];
+}
