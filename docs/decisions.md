@@ -919,3 +919,16 @@ was chosen, why.
   designing the grid builder. It is a core check, not a builder check, so every way of
   making a grid is covered. Whole numbers and decimals both count as numbers. A flat
   grid and every other shape are not affected.
+- Step 4.9b: a grid is loaded with `kind: "grid"`, a lattice (`origin`, `spacing`,
+  `dims` and an optional `rotation` in degrees), its cell values as columns (one value
+  per cell, X fastest, then Y, then Z; a 2D grid has 1 along Z) and either `elevation`
+  (every cell at that height; 0 if neither is given) or `elevationColumn` (the name of
+  a numeric column holding the height of each cell), not both: giving both is refused
+  as misuse. The three-number fields accept a plain array or a typed array, since they
+  are tiny; `dims` must be whole numbers of 0 or more. A lattice with a zero count, a
+  cell size at or below 0, or a position or rotation that is not a number, values for
+  the wrong number of cells, and a missing or non-numeric elevation column are all
+  found by validation and block the load; a grid whose cell count does not fit in a
+  `u64` or exceeds the limit is refused by the size guard without any cell being made
+  (4,000,000,000 x 4,000,000,000 x 2 is tested). Rotation is applied about the origin,
+  and the bounding box follows it.

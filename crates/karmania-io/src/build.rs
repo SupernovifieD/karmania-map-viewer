@@ -9,8 +9,8 @@
 
 use karmania_core::text::format_count;
 use karmania_core::{
-    Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Kind,
-    Lines, Mesh, Polygons, Positions, Table, Validity,
+    Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Grid,
+    GridZ, Kind, Lattice, Lines, Mesh, Polygons, Positions, Table, Validity,
 };
 
 /// The values of one column.
@@ -281,6 +281,73 @@ pub fn build_mesh(input: MeshInput, findings: &mut Findings) -> Option<Dataset> 
     );
     dataset.vertex_attributes = vertex_attributes?;
     Some(dataset)
+}
+
+/// A regular lattice of cells, as given by code. See [`Lattice`] for the conventions.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LatticeInput {
+    /// The outer corner of cell (0, 0, 0): the lowest corner before rotation.
+    pub origin: [f64; 3],
+    /// The size of a cell along each axis; each must be above 0.
+    pub spacing: [f64; 3],
+    /// How many cells there are along each axis; each must be at least 1. A 2D grid
+    /// has 1 along Z.
+    pub dims: [u32; 3],
+    /// Degrees counter-clockwise about +Z, pivoting at the origin.
+    pub rotation: f64,
+}
+
+impl From<LatticeInput> for Lattice {
+    fn from(input: LatticeInput) -> Self {
+        Lattice {
+            origin: input.origin,
+            spacing: input.spacing,
+            dims: input.dims,
+            rotation: input.rotation,
+        }
+    }
+}
+
+/// A regular grid to load: a lattice with attribute columns that hold one value
+/// per cell, `i` fastest, then `j`, then `k`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridInput {
+    /// The dataset's name; blank means `grid`.
+    pub name: String,
+    /// The coordinate system; `None` is reported by validation.
+    pub crs: Option<CrsRef>,
+    /// The cells.
+    pub lattice: LatticeInput,
+    /// The flat elevation of the grid, used when `elevation_column` is `None`; 0 if
+    /// that is `None` too.
+    pub elevation: Option<f64>,
+    /// The name of the numeric column that holds the elevation of each cell.
+    pub elevation_column: Option<String>,
+    /// The attribute columns, one value per cell.
+    pub columns: Vec<ColumnInput>,
+}
+
+/// Makes a grid dataset. `None`, with a finding, if the columns cannot be made into a
+/// table. A lattice that cannot be used, columns that are the wrong length and an
+/// elevation column that is missing are left to validation.
+pub fn build_grid(input: GridInput, findings: &mut Findings) -> Option<Dataset> {
+    let attributes = table_from_columns(input.columns, findings)?;
+    let z = match input.elevation_column {
+        Some(name) => GridZ::FromColumn { name },
+        None => GridZ::Flat {
+            elevation: input.elevation.unwrap_or(0.0),
+        },
+    };
+    Some(Dataset::new(
+        DatasetId(0),
+        name_or_kind(input.name, Kind::Grid),
+        input.crs,
+        Geometry::Grid(Grid {
+            lattice: input.lattice.into(),
+            z,
+        }),
+        attributes,
+    ))
 }
 
 #[cfg(test)]
@@ -784,5 +851,128 @@ mod tests {
         let mut findings = Findings::new();
         assert!(build_mesh(short, &mut findings).is_none());
         assert_eq!(codes(&findings), ["dataset.coordinates.length_mismatch"]);
+    }
+
+    /// A 2 x 3 grid of 10-metre cells with a column of values.
+    fn grid() -> GridInput {
+        GridInput {
+            name: "Topography".into(),
+            crs: metres(),
+            lattice: LatticeInput {
+                origin: [100.0, 200.0, 0.0],
+                spacing: [10.0, 10.0, 1.0],
+                dims: [2, 3, 1],
+                rotation: 0.0,
+            },
+            elevation: None,
+            elevation_column: None,
+            columns: vec![column(
+                "value",
+                ColumnValues::Float(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+            )],
+        }
+    }
+
+    #[test]
+    fn a_grid_becomes_a_dataset_with_a_flat_elevation_by_default() {
+        let mut findings = Findings::new();
+        let d = build_grid(grid(), &mut findings).unwrap();
+        assert!(findings.is_empty());
+        assert_eq!(
+            (d.kind(), d.element_count(), d.has_z(), d.name.as_str()),
+            (Kind::Grid, Some(6), false, "Topography")
+        );
+        let bbox = d.bbox().unwrap();
+        assert_eq!(
+            (bbox.min, bbox.max),
+            ([100.0, 200.0, 0.0], [120.0, 230.0, 0.0])
+        );
+        assert!(karmania_core::validate(&d).is_loadable());
+        let mut flat = grid();
+        flat.elevation = Some(75.0);
+        flat.name = String::new();
+        let d = build_grid(flat, &mut Findings::new()).unwrap();
+        assert_eq!((d.bbox().unwrap().min[2], d.name.as_str()), (75.0, "grid"));
+    }
+
+    #[test]
+    fn elevations_can_come_from_a_column_and_then_the_grid_has_z() {
+        let mut input = grid();
+        input.elevation_column = Some("elev".into());
+        input.columns.push(column(
+            "elev",
+            ColumnValues::Float(vec![5.0, 6.0, 7.0, 8.0, 9.0, 10.0]),
+        ));
+        let d = build_grid(input, &mut Findings::new()).unwrap();
+        assert!(d.has_z());
+        let bbox = d.bbox().unwrap();
+        assert_eq!((bbox.min[2], bbox.max[2]), (5.0, 10.0));
+        assert!(karmania_core::validate(&d).is_loadable());
+    }
+
+    #[test]
+    fn a_lattice_that_cannot_be_used_is_left_to_validation_which_names_the_problem() {
+        type Change = fn(&mut LatticeInput);
+        let cases: [(Change, &str); 4] = [
+            (|l| l.dims = [2, 0, 1], "lattice.dims.zero"),
+            (|l| l.spacing = [10.0, -1.0, 1.0], "lattice.spacing.invalid"),
+            (|l| l.origin[0] = f64::NAN, "lattice.origin.not_finite"),
+            (
+                |l| l.rotation = f64::INFINITY,
+                "lattice.rotation.not_finite",
+            ),
+        ];
+        for (change, code) in cases {
+            let mut input = grid();
+            change(&mut input.lattice);
+            let d = build_grid(input, &mut Findings::new()).unwrap();
+            let report = karmania_core::validate(&d);
+            assert!(report.findings().any(|f| f.code.as_str() == code), "{code}");
+            assert!(!report.is_loadable(), "{code}");
+        }
+    }
+
+    #[test]
+    fn values_for_the_wrong_number_of_cells_and_a_bad_elevation_column_are_found() {
+        let mut few = grid();
+        few.columns = vec![column("value", ColumnValues::Float(vec![1.0, 2.0]))];
+        let report = karmania_core::validate(&build_grid(few, &mut Findings::new()).unwrap());
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "dataset.attributes.rows_mismatch")
+        );
+        let mut missing = grid();
+        missing.elevation_column = Some("elev".into());
+        let report = karmania_core::validate(&build_grid(missing, &mut Findings::new()).unwrap());
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "grid.elevation_column.missing")
+        );
+    }
+
+    #[test]
+    fn a_grid_too_big_to_hold_is_refused_by_validation_before_anything_is_made() {
+        let mut huge = grid();
+        huge.lattice.dims = [u32::MAX, u32::MAX, 2];
+        huge.columns = Vec::new();
+        let d = build_grid(huge, &mut Findings::new()).unwrap();
+        let report = karmania_core::validate(&d);
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "dataset.too_large")
+        );
+    }
+
+    #[test]
+    fn column_problems_make_no_grid() {
+        let mut bad = grid();
+        bad.columns
+            .push(column("value", ColumnValues::Float(vec![0.0; 6])));
+        let mut findings = Findings::new();
+        assert!(build_grid(bad, &mut findings).is_none());
+        assert_eq!(codes(&findings), ["table.column.name_duplicate"]);
     }
 }

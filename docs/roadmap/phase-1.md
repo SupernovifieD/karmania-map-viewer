@@ -252,10 +252,10 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 4.6 Builders: lines.
 - [x] 4.7 Builders: polygons.
 - [x] 4.8 Builders: mesh.
-- [ ] 4.9 Builders: grid.
+- [x] 4.9 Builders: grid.
   - [x] 4.9a Validation: a grid's elevation column must exist and hold numbers
     (found missing while designing this step).
-  - [ ] 4.9b The grid builder and its export.
+  - [x] 4.9b The grid builder and its export.
 - [ ] 4.10 Builders: blocks.
 - [ ] 4.11 Export `summary(handle)`, `rows(handle, start, count)` with
   geometry-derived columns, and `remove(handle)`. (The summary itself is built in

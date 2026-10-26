@@ -9,7 +9,8 @@
 use js_sys::{Array, BigInt64Array, Float64Array, Reflect, Symbol, Uint8Array, Uint32Array};
 use karmania_core::CrsRef;
 use karmania_io::build::{
-    ColumnInput, ColumnValues, LinesInput, MeshInput, PointsInput, PolygonsInput,
+    ColumnInput, ColumnValues, GridInput, LatticeInput, LinesInput, MeshInput, PointsInput,
+    PolygonsInput,
 };
 use wasm_bindgen::{JsCast, JsError, JsValue};
 
@@ -23,6 +24,8 @@ pub(crate) enum DatasetInput {
     Polygons(PolygonsInput),
     /// A triangle mesh.
     Mesh(MeshInput),
+    /// A regular grid.
+    Grid(GridInput),
 }
 
 /// Reads a description of a dataset.
@@ -68,6 +71,23 @@ pub(crate) fn read_dataset(value: &JsValue) -> Result<DatasetInput, JsError> {
             columns: object.columns("columns")?,
             vertex_columns: object.columns("vertexColumns")?,
         })),
+        "grid" => {
+            let elevation = object.optional_number("elevation")?;
+            let elevation_column = object.optional_string("elevationColumn")?;
+            if elevation.is_some() && elevation_column.is_some() {
+                return Err(JsError::new(
+                    "the dataset can have an `elevation` or an `elevationColumn`, not both",
+                ));
+            }
+            Ok(DatasetInput::Grid(GridInput {
+                name: object.string("name")?,
+                crs: object.crs()?,
+                lattice: object.lattice()?,
+                elevation,
+                elevation_column,
+                columns: object.columns("columns")?,
+            }))
+        }
         other => Err(JsError::new(&format!(
             "the dataset has an unknown kind: \"{other}\""
         ))),
@@ -125,6 +145,82 @@ impl<'a> Reader<'a> {
                 typed::<Float64Array>(&value, "Float64Array", &self.what, key).map(|a| a.to_vec())
             })
             .transpose()
+    }
+
+    /// A number, or none if the field is missing.
+    fn optional_number(&self, key: &str) -> Result<Option<f64>, JsError> {
+        self.field(key)?
+            .map(|value| {
+                value.as_f64().ok_or_else(|| {
+                    JsError::new(&format!("{}: `{key}` must be a number", self.what))
+                })
+            })
+            .transpose()
+    }
+
+    /// A string, or none if the field is missing.
+    fn optional_string(&self, key: &str) -> Result<Option<String>, JsError> {
+        self.field(key)?
+            .map(|value| {
+                value.as_string().ok_or_else(|| {
+                    JsError::new(&format!("{}: `{key}` must be a string", self.what))
+                })
+            })
+            .transpose()
+    }
+
+    /// Three numbers, as a `Float64Array` or a plain array.
+    fn triple(&self, key: &str) -> Result<[f64; 3], JsError> {
+        let value = self.required(key)?;
+        let numbers: Vec<f64> = if Array::is_array(&value) {
+            Array::from(&value)
+                .iter()
+                .map(|item| {
+                    item.as_f64().ok_or_else(|| {
+                        JsError::new(&format!("{}: `{key}` must hold only numbers", self.what))
+                    })
+                })
+                .collect::<Result<_, _>>()?
+        } else {
+            typed::<Float64Array>(&value, "Float64Array", &self.what, key)?.to_vec()
+        };
+        <[f64; 3]>::try_from(numbers)
+            .map_err(|_| JsError::new(&format!("{}: `{key}` must have 3 numbers", self.what)))
+    }
+
+    /// Three whole numbers of 0 or more, as a `Uint32Array` or a plain array.
+    fn dims(&self, key: &str) -> Result<[u32; 3], JsError> {
+        let value = self.required(key)?;
+        let numbers: Vec<u32> = if Array::is_array(&value) {
+            Array::from(&value)
+                .iter()
+                .map(|item| {
+                    item.as_f64()
+                        .filter(|n| n.fract() == 0.0 && (0.0..=f64::from(u32::MAX)).contains(n))
+                        .map(|n| n as u32)
+                        .ok_or_else(|| {
+                            JsError::new(&format!(
+                                "{}: `{key}` must hold only whole numbers of 0 or more",
+                                self.what
+                            ))
+                        })
+                })
+                .collect::<Result<_, _>>()?
+        } else {
+            typed::<Uint32Array>(&value, "Uint32Array", &self.what, key)?.to_vec()
+        };
+        <[u32; 3]>::try_from(numbers)
+            .map_err(|_| JsError::new(&format!("{}: `{key}` must have 3 numbers", self.what)))
+    }
+
+    /// The lattice fields: `origin`, `spacing`, `dims` and an optional `rotation`.
+    fn lattice(&self) -> Result<LatticeInput, JsError> {
+        Ok(LatticeInput {
+            origin: self.triple("origin")?,
+            spacing: self.triple("spacing")?,
+            dims: self.dims("dims")?,
+            rotation: self.optional_number("rotation")?.unwrap_or(0.0),
+        })
     }
 
     fn unsigned(&self, key: &str) -> Result<Vec<u32>, JsError> {
