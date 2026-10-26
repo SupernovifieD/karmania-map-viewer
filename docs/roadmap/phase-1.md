@@ -245,6 +245,10 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 4.4f The `Kernel` object exported to JavaScript, with the TypeScript types
     and Node tests.
 - [ ] 4.5 Export builders from typed arrays: points.
+  - [x] 4.5a The points builder and the column conversion, in `karmania-io`, and
+    loading them through the kernel.
+  - [ ] 4.5b The `ColumnSet` and `loadPoints` exported to JavaScript, with the
+    TypeScript types and Node tests.
 - [ ] 4.6 Builders: lines.
 - [ ] 4.7 Builders: polygons.
 - [ ] 4.8 Builders: mesh.

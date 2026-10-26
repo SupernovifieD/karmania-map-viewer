@@ -850,3 +850,15 @@ was chosen, why.
   the engine will use, is what guards against that, so the check was left there. The
   stage names are `parsing` and `validating`; the brief's `reading` stage, reading the
   file from disk, belongs to the engine that calls the kernel.
+- Step 4.5a: datasets made from arrays are built in `karmania-io::build` as plain
+  Rust. A column is a name, typed values and optional null flags (`true` = null, the
+  same sense as the page format in the brief); the column types are the five of the data
+  model, and whole numbers are `i64`, so nothing is lost beyond 2^53 (the bindings
+  will take a `BigInt64Array`). `build_points` makes a points dataset. A problem with
+  the arrays themselves (coordinate lists of different lengths, null flags that do not
+  match their values, a column name empty or used twice, columns of different lengths)
+  is a finding and no dataset; a problem with the data (no coordinate system, a
+  coordinate that is not a number, attribute rows that do not match the points) is
+  found by validation when the dataset is loaded, like for a file. A blank name becomes
+  the name of the kind. `Kernel::load_points` builds, validates and loads, returning
+  the same `LoadResult` as an import.
