@@ -862,3 +862,20 @@ was chosen, why.
   found by validation when the dataset is loaded, like for a file. A blank name becomes
   the name of the kind. `Kernel::load_points` builds, validates and loads, returning
   the same `LoadResult` as an import.
+- Step 4.5b: points are loaded from JavaScript with `kernel.loadPoints(name, crs, x,
+  y, z?, columns?)`, where `x`, `y` and `z` are `Float64Array`s and `crs` is a
+  coordinate system object, `null` or `undefined` (validation reports a missing one).
+  Attribute columns are built in a `ColumnSet`, an object with one method per column
+  type: `addFloat` (`Float64Array`), `addInt` (`BigInt64Array`), `addBool` (`Uint8Array`
+  of 1 and 0), `addText` (array of strings) and `addCategory` (`Uint32Array` of codes
+  plus a dictionary), each with an optional `Uint8Array` of null flags (1 = null).
+  Typed arrays cross the boundary in one copy each, not element by element; the engine
+  (step 5.8) will turn a plain array of numbers or strings into the right typed array.
+  The `ColumnSet` is used up by the load call. The result is a load result, as for an
+  import. The bindings crate is now split into `columns`, `kernel`, `preview` and
+  `convert` modules, with `lib.rs` as the index. Tests load points with a column of
+  every type (including nulls and a whole number past 2^53), without a coordinate
+  system, with coordinate lists or columns that do not fit, with non-numeric
+  coordinates, with warnings, and with a coordinate system of the wrong shape (which
+  throws, as misuse). Inverting the meaning of the null bytes in the glue makes a test
+  fail.
