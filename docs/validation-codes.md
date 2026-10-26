@@ -273,6 +273,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Start with 0, end with the number of vertices, and never go backwards.
 - Example: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices (3).
 
+## `table.column.all_null`
+
+- Severity: warning
+- Step: nodata
+- Message: The {column or per-vertex column} "{name}" has no values: every entry is empty.
+- Hint: Ignore this column, or check which values you marked as no data.
+- Example: The column "ag" has no values: every entry is empty.
+
+## `table.column.category_out_of_range`
+
+- Severity: error
+- Step: none
+- Message: Some values in the {column or per-vertex column} "{name}" refer to categories that do not exist.
+- Hint: Every category code must point at one of the listed category names.
+- Example: Some values in the column "rock" refer to categories that do not exist.
+
 ## `table.column.length_mismatch`
 
 - Severity: error
