@@ -821,3 +821,13 @@ was chosen, why.
   and the registry blocks or admits them. A run that cannot read the file ends at its
   first step with no datasets and the reason. The run is in the malformed-input suite,
   which also checks that it always finishes.
+- Step 4.4e: the state behind the engine, a `Kernel` holding the registry and the
+  imports in progress, is plain Rust in `karmania-io` rather than in the bindings
+  crate, because it contains a rule that needs testing (a finished import is forgotten
+  and its datasets go into the registry, which validates or blocks them). The
+  JavaScript object in step 4.4f is a thin wrapper around it. `start_import` takes
+  the file name, bytes and mapping and returns an import identifier (from 1, never
+  reused); `step_import(id, budget)` returns `progress` (stage and fraction) or
+  `done` with the load result, and `None` for an identifier that never existed,
+  finished or was cancelled; `cancel_import` drops the import. Imports can run side
+  by side and be stepped alternately, and two kernels share nothing (no globals).

@@ -240,7 +240,9 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 4.4c An import job made from a file's bytes: format, encoding and CSV
     layout detected the same way as in the preview.
   - [x] 4.4d The staged run: parsing, then validating, with progress for each.
-  - [ ] 4.4e The `Kernel` object exported to JavaScript, with the TypeScript types
+  - [x] 4.4e The kernel state in `karmania-io`: the registry and the imports in
+    progress, as plain Rust.
+  - [ ] 4.4f The `Kernel` object exported to JavaScript, with the TypeScript types
     and Node tests.
 - [ ] 4.5 Export builders from typed arrays: points.
 - [ ] 4.6 Builders: lines.
