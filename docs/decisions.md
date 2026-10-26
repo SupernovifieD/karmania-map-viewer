@@ -736,7 +736,7 @@ was chosen, why.
   returns data, so the dependency and the helper arrive with `preview` in step 4.3,
   as the rule is to add a dependency in the step that first needs it. When they do,
   maps must be serialized as plain objects, not JavaScript `Map`s.
-\n- Step 4.3a: the preview is assembled in `karmania-io::preview` (not in the
+- Step 4.3a: the preview is assembled in `karmania-io::preview` (not in the
   bindings crate, which holds no logic) so it is plain Rust that runs and is tested
   natively. `preview(file_name, bytes, sidecars)` returns the detected format, the
   suggested kind, the encoding, the coordinate system with its source (`prj_file`,
