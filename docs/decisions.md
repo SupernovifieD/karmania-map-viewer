@@ -981,3 +981,8 @@ was chosen, why.
   the wizard with no system and the import blocked with `crs.missing` instead of guessing.
   The suggestions were good enough to import all three CSV samples with no error, so the
   preview and the import agree. Together with the earlier Node tests this closes M4.
+- Step 4.14: an opt-in test (`KARMANIA_TIMING=1`) times the built module in Node on a
+  million-row CSV: the preview takes 143 ms (target under 1 s) and the import with
+  validation 1.7 s (target under 5 s), so both targets hold with room to spare inside
+  WebAssembly on this laptop. It is not run by default for the same reason as the Rust
+  timing tests. The final measurement in a browser is step 10.3.

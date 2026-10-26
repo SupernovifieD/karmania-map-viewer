@@ -267,6 +267,8 @@ Definitions and reprojection can be added later, with the features that need the
   core has no EPSG definitions, so there is nothing to search.
 - [x] 4.13 Node smoke test: load the built WASM and round-trip one fixture per
   format.
+- [x] 4.14 Added at the end of M4: timings of the preview and a million-row import
+  inside WebAssembly (an opt-in test), recorded in `docs/perf.md`.
 
 ## M5: Engine (packages/engine)
 

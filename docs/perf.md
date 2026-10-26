@@ -103,3 +103,40 @@ cargo test -p karmania-io --release --test timing -- --ignored --nocapture
 
 The tests are ignored in normal runs. In a release build each fails if its read
 takes 5 s or more.
+
+## A million rows inside WebAssembly (step 4.14)
+
+The brief's targets are a preview in under 1 s and an import with validation in under
+5 s for a 1,000,000-row CSV. This is the first measurement of both inside WebAssembly,
+by loading the release module in Node (V8, the same engine as Chrome) on the machine
+named at the top. The final measurement in a browser, inside a worker with the wizard,
+is step 10.3.
+
+What was read: a 45.4 MB CSV of 1,000,000 rows with X, Y, Z and five attributes,
+generated from a fixed seed; the import runs in steps of 50,000 rows.
+
+| Step | Time |
+| --- | --- |
+| Preview | 143 ms |
+| Import with validation, in 22 steps | 1,736 ms |
+| The longest single step | 535 ms |
+| Two pages of 256 rows (the start and the end) | 2 ms |
+| Building 1,000,000 points from typed arrays, with validation | 304 ms |
+
+Process memory at the end, for Node, the file and the loaded datasets together: 530 MB.
+
+So the import uses about a third of its 5 s budget and the preview about a seventh of
+its 1 s. The longest step is the validation of the million points (the check for
+duplicate points sorts them); parsing steps of 50,000 rows are much shorter. All of it
+runs in a worker in the engine, so even a half-second step does not touch the main
+thread; the brief's limit of 50 ms per main-thread task is about what the main thread
+does with the results, not the kernel.
+
+To repeat (the test runs only when asked for):
+
+```
+pnpm build:wasm
+KARMANIA_TIMING=1 pnpm --filter @karmania/engine exec vitest run kernel-timing --reporter=verbose
+```
+
+The test fails if the preview takes 1 s or more or the import 5 s or more.
