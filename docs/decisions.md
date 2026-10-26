@@ -526,3 +526,15 @@ was chosen, why.
   dropped or repaired beyond that. Empty polygons give nothing, as an empty
   MultiPoint does; rings with too few vertices are left to validation. Ring
   orientation is not changed, because the core does not enforce one.
+- Step 3.15: a file with more than one kind of shape becomes one dataset per kind,
+  named `<file> (points)`, `<file> (lines)`, `<file> (polygons)`, with the info
+  finding `geojson.kinds.mixed` naming the kinds. All datasets from one file share
+  its coordinate system. With no `crs` member the datasets are EPSG:4326 as RFC
+  7946 says, with an info finding. The legacy `crs` member is read in four forms
+  (`EPSG:n`, the `urn:ogc:def:crs:EPSG:...:n` URN, the OpenGIS URL, and
+  `{"type": "EPSG", "properties": {"code": n}}`) plus the OGC name `CRS84`, which
+  is WGS 84 longitude and latitude; an explicit CRS is honored without a finding.
+  Anything else, including `"crs": null` (which means unknown), a link, or an
+  unknown name, sets no CRS and gives the warning `geojson.crs.unrecognized`, so
+  the wizard asks for one; the data is still imported. A code is not looked up in
+  the EPSG database here: validation reports an unknown code.

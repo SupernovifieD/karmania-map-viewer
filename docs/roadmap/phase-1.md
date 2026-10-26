@@ -181,7 +181,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   - [x] 3.13b Read LineString and MultiLineString as lines.
 - [x] 3.14 GeoJSON: Polygon and MultiPolygon give polygons; drop closing
   vertices; `feature_id` column.
-- [ ] 3.15 GeoJSON: mixed geometry types give one dataset per kind (info); CRS
+- [x] 3.15 GeoJSON: mixed geometry types give one dataset per kind (info); CRS
   defaults to EPSG:4326 (RFC 7946); the legacy "crs" member is honored when it
   names an EPSG code.
 - [ ] 3.16 ESRI ASCII grid header: ncols, nrows, xllcorner or xllcenter,

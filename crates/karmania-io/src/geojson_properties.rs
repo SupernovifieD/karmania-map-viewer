@@ -174,7 +174,7 @@ fn shape_of(
 }
 
 /// "a", "a and b", "a, b and c".
-fn join_and(words: &[&str]) -> String {
+pub(crate) fn join_and(words: &[&str]) -> String {
     match words {
         [] => String::new(),
         [only] => (*only).to_string(),

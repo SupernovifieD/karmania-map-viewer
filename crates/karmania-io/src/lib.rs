@@ -16,6 +16,7 @@ pub mod delimited;
 #[cfg(test)]
 mod fixtures;
 pub mod geojson;
+mod geojson_crs;
 mod geojson_properties;
 mod geojson_shapes;
 pub mod infer;

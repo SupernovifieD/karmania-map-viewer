@@ -20,13 +20,14 @@
 
 use std::collections::BTreeMap;
 
-use karmania_core::{Dataset, Finding, FindingCode, Findings, Location};
+use karmania_core::{CrsRef, Dataset, Finding, FindingCode, Findings, Location};
 use serde_json::error::Category;
 use serde_json::{Map, Value};
 
-use crate::geojson_properties::Properties;
+use crate::geojson_crs::{FileCrs, file_crs};
+use crate::geojson_properties::{Properties, join_and};
 use crate::geojson_shapes::{
-    GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, PolygonsAcc, parse_geometry,
+    GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, PolygonsAcc, WGS84, parse_geometry,
 };
 use crate::output::{ReadOutput, Tally};
 
@@ -69,10 +70,13 @@ impl Skips {
                 )
                 .with_hint("Each item should be an object with \"type\": \"Feature\"."),
             ),
-            no_geometry: Tally::new(Finding::new(
-                FindingCode::GeojsonGeometryMissing,
-                "Some features have no geometry, so they were left out.",
-            )),
+            no_geometry: Tally::new(
+                Finding::new(
+                    FindingCode::GeojsonGeometryMissing,
+                    "Some features have no geometry, so they were left out.",
+                )
+                .with_hint("Give the features a geometry, or ignore them."),
+            ),
             unsupported: BTreeMap::new(),
             invalid_geometry: Tally::new(
                 Finding::new(
@@ -165,6 +169,15 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
     .flatten()
     .collect();
     if datasets.len() > 1 {
+        let kinds: Vec<&str> = datasets.iter().map(|d| d.kind().as_str()).collect();
+        findings.add(Finding::new(
+            FindingCode::GeojsonKindsMixed,
+            format!(
+                "The file holds {}, so it was imported as {} datasets, one for each.",
+                join_and(&kinds),
+                datasets.len()
+            ),
+        ));
         // Several datasets from one file need names that tell them apart.
         for dataset in &mut datasets {
             let kind = dataset.kind().as_str();
@@ -184,15 +197,43 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
         );
     }
     if !datasets.is_empty() {
-        findings.add(
-            Finding::new(
-                FindingCode::GeojsonCrsAssumed,
-                "The file does not say which coordinate system it uses, so longitude and latitude on WGS 84 (EPSG:4326) were assumed, as the GeoJSON standard says.",
-            )
-            .with_hint("Choose another coordinate system if the coordinates are not longitude and latitude."),
-        );
+        apply_crs(&root, &mut datasets, findings);
     }
     datasets
+}
+
+/// Gives the datasets the file's coordinate system, saying so when it was assumed
+/// or could not be read.
+fn apply_crs(root: &Value, datasets: &mut [Dataset], findings: &mut Findings) {
+    let crs = match file_crs(root) {
+        FileCrs::Missing => {
+            findings.add(
+                Finding::new(
+                    FindingCode::GeojsonCrsAssumed,
+                    "The file does not say which coordinate system it uses, so longitude and latitude on WGS 84 (EPSG:4326) were assumed, as the GeoJSON standard says.",
+                )
+                .with_hint("Choose another coordinate system if the coordinates are not longitude and latitude."),
+            );
+            Some(WGS84)
+        }
+        FileCrs::Epsg(code) => Some(CrsRef::Epsg { code }),
+        FileCrs::Unrecognized(name) => {
+            let message = match name {
+                Some(name) => format!(
+                    "The file names the coordinate system \"{name}\", which could not be recognized, so none was set."
+                ),
+                None => "The file says its coordinate system is unknown, or gives it in a form that could not be read, so none was set.".to_string(),
+            };
+            findings.add(
+                Finding::new(FindingCode::GeojsonCrsUnrecognized, message)
+                    .with_hint("Choose the coordinate system yourself."),
+            );
+            None
+        }
+    };
+    for dataset in datasets {
+        dataset.crs = crs;
+    }
 }
 
 /// Parses the text, adding an error if it is empty or not JSON.
@@ -334,7 +375,18 @@ mod tests {
     fn the_mixed_sample_gives_points_lines_and_polygons() {
         let out = read_geojson(&fixtures::text("mixed.geojson"), Some("mixed.geojson"));
         // One well has no elevation.
-        assert_eq!(codes(&out), ["geojson.z.partial", "geojson.crs.assumed"]);
+        assert_eq!(
+            codes(&out),
+            [
+                "geojson.z.partial",
+                "geojson.kinds.mixed",
+                "geojson.crs.assumed"
+            ]
+        );
+        assert_eq!(
+            out.findings.as_slice()[1].message,
+            "The file holds points, lines and polygons, so it was imported as 3 datasets, one for each."
+        );
         assert_eq!(out.datasets.len(), 3);
         let d = &out.datasets[0];
         assert_eq!(
@@ -1039,5 +1091,110 @@ mod tests {
         let out = read_geojson(&text, None);
         let names: Vec<_> = out.datasets.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ["points", "lines", "polygons"]);
+    }
+
+    fn with_crs(mut file: serde_json::Value, crs: serde_json::Value) -> serde_json::Value {
+        file["crs"] = crs;
+        file
+    }
+
+    fn named_crs(name: &str) -> serde_json::Value {
+        json!({"type": "name", "properties": {"name": name}})
+    }
+
+    #[test]
+    fn two_kinds_are_named_in_the_info_and_one_kind_is_not() {
+        let two = read(&collection(vec![
+            point(json!([1, 2]), json!({})),
+            line_feature(json!([[0, 0], [1, 1]]), json!({})),
+        ]));
+        assert_eq!(codes(&two), ["geojson.kinds.mixed", "geojson.crs.assumed"]);
+        assert_eq!(
+            two.findings.as_slice()[0].message,
+            "The file holds points and lines, so it was imported as 2 datasets, one for each."
+        );
+        let one = read(&collection(vec![
+            point(json!([1, 2]), json!({})),
+            point(json!([3, 4]), json!({})),
+        ]));
+        assert_eq!(codes(&one), ["geojson.crs.assumed"]);
+    }
+
+    #[test]
+    fn a_declared_epsg_code_is_used_for_every_dataset_without_saying_anything() {
+        let file = with_crs(
+            collection(vec![
+                point(json!([500_000, 2_765_000]), json!({})),
+                line_feature(
+                    json!([[500_000, 2_765_000], [500_100, 2_765_100]]),
+                    json!({}),
+                ),
+            ]),
+            named_crs("urn:ogc:def:crs:EPSG::32640"),
+        );
+        let out = read(&file);
+        assert_eq!(codes(&out), ["geojson.kinds.mixed"]);
+        assert_eq!(out.datasets.len(), 2);
+        for d in &out.datasets {
+            assert_eq!(d.crs, Some(CrsRef::Epsg { code: 32640 }));
+            // These are valid UTM coordinates, so validation has no range complaint.
+            assert!(
+                karmania_core::validate(d)
+                    .findings()
+                    .all(|f| f.code.as_str() != "crs.geographic.out_of_range")
+            );
+        }
+    }
+
+    #[test]
+    fn crs84_and_the_older_epsg_form_are_understood() {
+        let crs84 = with_crs(
+            point(json!([1, 2]), json!({})),
+            named_crs("urn:ogc:def:crs:OGC:1.3:CRS84"),
+        );
+        let out = read(&crs84);
+        assert_eq!(only(&out).crs, Some(CrsRef::Epsg { code: 4326 }));
+        assert!(out.findings.is_empty());
+
+        let older = with_crs(
+            point(json!([1, 2]), json!({})),
+            json!({"type": "EPSG", "properties": {"code": 3857}}),
+        );
+        assert_eq!(only(&read(&older)).crs, Some(CrsRef::Epsg { code: 3857 }));
+    }
+
+    #[test]
+    fn a_crs_that_cannot_be_read_leaves_none_set_and_says_so() {
+        let file = with_crs(
+            collection(vec![point(json!([1, 2]), json!({}))]),
+            named_crs("My mine grid"),
+        );
+        let out = read(&file);
+        assert_eq!(codes(&out), ["geojson.crs.unrecognized"]);
+        assert_eq!(
+            out.findings.as_slice()[0].message,
+            "The file names the coordinate system \"My mine grid\", which could not be recognized, so none was set."
+        );
+        assert_eq!(only(&out).crs, None);
+
+        for crs in [
+            json!(null),
+            json!({"type": "link", "properties": {"href": "x"}}),
+        ] {
+            let out = read(&with_crs(point(json!([1, 2]), json!({})), crs));
+            assert_eq!(codes(&out), ["geojson.crs.unrecognized"]);
+            assert!(
+                out.findings.as_slice()[0]
+                    .message
+                    .starts_with("The file says its coordinate system is unknown")
+            );
+            assert_eq!(only(&out).crs, None);
+        }
+    }
+
+    #[test]
+    fn no_crs_is_only_reported_when_something_was_imported() {
+        let out = read(&with_crs(collection(vec![]), named_crs("My mine grid")));
+        assert_eq!(codes(&out), ["geojson.features.none"]);
     }
 }
