@@ -40,16 +40,12 @@
       "name": "crs",
       "findings": [
         {
-          "code": "crs.projected.implausible",
-          "severity": "warning",
-          "message": "Some coordinates do not fit EPSG:32640 (WGS 84 / UTM zone 40N): they cannot be converted to valid longitudes and latitudes.",
-          "hint": "Check that you chose the right coordinate system, for example the right UTM zone and hemisphere, and that X is the easting and Y the northing.",
-          "count": 3,
-          "examples": [
-            {
-              "vertex": 5
-            }
-          ],
+          "code": "crs.missing",
+          "severity": "error",
+          "message": "The coordinate reference system is missing, so the positions have no meaning on the Earth.",
+          "hint": "Choose an EPSG code, or choose a local grid and its units.",
+          "count": 1,
+          "examples": [],
           "step": "crs"
         }
       ]

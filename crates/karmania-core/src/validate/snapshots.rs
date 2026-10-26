@@ -124,13 +124,11 @@ fn fixture(name: &str) -> Dataset {
                 2_765_000.0,
                 0.0,
             ];
-            let mut d = dataset(Geometry::Polygons(Polygons {
+            dataset(Geometry::Polygons(Polygons {
                 positions: Positions::from_interleaved(xyz, false),
                 ring_offsets: vec![0, 2, 5, 7],
                 polygon_offsets: vec![0, 2, 2, 3],
-            }));
-            d.crs = Some(CrsRef::Epsg { code: 32640 });
-            d
+            }))
         }
         "mesh" => {
             let mut d = dataset(Geometry::Mesh(Mesh {

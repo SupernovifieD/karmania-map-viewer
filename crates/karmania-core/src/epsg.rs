@@ -64,12 +64,6 @@ pub fn lookup(code: u32) -> Option<CrsInfo> {
     Some(describe(code, def.wkt))
 }
 
-/// The PROJ string for an EPSG code, used to convert coordinates.
-pub(crate) fn proj4(code: u32) -> Option<&'static str> {
-    let def = crs_definitions::from_code(u16::try_from(code).ok()?)?;
-    Some(def.proj4)
-}
-
 /// Builds the description of one definition from its WKT.
 fn describe(code: u32, wkt: &str) -> CrsInfo {
     let fallback = || CrsInfo {

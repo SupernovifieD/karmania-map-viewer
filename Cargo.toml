@@ -16,7 +16,6 @@ libm = "0.2.16"
 crs-definitions = "0.6.0"
 csv = "1.4.0"
 # Default features off: "aeqd" compiles a C file, which a pure-Rust wasm32 build must avoid.
-proj4rs = { version = "0.2.1", default-features = false }
 
 # `unsafe_code` is forbidden per crate (`#![forbid(unsafe_code)]` in karmania-core
 # and karmania-io), not here, because wasm-bindgen generates unsafe code.
