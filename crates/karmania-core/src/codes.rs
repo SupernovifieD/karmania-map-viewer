@@ -52,6 +52,8 @@ macro_rules! finding_codes {
 }
 
 finding_codes! {
+    /// The X, Y and Z coordinate lists have different lengths.
+    DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
     /// A table column has a different number of rows from the first column.

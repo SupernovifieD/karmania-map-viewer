@@ -60,7 +60,7 @@ M0; each is its own commit):
   - [x] 1.4b ColumnData, Column and Value.
 - [x] 1.5 Table: ordered columns; construction reports duplicate or empty names
   as findings.
-- [ ] 1.6 Positions newtype (interleaved xyz, has_z) with constructors from x,
+- [x] 1.6 Positions newtype (interleaved xyz, has_z) with constructors from x,
   y and optional z.
 - [ ] 1.7 Dataset struct plus `Geometry::Points`.
 - [ ] 1.8 `Geometry::Lines`.

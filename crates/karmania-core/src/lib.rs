@@ -10,6 +10,7 @@ pub mod codes;
 pub mod column;
 pub mod crs;
 pub mod findings;
+pub mod positions;
 pub mod table;
 pub mod text;
 pub mod validity;
@@ -18,6 +19,7 @@ pub use codes::FindingCode;
 pub use column::{Column, ColumnData, ColumnType, LengthMismatch, Value};
 pub use crs::{CrsRef, Units};
 pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
+pub use positions::Positions;
 pub use table::Table;
 pub use validity::Validity;
 
