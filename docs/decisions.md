@@ -198,3 +198,12 @@ was chosen, why.
   Z extent when neither is usable; a dataset without Z reports Z as 0. The
   helper `Column::finite_range` (min and max of valid, finite numbers) was added
   for this and is reusable by validation.
+- Step 1.16: `MAX_ELEMENTS` is 134,217,728 (2^27) and applies to each count on
+  its own (points, vertices, cells or blocks), not to their sum. `check_size`
+  takes an `Option<u64>` so a count that overflowed (`None`, for example from
+  `Lattice::cell_count`) is rejected too, with its own message; callers pass the
+  plural noun for the message. Its hint is the same for every shape: the
+  cell-size advice that the first draft of `docs/validation-codes.md` had is
+  dropped because it made no sense for points. The guard only reports; readers
+  and builders (milestones M3 and M4) must call it before allocating, which is
+  tracked there.
