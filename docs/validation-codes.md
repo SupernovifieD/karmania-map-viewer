@@ -304,3 +304,11 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
 - Hint: Fix or remove those rows.
 - Example: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
+
+## `values.coordinates.very_large`
+
+- Severity: warning
+- Step: none
+- Message: Some coordinates are larger than 100,000,000. The units may be wrong, for example millimetres instead of metres.
+- Hint: Check the units of the coordinates and the coordinate system you chose.
+- Example: Some coordinates are larger than 100,000,000. The units may be wrong, for example millimetres instead of metres.
