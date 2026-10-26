@@ -4,6 +4,7 @@ import { createKernel, foreignArrays } from './test-support/kernel.js';
 import type {
   CrsRef,
   KernelColumn,
+  KernelGrid,
   KernelLines,
   KernelMesh,
   KernelPoints,
@@ -73,6 +74,19 @@ function mesh(extra: Partial<KernelMesh> = {}): KernelMesh {
     y: new Float64Array([0, 0, 10, 0]),
     z: new Float64Array([0, 0, 0, 10]),
     indices: new Uint32Array([0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]),
+    ...extra,
+  };
+}
+
+function grid(extra: Partial<KernelGrid> = {}): KernelGrid {
+  return {
+    kind: 'grid',
+    name: 'Topography',
+    crs: METRES,
+    origin: [100, 200, 0],
+    spacing: [10, 10, 1],
+    dims: [2, 3, 1],
+    columns: [{ name: 'value', type: 'float', values: new Float64Array([1, 2, 3, 4, 5, 6]) }],
     ...extra,
   };
 }
@@ -315,6 +329,97 @@ describe('loading a mesh from arrays through kernel.load', () => {
     ]);
     const withoutZ = Object.fromEntries(Object.entries(mesh()).filter(([key]) => key !== 'z'));
     expect(() => createKernel().load(withoutZ)).toThrow(/needs a `z`/);
+  });
+});
+
+describe('loading a grid from arrays through kernel.load', () => {
+  it('loads a grid with a flat elevation, and its box comes from the lattice', () => {
+    const [summary] = summaries(loadResult(grid({ elevation: 75 })));
+    expect(summary).toMatchObject({
+      name: 'Topography',
+      kind: 'grid',
+      elementCount: 6,
+      hasZ: false,
+    });
+    expect(summary?.columns).toEqual([{ name: 'value', type: 'float', nullCount: 0 }]);
+    expect(summary?.bbox).toEqual({ min: [100, 200, 75], max: [120, 230, 75] });
+    expect('vertexCount' in (summary ?? {})).toBe(false);
+  });
+
+  it('takes the cell elevations from a column, which makes the grid three-dimensional', () => {
+    const elev: KernelColumn = {
+      name: 'elev',
+      type: 'float',
+      values: new Float64Array([5, 6, 7, 8, 9, 10]),
+    };
+    const [summary] = summaries(
+      loadResult(grid({ elevationColumn: 'elev', columns: [...(grid().columns ?? []), elev] })),
+    );
+    expect(summary?.hasZ).toBe(true);
+    expect(summary?.bbox?.min[2]).toBe(5);
+    expect(summary?.bbox?.max[2]).toBe(10);
+  });
+
+  it('accepts plain arrays or typed arrays for the lattice, and a rotation', () => {
+    const typed = grid({
+      origin: new Float64Array([0, 0, 0]),
+      spacing: new Float64Array([10, 10, 1]),
+      dims: new Uint32Array([2, 3, 1]),
+      rotation: 90,
+    });
+    const [summary] = summaries(loadResult(typed));
+    // Rotated a quarter turn about the origin, the 20 x 30 footprint swings to the left.
+    expect(summary?.bbox?.min[0]).toBeCloseTo(-30);
+    expect(summary?.bbox?.max[0]).toBeCloseTo(0);
+    expect(summary?.bbox?.max[1]).toBeCloseTo(20);
+  });
+
+  it('blocks a lattice that cannot be used, and values that do not fit it', () => {
+    const lattice = (extra: Partial<KernelGrid>) => blockedCodes(loadResult(grid(extra)));
+    expect(lattice({ dims: [2, 0, 1] })).toContain('lattice.dims.zero');
+    expect(lattice({ spacing: [10, -1, 1] })).toContain('lattice.spacing.invalid');
+    expect(lattice({ origin: [Number.NaN, 0, 0] })).toContain('lattice.origin.not_finite');
+    expect(lattice({ rotation: Number.POSITIVE_INFINITY })).toContain(
+      'lattice.rotation.not_finite',
+    );
+    const few: KernelColumn = { name: 'value', type: 'float', values: new Float64Array([1, 2]) };
+    expect(lattice({ columns: [few] })).toContain('dataset.attributes.rows_mismatch');
+    expect(lattice({ elevationColumn: 'elev' })).toContain('grid.elevation_column.missing');
+    const words: KernelColumn = {
+      name: 'elev',
+      type: 'text',
+      values: ['a', 'b', 'c', 'd', 'e', 'f'],
+    };
+    expect(lattice({ elevationColumn: 'elev', columns: [words] })).toContain(
+      'grid.elevation_column.not_numeric',
+    );
+  });
+
+  it('refuses a grid too big to hold, without allocating its cells', () => {
+    const result = loadResult(grid({ dims: [4_000_000_000, 4_000_000_000, 2], columns: [] }));
+    expect(blockedCodes(result)).toContain('dataset.too_large');
+  });
+
+  it('refuses a malformed lattice as misuse', () => {
+    const kernel = createKernel();
+    expect(() => kernel.load({ ...grid(), origin: [1, 2] })).toThrow(
+      /`origin` must have 3 numbers/,
+    );
+    expect(() => kernel.load({ ...grid(), origin: [1, 2, 'x'] })).toThrow(/only numbers/);
+    expect(() => kernel.load({ ...grid(), dims: [2, 1.5, 1] })).toThrow(/whole numbers/);
+    expect(() => kernel.load({ ...grid(), dims: [2, -1, 1] })).toThrow(/whole numbers/);
+    expect(() => kernel.load({ ...grid(), spacing: new Float32Array(3) })).toThrow(
+      /`spacing` must be a Float64Array/,
+    );
+    expect(() => kernel.load({ ...grid(), rotation: 'a lot' })).toThrow(
+      /`rotation` must be a number/,
+    );
+    expect(() => kernel.load({ ...grid(), elevation: 1, elevationColumn: 'elev' })).toThrow(
+      /not both/,
+    );
+    expect(() => kernel.load({ ...grid(), elevationColumn: 5 })).toThrow(
+      /`elevationColumn` must be a string/,
+    );
   });
 });
 

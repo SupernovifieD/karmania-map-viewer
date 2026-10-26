@@ -328,5 +328,36 @@ export interface KernelMesh {
   readonly vertexColumns?: readonly KernelColumn[];
 }
 
+/** Three numbers: one for each of X, Y and Z. A plain array or a `Float64Array`. */
+export type Triple = readonly [number, number, number] | Float64Array;
+
+/** The cells of a regular grid or block model. */
+export interface KernelLattice {
+  /** The lowest corner of cell (0, 0, 0), before rotation. */
+  readonly origin: Triple;
+  /** The size of a cell along each axis; each above 0. */
+  readonly spacing: Triple;
+  /** How many cells there are along each axis, at least 1; 1 along Z for a 2D grid. */
+  readonly dims: readonly [number, number, number] | Uint32Array;
+  /** Degrees counter-clockwise about +Z, pivoting at the origin. Defaults to 0. */
+  readonly rotation?: number;
+}
+
+/**
+ * A regular grid as the kernel takes it. Its cell values are columns, one value per
+ * cell with X fastest, then Y, then Z. At most one of `elevation` and `elevationColumn`.
+ */
+export interface KernelGrid extends KernelLattice {
+  readonly kind: 'grid';
+  /** Blank means `grid`. */
+  readonly name: string;
+  readonly crs: CrsRef | null;
+  /** The elevation of every cell. Defaults to 0 when there is no `elevationColumn`. */
+  readonly elevation?: number;
+  /** The name of a numeric column that holds the elevation of each cell. */
+  readonly elevationColumn?: string;
+  readonly columns?: readonly KernelColumn[];
+}
+
 /** A dataset made from arrays, as the kernel takes it. */
-export type KernelDataset = KernelPoints | KernelLines | KernelPolygons | KernelMesh;
+export type KernelDataset = KernelPoints | KernelLines | KernelPolygons | KernelMesh | KernelGrid;
