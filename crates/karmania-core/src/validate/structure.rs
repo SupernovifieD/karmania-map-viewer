@@ -4,6 +4,7 @@ use super::attribute_rows;
 use super::offset_lists::{self, OffsetCodes, OffsetsSpec};
 use super::sparse_blocks;
 use crate::codes::FindingCode;
+use crate::column::ColumnType;
 use crate::dataset::{Dataset, Geometry, Kind};
 use crate::findings::{Finding, Findings, Location};
 use crate::limits::check_size;
@@ -20,8 +21,43 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_mesh_indices(dataset, findings);
     check_mesh_triangles(dataset, findings);
     check_lattice(dataset, findings);
+    check_grid_elevation(dataset, findings);
     sparse_blocks::check(dataset, findings);
     attribute_rows::check(dataset, findings);
+}
+
+/// A grid that takes its elevations from a column needs that column, and it must
+/// hold numbers.
+fn check_grid_elevation(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Grid(grid) = &dataset.geometry else {
+        return;
+    };
+    let Some(name) = grid.z_column() else {
+        return;
+    };
+    match dataset.attributes.column(name) {
+        None => findings.add(
+            Finding::new(
+                FindingCode::GridElevationColumnMissing,
+                format!(
+                    "The grid takes its elevations from a column called \"{name}\", but the dataset has no such column."
+                ),
+            )
+            .with_hint("Add a column with that name, or give the grid a flat elevation."),
+        ),
+        Some(column) if !matches!(column.column_type(), ColumnType::Float64 | ColumnType::Int64) => {
+            findings.add(
+                Finding::new(
+                    FindingCode::GridElevationColumnNotNumeric,
+                    format!(
+                        "The grid takes its elevations from the column \"{name}\", which does not hold numbers."
+                    ),
+                )
+                .with_hint("Use a column of numbers for the elevations."),
+            );
+        }
+        Some(_) => {}
+    }
 }
 
 /// Checks a grid's or block model's lattice: whole numbers of cells, a usable
@@ -825,6 +861,63 @@ mod tests {
         assert_eq!(
             run(check, &d).as_slice()[0].message,
             "The coordinate list ends with an incomplete position: it has 4 values, which is not a multiple of 3."
+        );
+    }
+
+    #[test]
+    fn a_grid_that_takes_its_elevations_from_a_column_needs_a_numeric_one() {
+        use crate::column::{Column, ColumnData};
+        use crate::grid::GridZ;
+        use crate::table::Table;
+        let with_column = |column: Option<Column>| {
+            let mut d = grid([2, 2, 1]);
+            if let Geometry::Grid(g) = &mut d.geometry {
+                g.z = GridZ::FromColumn {
+                    name: "elev".into(),
+                };
+            }
+            if let Some(column) = column {
+                d.attributes = Table::from_columns(vec![column], &mut Findings::new()).unwrap();
+            }
+            d
+        };
+        let numbers = |values: Vec<f64>| Column::without_nulls("elev", ColumnData::Float64(values));
+        assert!(
+            !run(check, &with_column(Some(numbers(vec![1.0; 4]))))
+                .iter()
+                .any(|f| f.code.as_str().starts_with("grid."))
+        );
+        let ints = Column::without_nulls("elev", ColumnData::Int64(vec![1, 2, 3, 4]));
+        assert!(
+            !run(check, &with_column(Some(ints)))
+                .iter()
+                .any(|f| f.code.as_str().starts_with("grid."))
+        );
+        let missing = run(check, &with_column(None));
+        let found: Vec<_> = missing.iter().map(|f| f.code.as_str()).collect();
+        assert!(found.contains(&"grid.elevation_column.missing"));
+        assert!(
+            missing
+                .iter()
+                .find(|f| f.code.as_str() == "grid.elevation_column.missing")
+                .unwrap()
+                .message
+                .contains("called \"elev\"")
+        );
+        let words = Column::without_nulls(
+            "elev",
+            ColumnData::Utf8(vec!["a".into(), "b".into(), "c".into(), "d".into()]),
+        );
+        let text = run(check, &with_column(Some(words)));
+        assert!(
+            text.iter()
+                .any(|f| f.code.as_str() == "grid.elevation_column.not_numeric")
+        );
+        // A flat grid is not affected, and neither is any other shape.
+        assert!(
+            !run(check, &grid([2, 2, 1]))
+                .iter()
+                .any(|f| f.code.as_str().starts_with("grid."))
         );
     }
 }

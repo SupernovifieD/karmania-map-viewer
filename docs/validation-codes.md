@@ -377,6 +377,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Give every position an elevation, or none.
 - Example: Some positions have no elevation, so the elevations of the others were ignored.
 
+## `grid.elevation_column.missing`
+
+- Severity: error
+- Step: none
+- Message: The grid takes its elevations from a column called "{name}", but the dataset has no such column.
+- Hint: Add a column with that name, or give the grid a flat elevation.
+- Example: The grid takes its elevations from a column called "elev", but the dataset has no such column.
+
+## `grid.elevation_column.not_numeric`
+
+- Severity: error
+- Step: none
+- Message: The grid takes its elevations from the column "{name}", which does not hold numbers.
+- Hint: Use a column of numbers for the elevations.
+- Example: The grid takes its elevations from the column "elev", which does not hold numbers.
+
 ## `lattice.dims.zero`
 
 - Severity: error
