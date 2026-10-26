@@ -29,7 +29,7 @@ brief says to stop.
 - [x] 0.7 `packages/engine` skeleton with Vitest and one passing test.
 - [x] 0.8 `docs/conventions.md` (naming, commit rules, finding code style) and
   empty `docs/decisions.md` and `docs/dependencies.md`.
-- [ ] 0.9 CI workflow (GitHub Actions, or the platform the remote uses) for
+- [x] 0.9 CI workflow (GitHub Actions, or the platform the remote uses) for
   Rust fmt, clippy and test, and TS lint, typecheck and test. Done when: CI is
   green on the pushed commit.
 - [ ] 0.10 Root `pnpm check` script as defined in section 5.

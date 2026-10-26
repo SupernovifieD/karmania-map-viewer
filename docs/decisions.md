@@ -65,3 +65,14 @@ was chosen, why.
   owner. It also fixes the finding-code style (`<area>.<subject>[.<problem>]`,
   lowercase ASCII, stable once released), which the brief only described as
   "stable, dotted lowercase".
+- Step 0.9: the CI workflow was pushed with step 0.9 unticked and ticked in a
+  follow-up commit, because the done condition (CI green on the pushed commit)
+  can only be proven after the push. Run 40273487943 on `d3c6823` passed both
+  jobs.
+- Step 0.9: CI uses third-party actions only from `actions/*` and `pnpm/*`, all
+  pinned to commit SHAs. It runs on `ubuntu-latest`, which resolved to
+  ubuntu-24.04; GitHub is migrating the label to Ubuntu 26. Revisit pinning the
+  image when screenshot baselines (step 7.9) make the OS matter.
+- Step 0.9: CI also runs `pnpm format:check`, which the brief's `pnpm check`
+  (step 0.10) does not list. Left for the owner to decide whether `pnpm check`
+  should include it so local and CI runs match.
