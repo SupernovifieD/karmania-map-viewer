@@ -235,3 +235,59 @@ export interface ImportMapping {
   /** The coordinate system, or `null` if none has been chosen. */
   readonly crs: CrsRef | null;
 }
+
+/** The part of every attribute column the kernel takes. `nulls` has a byte for each value: 1 for a null. */
+interface KernelColumnBase {
+  readonly name: string;
+  readonly nulls?: Uint8Array;
+}
+
+/**
+ * An attribute column as the kernel takes it, with its values in a typed array so
+ * that they cross into WebAssembly in one copy. Every column has one value for each
+ * element of the dataset (each point, line, ...).
+ */
+export type KernelColumn =
+  | (KernelColumnBase & { readonly type: 'float'; readonly values: Float64Array })
+  | (KernelColumnBase & { readonly type: 'int'; readonly values: BigInt64Array })
+  | (KernelColumnBase & { readonly type: 'bool'; readonly values: Uint8Array })
+  | (KernelColumnBase & { readonly type: 'text'; readonly values: readonly string[] })
+  | (KernelColumnBase & {
+      readonly type: 'category';
+      readonly codes: Uint32Array;
+      readonly dictionary: readonly string[];
+    });
+
+/** Points as the kernel takes them. */
+export interface KernelPoints {
+  readonly kind: 'points';
+  /** Blank means `points`. */
+  readonly name: string;
+  /** `null` is reported by validation. */
+  readonly crs: CrsRef | null;
+  readonly x: Float64Array;
+  readonly y: Float64Array;
+  readonly z?: Float64Array;
+  readonly columns?: readonly KernelColumn[];
+}
+
+/** Lines as the kernel takes them. */
+export interface KernelLines {
+  readonly kind: 'lines';
+  /** Blank means `lines`. */
+  readonly name: string;
+  readonly crs: CrsRef | null;
+  /** Every vertex of every line, in line order. */
+  readonly x: Float64Array;
+  readonly y: Float64Array;
+  readonly z?: Float64Array;
+  /** Where each line starts in the vertex list, plus the end: one more than there are lines. */
+  readonly offsets: Uint32Array;
+  /** One value per line. */
+  readonly columns?: readonly KernelColumn[];
+  /** One value per vertex. */
+  readonly vertexColumns?: readonly KernelColumn[];
+}
+
+/** A dataset made from arrays, as the kernel takes it. */
+export type KernelDataset = KernelPoints | KernelLines;
