@@ -307,3 +307,11 @@ was chosen, why.
   the info finding `crs.projected.unchecked` instead of being skipped silently.
   Results come from proj4rs's use of the platform math library, so a coordinate
   within a hair of a limit could in principle differ between platforms.
+- Step 2.21: snapshot tests compare a pretty-printed JSON report with a committed
+  file in `crates/karmania-core/src/validate/snapshots/`; there is no snapshot
+  library on the approved list, so a 15-line helper does it, and
+  `KARMANIA_UPDATE_SNAPSHOTS=1` rewrites the files. Regenerated files must be read
+  before committing (the first set was checked against what each fixture was
+  built to trip). The fixtures are built so the reports contain no floating point
+  numbers and no platform-dependent values. `crates/` is excluded from Prettier,
+  since rustfmt formats the Rust and the snapshots are generated.

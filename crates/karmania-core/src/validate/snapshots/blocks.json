@@ -1,0 +1,67 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": [
+        {
+          "code": "blocks.ijk.incomplete",
+          "severity": "error",
+          "message": "The list of block positions ends with an incomplete triplet: it has 14 numbers, which is not a multiple of 3.",
+          "hint": "Give three numbers (i, j, k) for every block.",
+          "count": 1,
+          "examples": []
+        },
+        {
+          "code": "blocks.ijk.out_of_range",
+          "severity": "error",
+          "message": "Some blocks are outside the model, which has 2 x 2 x 2 cells.",
+          "hint": "Block positions start at 0 and must be lower than the number of cells on each axis.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 3,
+              "cell": [
+                5,
+                5,
+                5
+              ]
+            }
+          ]
+        },
+        {
+          "code": "blocks.ijk.duplicate",
+          "severity": "error",
+          "message": "Some blocks are listed more than once.",
+          "hint": "List each block once.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 2,
+              "cell": [
+                0,
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "code": "dataset.attributes.rows_mismatch",
+          "severity": "error",
+          "message": "The attribute table has 3 rows, but the dataset has 4 blocks.",
+          "hint": "Give every one of the blocks exactly one value in each column.",
+          "count": 1,
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "findings": []
+    },
+    {
+      "name": "crs",
+      "findings": []
+    }
+  ]
+}

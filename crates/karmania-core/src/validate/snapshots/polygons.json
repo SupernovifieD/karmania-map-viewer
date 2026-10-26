@@ -1,0 +1,58 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": [
+        {
+          "code": "polygons.ring.too_short",
+          "severity": "error",
+          "message": "Some rings have fewer than 3 vertices, so they cannot enclose an area.",
+          "hint": "Remove those rings or add the missing vertices.",
+          "count": 2,
+          "examples": [
+            {
+              "element": 0
+            },
+            {
+              "element": 2
+            }
+          ]
+        },
+        {
+          "code": "polygons.polygon.no_rings",
+          "severity": "error",
+          "message": "Some polygons have no rings, so they have no outline.",
+          "hint": "Remove those polygons or give each one an outer ring.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "findings": []
+    },
+    {
+      "name": "crs",
+      "findings": [
+        {
+          "code": "crs.projected.implausible",
+          "severity": "warning",
+          "message": "Some coordinates do not fit EPSG:32640 (WGS 84 / UTM zone 40N): they cannot be converted to valid longitudes and latitudes.",
+          "hint": "Check that you chose the right coordinate system, for example the right UTM zone and hemisphere, and that X is the easting and Y the northing.",
+          "count": 3,
+          "examples": [
+            {
+              "vertex": 5
+            }
+          ],
+          "step": "crs"
+        }
+      ]
+    }
+  ]
+}

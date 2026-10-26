@@ -10,6 +10,9 @@ pnpm-lock.yaml
 # Hand-written sample files must stay byte-exact
 fixtures/
 
+# Rust sources and their generated test snapshots are formatted by rustfmt
+crates/
+
 # Markdown is written by hand and not reflowed
 *.md
 

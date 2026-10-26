@@ -1,0 +1,92 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": [
+        {
+          "code": "dataset.attributes.rows_mismatch",
+          "severity": "error",
+          "message": "The attribute table has 5 rows, but the dataset has 6 points.",
+          "hint": "Give every one of the points exactly one value in each column.",
+          "count": 1,
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "findings": [
+        {
+          "code": "values.coordinates.not_finite",
+          "severity": "error",
+          "message": "Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.",
+          "hint": "Fix or remove those rows.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 2
+            }
+          ]
+        },
+        {
+          "code": "values.coordinates.very_large",
+          "severity": "warning",
+          "message": "Some coordinates are larger than 100,000,000. The units may be wrong, for example millimetres instead of metres.",
+          "hint": "Check the units of the coordinates and the coordinate system you chose.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 4
+            }
+          ]
+        },
+        {
+          "code": "values.points.duplicate",
+          "severity": "warning",
+          "message": "Some points are repeated at exactly the same position.",
+          "hint": "Remove the repeated points if they are mistakes.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 1
+            }
+          ]
+        },
+        {
+          "code": "table.column.all_null",
+          "severity": "warning",
+          "message": "The column \"au\" has no values: every entry is empty.",
+          "hint": "Ignore this column, or check which values you marked as no data.",
+          "count": 1,
+          "examples": [
+            {
+              "column": "au"
+            }
+          ],
+          "step": "nodata"
+        }
+      ]
+    },
+    {
+      "name": "crs",
+      "findings": [
+        {
+          "code": "crs.geographic.out_of_range",
+          "severity": "error",
+          "message": "Some coordinates are not valid longitudes and latitudes: X runs from 10 to 200000000 and Y from 1 to 95, but longitude must be between -180 and 360 and latitude between -90 and 90.",
+          "hint": "Check the coordinate system. Values this large usually belong to a projected system such as UTM.",
+          "count": 2,
+          "examples": [
+            {
+              "element": 3
+            },
+            {
+              "element": 4
+            }
+          ],
+          "step": "crs"
+        }
+      ]
+    }
+  ]
+}

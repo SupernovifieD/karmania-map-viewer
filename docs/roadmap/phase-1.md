@@ -123,7 +123,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.20 CRS: projected plausibility. Inverse-project the bbox corners plus up
   to 1,000 evenly spaced sample points to longitude and latitude. Non-finite or
   out-of-range results give a warning.
-- [ ] 2.21 Report snapshot tests: one full report per kind, fixed and
+- [x] 2.21 Report snapshot tests: one full report per kind, fixed and
   deterministic.
 - [ ] 2.22 Ignored-by-default timing test: validate 1M points; record the result
   in `docs/perf.md`.
