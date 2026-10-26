@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crs::CrsRef;
 use crate::lines::Lines;
+use crate::polygons::Polygons;
 use crate::positions::Positions;
 use crate::table::Table;
 
@@ -54,6 +55,8 @@ pub enum Geometry {
     Points(Positions),
     /// Polylines, one attribute row per line.
     Lines(Lines),
+    /// Polygons with optional holes, one attribute row per polygon.
+    Polygons(Polygons),
 }
 
 impl Geometry {
@@ -63,6 +66,7 @@ impl Geometry {
         match self {
             Geometry::Points(_) => Kind::Points,
             Geometry::Lines(_) => Kind::Lines,
+            Geometry::Polygons(_) => Kind::Polygons,
         }
     }
 
@@ -73,6 +77,7 @@ impl Geometry {
         match self {
             Geometry::Points(positions) => positions.has_z(),
             Geometry::Lines(lines) => lines.positions.has_z(),
+            Geometry::Polygons(polygons) => polygons.positions.has_z(),
         }
     }
 }
@@ -209,6 +214,21 @@ mod tests {
             Table::empty(),
         );
         assert_eq!((d.kind(), d.has_z()), (Kind::Lines, true));
+    }
+
+    #[test]
+    fn a_polygons_dataset_reports_the_polygons_kind() {
+        let mut findings = Findings::new();
+        let positions =
+            Positions::from_xyz(&[0.0, 1.0, 1.0], &[0.0, 0.0, 1.0], None, &mut findings).unwrap();
+        let polygons = Polygons {
+            positions,
+            ring_offsets: vec![0, 3],
+            polygon_offsets: vec![0, 1],
+        };
+        let geometry = Geometry::Polygons(polygons);
+        let d = Dataset::new(DatasetId(2), "lots", None, geometry, Table::empty());
+        assert_eq!((d.kind(), d.has_z()), (Kind::Polygons, false));
     }
 
     #[test]

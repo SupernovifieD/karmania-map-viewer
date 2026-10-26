@@ -64,7 +64,7 @@ M0; each is its own commit):
   y and optional z.
 - [x] 1.7 Dataset struct plus `Geometry::Points`.
 - [x] 1.8 `Geometry::Lines`.
-- [ ] 1.9 `Geometry::Polygons`.
+- [x] 1.9 `Geometry::Polygons`.
 - [ ] 1.10 `Geometry::Mesh`.
 - [ ] 1.11 Lattice: fields, doc-commented conventions, index <-> ijk, cell
   centre with rotation. Tests include 30 and 90 degree rotations.
