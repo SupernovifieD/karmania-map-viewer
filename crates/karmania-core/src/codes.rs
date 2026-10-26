@@ -60,6 +60,14 @@ finding_codes! {
     DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
+    /// A grid or block model has a dimension of 0 cells.
+    LatticeDimsZero => "lattice.dims.zero", Error, None;
+    /// The origin of a grid or block model is not made of finite numbers.
+    LatticeOriginNotFinite => "lattice.origin.not_finite", Error, None;
+    /// The rotation of a grid or block model is not a finite number.
+    LatticeRotationNotFinite => "lattice.rotation.not_finite", Error, None;
+    /// The cell size of a grid or block model is not positive and finite.
+    LatticeSpacingInvalid => "lattice.spacing.invalid", Error, None;
     /// A line has fewer than two vertices.
     LinesLineTooShort => "lines.line.too_short", Warning, None;
     /// The triangle index list ends with an incomplete triangle.

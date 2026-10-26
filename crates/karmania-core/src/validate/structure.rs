@@ -2,8 +2,9 @@
 
 use super::offset_lists::{self, OffsetCodes, OffsetsSpec};
 use crate::codes::FindingCode;
-use crate::dataset::{Dataset, Geometry};
+use crate::dataset::{Dataset, Geometry, Kind};
 use crate::findings::{Finding, Findings, Location};
+use crate::limits::check_size;
 use crate::text::format_count;
 
 /// Runs the structure checks.
@@ -16,6 +17,76 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_polygon_rings(dataset, findings);
     check_mesh_indices(dataset, findings);
     check_mesh_triangles(dataset, findings);
+    check_lattice(dataset, findings);
+}
+
+/// Checks a grid's or block model's lattice: whole numbers of cells, a usable
+/// cell size, a finite position, and a size within the limit.
+fn check_lattice(dataset: &Dataset, findings: &mut Findings) {
+    let Some(lattice) = dataset.geometry.lattice() else {
+        return;
+    };
+    let what = match dataset.kind() {
+        Kind::Grid => "grid",
+        _ => "block model",
+    };
+    let [nx, ny, nz] = lattice.dims;
+    if nx == 0 || ny == 0 || nz == 0 {
+        findings.add(
+            Finding::new(
+                FindingCode::LatticeDimsZero,
+                format!(
+                    "The {what} has no cells along at least one axis ({nx} x {ny} x {nz}); every dimension must be at least 1."
+                ),
+            )
+            .with_hint("Check the number of cells along each axis."),
+        );
+    }
+    let [dx, dy, dz] = lattice.spacing;
+    if ![dx, dy, dz].iter().all(|s| s.is_finite() && *s > 0.0) {
+        findings.add(
+            Finding::new(
+                FindingCode::LatticeSpacingInvalid,
+                format!(
+                    "The cell size of the {what} must be greater than 0 on every axis, but it is {dx} x {dy} x {dz}."
+                ),
+            )
+            .with_hint("Use a positive cell size, such as 10 for 10-metre cells."),
+        );
+    }
+    let [ox, oy, oz] = lattice.origin;
+    if ![ox, oy, oz].iter().all(|v| v.is_finite()) {
+        findings.add(
+            Finding::new(
+                FindingCode::LatticeOriginNotFinite,
+                format!(
+                    "The position of the {what} must be made of numbers, but its corner is {ox}, {oy}, {oz}."
+                ),
+            )
+            .with_hint("Give the X, Y and Z of the grid's lower corner."),
+        );
+    }
+    if !lattice.rotation.is_finite() {
+        findings.add(
+            Finding::new(
+                FindingCode::LatticeRotationNotFinite,
+                format!(
+                    "The rotation of the {what} must be a number of degrees, but it is {}.",
+                    lattice.rotation
+                ),
+            )
+            .with_hint("Use 0 for a grid aligned with north."),
+        );
+    }
+    // A sparse block model only needs memory for the blocks it lists.
+    match &dataset.geometry {
+        Geometry::Blocks(blocks) if !blocks.is_dense() => {
+            check_size(blocks.block_count(), "blocks", findings);
+        }
+        _ => {
+            check_size(lattice.cell_count(), "cells", findings);
+        }
+    }
 }
 
 /// Warns about triangles with no area and reports vertices no triangle uses.
@@ -621,6 +692,70 @@ mod tests {
         assert_eq!(unused.count, 67);
     }
 
+    fn with_lattice(mut d: Dataset, change: impl FnOnce(&mut crate::lattice::Lattice)) -> Dataset {
+        match &mut d.geometry {
+            Geometry::Grid(g) => change(&mut g.lattice),
+            Geometry::Blocks(b) => change(&mut b.lattice),
+            _ => {}
+        }
+        d
+    }
+
+    #[test]
+    fn zero_dimensions_are_an_error_named_for_the_shape() {
+        let found = run(check, &grid([4, 0, 1]));
+        assert_eq!(codes(&found), ["lattice.dims.zero"]);
+        assert_eq!(
+            found.as_slice()[0].message,
+            "The grid has no cells along at least one axis (4 x 0 x 1); every dimension must be at least 1."
+        );
+        let found = run(check, &blocks([0, 0, 0], None));
+        assert!(
+            found.as_slice()[0]
+                .message
+                .starts_with("The block model has no cells")
+        );
+    }
+
+    #[test]
+    fn a_cell_size_must_be_positive_and_finite_on_every_axis() {
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let d = with_lattice(grid([2, 2, 1]), |l| l.spacing = [1.0, bad, 1.0]);
+            assert_eq!(codes(&run(check, &d)), ["lattice.spacing.invalid"], "{bad}");
+        }
+        let d = with_lattice(grid([2, 2, 1]), |l| l.spacing = [10.0, 0.0, 1.0]);
+        assert_eq!(
+            run(check, &d).as_slice()[0].message,
+            "The cell size of the grid must be greater than 0 on every axis, but it is 10 x 0 x 1."
+        );
+    }
+
+    #[test]
+    fn the_origin_and_rotation_must_be_finite() {
+        let d = with_lattice(blocks([2, 2, 2], None), |l| l.origin = [0.0, f64::NAN, 0.0]);
+        assert_eq!(codes(&run(check, &d)), ["lattice.origin.not_finite"]);
+        let d = with_lattice(grid([2, 2, 1]), |l| l.rotation = f64::INFINITY);
+        assert_eq!(codes(&run(check, &d)), ["lattice.rotation.not_finite"]);
+    }
+
+    #[test]
+    fn a_lattice_with_too_many_cells_is_rejected_before_anything_is_allocated() {
+        let d = grid([1_000, 1_000, 1_000]);
+        let found = run(check, &d);
+        assert_eq!(codes(&found), ["dataset.too_large"]);
+        assert!(found.as_slice()[0].message.contains("1,000,000,000 cells"));
+        let overflow = run(check, &grid([u32::MAX, u32::MAX, u32::MAX]));
+        assert_eq!(codes(&overflow), ["dataset.too_large"]);
+        assert!(overflow.as_slice()[0].message.contains("far more cells"));
+        assert!(check_all(&blocks([1_000, 1_000, 1_000], None)).contains(&"dataset.too_large"));
+    }
+
+    #[test]
+    fn a_sparse_block_model_on_a_huge_lattice_is_fine_if_it_has_few_blocks() {
+        let d = blocks([100_000, 100_000, 100_000], Some(vec![5, 5, 5]));
+        assert!(check_all(&d).is_empty());
+    }
+
     #[test]
     fn a_geometry_with_no_elements_is_reported_with_its_own_name() {
         let cases = [
@@ -641,9 +776,9 @@ mod tests {
     }
 
     #[test]
-    fn zero_dimension_lattices_are_left_to_the_lattice_check() {
-        assert!(check_all(&grid([0, 3, 1])).is_empty());
-        assert!(check_all(&blocks([2, 0, 2], None)).is_empty());
+    fn zero_dimension_lattices_get_one_finding_not_also_an_empty_dataset() {
+        assert_eq!(check_all(&grid([0, 3, 1])), ["lattice.dims.zero"]);
+        assert_eq!(check_all(&blocks([2, 0, 2], None)), ["lattice.dims.zero"]);
     }
 
     #[test]
