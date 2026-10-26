@@ -51,7 +51,7 @@ M0; each is its own commit):
   commit size guideline:
   - [x] 1.1a Severity, WizardStep, Location and Finding types (adds serde).
   - [x] 1.1b Findings collector that aggregates repeats.
-- [ ] 1.2 FindingCode: a registry of stable codes with `as_str()`, plus
+- [x] 1.2 FindingCode: a registry of stable codes with `as_str()`, plus
   `docs/validation-codes.md` with its "every code documented" test.
 - [ ] 1.3 CrsRef (Epsg, Local) and Units, with serde.
 - [ ] 1.4 Column and ColumnData (five types) with a validity bitmap: length,

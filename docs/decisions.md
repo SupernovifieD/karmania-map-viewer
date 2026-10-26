@@ -130,3 +130,13 @@ was chosen, why.
 - Step 1.1: `unicode-ident` (`Unicode-3.0`) is in the serde tree and is outside
   the written license policy. It is permissive and unavoidable with serde's
   derive macros, so work continues; approval is requested in the M1 report.
+- Step 1.2: a finding's severity and wizard step now come from its
+  `FindingCode`, so `Finding::new(code, message)` takes no severity and
+  `with_step` is gone; "one code, one severity" holds by construction and
+  `Finding.code` is the enum. The registry is one `macro_rules!` table (no extra
+  dependency), so `ALL`, `as_str`, `severity` and `step` cannot drift apart.
+- Step 1.2: the registry starts with the three codes M1 needs next
+  (`dataset.too_large`, `table.column.name_empty`, `table.column.name_duplicate`)
+  rather than an empty list, so the docs test has something to check. Later
+  steps add codes with the step that uses them. `dataset` was added to the list
+  of code areas in `docs/conventions.md` for the size limit.
