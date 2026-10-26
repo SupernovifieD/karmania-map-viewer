@@ -8,9 +8,11 @@ publish.workspace = true
 
 [dependencies]
 karmania-core.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 csv.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -14,6 +14,7 @@ pub mod delimited;
 #[cfg(test)]
 mod fixtures;
 pub mod infer;
+pub mod mapping;
 pub mod nodata;
 pub mod numbers;
 pub mod roles;
