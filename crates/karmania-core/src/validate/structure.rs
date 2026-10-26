@@ -3,7 +3,7 @@
 use super::offset_lists::{self, OffsetCodes, OffsetsSpec};
 use crate::codes::FindingCode;
 use crate::dataset::{Dataset, Geometry};
-use crate::findings::{Finding, Findings};
+use crate::findings::{Finding, Findings, Location};
 use crate::text::format_count;
 
 /// Runs the structure checks.
@@ -11,6 +11,30 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_not_empty(dataset, findings);
     check_position_lists(dataset, findings);
     check_line_offsets(dataset, findings);
+    check_short_lines(dataset, findings);
+}
+
+/// A line needs at least two vertices to be a line. Lines whose offsets are
+/// malformed are skipped here; the offsets check reports those.
+fn check_short_lines(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Lines(lines) = &dataset.geometry else {
+        return;
+    };
+    let mut short = Finding::new(
+        FindingCode::LinesLineTooShort,
+        "Some lines have fewer than 2 vertices, so they cannot be drawn.",
+    )
+    .with_hint("Remove those lines or add the missing vertices.");
+    short.count = 0;
+    for index in 0..lines.line_count().unwrap_or(0) {
+        if lines.vertex_range(index).is_some_and(|r| r.len() < 2) {
+            short.count += 1;
+            short = short.at(Location::default().with_element(index as u64));
+        }
+    }
+    if short.count > 0 {
+        findings.add(short);
+    }
 }
 
 /// The offsets that split a line set's vertices into lines.
@@ -100,9 +124,14 @@ mod tests {
     }
 
     #[test]
-    fn valid_line_offsets_pass_including_empty_lines() {
-        assert!(check_all(&lines(5, &[0, 2, 2, 5])).is_empty());
-        assert!(check_all(&lines(0, &[0, 0])).is_empty());
+    fn valid_line_offsets_pass_and_empty_lines_are_only_a_warning() {
+        assert!(check_all(&lines(5, &[0, 2, 5])).is_empty());
+        assert!(check_all(&lines(4, &[0, 2, 4])).is_empty());
+        // Structurally valid, but a line with no vertices is too short.
+        assert_eq!(
+            check_all(&lines(5, &[0, 2, 2, 5])),
+            ["lines.line.too_short"]
+        );
     }
 
     #[test]
@@ -117,7 +146,7 @@ mod tests {
 
     #[test]
     fn a_wrong_start_and_a_wrong_end_are_each_reported() {
-        let found = run(check, &lines(5, &[1, 3, 4]));
+        let found = run(check, &lines(5, &[1, 4]));
         assert_eq!(
             codes(&found),
             ["lines.offsets.bad_start", "lines.offsets.bad_end"]
@@ -166,6 +195,29 @@ mod tests {
     fn huge_offsets_are_reported_without_overflow() {
         let found = run(check, &lines(3, &[0, u32::MAX, 3]));
         assert_eq!(codes(&found), ["lines.offsets.decreasing"]);
+    }
+
+    #[test]
+    fn lines_with_fewer_than_two_vertices_are_a_counted_warning() {
+        let found = run(check, &lines(6, &[0, 1, 1, 4, 6]));
+        assert_eq!(codes(&found), ["lines.line.too_short"]);
+        let f = &found.as_slice()[0];
+        assert_eq!(f.severity, crate::findings::Severity::Warning);
+        assert_eq!(f.count, 2);
+        let at: Vec<_> = f.examples.iter().map(|l| l.element).collect();
+        assert_eq!(at, [Some(0), Some(1)]);
+        assert!(
+            found
+                .iter()
+                .all(|f| f.severity != crate::findings::Severity::Error)
+        );
+    }
+
+    #[test]
+    fn lines_of_two_or_more_vertices_and_malformed_offsets_are_not_short() {
+        assert!(check_all(&lines(5, &[0, 2, 5])).is_empty());
+        // Decreasing offsets are the offsets check's job, not "too short".
+        assert!(!codes(&run(check, &lines(5, &[0, 4, 2, 5]))).contains(&"lines.line.too_short"));
     }
 
     #[test]

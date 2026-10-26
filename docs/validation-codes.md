@@ -41,6 +41,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Use fewer {things}, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
 
+## `lines.line.too_short`
+
+- Severity: warning
+- Step: none
+- Message: Some lines have fewer than 2 vertices, so they cannot be drawn.
+- Hint: Remove those lines or add the missing vertices.
+- Example: Some lines have fewer than 2 vertices, so they cannot be drawn.
+
 ## `lines.offsets.bad_end`
 
 - Severity: error
