@@ -1,5 +1,6 @@
 //! The kernel object: the loaded datasets and the imports in progress.
 
+use karmania_core::DatasetId;
 use karmania_io::kernel::Kernel as CoreKernel;
 use karmania_io::mapping::ImportMapping;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -7,6 +8,7 @@ use wasm_bindgen::{JsError, JsValue};
 
 use crate::convert::to_js;
 use crate::input::{DatasetInput, read_dataset};
+use crate::page::page_to_js;
 
 /// The kernel: the loaded datasets and the imports in progress.
 ///
@@ -80,6 +82,44 @@ impl Kernel {
     /// Throws only if a summary cannot be turned into a JavaScript value.
     pub fn datasets(&self) -> Result<JsValue, JsError> {
         to_js(&self.inner.registry().summaries())
+    }
+
+    /// The summary of one loaded dataset, or `undefined` if there is no such dataset.
+    ///
+    /// # Errors
+    ///
+    /// Throws only if the summary cannot be turned into a JavaScript value.
+    pub fn summary(&self, dataset: u32) -> Result<JsValue, JsError> {
+        match self.inner.registry().summary(DatasetId(u64::from(dataset))) {
+            Some(summary) => to_js(summary),
+            None => Ok(JsValue::UNDEFINED),
+        }
+    }
+
+    /// Rows `start` to `start + count` of a loaded dataset, as `{ start, count, columns
+    /// }`. Each column is `{ name, values, nulls }`: the geometry columns come first
+    /// (for points `X`, `Y`, `Z`; for lines `line #` and `vertex count`; ...) and then
+    /// the attributes. `values` is a `Float64Array`, `Int32Array`, `Uint8Array` or an
+    /// array of strings; `nulls` has a 1 for each null. A window past the end is cut
+    /// short, and `count` says how many rows came back (at most 100,000).
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id.
+    pub fn rows(&self, dataset: u32, start: u32, count: u32) -> Result<JsValue, JsError> {
+        let found = self
+            .inner
+            .registry()
+            .dataset(DatasetId(u64::from(dataset)))
+            .ok_or_else(|| JsError::new("there is no dataset with that id"))?;
+        page_to_js(&found.page(u64::from(start), u64::from(count)))
+    }
+
+    /// Unloads a dataset. Returns whether there was one with that id.
+    pub fn remove(&mut self, dataset: u32) -> bool {
+        self.inner
+            .registry_mut()
+            .remove(DatasetId(u64::from(dataset)))
     }
 
     /// Loads a dataset made from arrays. `input` is one object: `{ kind, name, crs,

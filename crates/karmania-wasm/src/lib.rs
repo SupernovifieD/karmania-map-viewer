@@ -12,6 +12,7 @@
 mod convert;
 mod input;
 mod kernel;
+mod page;
 mod preview;
 
 pub use kernel::Kernel;

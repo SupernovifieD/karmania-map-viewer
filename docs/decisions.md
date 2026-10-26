@@ -960,3 +960,14 @@ was chosen, why.
   a dataset loads). A start past the end gives an empty page that still names its
   columns; a count past the end or past 100,000 rows is cut short and the page says how
   many rows it holds.
+- Step 4.11b: the kernel object gained `rows(datasetId, start, count)`,
+  `summary(datasetId)` and `remove(datasetId)`. A page comes back as `{ start, count,
+  columns: [{ name, values, nulls }] }` with `values` a `Float64Array`, `Int32Array`,
+  `Uint8Array` or array of strings, built by hand in the glue so the numbers cross as
+  typed arrays rather than being converted one by one; `nulls` is always a `Uint8Array`.
+  `rows` for a dataset that does not exist throws (misuse); `summary` for one returns
+  `undefined`, so a caller can ask without catching; `remove` returns whether there was
+  one, and the identifier is never given again. The tests page an imported CSV, a GeoJSON
+  file that made three datasets, and builder-made datasets of every shape, and check each
+  page against a strict contract check (typed arrays of the right length for the number of
+  rows, nulls that are only 0 or 1, unique column names).
