@@ -268,3 +268,13 @@ was chosen, why.
   `other`. A test describes all 6,184 definitions and requires a unit for every
   geographic and projected one. The names are the registry's own wording, for
   example "OSGB 1936 / British National Grid".
+- Step 2.18: for a geographic EPSG system, a range outside longitude -180 to 360
+  or latitude -90 to 90 is an error (`crs.geographic.out_of_range`), because
+  such values cannot be positions on the Earth. Longitude is allowed up to 360,
+  so data written as 0 to 360 is not blocked. The brief did not give a severity
+  for the range check. If the values fit longitude and latitude only with X and
+  Y swapped (X within 90 and Y above 90, up to 180), the check gives the
+  `crs.geographic.axes_swapped` warning instead of the error. Data that fits
+  both ways (for example X 35.7, Y 51.4) cannot be told apart and gets no
+  finding. The check uses the bounding box, so grids and block models are
+  checked by their extent.

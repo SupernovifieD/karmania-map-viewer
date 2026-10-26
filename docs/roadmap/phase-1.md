@@ -117,7 +117,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   Split to stay under the commit size guideline:
   - [x] 2.17a EPSG lookup: code, name, kind and units (reads the WKT).
   - [x] 2.17b Unknown EPSG code finding.
-- [ ] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
+- [x] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
   Y may be swapped").
 - [ ] 2.19 Add the proj4rs dependency (dependency-only commit).
 - [ ] 2.20 CRS: projected plausibility. Inverse-project the bbox corners plus up
