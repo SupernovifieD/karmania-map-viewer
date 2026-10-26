@@ -65,6 +65,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Choose an EPSG code, or choose a local grid and its units.
 - Example: The coordinate reference system is missing, so the positions have no meaning on the Earth.
 
+## `crs.projected.implausible`
+
+- Severity: warning
+- Step: crs
+- Message: Some coordinates do not fit EPSG:{code} ({name}): they cannot be converted to valid longitudes and latitudes.
+- Hint: Check that you chose the right coordinate system, for example the right UTM zone and hemisphere, and that X is the easting and Y the northing.
+- Example: Some coordinates do not fit EPSG:32640 (WGS 84 / UTM zone 40N): they cannot be converted to valid longitudes and latitudes.
+
+## `crs.projected.unchecked`
+
+- Severity: info
+- Step: none
+- Message: The coordinates could not be checked against EPSG:{code} ({name}) because this tool cannot calculate that projection.
+- Hint: none
+- Example: The coordinates could not be checked against EPSG:3993 (NAD83(NSRS2007) / Guam Dateline) because this tool cannot calculate that projection.
+
 ## `dataset.attributes.rows_mismatch`
 
 - Severity: error

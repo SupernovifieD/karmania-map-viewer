@@ -290,3 +290,20 @@ was chosen, why.
   our core code uses them (the brief wants a wasm-free core; our source is, the
   dependency tree is not), and a wasm32 check now takes about 80 s on a cold
   build. Reported to the owner at the M2 checkpoint.
+- Step 2.20: projected plausibility converts the four corners of the bounding
+  box plus up to 1,000 evenly spaced data positions (all of them for small
+  datasets, always including the first and last) to longitude and latitude with
+  proj4rs. A sample is bad if the conversion fails, gives a non-finite value, or
+  lands outside longitude -180 to 360 or latitude -90 to 90. Beyond the brief it
+  also converts the answer back and requires the original coordinate within
+  about a metre, because a projection such as transverse Mercator happily maps a
+  northing past the pole to a valid-looking position on the far side of the
+  Earth. Known limit, covered by a test: a coordinate that is absurd for the zone
+  but converts cleanly (an easting of 2.7 million in a UTM zone) is not flagged,
+  because that needs each system's area of use, which `crs-definitions` does not
+  have. A UTM-zone-distance rule could close most of that gap and is offered to
+  the owner at the M2 checkpoint, not added silently. 305 of the 5,217 projected
+  codes (6%) cannot be built by proj4rs without its C-backed feature; those get
+  the info finding `crs.projected.unchecked` instead of being skipped silently.
+  Results come from proj4rs's use of the platform math library, so a coordinate
+  within a hair of a limit could in principle differ between platforms.
