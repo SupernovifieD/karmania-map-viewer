@@ -5,6 +5,7 @@
 //! dataset always gives the same report. A dataset with any error finding is not
 //! loadable.
 
+mod attribute_rows;
 mod crs_checks;
 mod offset_lists;
 mod sparse_blocks;

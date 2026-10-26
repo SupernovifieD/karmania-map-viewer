@@ -1,5 +1,6 @@
 //! Structure checks: is the geometry well formed?
 
+use super::attribute_rows;
 use super::offset_lists::{self, OffsetCodes, OffsetsSpec};
 use super::sparse_blocks;
 use crate::codes::FindingCode;
@@ -20,6 +21,7 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_mesh_triangles(dataset, findings);
     check_lattice(dataset, findings);
     sparse_blocks::check(dataset, findings);
+    attribute_rows::check(dataset, findings);
 }
 
 /// Checks a grid's or block model's lattice: whole numbers of cells, a usable

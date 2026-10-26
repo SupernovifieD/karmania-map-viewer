@@ -33,6 +33,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `dataset.attributes.rows_mismatch`
+
+- Severity: error
+- Step: none
+- Message: The attribute table has {rows} rows, but the dataset has {count} {things}.
+- Hint: Give every one of the {things} exactly one value in each column.
+- Example: The attribute table has 5 rows, but the dataset has 3 points.
+
 ## `dataset.coordinates.incomplete`
 
 - Severity: error
@@ -64,6 +72,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: This dataset would have about {count} {things}, which is more than the limit of {limit}. (When the count is too large to calculate: This dataset would have far more {things} than the limit of {limit}.)
 - Hint: Use fewer {things}, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
+
+## `dataset.vertex_attributes.rows_mismatch`
+
+- Severity: error
+- Step: none
+- Message: The per-vertex table has {rows} rows, but the dataset has {count} vertices.
+- Hint: Give every vertex exactly one value in each column.
+- Example: The per-vertex table has 3 rows, but the dataset has 4 vertices.
+
+## `dataset.vertex_attributes.unsupported`
+
+- Severity: warning
+- Step: none
+- Message: Per-vertex attributes are only used for lines and meshes, so they are ignored for {things}.
+- Hint: Move those values to the attribute table, or remove them.
+- Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
 
 ## `lattice.dims.zero`
 
