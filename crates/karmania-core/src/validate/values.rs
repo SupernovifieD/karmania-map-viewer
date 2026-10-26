@@ -1,7 +1,7 @@
 //! Value checks: are the numbers and tables sensible?
 
 use crate::codes::FindingCode;
-use crate::dataset::{Dataset, Kind};
+use crate::dataset::{Dataset, Geometry, Kind};
 use crate::findings::{Finding, Findings, Location};
 
 /// Coordinates larger than this (in absolute value) suggest the wrong units, for
@@ -12,6 +12,58 @@ const VERY_LARGE_COORDINATE: f64 = 1e8;
 pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_finite_coordinates(dataset, findings);
     check_coordinate_magnitude(dataset, findings);
+    check_duplicate_points(dataset, findings);
+}
+
+/// Warns about points that repeat an earlier point exactly. "Exactly" means the
+/// same bit pattern for x, y and z, so 0.0 and -0.0 differ and points with a
+/// non-finite coordinate are skipped. Points are ordered by their bit patterns
+/// instead of hashed: the result does not depend on a hash function and it
+/// needs only four bytes per point.
+fn check_duplicate_points(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Points(positions) = &dataset.geometry else {
+        return;
+    };
+    // A set this big already breaks the size limit, which is reported elsewhere.
+    let Ok(count) = u32::try_from(positions.len()) else {
+        return;
+    };
+    let key = |i: u32| {
+        usize::try_from(i)
+            .ok()
+            .and_then(|i| positions.get(i))
+            .map(|p| p.map(f64::to_bits))
+    };
+    let mut order: Vec<u32> = (0..count)
+        .filter(|&i| {
+            usize::try_from(i)
+                .ok()
+                .and_then(|i| positions.get(i))
+                .is_some_and(|p| p.iter().all(|c| c.is_finite()))
+        })
+        .collect();
+    order.sort_unstable_by_key(|&i| (key(i), i));
+    let mut repeats: Vec<u32> = order
+        .windows(2)
+        .filter_map(|pair| match *pair {
+            [first, second] if key(first) == key(second) => Some(second),
+            _ => None,
+        })
+        .collect();
+    if repeats.is_empty() {
+        return;
+    }
+    repeats.sort_unstable();
+    let mut same = Finding::new(
+        FindingCode::ValuesPointsDuplicate,
+        "Some points are repeated at exactly the same position.",
+    )
+    .with_hint("Remove the repeated points if they are mistakes.");
+    same.count = repeats.len() as u64;
+    for index in repeats {
+        same = same.at(Location::default().with_element(u64::from(index)));
+    }
+    findings.add(same);
 }
 
 /// Where a position is reported: points have elements, other shapes vertices.
@@ -213,6 +265,62 @@ mod tests {
 
     fn grid_default() -> Dataset {
         super::super::testutil::grid([2, 2, 1])
+    }
+
+    #[test]
+    fn distinct_points_have_no_duplicates() {
+        assert!(run(check, &points(50)).is_empty());
+        // Same x and y but different z are different points.
+        let d = points_from(vec![1.0, 1.0, 1.0, 1.0, 1.0, 2.0]);
+        assert!(run(check, &d).is_empty());
+    }
+
+    #[test]
+    fn repeated_points_are_counted_after_the_first_copy() {
+        let d = points_from(vec![
+            1.0, 2.0, 3.0, //
+            9.0, 9.0, 9.0, //
+            1.0, 2.0, 3.0, //
+            1.0, 2.0, 3.0, //
+            9.0, 9.0, 9.0,
+        ]);
+        let f = run(check, &d);
+        assert_eq!(codes(&f), ["values.points.duplicate"]);
+        let one = &f.as_slice()[0];
+        assert_eq!(
+            (one.severity, one.count),
+            (crate::findings::Severity::Warning, 3)
+        );
+        let at: Vec<_> = one.examples.iter().map(|l| l.element).collect();
+        assert_eq!(at, [Some(2), Some(3), Some(4)]);
+    }
+
+    #[test]
+    fn exact_means_the_same_bits_so_negative_zero_is_different() {
+        let d = points_from(vec![0.0, 0.0, 0.0, -0.0, 0.0, 0.0]);
+        assert!(run(check, &d).is_empty());
+    }
+
+    #[test]
+    fn points_with_non_finite_coordinates_are_not_compared() {
+        let nan = f64::NAN;
+        let d = points_from(vec![nan, 0.0, 0.0, nan, 0.0, 0.0]);
+        assert_eq!(codes(&run(check, &d)), ["values.coordinates.not_finite"]);
+    }
+
+    #[test]
+    fn many_copies_are_all_counted_and_only_twenty_examples_are_kept() {
+        let xyz: Vec<f64> = (0..1_000).flat_map(|_| [4.0, 5.0, 6.0]).collect();
+        let f = run(check, &points_from(xyz));
+        let one = &f.as_slice()[0];
+        assert_eq!((one.count, one.examples.len()), (999, 20));
+        assert_eq!(one.examples[0].element, Some(1));
+    }
+
+    #[test]
+    fn other_shapes_are_not_checked_for_duplicate_points() {
+        let f = run(check, &lines(4, &[0, 4]));
+        assert!(!codes(&f).contains(&"values.points.duplicate"));
     }
 
     #[test]

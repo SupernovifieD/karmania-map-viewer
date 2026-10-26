@@ -246,3 +246,9 @@ was chosen, why.
   table on a shape that does not use one (anything but lines and meshes) is a
   warning, `dataset.vertex_attributes.unsupported`, so supplied values are never
   silently dropped.
+- Step 2.13: duplicate points are found by ordering point indices by the bit
+  patterns of x, y and z, not by hashing as the brief suggests. A hash set needs
+  about five times the memory at the size limit and its speed depends on a hash
+  function; the sort needs four bytes per point and gives the same answer. The
+  later copies are counted (the first is not blamed), and 0.0 and -0.0 count as
+  different points because "exact" means identical bits.

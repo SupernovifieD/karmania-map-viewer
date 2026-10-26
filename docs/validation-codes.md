@@ -312,3 +312,11 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: Some coordinates are larger than 100,000,000. The units may be wrong, for example millimetres instead of metres.
 - Hint: Check the units of the coordinates and the coordinate system you chose.
 - Example: Some coordinates are larger than 100,000,000. The units may be wrong, for example millimetres instead of metres.
+
+## `values.points.duplicate`
+
+- Severity: warning
+- Step: none
+- Message: Some points are repeated at exactly the same position.
+- Hint: Remove the repeated points if they are mistakes.
+- Example: Some points are repeated at exactly the same position.
