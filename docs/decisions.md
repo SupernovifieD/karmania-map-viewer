@@ -120,3 +120,5 @@ was chosen, why.
   `rolldown`), so licenses are now audited by reading each installed package's
   `license` field; result in `docs/dependencies.md`. If a license check is ever
   added to CI, it must not use `pnpm licenses list`.
+- Step 0.14: `pnpm check` also runs `pnpm format:check` as its last stage, an
+  owner-approved addition to the section 5 list, so local runs match CI.
