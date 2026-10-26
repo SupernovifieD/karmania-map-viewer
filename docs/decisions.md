@@ -667,3 +667,11 @@ was chosen, why.
   the step helper only committed the files it was given. I checked the new flag
   against a deliberately stale lockfile and it fails with "cannot update the lock
   file". The step helper now also stages a changed `Cargo.lock`.
+- Step 3.24: `crates/karmania-io/tests/timing.rs` holds ignored timing tests for the
+  readers on generated files of about a million elements, recorded in
+  `docs/perf.md`. Importing and validating a million-row CSV takes about 1.1 s
+  natively, a fifth of the brief's 5 s. The one worry is GeoJSON memory, about 20
+  times the file size; it is left as it is (recorded, not fixed) because reading
+  features one at a time is a bigger change that only matters for files over
+  roughly 100 MB, and it needs the owner's view on whether such files are
+  expected.

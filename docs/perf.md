@@ -46,3 +46,52 @@ cargo test -p karmania-core --release -- --ignored --nocapture one_million_point
 
 The test is ignored in normal runs. In a release build it fails if validation
 takes 5 s or more.
+
+## Reading large files (step 3.24)
+
+The brief's target is import plus validation of a 1,000,000-row CSV in under 5 s.
+Together with the validation entry above, the first row is that measurement for
+native code; WebAssembly (milestone M4) will be slower and is measured in step
+10.3.
+
+What was read: generated files from a fixed seed (building them is not timed), in
+a release build, on the machine named at the top. "Peak memory" is the largest
+resident set of the whole test process, so it includes the file text held in
+memory and the dataset made from it.
+
+| Read | Size | Time | Peak memory |
+| --- | --- | --- | --- |
+| CSV points, 1,000,000 rows, X Y Z and 5 attributes | 46.0 MB | 824 ms (plus 252 ms to validate: 1,076 ms in all) | 158 MB |
+| The same CSV, as an `ImportJob` in 20 steps of 50,000 rows | 46.0 MB | 755 ms | 158 MB |
+| CSV lines, 1,000,000 vertices in 10,000 lines | 33.1 MB | 1,285 ms | 142 MB |
+| CSV block model, 1,000,000 blocks, dense, rows in random order | 27.7 MB | 789 ms | 165 MB |
+| GeoJSON points, 200,000 features with 3 properties | 26.2 MB | 1,493 ms | 525 MB |
+| ESRI ASCII grid, 3,000 x 3,000 cells | 33.4 MB | 382 ms | 126 MB |
+| OBJ mesh, 500,000 vertices and 1,000,000 triangles | 29.7 MB | 271 ms | 81 MB |
+
+Reading in steps costs nothing measurable over reading at once.
+
+Things to know:
+
+- GeoJSON is the memory-hungry format: about 20 times the size of the file, because
+  the whole JSON document is held as a tree before the datasets are built. A
+  100 MB GeoJSON file would need about 2 GB, and a WebAssembly module cannot go
+  past 4 GB, so very large GeoJSON files will fail in the browser. If real files
+  turn out to be that big, the fix is to read the features one at a time instead
+  of building the tree (see the note in `docs/decisions.md`, step 3.12c).
+- The CSV readers hold the whole file text, the coordinates and the attribute
+  columns; the peak is about 3.4 times the file size for the points file.
+- Lines are the slowest CSV kind because every row's line identifier is looked up
+  in an ordered map.
+
+Not measured yet: files at the 134,217,728-element limit, decimal-comma files,
+files with many quoted fields, and the time to send a file into WebAssembly.
+
+To repeat (one test per format; add `-- --exact <name>` to run just one):
+
+```
+cargo test -p karmania-io --release --test timing -- --ignored --nocapture
+```
+
+The tests are ignored in normal runs. In a release build each fails if its read
+takes 5 s or more.
