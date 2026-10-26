@@ -70,6 +70,10 @@ finding_codes! {
     FileEncodingInvalidUtf16 => "file.encoding.invalid_utf16", Warning, Some(WizardStep::File);
     /// Rows have an empty or unreadable coordinate and the mapping says to stop.
     CsvCoordinateMissing => "csv.coordinate.missing", Error, Some(WizardStep::Nodata);
+    /// Rows were left out because they have no line identifier.
+    CsvLineIdMissing => "csv.line_id.missing", Warning, Some(WizardStep::Mapping);
+    /// The rows of some lines are not next to each other in the file.
+    CsvLinesScattered => "csv.lines.scattered", Info, None;
     /// Rows have a different number of values from the header.
     CsvRowsRagged => "csv.rows.ragged", Warning, Some(WizardStep::File);
     /// Rows were left out because a coordinate was empty or unreadable.

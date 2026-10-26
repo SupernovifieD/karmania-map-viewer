@@ -18,11 +18,11 @@
 //! - Coordinates must be numbers; empty, "no data" and unreadable values are
 //!   missing coordinates.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use karmania_core::{
     Column, ColumnData, ColumnType, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry,
-    Kind, Location, Positions, Provenance, Table, Validity, check_size,
+    Kind, Lines, Location, Positions, Provenance, Table, Validity, check_size,
 };
 
 use crate::delimited::{Delimiter, PREVIEW_ROWS, Record, RecordReader};
@@ -255,6 +255,18 @@ impl Builder {
         }
     }
 
+    /// Reorders the rows so that row `i` becomes the old row `order[i]`.
+    fn permute(&mut self, order: &[usize]) {
+        match &mut self.data {
+            Data::Float(v) => permute(v, order),
+            Data::Int(v) => permute(v, order),
+            Data::Bool(v) => permute(v, order),
+            Data::Text(v) => permute(v, order),
+            Data::Category { codes, .. } => permute(codes, order),
+        }
+        permute(&mut self.valid, order);
+    }
+
     /// The finished column and the warning about unreadable values, if any. The
     /// data and validity always have the same length by construction.
     fn finish(self) -> (Option<Column>, Option<Finding>) {
@@ -282,6 +294,86 @@ struct CoordinateColumn {
     missing: Tally,
 }
 
+/// Rows being grouped into lines by their line identifier.
+struct LineState {
+    source: usize,
+    name: String,
+    /// The identifiers in order of first appearance.
+    ids: Vec<String>,
+    index: BTreeMap<String, u32>,
+    /// The line each kept row belongs to.
+    line_of_row: Vec<u32>,
+    last: Option<u32>,
+    /// Lines whose rows were interrupted by another line's rows.
+    scattered_lines: BTreeSet<u32>,
+    scattered: Tally,
+    missing_id: Tally,
+}
+
+impl LineState {
+    /// Files the row under its line. Returns `false`, and counts it, if the row
+    /// has no identifier.
+    fn assign(&mut self, cell: Option<&str>, line: u64) -> bool {
+        let id = cell.unwrap_or("").trim();
+        let at = Location::default().with_line(line).with_column(&self.name);
+        if id.is_empty() {
+            self.missing_id.hit(at);
+            return false;
+        }
+        let known = self.index.contains_key(id);
+        let next = u32::try_from(self.ids.len()).unwrap_or(u32::MAX);
+        let line_index = *self.index.entry(id.to_string()).or_insert_with(|| {
+            self.ids.push(id.to_string());
+            next
+        });
+        if known && self.last != Some(line_index) && self.scattered_lines.insert(line_index) {
+            self.scattered.hit(at);
+        }
+        self.last = Some(line_index);
+        self.line_of_row.push(line_index);
+        true
+    }
+
+    /// The order of the kept rows that puts each line's rows together (lines in
+    /// order of first appearance, rows within a line in file order), and the
+    /// offset where each line starts in that order.
+    fn grouping(&self) -> (Vec<usize>, Vec<u32>) {
+        let lines = self.ids.len();
+        let mut starts = vec![0usize; lines + 1];
+        for &line in &self.line_of_row {
+            if let Some(count) = starts.get_mut(line as usize + 1) {
+                *count += 1;
+            }
+        }
+        for i in 1..starts.len() {
+            starts[i] += starts[i - 1];
+        }
+        let mut next = starts.clone();
+        let mut order = vec![0usize; self.line_of_row.len()];
+        for (row, &line) in self.line_of_row.iter().enumerate() {
+            if let Some(slot) = next.get_mut(line as usize) {
+                if let Some(place) = order.get_mut(*slot) {
+                    *place = row;
+                }
+                *slot += 1;
+            }
+        }
+        let offsets = starts
+            .into_iter()
+            .map(|s| u32::try_from(s).unwrap_or(u32::MAX))
+            .collect();
+        (order, offsets)
+    }
+}
+
+/// Reorders `values` so that element `i` of the result is `values[order[i]]`.
+fn permute<T: Clone>(values: &mut Vec<T>, order: &[usize]) {
+    *values = order
+        .iter()
+        .filter_map(|&i| values.get(i).cloned())
+        .collect();
+}
+
 /// Reads a CSV file into a dataset, a few rows at a time.
 ///
 /// Create it with [`CsvImport::new`], call [`CsvImport::step`] until it returns
@@ -295,6 +387,7 @@ pub struct CsvImport<'a> {
     mapping: &'a ImportMapping,
     conversion: Conversion,
     coordinates: [Option<CoordinateColumn>; 3],
+    lines: Option<LineState>,
     builders: Vec<Builder>,
     positions: [Vec<f64>; 3],
     header_len: usize,
@@ -336,15 +429,20 @@ impl<'a> CsvImport<'a> {
                     .with_hint("Check that you chose the right file."),
             );
         }
-        if mapping.kind != Kind::Points && !findings.has_errors() {
+        if mapping.kind == Kind::Blocks && !findings.has_errors() {
             findings.add(Finding::new(
                 FindingCode::MappingKindUnsupported,
-                "This version can only import a CSV file as points.",
+                "This version cannot import a CSV file as a block model yet.",
             ));
         }
         let lines = text.lines().filter(|l| !l.trim().is_empty()).count() as u64;
         let data_rows = lines.saturating_sub(u64::from(options.has_header));
-        check_size(Some(data_rows), "points", &mut findings);
+        let things = if mapping.kind == Kind::Lines {
+            "vertices"
+        } else {
+            "points"
+        };
+        check_size(Some(data_rows), things, &mut findings);
 
         let index_of = |name: &str| header.iter().position(|h| h == name);
         let coordinate = |role: Role| {
@@ -376,6 +474,34 @@ impl<'a> CsvImport<'a> {
                 Some(Builder::new(name, source, column_type))
             })
             .collect();
+        let line_state = (mapping.kind == Kind::Lines)
+            .then(|| {
+                let column = mapping.columns.iter().find(|c| c.role == Role::LineId)?;
+                let name = column.rename.clone().unwrap_or_else(|| column.source.clone());
+                Some(LineState {
+                    source: index_of(&column.source)?,
+                    scattered: Tally::new(
+                        Finding::new(
+                            FindingCode::CsvLinesScattered,
+                            "The rows of some lines are not next to each other in the file; they were gathered by line identifier.",
+                        ),
+                    ),
+                    missing_id: Tally::new(
+                        Finding::new(
+                            FindingCode::CsvLineIdMissing,
+                            "Some rows were left out because they have no line identifier.",
+                        )
+                        .with_hint("Fill in the line identifier, or remove those rows."),
+                    ),
+                    name,
+                    ids: Vec::new(),
+                    index: BTreeMap::new(),
+                    line_of_row: Vec::new(),
+                    last: None,
+                    scattered_lines: BTreeSet::new(),
+                })
+            })
+            .flatten();
         let done = findings.has_errors();
         Self {
             // Without a header the first row is data, so start again from the top.
@@ -393,6 +519,7 @@ impl<'a> CsvImport<'a> {
                 coordinate(Role::Y),
                 coordinate(Role::Z),
             ],
+            lines: line_state,
             builders,
             positions: [Vec::new(), Vec::new(), Vec::new()],
             header_len: header.len(),
@@ -468,6 +595,11 @@ impl CsvImport<'_> {
             self.skipped.hit(Location::default().with_line(line));
             return;
         }
+        if let Some(lines) = &mut self.lines
+            && !lines.assign(self.record.get(lines.source), line)
+        {
+            return;
+        }
         for (axis, store) in self.positions.iter_mut().enumerate() {
             if self.coordinates.get(axis).is_some_and(Option::is_some) {
                 store.push(values[axis]);
@@ -498,8 +630,34 @@ impl CsvImport<'_> {
         if let Some(f) = self.ragged.into_finding() {
             self.findings.add(f);
         }
+        let grouped = self.lines.map(|lines| {
+            let (order, offsets) = lines.grouping();
+            let grouped = Grouped {
+                contiguous: lines.scattered_lines.is_empty(),
+                ids: lines.ids,
+                name: lines.name,
+                order,
+                offsets,
+            };
+            for tally in [lines.missing_id, lines.scattered] {
+                if let Some(f) = tally.into_finding() {
+                    self.findings.add(f);
+                }
+            }
+            grouped
+        });
+        let mut builders = self.builders;
+        let mut positions = self.positions;
+        if let Some(g) = grouped.as_ref().filter(|g| !g.contiguous) {
+            for builder in &mut builders {
+                builder.permute(&g.order);
+            }
+            for axis in &mut positions {
+                permute(axis, &g.order);
+            }
+        }
         let mut columns = Vec::new();
-        for builder in self.builders {
+        for builder in builders {
             let (column, finding) = builder.finish();
             columns.extend(column);
             if let Some(f) = finding {
@@ -512,11 +670,36 @@ impl CsvImport<'_> {
                 findings: self.findings,
             };
         }
-        let [x, y, z] = self.positions;
-        let positions =
-            Positions::from_xyz(&x, &y, has_z.then_some(z.as_slice()), &mut self.findings);
-        let attributes = Table::from_columns(columns, &mut self.findings);
-        let (Some(positions), Some(attributes)) = (positions, attributes) else {
+        let [x, y, z] = positions;
+        let Some(positions) =
+            Positions::from_xyz(&x, &y, has_z.then_some(z.as_slice()), &mut self.findings)
+        else {
+            return ReadOutput {
+                datasets: Vec::new(),
+                findings: self.findings,
+            };
+        };
+        let built = match grouped {
+            None => Table::from_columns(columns, &mut self.findings)
+                .map(|attributes| (Geometry::Points(positions), attributes, None, "points")),
+            Some(g) => {
+                let ids = Column::without_nulls(g.name, ColumnData::Utf8(g.ids));
+                let attributes = Table::from_columns(vec![ids], &mut self.findings);
+                let vertex_attributes = if columns.is_empty() {
+                    Some(None)
+                } else {
+                    Table::from_columns(columns, &mut self.findings).map(Some)
+                };
+                let lines = Lines {
+                    positions,
+                    offsets: g.offsets,
+                };
+                attributes
+                    .zip(vertex_attributes)
+                    .map(|(a, v)| (Geometry::Lines(lines), a, v, "lines"))
+            }
+        };
+        let Some((geometry, attributes, vertex_attributes, default_name)) = built else {
             return ReadOutput {
                 datasets: Vec::new(),
                 findings: self.findings,
@@ -525,17 +708,12 @@ impl CsvImport<'_> {
         let name = if self.mapping.dataset_name.trim().is_empty() {
             self.file_name
                 .clone()
-                .unwrap_or_else(|| "points".to_string())
+                .unwrap_or_else(|| default_name.to_string())
         } else {
             self.mapping.dataset_name.clone()
         };
-        let mut dataset = Dataset::new(
-            DatasetId(0),
-            name,
-            self.mapping.crs,
-            Geometry::Points(positions),
-            attributes,
-        );
+        let mut dataset = Dataset::new(DatasetId(0), name, self.mapping.crs, geometry, attributes);
+        dataset.vertex_attributes = vertex_attributes;
         dataset.provenance = Provenance {
             source_file_name: self.file_name,
         };
@@ -544,6 +722,18 @@ impl CsvImport<'_> {
             findings: self.findings,
         }
     }
+}
+
+/// How the kept rows divide into lines.
+struct Grouped {
+    ids: Vec<String>,
+    name: String,
+    /// The row order that puts each line's rows together.
+    order: Vec<usize>,
+    /// Where each line starts in that order, plus the end.
+    offsets: Vec<u32>,
+    /// True if the rows were already together, so nothing needs reordering.
+    contiguous: bool,
 }
 
 /// Guesses column types from the first rows, for attribute columns whose type the
@@ -985,6 +1175,175 @@ mod tests {
         lines.columns.push(col("X", Role::LineId, None));
         let out = read_csv(&text, COMMA, &lines, None);
         assert!(out.datasets.is_empty() && out.findings.has_errors());
+    }
+
+    fn line_mapping(columns: Vec<ColumnMapping>) -> ImportMapping {
+        let mut mapping = collars();
+        mapping.kind = Kind::Lines;
+        mapping.columns = columns;
+        mapping
+    }
+
+    fn line_columns() -> Vec<ColumnMapping> {
+        vec![
+            col("Line", Role::LineId, None),
+            col("X", Role::X, None),
+            col("Y", Role::Y, None),
+            col("Z", Role::Z, None),
+        ]
+    }
+
+    fn as_lines(d: &Dataset) -> &karmania_core::Lines {
+        let Geometry::Lines(lines) = &d.geometry else {
+            panic!("not lines")
+        };
+        lines
+    }
+
+    fn line_ids(d: &Dataset) -> Vec<String> {
+        let ids = d.attributes.columns().first().expect("an id column");
+        (0..ids.len())
+            .map(|i| match ids.get(i) {
+                Some(Value::Utf8(s)) => s.to_string(),
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_sample_file_becomes_two_lines_grouped_by_their_identifier() {
+        let mapping = line_mapping(line_columns());
+        let out = read_csv(
+            &fixtures::text("lines.csv"),
+            COMMA,
+            &mapping,
+            Some("lines.csv"),
+        );
+        assert!(out.findings.is_empty(), "{:?}", codes(&out));
+        let d = only(&out);
+        assert_eq!(
+            (d.kind(), d.has_z(), d.name.as_str()),
+            (Kind::Lines, true, "Collars")
+        );
+        let lines = as_lines(d);
+        assert_eq!(lines.offsets, [0, 3, 5]);
+        assert_eq!(
+            lines.positions.get(0),
+            Some([500_000.0, 2_765_000.0, 100.0])
+        );
+        assert_eq!(lines.positions.get(3), Some([500_200.0, 2_765_000.0, 98.0]));
+        assert_eq!(d.element_count(), Some(2));
+        assert_eq!(line_ids(d), ["A", "B"]);
+        assert_eq!(d.attributes.columns()[0].name(), "Line");
+        assert!(d.vertex_attributes.is_none());
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn lines_come_in_order_of_first_appearance_and_vertices_in_row_order() {
+        let text = "Line,X,Y\nB,1,1\nB,2,2\nA,3,3\nA,4,4\nA,5,5\n";
+        let mut columns = line_columns();
+        columns.pop();
+        let out = read_csv(text, COMMA, &line_mapping(columns), None);
+        assert!(out.findings.is_empty());
+        let d = only(&out);
+        assert_eq!(line_ids(d), ["B", "A"]);
+        assert_eq!(as_lines(d).offsets, [0, 2, 5]);
+        assert!(!d.has_z());
+    }
+
+    #[test]
+    fn rows_of_a_line_that_are_not_together_are_gathered_and_reported_as_info() {
+        let text = "Line,X,Y,V\nA,1,1,10\nB,2,2,20\nA,3,3,30\nB,4,4,40\nA,5,5,50\n";
+        let mut columns = line_columns();
+        columns.pop();
+        columns.push(col("V", Role::Attribute, Some(ColumnType::Int64)));
+        let out = read_csv(text, COMMA, &line_mapping(columns), None);
+        assert_eq!(codes(&out), ["csv.lines.scattered"]);
+        let f = &out.findings.as_slice()[0];
+        assert_eq!((f.severity, f.count), (karmania_core::Severity::Info, 2));
+        let lines: Vec<_> = f.examples.iter().map(|l| l.line).collect();
+        assert_eq!(lines, [Some(4), Some(5)]);
+        let d = only(&out);
+        assert_eq!(line_ids(d), ["A", "B"]);
+        let l = as_lines(d);
+        assert_eq!(l.offsets, [0, 3, 5]);
+        let xs: Vec<f64> = l.positions.iter().map(|p| p[0]).collect();
+        assert_eq!(xs, [1.0, 3.0, 5.0, 2.0, 4.0]);
+        // The vertex attributes were reordered with the vertices.
+        let v = d.vertex_attributes.as_ref().unwrap().column("V").unwrap();
+        let values: Vec<_> = (0..5).map(|i| v.get(i)).collect();
+        let expected: Vec<_> = [10, 30, 50, 20, 40].map(|n| Some(Value::Int64(n))).to_vec();
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn identifiers_are_trimmed_and_a_missing_one_leaves_the_row_out_with_a_warning() {
+        let text = "Line,X,Y\n A ,1,1\n,2,2\nA,3,3\n  ,4,4\n";
+        let mut columns = line_columns();
+        columns.pop();
+        let out = read_csv(text, COMMA, &line_mapping(columns), None);
+        assert_eq!(codes(&out), ["csv.line_id.missing"]);
+        let f = &out.findings.as_slice()[0];
+        assert_eq!((f.count, f.severity), (2, karmania_core::Severity::Warning));
+        let lines: Vec<_> = f.examples.iter().map(|l| l.line).collect();
+        assert_eq!(lines, [Some(3), Some(5)]);
+        let d = only(&out);
+        assert_eq!(line_ids(d), ["A"]);
+        assert_eq!(as_lines(d).offsets, [0, 2]);
+    }
+
+    #[test]
+    fn skipped_coordinate_rows_do_not_disturb_the_line_grouping() {
+        let text = "Line,X,Y\nA,1,1\nA,,2\nB,3,3\nA,4,4\n";
+        let mut columns = line_columns();
+        columns.pop();
+        let mut mapping = line_mapping(columns);
+        mapping.empty_coordinates = EmptyCoordinates::Skip;
+        let out = read_csv(text, COMMA, &mapping, None);
+        assert_eq!(codes(&out), ["csv.rows.skipped", "csv.lines.scattered"]);
+        let d = only(&out);
+        assert_eq!(as_lines(d).offsets, [0, 2, 3]);
+        let xs: Vec<f64> = as_lines(d).positions.iter().map(|p| p[0]).collect();
+        assert_eq!(xs, [1.0, 4.0, 3.0]);
+    }
+
+    #[test]
+    fn the_line_column_can_be_renamed_and_other_columns_become_vertex_attributes() {
+        let mut columns = line_columns();
+        columns[0].rename = Some("line_name".into());
+        columns.push(col("Q", Role::Attribute, None));
+        let text = "Line,X,Y,Z,Q\nA,1,1,1,x\nA,2,2,2,y\n";
+        let out = read_csv(text, COMMA, &line_mapping(columns), None);
+        let d = only(&out);
+        assert_eq!(d.attributes.columns()[0].name(), "line_name");
+        let vertex = d.vertex_attributes.as_ref().unwrap();
+        assert_eq!(vertex.row_count(), 2);
+        assert_eq!(vertex.columns()[0].name(), "Q");
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn a_lines_file_with_only_a_header_gives_a_lines_dataset_with_no_lines() {
+        let out = read_csv(
+            "Line,X,Y,Z\n",
+            COMMA,
+            &line_mapping(line_columns()),
+            Some("empty.csv"),
+        );
+        let d = only(&out);
+        assert_eq!(
+            (d.element_count(), as_lines(d).offsets.clone()),
+            (Some(0), vec![0])
+        );
+        assert_eq!(d.name, "Collars");
+        // Validation then says the dataset is empty.
+        let report = karmania_core::validate(d);
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "dataset.empty")
+        );
     }
 
     #[test]

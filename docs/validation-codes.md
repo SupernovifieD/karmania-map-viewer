@@ -97,6 +97,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Fix those rows, or choose to skip rows with an empty coordinate.
 - Example: Some rows have an empty or unreadable value in the coordinate column "Easting".
 
+## `csv.line_id.missing`
+
+- Severity: warning
+- Step: mapping
+- Message: Some rows were left out because they have no line identifier.
+- Hint: Fill in the line identifier, or remove those rows.
+- Example: Some rows were left out because they have no line identifier.
+
+## `csv.lines.scattered`
+
+- Severity: info
+- Step: none
+- Message: The rows of some lines are not next to each other in the file; they were gathered by line identifier.
+- Hint: none
+- Example: The rows of some lines are not next to each other in the file; they were gathered by line identifier.
+
 ## `csv.rows.ragged`
 
 - Severity: warning
