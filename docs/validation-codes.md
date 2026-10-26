@@ -585,6 +585,54 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: none
 - Example: Some vertices are not used by any triangle.
 
+## `obj.face.invalid`
+
+- Severity: warning
+- Step: file
+- Message: Some faces have fewer than three corners or a vertex number that cannot be used, so they were left out.
+- Hint: Vertex numbers count from 1, or from the end if negative.
+- Example: Some faces have fewer than three corners or a vertex number that cannot be used, so they were left out.
+
+## `obj.faces.triangulated`
+
+- Severity: info
+- Step: none
+- Message: Some faces have more than three corners; they were split into triangles.
+- Hint: none
+- Example: Some faces have more than three corners; they were split into triangles.
+
+## `obj.mesh.empty`
+
+- Severity: error
+- Step: file
+- Message: The file has no vertices and faces to build a mesh from.
+- Hint: A mesh file needs "v" lines for the vertices and "f" lines for the faces.
+- Example: The file has no vertices and faces to build a mesh from.
+
+## `obj.records.unsupported`
+
+- Severity: warning
+- Step: file
+- Message: Some lines are not vertices or faces (lines, points, curves or unknown records), so they were left out.
+- Hint: Only triangle meshes can be imported.
+- Example: Some lines are not vertices or faces (lines, points, curves or unknown records), so they were left out.
+
+## `obj.vertex.extra_values`
+
+- Severity: info
+- Step: none
+- Message: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
+- Hint: none
+- Example: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
+
+## `obj.vertex.invalid`
+
+- Severity: error
+- Step: file
+- Message: Some vertex lines do not have three numbers.
+- Hint: Each vertex line is "v" followed by x, y and z.
+- Example: Some vertex lines do not have three numbers.
+
 ## `polygons.polygon.no_rings`
 
 - Severity: error

@@ -24,6 +24,7 @@ pub mod infer;
 pub mod mapping;
 pub mod nodata;
 pub mod numbers;
+pub mod obj;
 mod output;
 pub mod roles;
 pub mod text;

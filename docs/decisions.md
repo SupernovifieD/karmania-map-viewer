@@ -566,3 +566,20 @@ was chosen, why.
   single precision grid) also matches values written with fewer digits, within
   one part in a million, since writers disagree on how many digits to print. With
   no `NODATA_value` line no number is treated as nodata.
+- Step 3.18: `read_obj` reads only `v` and `f` records. Texture coordinates,
+  normals, objects, groups, smoothing and materials do not change the shape and are
+  ignored without a finding; everything in the file is one mesh whatever its
+  objects and groups. Records for lines, points and curves (and anything not
+  recognized) cannot be imported and are counted in `obj.records.unsupported`.
+  A face with more than three corners is split into a fan from its first corner
+  (counted in an info finding); this is exact for convex faces, and a concave face
+  may give triangles that overlap or lie outside it, which the file gives us no way
+  to tell apart. Face numbers count from 1, or from the end of the vertices
+  defined so far if negative; a face with fewer than three corners, a zero, a
+  non-number or a negative number before the first vertex is left out and counted
+  (`obj.face.invalid`). A positive number past the last vertex is kept, as the
+  core keeps all indices as given, and validation reports it. A vertex line that
+  is not three numbers is an error, not a skip, because dropping a vertex would
+  silently shift the numbers of every later one. Extra numbers on a vertex (a
+  weight or a colour) are ignored and counted. A backslash at the end of a line
+  continues it. The file has no coordinate system, so it is left unset.

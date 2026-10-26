@@ -42,7 +42,7 @@ A finding code names one kind of problem, for example `crs.missing` or
   lowercase ASCII letters, digits or underscores. The area is a shape (`points`,
   `lines`, `polygons`, `mesh`, `grid`, `blocks`), `dataset`, `table`, `values`,
   `crs`, `file`, `mapping`, or a file format that has findings of its own (`csv`,
-  `geojson`, `asc` for ESRI ASCII grids).
+  `geojson`, `asc` for ESRI ASCII grids, `obj`).
 - Codes are stable. Once a code is released, do not rename it or change its
   meaning; add a new code instead. Never reuse a retired code.
 - One code has one severity (`error`, `warning` or `info`), one message

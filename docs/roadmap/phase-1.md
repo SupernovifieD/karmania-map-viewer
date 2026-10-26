@@ -189,7 +189,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 - [x] 3.17 ESRI ASCII grid values: flip rows to south-first; normalize centre
   registration to corner; check value count; nodata to null with a warning
   count.
-- [ ] 3.18 OBJ mesh: v and f records, 1-based and negative indices, fan
+- [x] 3.18 OBJ mesh: v and f records, 1-based and negative indices, fan
   triangulation of n-gons (info with count); ignore vt and vn.
 - [ ] 3.19 .prj sidecar: extract the EPSG code from WKT1 AUTHORITY or WKT2 ID.
   Otherwise report "unrecognized", and the wizard asks.

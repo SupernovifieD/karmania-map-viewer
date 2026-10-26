@@ -128,6 +128,18 @@ finding_codes! {
     AscValuesNodata => "asc.values.nodata", Warning, Some(WizardStep::Nodata);
     /// Some cells of an ASCII grid are not numbers and were left empty.
     AscValuesUnreadable => "asc.values.unreadable", Warning, Some(WizardStep::File);
+    /// Some faces of an OBJ file have fewer than three corners or a bad vertex number.
+    ObjFaceInvalid => "obj.face.invalid", Warning, Some(WizardStep::File);
+    /// Some faces of an OBJ file have more than three corners and were split.
+    ObjFacesTriangulated => "obj.faces.triangulated", Info, None;
+    /// The OBJ file has no vertices or no faces.
+    ObjMeshEmpty => "obj.mesh.empty", Error, Some(WizardStep::File);
+    /// Some records of an OBJ file are lines, points or curves.
+    ObjRecordsUnsupported => "obj.records.unsupported", Warning, Some(WizardStep::File);
+    /// Some vertex lines of an OBJ file do not have three numbers.
+    ObjVertexInvalid => "obj.vertex.invalid", Error, Some(WizardStep::File);
+    /// Some vertices of an OBJ file have more than three numbers.
+    ObjVertexExtraValues => "obj.vertex.extra_values", Info, None;
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.
