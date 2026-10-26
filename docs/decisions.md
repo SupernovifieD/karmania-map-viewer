@@ -387,3 +387,10 @@ was chosen, why.
   attribute at 0.5, meaning "no idea". Suggestions use the header and the inferred
   types, not the values, so a column named `Lat` holding projected numbers is still
   suggested; the CRS checks catch that later.
+- Step 3.6: nodata suggestions follow the brief's lists exactly. A candidate is
+  offered only when it appears in a numeric column of the sample, for words as well
+  as numbers, so an `NA` in a text column stays text. Counts are for the sample, not
+  the whole file. Words are compared ignoring case and spaces except `-` and `*`,
+  which must match; the empty word matches empty or blank cells but not a missing
+  cell in a short row. Numbers are matched exactly after parsing, so `-999`,
+  `-999.0` and `-9.99e2` all count, and `-998` or `-999.5` do not.

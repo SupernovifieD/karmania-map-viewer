@@ -148,7 +148,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   Recognize at least: x: X, EAST, EASTING, XC, XCOORD, XCENTRE, LON, LONG,
   LONGITUDE; y: Y, NORTH, NORTHING, YC, YCOORD, YCENTRE, LAT, LATITUDE; z: Z,
   RL, ELEV, ELEVATION, ZC, ZCOORD, ZCENTRE, DEPTH. Matching is case-insensitive.
-- [ ] 3.6 Nodata suggestions. Tokens: empty, NA, N/A, null, NaN, "-", "\*".
+- [x] 3.6 Nodata suggestions. Tokens: empty, NA, N/A, null, NaN, "-", "\*".
   Numbers: -999, -9999, -99999, 1e30, -1e30, 1.70141e38. A value is suggested
   only when it actually appears in a numeric column.
 - [ ] 3.7 ImportMapping type with serde, plus a mapping validation that returns
