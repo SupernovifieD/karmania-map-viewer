@@ -713,6 +713,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Start with 0, end with the number of vertices, and never go backwards.
 - Example: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices (3).
 
+## `prj.unrecognized`
+
+- Severity: warning
+- Step: crs
+- Message: The projection file {describes "{name}" but does not give an EPSG code | does not give an EPSG code | is empty | could not be read}, so the coordinate system could not be set.
+- Hint: Choose the coordinate system yourself.
+- Example: The projection file describes "WGS_1984_UTM_Zone_40N" but does not give an EPSG code, so the coordinate system could not be set.
+
 ## `table.column.all_null`
 
 - Severity: warning
