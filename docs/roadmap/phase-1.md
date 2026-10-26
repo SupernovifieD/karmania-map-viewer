@@ -26,7 +26,7 @@ brief says to stop.
   section 6).
 - [x] 0.6 ESLint (typescript-eslint, strict) and Prettier configs, with root
   lint and format scripts.
-- [ ] 0.7 `packages/engine` skeleton with Vitest and one passing test.
+- [x] 0.7 `packages/engine` skeleton with Vitest and one passing test.
 - [ ] 0.8 `docs/conventions.md` (naming, commit rules, finding code style) and
   empty `docs/decisions.md` and `docs/dependencies.md`.
 - [ ] 0.9 CI workflow (GitHub Actions, or the platform the remote uses) for

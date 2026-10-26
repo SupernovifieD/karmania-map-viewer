@@ -50,3 +50,13 @@ was chosen, why.
 - Step 0.6: `minimatch` (BlueOak-1.0.0, permissive, dev-only transitive of
   ESLint) is outside the allowed license list but unavoidable with ESLint;
   recorded in `docs/dependencies.md` for owner approval.
+- Step 0.7: Vite is pinned to `^7.3.7`, added explicitly, instead of the Vite 8
+  that pnpm auto-installs as Vitest's peer. Vite 8 has `lightningcss` (MPL-2.0)
+  as a hard dependency, which breaks the no-copyleft rule; Vite 7 only lists it
+  as an optional peer and Vitest 5 supports Vite 7. Revisit when the project
+  license is decided or Vite 8 drops it.
+- Step 0.7: Vitest is a dev dependency of each package that has tests, not the
+  root. `@karmania/engine` exports its TypeScript source (`exports` points at
+  `src/index.ts`) for workspace use only; the build and publish setup is decided
+  in M5. Its tsconfig uses the `DOM` lib; typing for the worker entry (the
+  `WebWorker` lib) is decided in step 5.2.
