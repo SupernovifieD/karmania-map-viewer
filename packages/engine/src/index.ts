@@ -32,6 +32,7 @@ export type {
   KernelColumn,
   KernelDataset,
   KernelLines,
+  KernelMesh,
   KernelPoints,
   KernelPolygons,
   LoadResult,

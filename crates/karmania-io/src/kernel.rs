@@ -12,7 +12,8 @@ use serde::Serialize;
 use karmania_core::{Dataset, Findings};
 
 use crate::build::{
-    LinesInput, PointsInput, PolygonsInput, build_lines, build_points, build_polygons,
+    LinesInput, MeshInput, PointsInput, PolygonsInput, build_lines, build_mesh, build_points,
+    build_polygons,
 };
 use crate::import_run::{ImportRun, Phase, RunStep};
 use crate::mapping::ImportMapping;
@@ -112,6 +113,11 @@ impl Kernel {
     /// Loads polygons made from arrays; see [`Kernel::load_points`].
     pub fn load_polygons(&mut self, input: PolygonsInput) -> LoadResult {
         self.load_built(|findings| build_polygons(input, findings))
+    }
+
+    /// Loads a triangle mesh made from arrays; see [`Kernel::load_points`].
+    pub fn load_mesh(&mut self, input: MeshInput) -> LoadResult {
+        self.load_built(|findings| build_mesh(input, findings))
     }
 
     /// Loads what `build` makes, or blocks with its findings if it makes nothing.

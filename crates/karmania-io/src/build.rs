@@ -10,7 +10,7 @@
 use karmania_core::text::format_count;
 use karmania_core::{
     Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Kind,
-    Lines, Polygons, Positions, Table, Validity,
+    Lines, Mesh, Polygons, Positions, Table, Validity,
 };
 
 /// The values of one column.
@@ -238,6 +238,49 @@ pub fn build_polygons(input: PolygonsInput, findings: &mut Findings) -> Option<D
         }),
         attributes?,
     ))
+}
+
+/// A triangle mesh to load: vertices, the triangles that join them, and attributes
+/// per triangle and optionally per vertex.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MeshInput {
+    /// The dataset's name; blank means `mesh`.
+    pub name: String,
+    /// The coordinate system; `None` is reported by validation.
+    pub crs: Option<CrsRef>,
+    /// Easting or longitude of each vertex.
+    pub x: Vec<f64>,
+    /// Northing or latitude of each vertex.
+    pub y: Vec<f64>,
+    /// Elevation of each vertex. A mesh is always 3D.
+    pub z: Vec<f64>,
+    /// Three vertex numbers per triangle, counting from 0.
+    pub indices: Vec<u32>,
+    /// The attribute columns, one value per triangle.
+    pub columns: Vec<ColumnInput>,
+    /// Attribute columns with one value per vertex; none for no vertex table.
+    pub vertex_columns: Vec<ColumnInput>,
+}
+
+/// Makes a mesh dataset. `None`, with a finding, if the coordinate lists differ in
+/// length or the columns cannot be made into tables. Indices that are out of range
+/// or not a multiple of three are left to validation.
+pub fn build_mesh(input: MeshInput, findings: &mut Findings) -> Option<Dataset> {
+    let positions = Positions::from_xyz(&input.x, &input.y, Some(&input.z), findings);
+    let attributes = table_from_columns(input.columns, findings);
+    let vertex_attributes = optional_table(input.vertex_columns, findings);
+    let mut dataset = Dataset::new(
+        DatasetId(0),
+        name_or_kind(input.name, Kind::Mesh),
+        input.crs,
+        Geometry::Mesh(Mesh {
+            positions: positions?,
+            indices: input.indices,
+        }),
+        attributes?,
+    );
+    dataset.vertex_attributes = vertex_attributes?;
+    Some(dataset)
 }
 
 #[cfg(test)]
@@ -639,6 +682,107 @@ mod tests {
         input.x.pop();
         let mut findings = Findings::new();
         assert!(build_polygons(input, &mut findings).is_none());
+        assert_eq!(codes(&findings), ["dataset.coordinates.length_mismatch"]);
+    }
+
+    /// A tetrahedron: four vertices, four triangles.
+    fn mesh() -> MeshInput {
+        MeshInput {
+            name: "Pit".into(),
+            crs: metres(),
+            x: vec![0.0, 10.0, 0.0, 0.0],
+            y: vec![0.0, 0.0, 10.0, 0.0],
+            z: vec![0.0, 0.0, 0.0, 10.0],
+            indices: vec![0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
+            columns: vec![column("face", ColumnValues::Int(vec![1, 2, 3, 4]))],
+            vertex_columns: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_mesh_becomes_a_three_dimensional_dataset() {
+        let mut input = mesh();
+        input.vertex_columns = vec![column(
+            "grade",
+            ColumnValues::Float(vec![1.0, 2.0, 3.0, 4.0]),
+        )];
+        let mut findings = Findings::new();
+        let d = build_mesh(input, &mut findings).unwrap();
+        assert!(findings.is_empty());
+        assert_eq!(
+            (
+                d.kind(),
+                d.has_z(),
+                d.element_count(),
+                d.geometry.vertex_count()
+            ),
+            (Kind::Mesh, true, Some(4), Some(4))
+        );
+        assert_eq!(d.vertex_attributes.as_ref().map(Table::row_count), Some(4));
+        assert!(karmania_core::validate(&d).is_loadable());
+        let mut unnamed = mesh();
+        unnamed.name = String::new();
+        assert_eq!(
+            build_mesh(unnamed, &mut Findings::new()).unwrap().name,
+            "mesh"
+        );
+    }
+
+    #[test]
+    fn indices_that_do_not_fit_are_left_to_validation_which_names_the_problem() {
+        let mut outside = mesh();
+        outside.indices[11] = 4;
+        let mut incomplete = mesh();
+        incomplete.indices.push(0);
+        for (input, code) in [
+            (outside, "mesh.indices.out_of_range"),
+            (incomplete, "mesh.indices.incomplete"),
+        ] {
+            let d = build_mesh(input, &mut Findings::new()).unwrap();
+            let report = karmania_core::validate(&d);
+            assert!(report.findings().any(|f| f.code.as_str() == code), "{code}");
+            assert!(!report.is_loadable(), "{code}");
+        }
+    }
+
+    #[test]
+    fn a_flat_triangle_and_an_unused_vertex_load_with_notes() {
+        let mut input = mesh();
+        input.indices = vec![0, 1, 2, 0, 0, 1, 0, 2, 3, 1, 2, 3];
+        let d = build_mesh(input, &mut Findings::new()).unwrap();
+        let report = karmania_core::validate(&d);
+        assert!(report.is_loadable());
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "mesh.triangle.degenerate")
+        );
+        let mut unused = mesh();
+        unused.indices = vec![0, 1, 2];
+        unused.columns = vec![column("face", ColumnValues::Int(vec![1]))];
+        let report = karmania_core::validate(&build_mesh(unused, &mut Findings::new()).unwrap());
+        assert!(report.is_loadable());
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "mesh.vertices.unused")
+        );
+    }
+
+    #[test]
+    fn rows_that_do_not_fit_and_mismatched_coordinates_are_found() {
+        let mut vertex_rows = mesh();
+        vertex_rows.vertex_columns = vec![column("grade", ColumnValues::Float(vec![1.0]))];
+        let d = build_mesh(vertex_rows, &mut Findings::new()).unwrap();
+        assert!(
+            karmania_core::validate(&d)
+                .findings()
+                .any(|f| f.code.as_str() == "dataset.vertex_attributes.rows_mismatch")
+        );
+        let mut short = mesh();
+        short.z.pop();
+        let mut findings = Findings::new();
+        assert!(build_mesh(short, &mut findings).is_none());
         assert_eq!(codes(&findings), ["dataset.coordinates.length_mismatch"]);
     }
 }

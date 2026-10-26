@@ -5,6 +5,7 @@ import type {
   CrsRef,
   KernelColumn,
   KernelLines,
+  KernelMesh,
   KernelPoints,
   KernelPolygons,
   LoadResult,
@@ -59,6 +60,19 @@ function polygons(extra: Partial<KernelPolygons> = {}): KernelPolygons {
     ringOffsets: new Uint32Array([0, 4, 8, 11]),
     polygonOffsets: new Uint32Array([0, 2, 3]),
     columns: [{ name: 'name', type: 'text', values: ['A', 'B'] }],
+    ...extra,
+  };
+}
+
+function mesh(extra: Partial<KernelMesh> = {}): KernelMesh {
+  return {
+    kind: 'mesh',
+    name: 'Pit',
+    crs: METRES,
+    x: new Float64Array([0, 10, 0, 0]),
+    y: new Float64Array([0, 0, 10, 0]),
+    z: new Float64Array([0, 0, 0, 10]),
+    indices: new Uint32Array([0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]),
     ...extra,
   };
 }
@@ -258,6 +272,49 @@ describe('loading polygons from arrays through kernel.load', () => {
       Object.entries(polygons()).filter(([key]) => key !== 'ringOffsets'),
     );
     expect(() => createKernel().load(withoutRings)).toThrow(/needs a `ringOffsets`/);
+  });
+});
+
+describe('loading a mesh from arrays through kernel.load', () => {
+  it('loads a tetrahedron with per-triangle and per-vertex columns', () => {
+    const [summary] = summaries(
+      loadResult(
+        mesh({
+          columns: [{ name: 'face', type: 'int', values: new BigInt64Array([1n, 2n, 3n, 4n]) }],
+          vertexColumns: [{ name: 'grade', type: 'float', values: new Float64Array([1, 2, 3, 4]) }],
+        }),
+      ),
+    );
+    expect(summary).toMatchObject({
+      name: 'Pit',
+      kind: 'mesh',
+      elementCount: 4,
+      vertexCount: 4,
+      hasZ: true,
+    });
+    expect(summary?.columns).toEqual([{ name: 'face', type: 'int', nullCount: 0 }]);
+    expect(summary?.bbox).toEqual({ min: [0, 0, 0], max: [10, 10, 10] });
+  });
+
+  it('blocks indices that do not fit and loads a flat triangle and an unused vertex with notes', () => {
+    const indices = (values: number[]) => mesh({ indices: new Uint32Array(values) });
+    expect(blockedCodes(loadResult(indices([0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 4])))).toContain(
+      'mesh.indices.out_of_range',
+    );
+    expect(blockedCodes(loadResult(indices([0, 1, 2, 0])))).toContain('mesh.indices.incomplete');
+    const flat = summaries(loadResult(indices([0, 1, 2, 0, 0, 1, 0, 2, 3, 1, 2, 3])))[0];
+    expect(flat?.findings.map((f) => f.code)).toEqual(['mesh.triangle.degenerate']);
+    const unused = summaries(loadResult(indices([0, 1, 2])))[0];
+    expect(unused?.findings.map((f) => f.code)).toEqual(['mesh.vertices.unused']);
+  });
+
+  it('blocks per-vertex rows that do not fit and refuses a mesh with no z as misuse', () => {
+    const bad: KernelColumn = { name: 'grade', type: 'float', values: new Float64Array([1]) };
+    expect(blockedCodes(loadResult(mesh({ vertexColumns: [bad] })))).toEqual([
+      'dataset.vertex_attributes.rows_mismatch',
+    ]);
+    const withoutZ = Object.fromEntries(Object.entries(mesh()).filter(([key]) => key !== 'z'));
+    expect(() => createKernel().load(withoutZ)).toThrow(/needs a `z`/);
   });
 });
 
