@@ -781,3 +781,18 @@ was chosen, why.
   attribute columns are not listed: nothing shows them in phase 1. The JSON uses
   camelCase and leaves out what is absent, so `crs`, `bbox` and `vertexCount` are
   omitted rather than null.
+- Step 4.4b: `Registry` (in `karmania-io`, plain Rust) holds the loaded datasets.
+  `load(datasets, context)` validates them and, if nothing has an error, stores them
+  under new identifiers (starting at 1, in the order given, never reused after a
+  removal) and returns `Loaded { summaries }`; otherwise it returns `Blocked {
+  findings }` and stores nothing. Loading is all or nothing for the datasets given
+  together, because they came from one file and a half-loaded file would be
+  confusing; and a failed load does not use up identifiers. `context` is the findings
+  about how the datasets were made (reading problems); an error there blocks too, and
+  it is attached to every dataset loaded, so a mixed GeoJSON file's notes appear on
+  each of its datasets. Blocked findings are the context first, then each dataset's
+  validation findings in order; they do not name the dataset, which only matters for
+  multi-dataset files. A summary is worked out once at load time, since a loaded
+  dataset never changes, so listing the datasets does not rescan their coordinates.
+  `LoadResult` serializes as `{ status: "loaded", summaries }` or `{ status:
+  "blocked", findings }`, as the brief's contract says.

@@ -235,7 +235,7 @@ Definitions and reprojection can be added later, with the features that need the
   ImportJob creation and `step()`.
   - [x] 4.4a The dataset summary, in `karmania-core` (moved up from 4.11, since a
     load result carries summaries).
-  - [ ] 4.4b The registry in `karmania-io`: validates datasets and stores them, or
+  - [x] 4.4b The registry in `karmania-io`: validates datasets and stores them, or
     blocks them.
   - [ ] 4.4c An import job made from a file's bytes: format, encoding and CSV
     layout detected the same way as in the preview.
