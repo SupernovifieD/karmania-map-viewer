@@ -296,3 +296,11 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: Column {position} has no name.
 - Hint: Give the column a name, or ignore it.
 - Example: Column 3 has no name.
+
+## `values.coordinates.not_finite`
+
+- Severity: error
+- Step: none
+- Message: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
+- Hint: Fix or remove those rows.
+- Example: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
