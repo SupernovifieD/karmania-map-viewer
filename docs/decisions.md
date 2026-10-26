@@ -615,3 +615,21 @@ was chosen, why.
   `XCentre YCentre ZCentre`) and points otherwise. GeoJSON gets none: its kinds
   come from its features. Cutting the examined bytes inside a UTF-8 character is
   handled so it does not make the text look invalid.
+- Step 3.21: `crates/karmania-io/tests/robustness.rs` runs every reader (CSV as
+  points, lines and blocks with both coordinate policies, GeoJSON, ASCII grid and
+  OBJ, plus the `.prj` reader and format detection) against malformed input: empty,
+  blank and mark-only files; every prefix of every sample file; random edits
+  (flips, deletions, duplications, inserted delimiters) and random bytes; random
+  text built from data-like pieces; byte-order marks, CRLF, UTF-16 and
+  Windows-1252; trailing delimiters and ragged rows; extreme numbers in every
+  numeric slot; NUL and control characters; and very long lines, many columns and
+  rows, and long runs of brackets and quotes. For all of them it checks that no
+  reader panics, that the same input gives the same output, that an error means
+  no dataset, that no dataset means an error (nothing fails silently), that every
+  finding has text and a count, and that validating whatever was produced does not
+  panic. Each sample file is also run through its own matching reader and mapping,
+  and the random edits must both import and be refused, or the test proves
+  nothing. The suite found no defects. To be sure it can, I injected a panic and
+  a silent failure into the OBJ and grid readers and both were caught. In a release
+  build no stress case takes over 300 ms, so there is no slow path; the sizes are
+  scaled so the suite takes about 8 seconds in a debug build.

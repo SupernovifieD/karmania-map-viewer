@@ -195,7 +195,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   Otherwise report "unrecognized", and the wizard asks.
 - [x] 3.20 Format detection from extension plus content sniffing, giving
   DetectedFormat and the suggested kind.
-- [ ] 3.21 Reader robustness tests: the malformed-input list from section 6 for
+- [x] 3.21 Reader robustness tests: the malformed-input list from section 6 for
   every reader.
 - [ ] 3.22 Incremental ImportJob with `step(budget_rows) -> Progress | Done` for
   CSV; the other readers run as one step for now.
