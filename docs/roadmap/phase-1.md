@@ -70,7 +70,7 @@ M0; each is its own commit):
   centre with rotation. Tests include 30 and 90 degree rotations.
 - [x] 1.12 `Geometry::Grid` (Flat or FromColumn z).
 - [x] 1.13 `Geometry::Blocks` (dense or sparse ijk).
-- [ ] 1.14 `element_count()` and expected attribute rows for each kind.
+- [x] 1.14 `element_count()` and expected attribute rows for each kind.
 - [ ] 1.15 Bounding box for each kind (lattice bbox accounts for rotation).
 - [ ] 1.16 MAX_ELEMENTS guard: a size estimate before allocation that returns
   an error finding.

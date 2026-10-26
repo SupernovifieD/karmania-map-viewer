@@ -96,6 +96,49 @@ impl Geometry {
             Geometry::Blocks(_) => true,
         }
     }
+
+    /// The number of elements: points, lines, polygons, triangles, cells or
+    /// blocks. An attribute table has one row per element. `None` when the
+    /// geometry is too malformed to count (for example empty offsets) or the
+    /// count does not fit in a `u64`.
+    #[must_use]
+    pub fn element_count(&self) -> Option<u64> {
+        match self {
+            Geometry::Points(positions) => to_u64(positions.len()),
+            Geometry::Lines(lines) => lines.line_count().and_then(to_u64),
+            Geometry::Polygons(polygons) => polygons.polygon_count().and_then(to_u64),
+            Geometry::Mesh(mesh) => to_u64(mesh.triangle_count()),
+            Geometry::Grid(grid) => grid.cell_count(),
+            Geometry::Blocks(blocks) => blocks.block_count(),
+        }
+    }
+
+    /// The number of vertices, for the shapes built from a vertex list: lines,
+    /// polygons and meshes. `None` for points, grids and block models.
+    #[must_use]
+    pub fn vertex_count(&self) -> Option<u64> {
+        match self {
+            Geometry::Lines(lines) => to_u64(lines.vertex_count()),
+            Geometry::Polygons(polygons) => to_u64(polygons.vertex_count()),
+            Geometry::Mesh(mesh) => to_u64(mesh.vertex_count()),
+            Geometry::Points(_) | Geometry::Grid(_) | Geometry::Blocks(_) => None,
+        }
+    }
+
+    /// The number of rows a per-vertex attribute table must have: the vertex
+    /// count for lines and meshes, the only shapes that may carry one. `None`
+    /// for the other shapes.
+    #[must_use]
+    pub fn expected_vertex_attribute_rows(&self) -> Option<u64> {
+        match self {
+            Geometry::Lines(_) | Geometry::Mesh(_) => self.vertex_count(),
+            _ => None,
+        }
+    }
+}
+
+fn to_u64(n: usize) -> Option<u64> {
+    u64::try_from(n).ok()
 }
 
 /// Where a dataset came from.
@@ -158,6 +201,26 @@ impl Dataset {
     #[must_use]
     pub fn has_z(&self) -> bool {
         self.geometry.has_z()
+    }
+
+    /// The number of elements; see [`Geometry::element_count`].
+    #[must_use]
+    pub fn element_count(&self) -> Option<u64> {
+        self.geometry.element_count()
+    }
+
+    /// The number of rows `attributes` should have: one per element (per point,
+    /// line, polygon, triangle, cell or block).
+    #[must_use]
+    pub fn expected_attribute_rows(&self) -> Option<u64> {
+        self.element_count()
+    }
+
+    /// The number of rows `vertex_attributes` should have, if the shape can
+    /// carry per-vertex attributes; see [`Geometry::expected_vertex_attribute_rows`].
+    #[must_use]
+    pub fn expected_vertex_attribute_rows(&self) -> Option<u64> {
+        self.geometry.expected_vertex_attribute_rows()
     }
 }
 
@@ -307,6 +370,102 @@ mod tests {
             Table::empty(),
         );
         assert_eq!((d.kind(), d.has_z()), (Kind::Blocks, true));
+    }
+
+    fn positions(n: usize) -> Positions {
+        let coords: Vec<f64> = (0..n).map(|i| i as f64).collect();
+        Positions::from_xyz(&coords, &coords, None, &mut Findings::new()).unwrap()
+    }
+
+    fn lattice(dims: [u32; 3]) -> Lattice {
+        Lattice {
+            origin: [0.0; 3],
+            spacing: [1.0; 3],
+            dims,
+            rotation: 0.0,
+        }
+    }
+
+    fn flat() -> GridZ {
+        GridZ::Flat { elevation: 0.0 }
+    }
+
+    #[test]
+    fn every_kind_counts_its_elements_vertices_and_expected_rows() {
+        let lines = Lines {
+            positions: positions(5),
+            offsets: vec![0, 2, 5],
+        };
+        let polygons = Polygons {
+            positions: positions(6),
+            ring_offsets: vec![0, 3, 6],
+            polygon_offsets: vec![0, 1, 2],
+        };
+        let mesh = Mesh {
+            positions: positions(4),
+            indices: vec![0, 1, 2, 2, 1, 3],
+        };
+        let grid = Grid {
+            lattice: lattice([4, 3, 1]),
+            z: flat(),
+        };
+        let dense = Blocks {
+            lattice: lattice([2, 3, 4]),
+            ijk: None,
+        };
+        let sparse = Blocks {
+            lattice: lattice([9, 9, 9]),
+            ijk: Some(vec![0, 0, 0, 1, 1, 1, 2, 2, 2]),
+        };
+        // (geometry, elements, vertices, expected per-vertex attribute rows)
+        let cases = [
+            (Geometry::Points(positions(3)), Some(3), None, None),
+            (Geometry::Lines(lines), Some(2), Some(5), Some(5)),
+            (Geometry::Polygons(polygons), Some(2), Some(6), None),
+            (Geometry::Mesh(mesh), Some(2), Some(4), Some(4)),
+            (Geometry::Grid(grid), Some(12), None, None),
+            (Geometry::Blocks(dense), Some(24), None, None),
+            (Geometry::Blocks(sparse), Some(3), None, None),
+        ];
+        for (geometry, elements, vertices, vertex_rows) in cases {
+            let kind = geometry.kind();
+            assert_eq!(geometry.element_count(), elements, "{kind:?} elements");
+            assert_eq!(geometry.vertex_count(), vertices, "{kind:?} vertices");
+            assert_eq!(
+                geometry.expected_vertex_attribute_rows(),
+                vertex_rows,
+                "{kind:?} vertex rows"
+            );
+            let d = Dataset::new(DatasetId(1), "d", None, geometry, Table::empty());
+            assert_eq!(d.element_count(), elements);
+            assert_eq!(d.expected_attribute_rows(), elements);
+            assert_eq!(d.expected_vertex_attribute_rows(), vertex_rows);
+        }
+    }
+
+    #[test]
+    fn malformed_or_oversized_geometry_has_no_element_count() {
+        let no_lines = Geometry::Lines(Lines {
+            positions: positions(2),
+            offsets: vec![],
+        });
+        let no_polygons = Geometry::Polygons(Polygons {
+            positions: positions(2),
+            ring_offsets: vec![0],
+            polygon_offsets: vec![],
+        });
+        let huge = Geometry::Grid(Grid {
+            lattice: lattice([u32::MAX, u32::MAX, 2]),
+            z: flat(),
+        });
+        for geometry in [no_lines, no_polygons, huge] {
+            assert_eq!(geometry.element_count(), None);
+        }
+        let partial = Geometry::Mesh(Mesh {
+            positions: positions(3),
+            indices: vec![0, 1, 2, 0],
+        });
+        assert_eq!(partial.element_count(), Some(1));
     }
 
     #[test]

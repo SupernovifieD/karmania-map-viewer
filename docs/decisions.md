@@ -178,3 +178,13 @@ was chosen, why.
   The lattice stores `dims` as `u32`, with cell counts computed in `u64` using
   checked multiplication; methods return `None` or NaN for invalid values and
   never panic.
+- Step 1.13: a block model is always reported as 3D (`has_z` is true), and a
+  grid is 3D only with elevations from a column or more than one layer. Sparse
+  block triplets are a flat `Vec<u32>` rather than `Vec<[u32; 3]>` so that a
+  length that is not a multiple of 3 stays representable and can be reported.
+- Step 1.14: `vertex_count` is `Some` only for lines, polygons and meshes (the
+  shapes with a vertex list; the dataset summary shows it "where relevant"),
+  and per-vertex attributes are expected only for lines and meshes, as the brief
+  says. Every count returns `None` rather than a guess when the geometry is too
+  malformed to count; the expected attribute rows equal the element count for
+  every kind.
