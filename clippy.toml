@@ -1,0 +1,7 @@
+# Malformed input must never panic, so unwrap, expect and panic are denied in
+# library code (see [workspace.lints.clippy] in Cargo.toml). Tests may use them.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true

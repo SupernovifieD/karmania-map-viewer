@@ -20,7 +20,7 @@ brief says to stop.
   reports, generated fixtures).
 - [x] 0.3 Rust workspace plus `rust-toolchain.toml`; `crates/karmania-core` as
   an empty library with one passing test.
-- [ ] 0.4 `rustfmt.toml` and clippy settings; workspace lints; forbid
+- [x] 0.4 `rustfmt.toml` and clippy settings; workspace lints; forbid
   `unsafe_code` in core.
 - [ ] 0.5 pnpm workspace root, `.nvmrc`, base tsconfig (strict options from
   section 6).

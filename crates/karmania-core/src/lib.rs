@@ -4,6 +4,8 @@
 //! This crate performs no I/O, contains no WebAssembly-specific code and keeps
 //! no global state, so the same code can later be bound to other languages.
 
+#![forbid(unsafe_code)]
+
 #[cfg(test)]
 mod tests {
     #[test]
