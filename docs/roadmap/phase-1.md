@@ -62,7 +62,7 @@ M0; each is its own commit):
   as findings.
 - [x] 1.6 Positions newtype (interleaved xyz, has_z) with constructors from x,
   y and optional z.
-- [ ] 1.7 Dataset struct plus `Geometry::Points`.
+- [x] 1.7 Dataset struct plus `Geometry::Points`.
 - [ ] 1.8 `Geometry::Lines`.
 - [ ] 1.9 `Geometry::Polygons`.
 - [ ] 1.10 `Geometry::Mesh`.
