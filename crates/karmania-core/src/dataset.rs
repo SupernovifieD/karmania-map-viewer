@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crs::CrsRef;
+use crate::grid::Grid;
 use crate::lines::Lines;
 use crate::mesh::Mesh;
 use crate::polygons::Polygons;
@@ -60,6 +61,8 @@ pub enum Geometry {
     Polygons(Polygons),
     /// A triangle mesh, one attribute row per triangle.
     Mesh(Mesh),
+    /// A regular grid, one attribute row per cell.
+    Grid(Grid),
 }
 
 impl Geometry {
@@ -71,6 +74,7 @@ impl Geometry {
             Geometry::Lines(_) => Kind::Lines,
             Geometry::Polygons(_) => Kind::Polygons,
             Geometry::Mesh(_) => Kind::Mesh,
+            Geometry::Grid(_) => Kind::Grid,
         }
     }
 
@@ -83,6 +87,7 @@ impl Geometry {
             Geometry::Lines(lines) => lines.positions.has_z(),
             Geometry::Polygons(polygons) => polygons.positions.has_z(),
             Geometry::Mesh(mesh) => mesh.positions.has_z(),
+            Geometry::Grid(grid) => grid.has_z(),
         }
     }
 }
@@ -155,6 +160,8 @@ mod tests {
     use super::*;
     use crate::crs::Units;
     use crate::findings::Findings;
+    use crate::grid::GridZ;
+    use crate::lattice::Lattice;
 
     fn points(z: Option<&[f64]>) -> Geometry {
         let mut findings = Findings::new();
@@ -253,6 +260,28 @@ mod tests {
             Table::empty(),
         );
         assert_eq!((d.kind(), d.has_z()), (Kind::Mesh, true));
+    }
+
+    #[test]
+    fn a_grid_dataset_reports_the_grid_kind() {
+        let lattice = Lattice {
+            origin: [0.0; 3],
+            spacing: [10.0; 3],
+            dims: [5, 5, 1],
+            rotation: 0.0,
+        };
+        let grid = Grid {
+            lattice,
+            z: GridZ::Flat { elevation: 100.0 },
+        };
+        let d = Dataset::new(
+            DatasetId(4),
+            "dem",
+            None,
+            Geometry::Grid(grid),
+            Table::empty(),
+        );
+        assert_eq!((d.kind(), d.has_z()), (Kind::Grid, false));
     }
 
     #[test]

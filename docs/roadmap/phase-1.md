@@ -68,7 +68,7 @@ M0; each is its own commit):
 - [x] 1.10 `Geometry::Mesh`.
 - [x] 1.11 Lattice: fields, doc-commented conventions, index <-> ijk, cell
   centre with rotation. Tests include 30 and 90 degree rotations.
-- [ ] 1.12 `Geometry::Grid` (Flat or FromColumn z).
+- [x] 1.12 `Geometry::Grid` (Flat or FromColumn z).
 - [ ] 1.13 `Geometry::Blocks` (dense or sparse ijk).
 - [ ] 1.14 `element_count()` and expected attribute rows for each kind.
 - [ ] 1.15 Bounding box for each kind (lattice bbox accounts for rotation).
