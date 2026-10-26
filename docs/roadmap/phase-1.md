@@ -66,7 +66,7 @@ M0; each is its own commit):
 - [x] 1.8 `Geometry::Lines`.
 - [x] 1.9 `Geometry::Polygons`.
 - [x] 1.10 `Geometry::Mesh`.
-- [ ] 1.11 Lattice: fields, doc-commented conventions, index <-> ijk, cell
+- [x] 1.11 Lattice: fields, doc-commented conventions, index <-> ijk, cell
   centre with rotation. Tests include 30 and 90 degree rotations.
 - [ ] 1.12 `Geometry::Grid` (Flat or FromColumn z).
 - [ ] 1.13 `Geometry::Blocks` (dense or sparse ijk).

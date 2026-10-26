@@ -169,3 +169,12 @@ was chosen, why.
   accessors such as `Lines::vertex_range` return `None` for malformed offsets,
   because checking the offsets is validation's job (step 2.3). Offsets are
   `u32`, which is enough because the size limit is far below 2^32 elements.
+- Step 1.11: lattice rotation uses exact sine and cosine for multiples of 90
+  degrees (so a quarter turn gives exact coordinates, and -270, 90 and 450
+  agree bit for bit). Other angles use the platform's `f64::sin_cos`, whose last
+  bit can differ between native code and WebAssembly. Bit-identical results for
+  every angle would need a pure-Rust math crate such as `libm`, which is not on
+  the approved dependency list; this is flagged for the owner in the M1 report.
+  The lattice stores `dims` as `u32`, with cell counts computed in `u64` using
+  checked multiplication; methods return `None` or NaN for invalid values and
+  never panic.
