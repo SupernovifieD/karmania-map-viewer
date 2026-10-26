@@ -29,6 +29,7 @@ export type {
   ImportMapping,
   ImportStatus,
   Kind,
+  KernelBlocks,
   KernelColumn,
   KernelDataset,
   KernelGrid,

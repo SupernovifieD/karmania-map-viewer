@@ -256,7 +256,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 4.9a Validation: a grid's elevation column must exist and hold numbers
     (found missing while designing this step).
   - [x] 4.9b The grid builder and its export.
-- [ ] 4.10 Builders: blocks.
+- [x] 4.10 Builders: blocks.
 - [ ] 4.11 Export `summary(handle)`, `rows(handle, start, count)` with
   geometry-derived columns, and `remove(handle)`. (The summary itself is built in
   4.4a and the store in 4.4b.)

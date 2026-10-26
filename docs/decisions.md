@@ -932,3 +932,14 @@ was chosen, why.
   `u64` or exceeds the limit is refused by the size guard without any cell being made
   (4,000,000,000 x 4,000,000,000 x 2 is tested). Rotation is applied about the origin,
   and the bounding box follows it.
+- Step 4.10: a block model is loaded with `kind: "blocks"`, a lattice (as for a grid),
+  and attribute columns with one value per block. Without `ijk` the model is dense: a
+  block in every cell, values in lattice order (X fastest, then Y, then Z). With `ijk`
+  (a `Uint32Array` of `i, j, k` triplets) it is sparse, and the values follow the order
+  of the triplets. Blocks outside the lattice, blocks listed twice, an incomplete last
+  triplet, values for the wrong number of blocks and a lattice that cannot be used are
+  found by validation, which names each. A sparse model on a huge lattice (100,000
+  cells along each axis) loads, because only its blocks exist and the check for
+  repeats sorts instead of using one bit per cell; a dense model too big to hold is
+  refused by the size guard before any block is made. The bounding box of a model is
+  its whole lattice, sparse or not. This completes the builders (steps 4.5 to 4.10).

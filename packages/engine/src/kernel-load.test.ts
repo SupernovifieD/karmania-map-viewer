@@ -3,6 +3,7 @@ import { checkedLoadResult } from './contract-check.js';
 import { createKernel, foreignArrays } from './test-support/kernel.js';
 import type {
   CrsRef,
+  KernelBlocks,
   KernelColumn,
   KernelGrid,
   KernelLines,
@@ -87,6 +88,25 @@ function grid(extra: Partial<KernelGrid> = {}): KernelGrid {
     spacing: [10, 10, 1],
     dims: [2, 3, 1],
     columns: [{ name: 'value', type: 'float', values: new Float64Array([1, 2, 3, 4, 5, 6]) }],
+    ...extra,
+  };
+}
+
+function blocks(values: number, extra: Partial<KernelBlocks> = {}): KernelBlocks {
+  return {
+    kind: 'blocks',
+    name: 'Model',
+    crs: METRES,
+    origin: [500_000, 2_765_000, 90],
+    spacing: [10, 10, 10],
+    dims: [2, 2, 2],
+    columns: [
+      {
+        name: 'grade',
+        type: 'float',
+        values: Float64Array.from({ length: values }, (_, i) => i),
+      },
+    ],
     ...extra,
   };
 }
@@ -419,6 +439,54 @@ describe('loading a grid from arrays through kernel.load', () => {
     );
     expect(() => kernel.load({ ...grid(), elevationColumn: 5 })).toThrow(
       /`elevationColumn` must be a string/,
+    );
+  });
+});
+
+describe('loading a block model from arrays through kernel.load', () => {
+  it('loads a dense model, with a block in every cell', () => {
+    const [summary] = summaries(loadResult(blocks(8)));
+    expect(summary).toMatchObject({ name: 'Model', kind: 'blocks', elementCount: 8, hasZ: true });
+    expect(summary?.bbox).toEqual({
+      min: [500_000, 2_765_000, 90],
+      max: [500_020, 2_765_020, 110],
+    });
+    expect(summary?.columns).toEqual([{ name: 'grade', type: 'float', nullCount: 0 }]);
+  });
+
+  it('loads a sparse model, which lists the cell of each block', () => {
+    const ijk = new Uint32Array([0, 0, 0, 1, 1, 1, 0, 1, 0]);
+    const [summary] = summaries(loadResult(blocks(3, { ijk })));
+    expect(summary).toMatchObject({ elementCount: 3, kind: 'blocks' });
+    // The box still covers the lattice.
+    expect(summary?.bbox?.max).toEqual([500_020, 2_765_020, 110]);
+  });
+
+  it('loads a sparse model on a huge lattice, because only its blocks exist', () => {
+    const ijk = new Uint32Array([0, 0, 0, 99_999, 99_999, 99_999, 5, 6, 7]);
+    const [summary] = summaries(loadResult(blocks(3, { ijk, dims: [100_000, 100_000, 100_000] })));
+    expect(summary?.elementCount).toBe(3);
+  });
+
+  it('blocks blocks that do not fit the lattice, saying how', () => {
+    const sparse = (ijk: number[], values: number) =>
+      blockedCodes(loadResult(blocks(values, { ijk: new Uint32Array(ijk) })));
+    expect(sparse([0, 0, 0, 2, 0, 0], 2)).toContain('blocks.ijk.out_of_range');
+    expect(sparse([1, 1, 1, 1, 1, 1], 2)).toContain('blocks.ijk.duplicate');
+    expect(sparse([0, 0, 0, 1, 1], 1)).toContain('blocks.ijk.incomplete');
+    expect(sparse([0, 0, 0, 1, 1, 1], 3)).toContain('dataset.attributes.rows_mismatch');
+    expect(blockedCodes(loadResult(blocks(5)))).toContain('dataset.attributes.rows_mismatch');
+    expect(blockedCodes(loadResult(blocks(8, { dims: [2, 0, 2] })))).toContain('lattice.dims.zero');
+    expect(blockedCodes(loadResult(blocks(8, { spacing: [10, 0, 10] })))).toContain(
+      'lattice.spacing.invalid',
+    );
+  });
+
+  it('refuses a dense model too big to hold, and a sparse list of the wrong type', () => {
+    const huge = loadResult(blocks(0, { dims: [4_000_000_000, 4_000_000_000, 2], columns: [] }));
+    expect(blockedCodes(huge)).toContain('dataset.too_large');
+    expect(() => createKernel().load({ ...blocks(2), ijk: [0, 0, 0, 1, 1, 1] })).toThrow(
+      /`ijk` must be a Uint32Array/,
     );
   });
 });

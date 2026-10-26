@@ -12,8 +12,8 @@ use serde::Serialize;
 use karmania_core::{Dataset, Findings};
 
 use crate::build::{
-    GridInput, LinesInput, MeshInput, PointsInput, PolygonsInput, build_grid, build_lines,
-    build_mesh, build_points, build_polygons,
+    BlocksInput, GridInput, LinesInput, MeshInput, PointsInput, PolygonsInput, build_blocks,
+    build_grid, build_lines, build_mesh, build_points, build_polygons,
 };
 use crate::import_run::{ImportRun, Phase, RunStep};
 use crate::mapping::ImportMapping;
@@ -123,6 +123,11 @@ impl Kernel {
     /// Loads a regular grid made from arrays; see [`Kernel::load_points`].
     pub fn load_grid(&mut self, input: GridInput) -> LoadResult {
         self.load_built(|findings| build_grid(input, findings))
+    }
+
+    /// Loads a block model made from arrays; see [`Kernel::load_points`].
+    pub fn load_blocks(&mut self, input: BlocksInput) -> LoadResult {
+        self.load_built(|findings| build_blocks(input, findings))
     }
 
     /// Loads what `build` makes, or blocks with its findings if it makes nothing.
