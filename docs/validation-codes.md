@@ -89,6 +89,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: none
 - Example: The coordinates could not be checked against EPSG:3993 (NAD83(NSRS2007) / Guam Dateline) because this tool cannot calculate that projection.
 
+## `csv.coordinate.missing`
+
+- Severity: error
+- Step: nodata
+- Message: Some rows have an empty or unreadable value in the coordinate column "{name}".
+- Hint: Fix those rows, or choose to skip rows with an empty coordinate.
+- Example: Some rows have an empty or unreadable value in the coordinate column "Easting".
+
+## `csv.rows.ragged`
+
+- Severity: warning
+- Step: file
+- Message: Some rows have a different number of values from the header ({count}); missing values were left empty and extra ones ignored.
+- Hint: Check the delimiter, and the file for stray line breaks and quotes.
+- Example: Some rows have a different number of values from the header (6); missing values were left empty and extra ones ignored.
+
+## `csv.rows.skipped`
+
+- Severity: warning
+- Step: nodata
+- Message: Some rows were left out because a coordinate was empty or unreadable.
+- Hint: Check the file if you expected every row to be used.
+- Example: Some rows were left out because a coordinate was empty or unreadable.
+
+## `csv.value.unreadable`
+
+- Severity: warning
+- Step: mapping
+- Message: Some values in the column "{name}" could not be read as {type}, so they were left empty.
+- Hint: Check the column's type, or the values you marked as no data.
+- Example: Some values in the column "Au" could not be read as float, so they were left empty.
+
 ## `dataset.attributes.rows_mismatch`
 
 - Severity: error
