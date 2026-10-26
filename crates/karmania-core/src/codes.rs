@@ -88,6 +88,10 @@ finding_codes! {
     CsvRowsSkipped => "csv.rows.skipped", Warning, Some(WizardStep::Nodata);
     /// Some values could not be read as the column's type and were left empty.
     CsvValueUnreadable => "csv.value.unreadable", Warning, Some(WizardStep::Mapping);
+    /// A GeoJSON property was read as text because its values are of different kinds.
+    GeojsonPropertyAsText => "geojson.property.as_text", Warning, Some(WizardStep::Mapping);
+    /// Some GeoJSON features have a property with no name.
+    GeojsonPropertyUnnamed => "geojson.property.unnamed", Warning, Some(WizardStep::Mapping);
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.
