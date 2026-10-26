@@ -70,6 +70,26 @@ finding_codes! {
     LinesOffsetsDecreasing => "lines.offsets.decreasing", Error, None;
     /// The offsets list of a line set is empty.
     LinesOffsetsEmpty => "lines.offsets.empty", Error, None;
+    /// The offsets list that groups rings into polygons ends at the wrong ring.
+    PolygonsPolygonOffsetsBadEnd => "polygons.polygon_offsets.bad_end", Error, None;
+    /// The offsets list that groups rings into polygons does not start at 0.
+    PolygonsPolygonOffsetsBadStart => "polygons.polygon_offsets.bad_start", Error, None;
+    /// Some polygons end before they start.
+    PolygonsPolygonOffsetsDecreasing => "polygons.polygon_offsets.decreasing", Error, None;
+    /// The offsets list that groups rings into polygons is empty.
+    PolygonsPolygonOffsetsEmpty => "polygons.polygon_offsets.empty", Error, None;
+    /// Some polygons have no rings at all.
+    PolygonsPolygonNoRings => "polygons.polygon.no_rings", Error, None;
+    /// The offsets list that splits vertices into rings ends at the wrong vertex.
+    PolygonsRingOffsetsBadEnd => "polygons.ring_offsets.bad_end", Error, None;
+    /// The offsets list that splits vertices into rings does not start at 0.
+    PolygonsRingOffsetsBadStart => "polygons.ring_offsets.bad_start", Error, None;
+    /// Some rings end before they start.
+    PolygonsRingOffsetsDecreasing => "polygons.ring_offsets.decreasing", Error, None;
+    /// The offsets list that splits vertices into rings is empty.
+    PolygonsRingOffsetsEmpty => "polygons.ring_offsets.empty", Error, None;
+    /// Some rings have fewer than three vertices.
+    PolygonsRingTooShort => "polygons.ring.too_short", Error, None;
     /// A table column has a different number of rows from the first column.
     TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.

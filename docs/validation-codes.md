@@ -81,6 +81,86 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Start with 0, end with the number of vertices, and never go backwards.
 - Example: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3).
 
+## `polygons.polygon.no_rings`
+
+- Severity: error
+- Step: none
+- Message: Some polygons have no rings, so they have no outline.
+- Hint: Remove those polygons or give each one an outer ring.
+- Example: Some polygons have no rings, so they have no outline.
+
+## `polygons.polygon_offsets.bad_end`
+
+- Severity: error
+- Step: none
+- Message: The list that says which rings belong to each polygon must end with the number of rings ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of rings, and never go backwards.
+- Example: The list that says which rings belong to each polygon must end with the number of rings (2), but it ends with 1.
+
+## `polygons.polygon_offsets.bad_start`
+
+- Severity: error
+- Step: none
+- Message: The list that says which rings belong to each polygon must start with 0, but it starts with {actual}.
+- Hint: Start with 0, end with the number of rings, and never go backwards.
+- Example: The list that says which rings belong to each polygon must start with 0, but it starts with 1.
+
+## `polygons.polygon_offsets.decreasing`
+
+- Severity: error
+- Step: none
+- Message: Some polygons end before they start.
+- Hint: Start with 0, end with the number of rings, and never go backwards.
+- Example: Some polygons end before they start.
+
+## `polygons.polygon_offsets.empty`
+
+- Severity: error
+- Step: none
+- Message: The list that says which rings belong to each polygon is empty. It must start with 0 and end with the number of rings ({expected}).
+- Hint: Start with 0, end with the number of rings, and never go backwards.
+- Example: The list that says which rings belong to each polygon is empty. It must start with 0 and end with the number of rings (2).
+
+## `polygons.ring.too_short`
+
+- Severity: error
+- Step: none
+- Message: Some rings have fewer than 3 vertices, so they cannot enclose an area.
+- Hint: Remove those rings or add the missing vertices.
+- Example: Some rings have fewer than 3 vertices, so they cannot enclose an area.
+
+## `polygons.ring_offsets.bad_end`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each ring starts must end with the number of vertices ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each ring starts must end with the number of vertices (9), but it ends with 7.
+
+## `polygons.ring_offsets.bad_start`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each ring starts must start with 0, but it starts with {actual}.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each ring starts must start with 0, but it starts with 1.
+
+## `polygons.ring_offsets.decreasing`
+
+- Severity: error
+- Step: none
+- Message: Some rings end before they start.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: Some rings end before they start.
+
+## `polygons.ring_offsets.empty`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices ({expected}).
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices (3).
+
 ## `table.column.length_mismatch`
 
 - Severity: error
