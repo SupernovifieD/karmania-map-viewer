@@ -110,7 +110,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   dictionary (error).
 - [x] 2.15 CRS: missing CRS (error, hint: choose an EPSG code or Local grid,
   step "crs"); Local accepted.
-- [ ] 2.16 Add the EPSG definitions dependency (dependency-only commit, with
+- [x] 2.16 Add the EPSG definitions dependency (dependency-only commit, with
   `docs/dependencies.md`).
 - [ ] 2.17 CRS: unknown EPSG code (error); expose a lookup with code, name,
   kind (geographic or projected) and units.

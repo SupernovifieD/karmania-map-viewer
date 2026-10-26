@@ -252,3 +252,12 @@ was chosen, why.
   function; the sort needs four bytes per point and gives the same answer. The
   later copies are counted (the first is not blamed), and 0.0 and -0.0 count as
   different points because "exact" means identical bits.
+- Step 2.16: the EPSG definitions come from `crs-definitions` 0.6.0 (CC0-1.0,
+  `no_std`, no dependencies, released regularly through September 2026). It maps
+  a `u16` EPSG code to a PROJ string and a WKT string; it has no names or unit
+  fields, so step 2.17 reads the name, kind and unit from the WKT. Codes above
+  65535 are therefore unknown, which covers every EPSG code in use. The owner
+  said to use EPSG whatever its license; the data's provenance (PostGIS table,
+  derived from the IOGP EPSG registry) is written down in
+  `docs/dependencies.md`. Its size in the WebAssembly build is to be measured
+  at step 4.1 and reported at the M4 checkpoint.
