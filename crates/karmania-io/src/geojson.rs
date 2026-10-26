@@ -25,7 +25,7 @@ use serde_json::error::Category;
 use serde_json::{Map, Value};
 
 use crate::geojson_properties::Properties;
-use crate::geojson_shapes::{GEOMETRY_TYPES, Parsed, PointsAcc, parse_geometry};
+use crate::geojson_shapes::{GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, parse_geometry};
 use crate::output::{ReadOutput, Tally};
 
 /// One feature (or a bare geometry): where it is in the file, its geometry and
@@ -137,6 +137,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
         return Vec::new();
     };
     let mut points = PointsAcc::new();
+    let mut lines = LinesAcc::new();
     for item in &items {
         let Some(geometry) = item.geometry.filter(|g| !g.is_null()) else {
             skips.no_geometry.hit(item.at());
@@ -144,13 +145,30 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
         };
         match parse_geometry(geometry) {
             Parsed::Points(positions) => points.add(item.properties(), &positions),
+            Parsed::Lines(parts) => lines.add(item.properties(), &parts),
             Parsed::Unsupported(kind) => skips.unsupported(kind, item.at()),
             Parsed::Invalid => skips.invalid_geometry.hit(item.at()),
         }
     }
     skips.report(findings);
 
-    let datasets: Vec<Dataset> = points.finish(file_name, findings).into_iter().collect();
+    let mut datasets: Vec<Dataset> = [
+        points.finish(file_name, findings),
+        lines.finish(file_name, findings),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if datasets.len() > 1 {
+        // Several datasets from one file need names that tell them apart.
+        for dataset in &mut datasets {
+            let kind = dataset.kind().as_str();
+            dataset.name = match file_name.filter(|n| !n.trim().is_empty()) {
+                Some(file) => format!("{file} ({kind})"),
+                None => kind.to_string(),
+            };
+        }
+    }
     if datasets.is_empty() && !findings.has_errors() {
         findings.add(
             Finding::new(
@@ -272,7 +290,7 @@ fn feature(value: &Value, index: u64) -> Option<Item<'_>> {
 mod tests {
     use super::*;
     use crate::fixtures;
-    use karmania_core::{ColumnType, CrsRef, Geometry, Kind, Positions, Value as Cell};
+    use karmania_core::{Column, ColumnType, CrsRef, Geometry, Kind, Positions, Value as Cell};
     use serde_json::json;
 
     fn codes(out: &ReadOutput) -> Vec<&'static str> {
@@ -308,30 +326,26 @@ mod tests {
     }
 
     #[test]
-    fn the_points_of_the_mixed_sample_are_imported_and_the_rest_is_reported() {
+    fn the_points_and_lines_of_the_mixed_sample_are_imported_and_the_polygon_is_reported() {
         let out = read_geojson(&fixtures::text("mixed.geojson"), Some("mixed.geojson"));
-        // The road and the lease are not imported yet; one well has no elevation.
+        // The lease is not imported yet; one well has no elevation.
         assert_eq!(
             codes(&out),
             [
-                "geojson.geometry.unsupported",
                 "geojson.geometry.unsupported",
                 "geojson.z.partial",
                 "geojson.crs.assumed"
             ]
         );
-        let messages: Vec<_> = out.findings.iter().map(|f| f.message.as_str()).collect();
         assert_eq!(
-            &messages[..2],
-            [
-                "Features of type LineString cannot be imported, so they were left out.",
-                "Features of type Polygon cannot be imported, so they were left out."
-            ]
+            out.findings.as_slice()[0].message,
+            "Features of type Polygon cannot be imported, so they were left out."
         );
-        let d = only(&out);
+        assert_eq!(out.datasets.len(), 2);
+        let d = &out.datasets[0];
         assert_eq!(
             (d.name.as_str(), d.kind(), d.has_z(), d.element_count()),
-            ("mixed.geojson", Kind::Points, false, Some(2))
+            ("mixed.geojson (points)", Kind::Points, false, Some(2))
         );
         assert_eq!(d.crs, Some(CrsRef::Epsg { code: 4326 }));
         assert_eq!(
@@ -361,6 +375,13 @@ mod tests {
         // Well A is the first feature and has no elevation.
         assert_eq!((z.count, z.examples[0].element), (1, Some(0)));
         assert!(karmania_core::validate(d).is_loadable());
+
+        let road = &out.datasets[1];
+        assert_eq!(
+            (road.name.as_str(), road.kind(), road.element_count()),
+            ("mixed.geojson (lines)", Kind::Lines, Some(1))
+        );
+        assert!(karmania_core::validate(road).is_loadable());
     }
 
     #[test]
@@ -648,5 +669,183 @@ mod tests {
             read_geojson(&text, Some("m.geojson")),
             read_geojson(&text, Some("m.geojson"))
         );
+    }
+
+    fn lines(d: &Dataset) -> &karmania_core::Lines {
+        let Geometry::Lines(l) = &d.geometry else {
+            panic!("not lines")
+        };
+        l
+    }
+
+    fn line_feature(
+        coordinates: serde_json::Value,
+        properties: serde_json::Value,
+    ) -> serde_json::Value {
+        json!({
+            "type": "Feature",
+            "properties": properties,
+            "geometry": {"type": "LineString", "coordinates": coordinates}
+        })
+    }
+
+    fn multi_line_feature(
+        parts: serde_json::Value,
+        properties: serde_json::Value,
+    ) -> serde_json::Value {
+        json!({
+            "type": "Feature",
+            "properties": properties,
+            "geometry": {"type": "MultiLineString", "coordinates": parts}
+        })
+    }
+
+    #[test]
+    fn a_linestring_is_a_line_with_its_properties_and_the_number_of_its_feature() {
+        let out = read(&collection(vec![
+            point(json!([9, 9]), json!({})),
+            line_feature(
+                json!([[0, 0], [1, 1], [2, 0]]),
+                json!({"name": "Road", "lanes": 2}),
+            ),
+        ]));
+        let road = &out.datasets[1];
+        assert_eq!(road.name, "test.geojson (lines)");
+        let l = lines(road);
+        assert_eq!((l.offsets.as_slice(), l.vertex_count()), (&[0, 3][..], 3));
+        assert_eq!(l.positions.get(1), Some([1.0, 1.0, 0.0]));
+        let names: Vec<_> = road.attributes.columns().iter().map(Column::name).collect();
+        assert_eq!(names, ["feature_id", "lanes", "name"]);
+        // The road is the second feature of the file.
+        assert_eq!(
+            road.attributes.column("feature_id").unwrap().get(0),
+            Some(Cell::Int64(2))
+        );
+        assert_eq!(
+            road.attributes.column("lanes").unwrap().get(0),
+            Some(Cell::Int64(2))
+        );
+        assert!(karmania_core::validate(road).is_loadable());
+    }
+
+    #[test]
+    fn every_part_of_a_multilinestring_is_a_line_that_shares_the_features_values() {
+        let out = read(&collection(vec![
+            multi_line_feature(
+                json!([[[0, 0], [1, 0]], [[5, 5], [6, 6], [7, 7]]]),
+                json!({"name": "Fork"}),
+            ),
+            line_feature(json!([[9, 9], [8, 8]]), json!({"name": "Single"})),
+        ]));
+        let d = only(&out);
+        assert_eq!(d.name, "test.geojson");
+        assert_eq!(d.element_count(), Some(3));
+        let l = lines(d);
+        assert_eq!(l.offsets, [0, 2, 5, 7]);
+        let ids = d.attributes.column("feature_id").unwrap();
+        let name = d.attributes.column("name").unwrap();
+        let rows: Vec<_> = (0..3).map(|i| (ids.get(i), name.get(i))).collect();
+        assert_eq!(
+            rows,
+            [
+                (Some(Cell::Int64(1)), Some(Cell::Utf8("Fork"))),
+                (Some(Cell::Int64(1)), Some(Cell::Utf8("Fork"))),
+                (Some(Cell::Int64(2)), Some(Cell::Utf8("Single")))
+            ]
+        );
+    }
+
+    #[test]
+    fn line_elevations_follow_the_same_rules_as_points() {
+        let all = read(&collection(vec![line_feature(
+            json!([[0, 0, 5], [1, 1, 6]]),
+            json!({}),
+        )]));
+        assert!(only(&all).has_z());
+        assert_eq!(lines(only(&all)).positions.get(1), Some([1.0, 1.0, 6.0]));
+
+        let some = read(&collection(vec![
+            line_feature(json!([[0, 0, 5], [1, 1]]), json!({})),
+            line_feature(json!([[3, 3], [4, 4, 4, 4]]), json!({})),
+        ]));
+        assert_eq!(
+            codes(&some),
+            [
+                "geojson.z.partial",
+                "geojson.position.extra_values",
+                "geojson.crs.assumed"
+            ]
+        );
+        assert!(!only(&some).has_z());
+        // Two positions have no elevation, one in each feature.
+        let f = &some.findings.as_slice()[0];
+        let at: Vec<_> = f.examples.iter().map(|l| l.element).collect();
+        assert_eq!((f.count, at), (2, vec![Some(0), Some(1)]));
+    }
+
+    #[test]
+    fn a_property_called_feature_id_does_not_clash_with_the_added_column() {
+        let out = read(&collection(vec![line_feature(
+            json!([[0, 0], [1, 1]]),
+            json!({"feature_id": "mine", "feature_id_2": 5}),
+        )]));
+        let d = only(&out);
+        let names: Vec<_> = d.attributes.columns().iter().map(Column::name).collect();
+        assert_eq!(names, ["feature_id_3", "feature_id", "feature_id_2"]);
+        assert_eq!(
+            d.attributes.column("feature_id").unwrap().get(0),
+            Some(Cell::Utf8("mine"))
+        );
+    }
+
+    #[test]
+    fn short_and_empty_lines_are_read_and_left_to_validation() {
+        let out = read(&collection(vec![
+            line_feature(json!([[0, 0]]), json!({})),
+            line_feature(json!([]), json!({})),
+            line_feature(json!([[0, 0], [1, 1]]), json!({})),
+        ]));
+        let d = only(&out);
+        assert_eq!(lines(d).offsets, [0, 1, 1, 3]);
+        let report = karmania_core::validate(d);
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "lines.line.too_short")
+        );
+    }
+
+    #[test]
+    fn a_multilinestring_with_no_parts_has_no_lines_and_a_bad_part_leaves_the_feature_out() {
+        let out = read(&multi_line_feature(json!([]), json!({})));
+        assert_eq!(codes(&out), ["geojson.features.none"]);
+
+        let out = read(&collection(vec![
+            multi_line_feature(json!([[[0, 0], [1, 1]], [[2, 2], "oops"]]), json!({})),
+            line_feature(json!([[0, 0], ["a", 1]]), json!({})),
+            line_feature(json!([[0, 0], [1, 1]]), json!({})),
+        ]));
+        assert_eq!(
+            codes(&out),
+            ["geojson.geometry.invalid", "geojson.crs.assumed"]
+        );
+        assert_eq!(out.findings.as_slice()[0].count, 2);
+        assert_eq!(only(&out).element_count(), Some(1));
+    }
+
+    #[test]
+    fn a_bare_linestring_is_read_and_a_file_of_several_kinds_has_names_that_differ() {
+        let out = read(&json!({"type": "LineString", "coordinates": [[0, 0], [1, 1]]}));
+        assert_eq!(only(&out).kind(), Kind::Lines);
+        assert_eq!(only(&out).name, "test.geojson");
+
+        let text = collection(vec![
+            point(json!([1, 2]), json!({})),
+            line_feature(json!([[0, 0], [1, 1]]), json!({})),
+        ])
+        .to_string();
+        let out = read_geojson(&text, None);
+        let names: Vec<_> = out.datasets.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["points", "lines"]);
     }
 }
