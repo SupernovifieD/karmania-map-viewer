@@ -9,6 +9,9 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use karmania_core::{Dataset, Findings};
+
+use crate::build::{PointsInput, build_points};
 use crate::import_run::{ImportRun, Phase, RunStep};
 use crate::mapping::ImportMapping;
 use crate::registry::{LoadResult, Registry};
@@ -90,6 +93,22 @@ impl Kernel {
     /// under way with that identifier.
     pub fn cancel_import(&mut self, id: u32) -> bool {
         self.imports.remove(&id).is_some()
+    }
+
+    /// Loads points made from arrays. The dataset is validated like any other: if it
+    /// has an error, or the arrays do not fit together, nothing is loaded and the
+    /// findings say why.
+    pub fn load_points(&mut self, input: PointsInput) -> LoadResult {
+        self.load_built(|findings| build_points(input, findings))
+    }
+
+    /// Loads what `build` makes, or blocks with its findings if it makes nothing.
+    fn load_built(&mut self, build: impl FnOnce(&mut Findings) -> Option<Dataset>) -> LoadResult {
+        let mut findings = Findings::new();
+        match build(&mut findings) {
+            Some(dataset) => self.registry.load(vec![dataset], findings),
+            None => LoadResult::Blocked { findings },
+        }
     }
 
     /// How many imports are under way.
@@ -334,5 +353,46 @@ mod tests {
         assert_eq!(done["status"], "done");
         assert_eq!(done["result"]["status"], "loaded");
         assert_eq!(done["result"]["summaries"][0]["kind"], "grid");
+    }
+
+    #[test]
+    fn points_made_from_arrays_are_validated_and_loaded_like_any_other() {
+        use crate::build::{ColumnInput, ColumnValues, PointsInput};
+        let input = |crs: Option<CrsRef>, x: Vec<f64>| PointsInput {
+            name: "Wells".into(),
+            crs,
+            x,
+            y: vec![1.0, 2.0],
+            z: None,
+            columns: vec![ColumnInput {
+                name: "au".into(),
+                values: ColumnValues::Float(vec![0.1, 0.2]),
+                nulls: None,
+            }],
+        };
+        let mut kernel = Kernel::new();
+        let LoadResult::Loaded { summaries } = kernel.load_points(input(utm40(), vec![1.0, 2.0]))
+        else {
+            panic!("expected Loaded")
+        };
+        assert_eq!(
+            (summaries[0].id, summaries[0].element_count),
+            (DatasetId(1), 2)
+        );
+        // Without a coordinate system validation blocks it.
+        let LoadResult::Blocked { findings } = kernel.load_points(input(None, vec![1.0, 2.0]))
+        else {
+            panic!("expected Blocked")
+        };
+        assert_eq!(findings.as_slice()[0].code.as_str(), "crs.missing");
+        // Arrays that do not fit together make no dataset at all.
+        let LoadResult::Blocked { findings } = kernel.load_points(input(utm40(), vec![1.0])) else {
+            panic!("expected Blocked")
+        };
+        assert_eq!(
+            findings.as_slice()[0].code.as_str(),
+            "dataset.coordinates.length_mismatch"
+        );
+        assert_eq!(kernel.registry().len(), 1);
     }
 }
