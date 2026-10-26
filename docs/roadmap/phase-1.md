@@ -97,7 +97,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.5 Structure: polygon ring and polygon offsets; rings with fewer than 3
   vertices (error).
 - [x] 2.6 Structure: mesh indices are a multiple of 3 and in range.
-- [ ] 2.7 Structure: degenerate triangles (warning); unused vertices (info).
+- [x] 2.7 Structure: degenerate triangles (warning); unused vertices (info).
 - [ ] 2.8 Structure: lattice dims and spacing valid; checked cell count equals
   value count.
 - [ ] 2.9 Structure: sparse ijk length, in range, no duplicates (error).

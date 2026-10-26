@@ -15,6 +15,89 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_polygon_offsets(dataset, findings);
     check_polygon_rings(dataset, findings);
     check_mesh_indices(dataset, findings);
+    check_mesh_triangles(dataset, findings);
+}
+
+/// Warns about triangles with no area and reports vertices no triangle uses.
+/// Triangles that point at missing vertices are skipped; the index check
+/// reports those.
+fn check_mesh_triangles(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Mesh(mesh) = &dataset.geometry else {
+        return;
+    };
+    let vertices = mesh.vertex_count();
+    let mut used = vec![0u64; vertices.div_ceil(64)];
+    let mut flat = Finding::new(
+        FindingCode::MeshTriangleDegenerate,
+        "Some triangles have no area: two corners are the same point, or all three are in a straight line.",
+    )
+    .with_hint("Remove those triangles; they cannot be shaded.");
+    flat.count = 0;
+    // Every index entry counts as a use, even in an incomplete last triangle,
+    // so a vertex is not reported as unused on top of the real error.
+    for &index in &mesh.indices {
+        if let Some(vertex) = usize::try_from(index).ok().filter(|&v| v < vertices)
+            && let Some(word) = used.get_mut(vertex / 64)
+        {
+            *word |= 1u64 << (vertex % 64);
+        }
+    }
+    for (t, triangle) in mesh.indices.as_chunks::<3>().0.iter().enumerate() {
+        let corners = triangle.map(|i| usize::try_from(i).ok().filter(|&v| v < vertices));
+        let [Some(a), Some(b), Some(c)] = corners else {
+            continue;
+        };
+        if is_degenerate(mesh, [a, b, c]) {
+            flat.count += 1;
+            flat = flat.at(Location::default().with_element(t as u64));
+        }
+    }
+    if flat.count > 0 {
+        findings.add(flat);
+    }
+    let mut unused = Finding::new(
+        FindingCode::MeshVerticesUnused,
+        "Some vertices are not used by any triangle.",
+    );
+    unused.count = 0;
+    for vertex in 0..vertices {
+        let is_used = used
+            .get(vertex / 64)
+            .is_some_and(|w| w >> (vertex % 64) & 1 == 1);
+        if !is_used {
+            unused.count += 1;
+            unused = unused.at(Location::default().with_vertex(vertex as u64));
+        }
+    }
+    if unused.count > 0 {
+        findings.add(unused);
+    }
+}
+
+/// True when a triangle repeats a vertex or has exactly zero area. Triangles
+/// with a non-finite coordinate are not judged here.
+fn is_degenerate(mesh: &crate::mesh::Mesh, [a, b, c]: [usize; 3]) -> bool {
+    if a == b || b == c || a == c {
+        return true;
+    }
+    let (Some(pa), Some(pb), Some(pc)) = (
+        mesh.positions.get(a),
+        mesh.positions.get(b),
+        mesh.positions.get(c),
+    ) else {
+        return false;
+    };
+    if ![pa, pb, pc].iter().all(|p| p.iter().all(|v| v.is_finite())) {
+        return false;
+    }
+    let u = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]];
+    let v = [pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2]];
+    let cross = [
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    ];
+    cross.iter().all(|&x| x == 0.0)
 }
 
 /// Triangle indices come in threes and must point at existing vertices.
@@ -460,6 +543,82 @@ mod tests {
     fn every_index_is_out_of_range_when_there_are_no_vertices() {
         let found = run(check, &mesh(0, &[0, 0, 0]));
         assert!(codes(&found).contains(&"mesh.indices.out_of_range"));
+    }
+
+    #[test]
+    fn real_triangles_and_used_vertices_give_no_findings() {
+        assert!(check_all(&mesh(4, &[0, 1, 2, 1, 2, 3])).is_empty());
+    }
+
+    #[test]
+    fn a_repeated_corner_is_a_degenerate_warning() {
+        let found = run(check, &mesh(3, &[0, 1, 2, 1, 1, 2]));
+        assert_eq!(codes(&found), ["mesh.triangle.degenerate"]);
+        let f = &found.as_slice()[0];
+        assert_eq!(
+            (f.severity, f.count),
+            (crate::findings::Severity::Warning, 1)
+        );
+        assert_eq!(f.examples[0].element, Some(1));
+    }
+
+    #[test]
+    fn three_points_in_a_line_have_no_area() {
+        use crate::dataset::Geometry;
+        use crate::mesh::Mesh;
+        use crate::positions::Positions;
+        let line =
+            Positions::from_interleaved(vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0], true);
+        let d = super::super::testutil::dataset(Geometry::Mesh(Mesh {
+            positions: line,
+            indices: vec![0, 1, 2],
+        }));
+        assert_eq!(codes(&run(check, &d)), ["mesh.triangle.degenerate"]);
+    }
+
+    #[test]
+    fn triangles_with_missing_vertices_or_non_finite_corners_are_not_judged() {
+        use crate::dataset::Geometry;
+        use crate::mesh::Mesh;
+        use crate::positions::Positions;
+        let found = run(check, &mesh(3, &[0, 1, 9]));
+        assert!(!codes(&found).contains(&"mesh.triangle.degenerate"));
+        let bad = Positions::from_interleaved(
+            vec![f64::NAN, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0],
+            true,
+        );
+        let d = super::super::testutil::dataset(Geometry::Mesh(Mesh {
+            positions: bad,
+            indices: vec![0, 1, 2],
+        }));
+        assert!(check_all(&d).is_empty());
+    }
+
+    #[test]
+    fn vertices_no_triangle_uses_are_an_info_finding() {
+        let found = run(check, &mesh(6, &[0, 1, 2]));
+        assert_eq!(codes(&found), ["mesh.vertices.unused"]);
+        let f = &found.as_slice()[0];
+        assert_eq!((f.severity, f.count), (crate::findings::Severity::Info, 3));
+        let at: Vec<_> = f.examples.iter().map(|l| l.vertex).collect();
+        assert_eq!(at, [Some(3), Some(4), Some(5)]);
+    }
+
+    #[test]
+    fn a_mesh_with_no_triangles_reports_every_vertex_unused() {
+        let found = run(check, &mesh(2, &[]));
+        let unused = found
+            .iter()
+            .find(|f| f.code.as_str() == "mesh.vertices.unused")
+            .unwrap();
+        assert_eq!(unused.count, 2);
+        // The word boundary of the usage bitmap: 70 vertices, one used triangle.
+        let found = run(check, &mesh(70, &[0, 64, 69]));
+        let unused = found
+            .iter()
+            .find(|f| f.code.as_str() == "mesh.vertices.unused")
+            .unwrap();
+        assert_eq!(unused.count, 67);
     }
 
     #[test]
