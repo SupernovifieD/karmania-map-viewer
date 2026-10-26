@@ -18,6 +18,7 @@
 //! - Coordinates must be numbers; empty, "no data" and unreadable values are
 //!   missing coordinates.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use karmania_core::{
@@ -26,7 +27,7 @@ use karmania_core::{
 };
 
 use crate::csv_blocks::place_blocks;
-use crate::delimited::{Delimiter, PREVIEW_ROWS, Record, RecordReader};
+use crate::delimited::{Delimiter, PREVIEW_ROWS, ReaderPosition, Record, RecordReader};
 use crate::infer::infer_types;
 use crate::mapping::{EmptyCoordinates, ImportMapping, validate_mapping};
 use crate::numbers::{DecimalSeparator, parse_int, parse_number};
@@ -352,10 +353,13 @@ fn permute<T: Clone>(values: &mut Vec<T>, order: &[usize]) {
 /// errors, an empty file, or a file too big to hold makes the import finish at
 /// once with no dataset.
 pub struct CsvImport<'a> {
-    reader: RecordReader<'a>,
+    text: Cow<'a, str>,
+    delimiter: Delimiter,
+    /// Where the next row starts.
+    position: ReaderPosition,
     record: Record,
     file_name: Option<String>,
-    mapping: &'a ImportMapping,
+    mapping: Cow<'a, ImportMapping>,
     conversion: Conversion,
     coordinates: [Option<CoordinateColumn>; 3],
     lines: Option<LineState>,
@@ -383,8 +387,37 @@ impl<'a> CsvImport<'a> {
         mapping: &'a ImportMapping,
         file_name: Option<&str>,
     ) -> Self {
+        Self::build(
+            Cow::Borrowed(text),
+            options,
+            Cow::Borrowed(mapping),
+            file_name,
+        )
+    }
+
+    /// Like [`CsvImport::new`], but the import keeps its own copy of the mapping
+    /// and takes the text, so it does not borrow from anything and can be held
+    /// between calls (for example by a WebAssembly object).
+    #[must_use]
+    pub fn owned(
+        text: String,
+        options: CsvOptions,
+        mapping: ImportMapping,
+        file_name: Option<&str>,
+    ) -> CsvImport<'static> {
+        CsvImport::build(Cow::Owned(text), options, Cow::Owned(mapping), file_name)
+    }
+
+    fn build(
+        text: Cow<'a, str>,
+        options: CsvOptions,
+        mapping: Cow<'a, ImportMapping>,
+        file_name: Option<&str>,
+    ) -> Self {
+        let text_ref: &str = &text;
+        let mapping_ref: &ImportMapping = &mapping;
         let mut findings = Findings::new();
-        let mut reader = RecordReader::new(text, options.delimiter);
+        let mut reader = RecordReader::new(text_ref, options.delimiter);
         let mut first = Record::new();
         let have_first = reader.read(&mut first);
         let header: Vec<String> = if !have_first {
@@ -395,16 +428,16 @@ impl<'a> CsvImport<'a> {
             (1..=first.len()).map(|n| format!("Column {n}")).collect()
         };
         if have_first {
-            validate_mapping(mapping, &header, &mut findings);
+            validate_mapping(mapping_ref, &header, &mut findings);
         } else {
             findings.add(
                 Finding::new(FindingCode::FileEmpty, "The file has no data in it.")
                     .with_hint("Check that you chose the right file."),
             );
         }
-        let lines = text.lines().filter(|l| !l.trim().is_empty()).count() as u64;
+        let lines = text_ref.lines().filter(|l| !l.trim().is_empty()).count() as u64;
         let data_rows = lines.saturating_sub(u64::from(options.has_header));
-        let things = match mapping.kind {
+        let things = match mapping_ref.kind {
             Kind::Lines => "vertices",
             Kind::Blocks => "blocks",
             _ => "points",
@@ -413,7 +446,7 @@ impl<'a> CsvImport<'a> {
 
         let index_of = |name: &str| header.iter().position(|h| h == name);
         let coordinate = |role: Role| {
-            let column = mapping.columns.iter().find(|c| c.role == role)?;
+            let column = mapping_ref.columns.iter().find(|c| c.role == role)?;
             Some(CoordinateColumn {
                 source: index_of(&column.source)?,
                 name: column.source.clone(),
@@ -429,8 +462,8 @@ impl<'a> CsvImport<'a> {
                 ),
             })
         };
-        let sample = sample_types(text, options, mapping, header.len());
-        let builders = mapping
+        let sample = sample_types(text_ref, options, mapping_ref, header.len());
+        let builders = mapping_ref
             .columns
             .iter()
             .filter(|c| c.role == Role::Attribute)
@@ -441,9 +474,12 @@ impl<'a> CsvImport<'a> {
                 Some(Builder::new(name, source, column_type))
             })
             .collect();
-        let line_state = (mapping.kind == Kind::Lines)
+        let line_state = (mapping_ref.kind == Kind::Lines)
             .then(|| {
-                let column = mapping.columns.iter().find(|c| c.role == Role::LineId)?;
+                let column = mapping_ref
+                    .columns
+                    .iter()
+                    .find(|c| c.role == Role::LineId)?;
                 let name = column.rename.clone().unwrap_or_else(|| column.source.clone());
                 Some(LineState {
                     source: index_of(&column.source)?,
@@ -470,24 +506,28 @@ impl<'a> CsvImport<'a> {
             })
             .flatten();
         let done = findings.has_errors();
+        let coordinates = [
+            coordinate(Role::X),
+            coordinate(Role::Y),
+            coordinate(Role::Z),
+        ];
+        let conversion = Conversion::new(mapping_ref);
+        let block_lines = (mapping_ref.kind == Kind::Blocks).then(Vec::new);
+        // Without a header the first row is data, so start again from the top.
+        let position = if options.has_header {
+            reader.position()
+        } else {
+            ReaderPosition::START
+        };
         Self {
-            // Without a header the first row is data, so start again from the top.
-            reader: if options.has_header {
-                reader
-            } else {
-                RecordReader::new(text, options.delimiter)
-            },
+            delimiter: options.delimiter,
+            position,
             record: Record::new(),
             file_name: file_name.map(str::to_string),
-            mapping,
-            conversion: Conversion::new(mapping),
-            coordinates: [
-                coordinate(Role::X),
-                coordinate(Role::Y),
-                coordinate(Role::Z),
-            ],
+            conversion,
+            coordinates,
             lines: line_state,
-            block_lines: (mapping.kind == Kind::Blocks).then(Vec::new),
+            block_lines,
             builders,
             positions: [Vec::new(), Vec::new(), Vec::new()],
             header_len: header.len(),
@@ -511,6 +551,8 @@ impl<'a> CsvImport<'a> {
             findings,
             done,
             rows: 0,
+            text,
+            mapping,
         }
     }
 }
@@ -518,16 +560,24 @@ impl<'a> CsvImport<'a> {
 impl CsvImport<'_> {
     /// Reads up to `max_rows` more rows. Returns `true` when the file is done.
     pub fn step(&mut self, max_rows: usize) -> bool {
+        if self.done {
+            return true;
+        }
+        // The reader borrows the text and the row handler needs all of `self`, so
+        // the text (and the row buffer) are taken out for the length of the step.
+        let text = std::mem::take(&mut self.text);
+        let mut record = std::mem::replace(&mut self.record, Record::new());
+        let mut reader = RecordReader::resume(&text, self.delimiter, self.position);
         for _ in 0..max_rows {
-            if self.done {
-                break;
-            }
-            if !self.reader.read(&mut self.record) {
+            if !reader.read(&mut record) {
                 self.done = true;
                 break;
             }
-            self.row();
+            self.row(&record);
         }
+        self.position = reader.position();
+        self.record = record;
+        self.text = text;
         self.done
     }
 
@@ -537,17 +587,17 @@ impl CsvImport<'_> {
         self.rows
     }
 
-    fn row(&mut self) {
+    fn row(&mut self, record: &Record) {
         self.rows += 1;
-        let line = self.record.line();
-        if self.record.len() != self.header_len {
+        let line = record.line();
+        if record.len() != self.header_len {
             self.ragged.hit(Location::default().with_line(line));
         }
         let mut values = [0.0f64; 3];
         let mut usable = true;
         for (axis, slot) in self.coordinates.iter_mut().enumerate() {
             let Some(column) = slot else { continue };
-            match self.conversion.float(self.record.get(column.source)) {
+            match self.conversion.float(record.get(column.source)) {
                 Cell::Value(v) => values[axis] = v,
                 Cell::Null | Cell::Bad => {
                     usable = false;
@@ -564,7 +614,7 @@ impl CsvImport<'_> {
             return;
         }
         if let Some(lines) = &mut self.lines
-            && !lines.assign(self.record.get(lines.source), line)
+            && !lines.assign(record.get(lines.source), line)
         {
             return;
         }
@@ -577,7 +627,7 @@ impl CsvImport<'_> {
             block_lines.push(line);
         }
         for builder in &mut self.builders {
-            builder.push(self.record.get(builder.source), &self.conversion, line);
+            builder.push(record.get(builder.source), &self.conversion, line);
         }
     }
 
@@ -1583,5 +1633,63 @@ mod tests {
         while !import.step(1) {}
         assert_eq!(import.rows_read(), 18);
         assert_eq!(import.finish(), whole);
+    }
+
+    /// An import that owns everything it needs, built from values that are gone
+    /// when this returns.
+    fn owned_import(rows: usize) -> CsvImport<'static> {
+        let mut text = String::from("X,Y\n");
+        for i in 0..rows {
+            text.push_str(&format!("{i},{}\n", i * 2));
+        }
+        let (_, mapping) = simple(&[]);
+        CsvImport::owned(text, COMMA, mapping, Some("owned.csv"))
+    }
+
+    #[test]
+    fn an_import_that_owns_its_inputs_gives_the_same_result_as_one_that_borrows() {
+        let text = fixtures::text("points.csv");
+        let whole = read_csv(&text, COMMA, &collars(), Some("points.csv"));
+        let mut owned = CsvImport::owned(text.clone(), COMMA, collars(), Some("points.csv"));
+        drop(text);
+        let mut steps = 0;
+        while !owned.step(3) {
+            steps += 1;
+        }
+        assert_eq!(steps, 2);
+        assert_eq!(owned.finish(), whole);
+    }
+
+    #[test]
+    fn an_owned_import_can_be_held_between_steps_and_stepping_after_the_end_is_harmless() {
+        let mut import = owned_import(10);
+        assert!(!import.step(4));
+        assert_eq!(import.rows_read(), 4);
+        assert!(!import.step(4));
+        assert!(import.step(4));
+        assert_eq!(import.rows_read(), 10);
+        // Done stays done and reads nothing more.
+        assert!(import.step(4));
+        assert_eq!(import.rows_read(), 10);
+        let out = import.finish();
+        assert_eq!(only(&out).element_count(), Some(10));
+        assert_eq!(only(&out).name, "Collars");
+    }
+
+    #[test]
+    fn stepping_one_row_at_a_time_matches_reading_in_one_go_for_every_kind() {
+        let blocks = fixtures::text("blocks.csv");
+        let lines = fixtures::text("lines.csv");
+        let cases: [(String, ImportMapping); 3] = [
+            (fixtures::text("points.csv"), collars()),
+            (lines, line_mapping(line_columns())),
+            (blocks, block_mapping()),
+        ];
+        for (text, mapping) in cases {
+            let whole = read_csv(&text, COMMA, &mapping, Some("f.csv"));
+            let mut import = CsvImport::owned(text, COMMA, mapping, Some("f.csv"));
+            while !import.step(1) {}
+            assert_eq!(import.finish(), whole);
+        }
     }
 }

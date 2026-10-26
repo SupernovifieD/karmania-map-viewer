@@ -633,3 +633,15 @@ was chosen, why.
   a silent failure into the OBJ and grid readers and both were caught. In a release
   build no stress case takes over 300 ms, so there is no slow path; the sizes are
   scaled so the suite takes about 8 seconds in a debug build.
+- Step 3.22a: a `CsvImport` can own its text and mapping (`CsvImport::owned`,
+  giving a `CsvImport<'static>`) as well as borrow them (`CsvImport::new`, as
+  before). In step 4 the import has to live inside a WebAssembly object between
+  JavaScript calls, which cannot carry a borrowed lifetime, so this is done now
+  rather than as a rewrite then. Both share one implementation through `Cow`, so
+  `read_csv` still copies nothing. The reader no longer lives inside the import:
+  each step builds a `RecordReader` at a saved `ReaderPosition` (offset and line
+  number) and saves it again, which keeps line numbers exact across steps. The
+  text and row buffer are moved out of the import for the length of a step, since
+  the reader borrows the text while the row handler needs the rest of the import.
+  No unsafe code is involved. Output is unchanged: all earlier tests pass, and
+  every kind of CSV import read one row at a time equals one read in one go.
