@@ -904,3 +904,10 @@ was chosen, why.
   vertices and a polygon without rings are left to validation, which names each; the
   tests check every one of them through the real module. As for lines, coordinate lists
   of different lengths make no dataset at all.
+- Step 4.8: a mesh is loaded with `kind: "mesh"`, `x`, `y`, `z` (required: a mesh is
+  always three-dimensional), `indices` (a `Uint32Array`, three vertex numbers per
+  triangle, counting from 0), one attribute value per triangle and optional
+  `vertexColumns`. Indices out of range or not a multiple of three are errors found by
+  validation; a flat (degenerate) triangle is a warning and a vertex no triangle uses is
+  info, and both load. A mesh with no `z` is refused as misuse, since the type requires
+  it.

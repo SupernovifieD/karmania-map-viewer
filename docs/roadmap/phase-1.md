@@ -251,7 +251,7 @@ Definitions and reprojection can be added later, with the features that need the
     TypeScript types and Node tests.
 - [x] 4.6 Builders: lines.
 - [x] 4.7 Builders: polygons.
-- [ ] 4.8 Builders: mesh.
+- [x] 4.8 Builders: mesh.
 - [ ] 4.9 Builders: grid.
 - [ ] 4.10 Builders: blocks.
 - [ ] 4.11 Export `summary(handle)`, `rows(handle, start, count)` with

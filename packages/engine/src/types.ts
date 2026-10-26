@@ -310,5 +310,23 @@ export interface KernelPolygons {
   readonly columns?: readonly KernelColumn[];
 }
 
+/** A triangle mesh as the kernel takes it. */
+export interface KernelMesh {
+  readonly kind: 'mesh';
+  /** Blank means `mesh`. */
+  readonly name: string;
+  readonly crs: CrsRef | null;
+  readonly x: Float64Array;
+  readonly y: Float64Array;
+  /** A mesh is always three-dimensional. */
+  readonly z: Float64Array;
+  /** Three vertex numbers per triangle, counting from 0. */
+  readonly indices: Uint32Array;
+  /** One value per triangle. */
+  readonly columns?: readonly KernelColumn[];
+  /** One value per vertex. */
+  readonly vertexColumns?: readonly KernelColumn[];
+}
+
 /** A dataset made from arrays, as the kernel takes it. */
-export type KernelDataset = KernelPoints | KernelLines | KernelPolygons;
+export type KernelDataset = KernelPoints | KernelLines | KernelPolygons | KernelMesh;

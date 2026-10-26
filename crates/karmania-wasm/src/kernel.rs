@@ -96,6 +96,7 @@ impl Kernel {
             DatasetInput::Points(points) => self.inner.load_points(points),
             DatasetInput::Lines(lines) => self.inner.load_lines(lines),
             DatasetInput::Polygons(polygons) => self.inner.load_polygons(polygons),
+            DatasetInput::Mesh(mesh) => self.inner.load_mesh(mesh),
         };
         to_js(&result)
     }
