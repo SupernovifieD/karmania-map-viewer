@@ -84,3 +84,23 @@ was chosen, why.
   pinned toolchain and the wasm32 target (needed from step 4.1) only apply when
   `~/.cargo/bin` comes first. Fix is a PATH line in `~/.zshrc`, left to the
   owner.
+- After the M0 report the owner approved `minimatch` (BlueOak-1.0.0), asked to
+  allow MPL-2.0 build tooling (Vite 8), to update pnpm, and to add
+  `pnpm format:check` to `pnpm check`. These became steps 0.11 to 0.14. The
+  owner also put the rustup PATH line in `~/.zshrc`; verified: a fresh login
+  shell resolves `rustc` to `~/.cargo/bin`.
+- Step 0.11: pnpm is 12.15.0 (`packageManager`), superseding the 10.7.1 pin from
+  step 0.5. `pnpm self-update` from 10.7.1 cannot do this on this machine: pnpm
+  10 skips the install script that replaces pnpm 12's text placeholder with the
+  native binary, so the switch fails with `ENOEXEC`. The global pnpm in
+  `/usr/local` was updated with `npm install -g --prefix /usr/local
+  pnpm@12.15.0` instead, and the broken tool-cache copy was deleted. Anyone
+  still on pnpm 10 must do the same (or use the standalone installer); this goes
+  in the README setup section (step 10.5).
+- Step 0.11: pnpm 12 defaults kept on purpose. `minimumReleaseAge` (one day)
+  rejects packages published in the last 24 hours, which is a supply-chain
+  guard; the lockfile was re-resolved once because `magic-string@1.4.4` was a few
+  hours old (now 1.4.3). Dependency build scripts need approval: esbuild's
+  postinstall is denied (`allowBuilds` in `pnpm-workspace.yaml`) because esbuild
+  runs without it; the entry becomes unnecessary once Vite 8 replaces Vite 7
+  (step 0.13). The lockfile now begins with a document that pins pnpm itself.
