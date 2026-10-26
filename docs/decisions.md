@@ -911,3 +911,11 @@ was chosen, why.
   validation; a flat (degenerate) triangle is a warning and a vertex no triangle uses is
   info, and both load. A mesh with no `z` is refused as misuse, since the type requires
   it.
+- Step 4.9a: validation gained two structure errors for grids, `grid.elevation_column.missing`
+  and `grid.elevation_column.not_numeric`. A grid's elevations can come from a column
+  of its attribute table (`GridZ::FromColumn`), but nothing checked that the column
+  exists or holds numbers, so a grid could name a column that was not there and still
+  load, with its elevations quietly ignored in the bounding box. This was noticed while
+  designing the grid builder. It is a core check, not a builder check, so every way of
+  making a grid is covered. Whole numbers and decimals both count as numbers. A flat
+  grid and every other shape are not affected.

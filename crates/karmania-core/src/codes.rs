@@ -176,6 +176,10 @@ finding_codes! {
     DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
+    /// A grid takes its elevations from a column that does not exist.
+    GridElevationColumnMissing => "grid.elevation_column.missing", Error, None;
+    /// A grid takes its elevations from a column that does not hold numbers.
+    GridElevationColumnNotNumeric => "grid.elevation_column.not_numeric", Error, None;
     /// A grid or block model has a dimension of 0 cells.
     LatticeDimsZero => "lattice.dims.zero", Error, None;
     /// The origin of a grid or block model is not made of finite numbers.
