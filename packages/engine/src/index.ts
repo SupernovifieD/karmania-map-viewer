@@ -33,6 +33,7 @@ export type {
   KernelDataset,
   KernelLines,
   KernelPoints,
+  KernelPolygons,
   LoadResult,
   Location,
   NodataSuggestions,

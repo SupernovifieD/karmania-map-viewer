@@ -289,5 +289,26 @@ export interface KernelLines {
   readonly vertexColumns?: readonly KernelColumn[];
 }
 
+/** Polygons as the kernel takes them. */
+export interface KernelPolygons {
+  readonly kind: 'polygons';
+  /** Blank means `polygons`. */
+  readonly name: string;
+  readonly crs: CrsRef | null;
+  /** Every vertex of every ring. Rings are open: the closing vertex is not repeated. */
+  readonly x: Float64Array;
+  readonly y: Float64Array;
+  readonly z?: Float64Array;
+  /** Where each ring starts in the vertex list, plus the end. */
+  readonly ringOffsets: Uint32Array;
+  /**
+   * Where each polygon's rings start in the ring list, plus the end. The first ring of
+   * a polygon is its exterior and the rest are holes.
+   */
+  readonly polygonOffsets: Uint32Array;
+  /** One value per polygon. */
+  readonly columns?: readonly KernelColumn[];
+}
+
 /** A dataset made from arrays, as the kernel takes it. */
-export type KernelDataset = KernelPoints | KernelLines;
+export type KernelDataset = KernelPoints | KernelLines | KernelPolygons;

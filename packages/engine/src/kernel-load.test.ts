@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { checkedLoadResult } from './contract-check.js';
 import { createKernel, foreignArrays } from './test-support/kernel.js';
-import type { CrsRef, KernelColumn, KernelLines, KernelPoints, LoadResult } from './types.js';
+import type {
+  CrsRef,
+  KernelColumn,
+  KernelLines,
+  KernelPoints,
+  KernelPolygons,
+  LoadResult,
+} from './types.js';
 
 const METRES: CrsRef = { kind: 'local', units: 'm' };
 
@@ -38,6 +45,20 @@ function lines(extra: Partial<KernelLines> = {}): KernelLines {
     x: new Float64Array([0, 1, 2, 5, 6]),
     y: new Float64Array([0, 1, 0, 5, 6]),
     offsets: new Uint32Array([0, 3, 5]),
+    ...extra,
+  };
+}
+
+function polygons(extra: Partial<KernelPolygons> = {}): KernelPolygons {
+  return {
+    kind: 'polygons',
+    name: 'Leases',
+    crs: METRES,
+    x: new Float64Array([0, 10, 10, 0, 2, 2, 4, 4, 20, 30, 25]),
+    y: new Float64Array([0, 0, 10, 10, 2, 4, 4, 2, 0, 0, 9]),
+    ringOffsets: new Uint32Array([0, 4, 8, 11]),
+    polygonOffsets: new Uint32Array([0, 2, 3]),
+    columns: [{ name: 'name', type: 'text', values: ['A', 'B'] }],
     ...extra,
   };
 }
@@ -191,6 +212,52 @@ describe('loading lines from arrays through kernel.load', () => {
     expect(blockedCodes(loadResult(lines({ vertexColumns: [bad] })))).toEqual([
       'dataset.vertex_attributes.rows_mismatch',
     ]);
+  });
+});
+
+describe('loading polygons from arrays through kernel.load', () => {
+  it('loads polygons with holes', () => {
+    const [summary] = summaries(loadResult(polygons()));
+    expect(summary).toMatchObject({
+      name: 'Leases',
+      kind: 'polygons',
+      elementCount: 2,
+      vertexCount: 11,
+      hasZ: false,
+    });
+    expect(summary?.columns).toEqual([{ name: 'name', type: 'text', nullCount: 0 }]);
+    expect(summary?.bbox).toEqual({ min: [0, 0, 0], max: [30, 10, 0] });
+  });
+
+  it('blocks ring and polygon offsets that do not fit, saying how', () => {
+    const rings = (offsets: number[]) => polygons({ ringOffsets: new Uint32Array(offsets) });
+    const polys = (offsets: number[]) => polygons({ polygonOffsets: new Uint32Array(offsets) });
+    expect(blockedCodes(loadResult(rings([0, 8, 4, 11])))).toContain(
+      'polygons.ring_offsets.decreasing',
+    );
+    expect(blockedCodes(loadResult(rings([1, 4, 8, 11])))).toContain(
+      'polygons.ring_offsets.bad_start',
+    );
+    expect(blockedCodes(loadResult(rings([0, 4, 8, 10])))).toContain(
+      'polygons.ring_offsets.bad_end',
+    );
+    expect(blockedCodes(loadResult(polys([0, 3, 2])))).toContain(
+      'polygons.polygon_offsets.decreasing',
+    );
+    expect(blockedCodes(loadResult(polys([0, 2, 4])))).toContain(
+      'polygons.polygon_offsets.bad_end',
+    );
+    expect(blockedCodes(loadResult(rings([0, 2, 8, 11])))).toContain('polygons.ring.too_short');
+  });
+
+  it('blocks coordinates that do not fit and refuses missing offsets as misuse', () => {
+    expect(blockedCodes(loadResult(polygons({ y: new Float64Array([1]) })))).toEqual([
+      'dataset.coordinates.length_mismatch',
+    ]);
+    const withoutRings = Object.fromEntries(
+      Object.entries(polygons()).filter(([key]) => key !== 'ringOffsets'),
+    );
+    expect(() => createKernel().load(withoutRings)).toThrow(/needs a `ringOffsets`/);
   });
 });
 

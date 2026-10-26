@@ -95,6 +95,7 @@ impl Kernel {
         let result = match read_dataset(input)? {
             DatasetInput::Points(points) => self.inner.load_points(points),
             DatasetInput::Lines(lines) => self.inner.load_lines(lines),
+            DatasetInput::Polygons(polygons) => self.inner.load_polygons(polygons),
         };
         to_js(&result)
     }
