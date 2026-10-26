@@ -796,3 +796,14 @@ was chosen, why.
   dataset never changes, so listing the datasets does not rescan their coordinates.
   `LoadResult` serializes as `{ status: "loaded", summaries }` or `{ status:
   "blocked", findings }`, as the brief's contract says.
+- Step 4.4c: `ImportJob::file(file_name, bytes, mapping)` makes a job from a file's
+  raw bytes: it detects the format, decodes the text and, for a delimited file,
+  sniffs the delimiter and header, with the same code as the preview, so a mapping
+  made from a preview names the columns the import reads. The mapping is used by CSV
+  only; GeoJSON, ASCII grids and OBJ meshes ignore it in the reader (the run in step
+  4.4d applies the dataset name and coordinate system from it). What was found before
+  the reader ran (a name that disagrees with the content, an encoding fallback) comes
+  first in the result's findings. A file that cannot be imported, including a `.prj`
+  (which names a coordinate system and holds no data), gives a job that finishes in
+  its first step with an error and no dataset. File jobs are part of the malformed-input
+  suite.
