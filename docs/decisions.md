@@ -234,3 +234,9 @@ was chosen, why.
   once, for every kind, in step 2.10. Numbers in these messages use Rust's
   shortest round-trip format (`10`, `0.5`, `NaN`, `inf`), which is identical on
   every platform.
+- Step 2.9: duplicate sparse blocks are found with one bit per lattice cell when
+  the lattice has at most `MAX_ELEMENTS` cells (linear time, at most 16 MB), and
+  by sorting block indices otherwise (a sparse model on a huge lattice). A test
+  checks that both paths give identical results. Only blocks inside the lattice
+  can be duplicates; out-of-range blocks are reported separately. The first copy
+  of a repeated block is not blamed, only the later ones.
