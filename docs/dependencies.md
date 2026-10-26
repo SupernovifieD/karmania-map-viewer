@@ -50,9 +50,10 @@ BSD-3-Clause or ISC, except:
 | serde_json (dev, `karmania-core`) | 1.0.154 | MIT OR Apache-2.0 | Tests that pin the exact JSON shape of serialized types. | step 1.1a |
 | serde_json (`karmania-io`) | 1.0.154 | MIT OR Apache-2.0 | Parses GeoJSON. Already in use in tests; now also part of the reader, so its `itoa` (MIT OR Apache-2.0), `memchr` (Unlicense OR MIT, used under MIT) and `zmij` (MIT) dependencies are in the engine build too. | step 3.12a |
 | csv (dev, `karmania-io`) | 1.4.0 | Unlicense/MIT | Cross-checks the hand-written delimited-text reader in tests only; not part of any build of the engine. Brings `csv-core` and `ryu` (`Apache-2.0 OR BSL-1.0`, used under Apache-2.0), plus crates already listed. | step 3.3 |
+| wasm-bindgen (`karmania-wasm`) | 0.2.129 | MIT OR Apache-2.0 | Generates the JavaScript glue and types for the WebAssembly module. Brings `wasm-bindgen-macro`, `-macro-support` and `-shared`, `bumpalo`, `cfg-if`, `once_cell` and `rustversion`, all MIT OR Apache-2.0, and `quote`, `proc-macro2`, `syn` and `unicode-ident`, listed below. | step 4.1 |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
 
-Rust transitive tree at step 3.25b (15 crates in the resolved graph, checked with
+Rust transitive tree at step 4.1 (23 crates in the resolved graph, checked with
 `cargo metadata`, the same for host and `wasm32-unknown-unknown`): all MIT,
 Apache-2.0, `Unlicense OR MIT` (memchr), `Apache-2.0 OR BSL-1.0` (ryu, used only
 by the dev dependency `csv`), or Unicode-3.0 with MIT or Apache-2.0
@@ -68,3 +69,10 @@ reprojection, with the crates it brought along) and `crs-definitions` (CC0-1.0,
 the EPSG definitions, 4.8 MB of source text). If definitions are added again later,
 note that they derive from the EPSG registry maintained by IOGP, whose own terms of
 use apply; check them before redistributing the definitions on their own.
+
+Build tools (not part of the Rust build or of the shipped code; installed on the
+developer's machine and in CI):
+
+| Tool | Version | License | Purpose | Added |
+| --- | --- | --- | --- | --- |
+| wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |
