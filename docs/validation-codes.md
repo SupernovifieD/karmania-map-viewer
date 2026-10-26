@@ -9,6 +9,14 @@ severity or step disagrees with the registry, or if this file lists a code that
 is not registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
+## `dataset.coordinates.length_mismatch`
+
+- Severity: error
+- Step: none
+- Message: The coordinate lists have different lengths: X has {nx} values, Y has {ny}[, Z has {nz}].
+- Hint: Give X, Y and Z (if used) the same number of values.
+- Example: The coordinate lists have different lengths: X has 1,204 values, Y has 5.
+
 ## `dataset.too_large`
 
 - Severity: error
