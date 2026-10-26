@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::crs::CrsRef;
+use crate::lines::Lines;
 use crate::positions::Positions;
 use crate::table::Table;
 
@@ -51,6 +52,8 @@ pub struct DatasetId(pub u64);
 pub enum Geometry {
     /// Individual points, one attribute row per point.
     Points(Positions),
+    /// Polylines, one attribute row per line.
+    Lines(Lines),
 }
 
 impl Geometry {
@@ -59,6 +62,7 @@ impl Geometry {
     pub fn kind(&self) -> Kind {
         match self {
             Geometry::Points(_) => Kind::Points,
+            Geometry::Lines(_) => Kind::Lines,
         }
     }
 
@@ -68,6 +72,7 @@ impl Geometry {
     pub fn has_z(&self) -> bool {
         match self {
             Geometry::Points(positions) => positions.has_z(),
+            Geometry::Lines(lines) => lines.positions.has_z(),
         }
     }
 }
@@ -184,6 +189,26 @@ mod tests {
             Table::empty(),
         );
         assert_eq!((d3.kind(), d3.has_z(), d3.crs), (Kind::Points, true, None));
+    }
+
+    #[test]
+    fn a_lines_dataset_reports_the_lines_kind_and_its_positions_z_flag() {
+        let mut findings = Findings::new();
+        let positions =
+            Positions::from_xyz(&[0.0, 1.0], &[0.0, 1.0], Some(&[5.0, 6.0]), &mut findings)
+                .unwrap();
+        let lines = Lines {
+            positions,
+            offsets: vec![0, 2],
+        };
+        let d = Dataset::new(
+            DatasetId(1),
+            "roads",
+            None,
+            Geometry::Lines(lines),
+            Table::empty(),
+        );
+        assert_eq!((d.kind(), d.has_z()), (Kind::Lines, true));
     }
 
     #[test]
