@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 
 use karmania_core::{Finding, FindingCode, Findings};
 
+use crate::numbers::looks_numeric;
+
 /// How many data rows a preview keeps.
 pub const PREVIEW_ROWS: usize = 200;
 /// How many records are read to decide the delimiter.
@@ -372,24 +374,6 @@ fn detect_delimiter(text: &str) -> Delimiter {
     best.map_or(Delimiter::Comma, |b| b.3)
 }
 
-/// True for text that reads as a number: an optional sign, digits with at most
-/// one decimal point or decimal comma, and an optional exponent. Words such as
-/// `NaN` and `inf` are not numbers here.
-#[must_use]
-pub fn looks_numeric(field: &str) -> bool {
-    let trimmed = field.trim();
-    let unsigned = trimmed.strip_prefix(['+', '-']).unwrap_or(trimmed);
-    if !unsigned.starts_with(|c: char| c.is_ascii_digit() || c == '.' || c == ',') {
-        return false;
-    }
-    let normal = if trimmed.matches(',').count() == 1 && !trimmed.contains('.') {
-        trimmed.replace(',', ".")
-    } else {
-        trimmed.to_string()
-    };
-    normal.parse::<f64>().is_ok()
-}
-
 /// Whether the first row is a header: some column is text in the first row but
 /// mostly numbers below it, or the first row is all distinct non-numeric names.
 fn detect_header(first: &[String], rest: &[Vec<String>]) -> bool {
@@ -599,20 +583,6 @@ mod tests {
             lines.push(line_of(&record));
         }
         assert_eq!(lines, [1, 3, 4]);
-    }
-
-    #[test]
-    fn numbers_are_recognised_with_either_decimal_separator() {
-        for yes in [
-            "1", "-2", "+3.5", ".5", "1,5", "-0,25", "1e3", "2.5E-4", " 7 ",
-        ] {
-            assert!(looks_numeric(yes), "{yes:?}");
-        }
-        for no in [
-            "", "abc", "NaN", "inf", "1,2,3", "1.2.3", "-", "DH001", "1,5.5", "0x10",
-        ] {
-            assert!(!looks_numeric(no), "{no:?}");
-        }
     }
 
     /// A small deterministic random generator for the tests below.

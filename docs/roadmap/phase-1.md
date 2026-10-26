@@ -142,7 +142,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   warning finding.
 - [x] 3.3 Delimited text sniffing: delimiter (comma, semicolon, tab,
   whitespace), header detection, first 200 rows, estimated row count.
-- [ ] 3.4 Column type inference from a sample (float, int, bool, text,
+- [x] 3.4 Column type inference from a sample (float, int, bool, text,
   category). Decimal comma detection when the delimiter is a semicolon.
 - [ ] 3.5 Coordinate role suggestions from header names, with confidence scores.
   Recognize at least: x: X, EAST, EASTING, XC, XCOORD, XCENTRE, LON, LONG,

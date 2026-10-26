@@ -364,3 +364,14 @@ was chosen, why.
   semicolon, tab, whitespace) that splits the first 50 rows into the same number of
   fields most consistently, ties going to the earlier candidate; a text with only
   white space is empty (`file.empty`, an error).
+- Step 3.4: type inference ignores empty cells and the words `NA`, `N/A`, `null`,
+  `NaN`, `-` and `*`. A column is numeric when at least 90% of its values are
+  numbers (so a few `<0.01` detection-limit entries do not turn an assay column
+  into text; the readers report them as bad numbers), and `Int` only if all its
+  numbers are whole. Text with leading zeros (`007`) is never turned into a number,
+  because that would lose the zeros. A text column is a category when it has at
+  most 50 distinct values and each appears twice on average. Decimal-comma
+  detection is done for semicolon files as the brief says, and also for tab and
+  whitespace files, since European data uses them with decimal commas too; a comma
+  file always uses a decimal point. Thousands separators are not understood.
+  Number parsing lives in `numbers.rs` so the readers share one definition.
