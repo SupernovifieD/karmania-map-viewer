@@ -807,3 +807,17 @@ was chosen, why.
   (which names a coordinate system and holds no data), gives a job that finishes in
   its first step with an error and no dataset. File jobs are part of the malformed-input
   suite.
+- Step 4.4d: `ImportRun` is a whole file import in two stages. Parsing wraps the
+  import job (a bounded number of CSV rows per step, or the whole file in one step for
+  the other formats); validating then checks one dataset per step, so a file with
+  several datasets reports progress through them. Progress carries the stage (`parsing`
+  or `validating`) and a fraction of that stage; reading the file from disk happens
+  before the kernel sees it and is the caller's stage. The name and coordinate system
+  the user chose in the wizard are applied to the datasets after parsing, for every
+  format: a name given to a file that makes several datasets gets the kind added
+  (`Survey (points)`), a blank name keeps the reader's, and no coordinate system keeps
+  the one the file named. The run does not decide whether to load: it ends with
+  `Imported`, the datasets each with their validation report and the reading findings,
+  and the registry blocks or admits them. A run that cannot read the file ends at its
+  first step with no datasets and the reason. The run is in the malformed-input suite,
+  which also checks that it always finishes.

@@ -14,6 +14,7 @@ use karmania_io::delimited::Delimiter;
 use karmania_io::detect::detect_format;
 use karmania_io::geojson::read_geojson;
 use karmania_io::import_job::ImportJob;
+use karmania_io::import_run::{ImportRun, RunStep};
 use karmania_io::mapping::{ColumnMapping, EmptyCoordinates, ImportMapping, Nodata};
 use karmania_io::numbers::DecimalSeparator;
 use karmania_io::obj::read_obj;
@@ -249,11 +250,31 @@ fn check_preview(name: &str, bytes: &[u8]) {
 fn check_file_job(name: &str, bytes: &[u8]) {
     let first = ImportJob::file(name, bytes, mapping(Kind::Points, false)).run();
     check("file job", name, &first);
+    check_run(name, bytes);
     assert_eq!(
         first,
         ImportJob::file(name, bytes, mapping(Kind::Points, false)).run(),
         "the file job for {name} is not deterministic"
     );
+}
+
+/// Runs the staged import of the bytes: it must finish, say why when it produces
+/// nothing, and hand over a report with every dataset.
+fn check_run(name: &str, bytes: &[u8]) {
+    let mut run = ImportRun::new(name, bytes, mapping(Kind::Points, true));
+    for _ in 0..100_000 {
+        if let RunStep::Done(imported) = run.step(1_000) {
+            if imported.datasets.is_empty() {
+                assert!(
+                    imported.findings.has_errors(),
+                    "no dataset and no error: {name}"
+                );
+            }
+            assert!(run.is_finished());
+            return;
+        }
+    }
+    unreachable!("the import of {name} did not finish");
 }
 
 /// A small deterministic random number generator.
