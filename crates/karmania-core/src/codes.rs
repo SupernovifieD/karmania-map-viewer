@@ -60,6 +60,8 @@ finding_codes! {
     DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
+    /// A line has fewer than two vertices.
+    LinesLineTooShort => "lines.line.too_short", Warning, None;
     /// The offsets list of a line set ends at the wrong vertex.
     LinesOffsetsBadEnd => "lines.offsets.bad_end", Error, None;
     /// The offsets list of a line set does not start at 0.
