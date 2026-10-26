@@ -1,0 +1,23 @@
+# Rust build output
+/target/
+
+# Generated WebAssembly output (wasm-pack)
+pkg/
+
+# JavaScript build output and dependencies
+node_modules/
+dist/
+
+# Test reports (Playwright)
+playwright-report/
+test-results/
+blob-report/
+
+# Large generated fixtures (written by scripts/generate-fixtures)
+/fixtures/generated/
+
+# Claude Code project files
+.claude/
+
+# macOS
+.DS_Store

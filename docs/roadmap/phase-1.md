@@ -16,7 +16,7 @@ brief says to stop.
   and approved. No commit.
 - [x] 0.1 `docs/roadmap/phase-1.md` with this step list; a README stub with the
   project's one-paragraph purpose.
-- [ ] 0.2 `.editorconfig` and `.gitignore` (target, pkg, dist, node_modules,
+- [x] 0.2 `.editorconfig` and `.gitignore` (target, pkg, dist, node_modules,
   reports, generated fixtures).
 - [ ] 0.3 Rust workspace plus `rust-toolchain.toml`; `crates/karmania-core` as
   an empty library with one passing test.
