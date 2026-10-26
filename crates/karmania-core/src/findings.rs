@@ -185,10 +185,15 @@ impl Finding {
     /// Adds an example location, ignored once [`MAX_EXAMPLES`] are kept.
     #[must_use]
     pub fn at(mut self, location: Location) -> Self {
+        self.add_example(location);
+        self
+    }
+
+    /// Like [`Finding::at`], for a finding you already hold by reference.
+    pub fn add_example(&mut self, location: Location) {
         if self.examples.len() < MAX_EXAMPLES {
             self.examples.push(location);
         }
-        self
     }
 }
 

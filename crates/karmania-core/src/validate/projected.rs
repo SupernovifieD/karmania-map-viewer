@@ -22,6 +22,10 @@ const EPSILON: f64 = 1e-7;
 /// How far a round trip may drift, in the projection's own units (about a metre
 /// for metric systems), plus a relative part of one part in a billion.
 const ROUND_TRIP_TOLERANCE: f64 = 1.0;
+/// A UTM zone is 6 degrees wide (3 each side of its middle). Data may reach one
+/// more zone width beyond that, which is 9 degrees from the middle; further out
+/// it is almost certainly in the wrong zone.
+const UTM_ZONE_TOLERANCE: f64 = 9.0;
 
 /// One coordinate to try, and where it came from if it is a data position.
 struct Sample {
@@ -61,23 +65,78 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     )
     .with_hint("Check that you chose the right coordinate system, for example the right UTM zone and hemisphere, and that X is the easting and Y the northing.");
     bad.count = 0;
+    let zone = epsg::proj4(code).and_then(utm_zone);
+    let mut off_zone = zone.map(|zone| {
+        let mut finding = Finding::new(
+            FindingCode::CrsProjectedOutsideZone,
+            format!(
+                "Some coordinates are more than {UTM_ZONE_TOLERANCE} degrees of longitude from the middle of UTM zone {zone} (EPSG:{code}), so they probably belong to another zone or coordinate system."
+            ),
+        )
+        .with_hint("Each UTM zone is 6 degrees wide. Find the zone for your area and choose its EPSG code, for example 32640 for zone 40 north or 32740 for zone 40 south.");
+        finding.count = 0;
+        finding
+    });
     for sample in samples {
-        if converts_to_a_valid_position(&from, &to, sample.xy) {
-            continue;
-        }
-        bad.count += 1;
-        if let Some(index) = sample.element {
-            let at = Location::default();
-            let at = match dataset.kind() {
-                Kind::Points => at.with_element(index as u64),
-                _ => at.with_vertex(index as u64),
-            };
-            bad = bad.at(at);
+        let at = sample.element.map(|index| location(dataset.kind(), index));
+        match convert(&from, &to, sample.xy) {
+            None => {
+                bad.count += 1;
+                if let Some(at) = at {
+                    bad.add_example(at);
+                }
+            }
+            Some(longitude) => {
+                let (Some(zone), Some(finding)) = (zone, off_zone.as_mut()) else {
+                    continue;
+                };
+                if degrees_from_zone_centre(longitude, zone) > UTM_ZONE_TOLERANCE {
+                    finding.count += 1;
+                    if let Some(at) = at {
+                        finding.add_example(at);
+                    }
+                }
+            }
         }
     }
     if bad.count > 0 {
         findings.add(bad);
     }
+    if let Some(finding) = off_zone.filter(|f| f.count > 0) {
+        findings.add(finding);
+    }
+}
+
+/// Where a sampled data position is reported: points have elements, other
+/// shapes vertices.
+fn location(kind: Kind, index: usize) -> Location {
+    match kind {
+        Kind::Points => Location::default().with_element(index as u64),
+        _ => Location::default().with_vertex(index as u64),
+    }
+}
+
+/// The UTM zone number (1 to 60) of a PROJ string, if it is a UTM system.
+fn utm_zone(proj4: &str) -> Option<u8> {
+    let mut is_utm = false;
+    let mut zone = None;
+    for token in proj4.split_whitespace() {
+        match token.split_once('=') {
+            Some(("+proj", "utm")) => is_utm = true,
+            Some(("+zone", number)) => {
+                zone = number.parse::<u8>().ok().filter(|z| (1..=60).contains(z))
+            }
+            _ => {}
+        }
+    }
+    is_utm.then_some(zone).flatten()
+}
+
+/// How far a longitude is from the middle of a UTM zone, in degrees (0 to 180).
+/// The middle of zone `n` is at `6 * n - 183` degrees.
+fn degrees_from_zone_centre(longitude: f64, zone: u8) -> f64 {
+    let centre = 6.0 * f64::from(zone) - 183.0;
+    ((longitude - centre + 540.0).rem_euclid(360.0) - 180.0).abs()
 }
 
 /// The four corners of the bounding box, then up to [`MAX_SAMPLES`] evenly
@@ -119,33 +178,30 @@ fn samples(dataset: &Dataset) -> Vec<Sample> {
     samples
 }
 
-/// Converts one coordinate to longitude and latitude and checks the answer.
+/// Converts one coordinate to longitude and latitude and checks the answer,
+/// returning the longitude in degrees if it is good.
 ///
 /// The answer must be a real position (finite, within the range of longitude
 /// and latitude), and converting it back must give the coordinate we started
 /// with. The second test catches coordinates a projection can only wrap around
 /// the globe, such as a northing beyond the pole, which still come out as
 /// plausible-looking numbers. A failed conversion counts as not valid.
-fn converts_to_a_valid_position(from: &Proj, to: &Proj, xy: [f64; 2]) -> bool {
+fn convert(from: &Proj, to: &Proj, xy: [f64; 2]) -> Option<f64> {
     let mut point = (xy[0], xy[1], 0.0);
-    if proj4rs::transform::transform(from, to, &mut point).is_err() {
-        return false;
-    }
+    proj4rs::transform::transform(from, to, &mut point).ok()?;
     let (lon, lat) = (point.0.to_degrees(), point.1.to_degrees());
     let real_position = lon.is_finite()
         && lat.is_finite()
         && lat.abs() <= 90.0 + EPSILON
         && (-180.0 - EPSILON..=360.0 + EPSILON).contains(&lon);
     if !real_position {
-        return false;
+        return None;
     }
     let mut back = point;
-    if proj4rs::transform::transform(to, from, &mut back).is_err() {
-        return false;
-    }
+    proj4rs::transform::transform(to, from, &mut back).ok()?;
     let close =
         |got: f64, wanted: f64| (got - wanted).abs() <= ROUND_TRIP_TOLERANCE + 1e-9 * wanted.abs();
-    close(back.0, xy[0]) && close(back.1, xy[1])
+    (close(back.0, xy[0]) && close(back.1, xy[1])).then_some(lon)
 }
 
 #[cfg(test)]
@@ -197,12 +253,85 @@ mod tests {
     }
 
     #[test]
-    fn coordinates_that_are_absurd_for_the_zone_but_convert_cleanly_are_not_flagged() {
-        // Known limit: without the area each system is meant for, an easting of
-        // 2.7 million in a UTM zone still converts to a valid position 20
-        // degrees from the zone, so nothing can be said about it.
-        let d = utm40(&[(2_765_000.0, 500_000.0), (5_000_000.0, 2_765_000.0)]);
+    fn coordinates_far_from_the_utm_zone_are_flagged_with_the_zone_named() {
+        // An easting of 2.7 million is about 20 degrees from the zone's middle,
+        // and swapped easting and northing look just like that.
+        let d = utm40(&[
+            (500_000.0, 2_765_000.0),
+            (2_765_000.0, 500_000.0),
+            (5_000_000.0, 2_765_000.0),
+        ]);
+        let f = run(check, &d);
+        assert_eq!(codes(&f), ["crs.projected.outside_zone"]);
+        let one = &f.as_slice()[0];
+        assert_eq!(
+            (one.severity, one.count),
+            (crate::findings::Severity::Warning, 2)
+        );
+        assert_eq!(one.step, Some(crate::findings::WizardStep::Crs));
+        assert!(one.message.contains(
+            "more than 9 degrees of longitude from the middle of UTM zone 40 (EPSG:32640)"
+        ));
+        let at: Vec<_> = one.examples.iter().map(|l| l.element).collect();
+        assert_eq!(at, [Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn data_across_a_whole_zone_and_a_bit_beyond_is_accepted() {
+        // Eastings 150,000 to 850,000 are lon 53.5 to 60.5: inside the zone.
+        // 1,300,000 is about 8 degrees out: past the zone edge but within tolerance.
+        let d = utm40(&[
+            (150_000.0, 2_765_000.0),
+            (850_000.0, 2_765_000.0),
+            (1_300_000.0, 2_765_000.0),
+        ]);
         assert!(run(check, &d).is_empty());
+    }
+
+    #[test]
+    fn south_zones_are_checked_the_same_way() {
+        let mut d = utm40(&[(500_000.0, 7_235_000.0)]);
+        d.crs = Some(CrsRef::Epsg { code: 32740 });
+        assert!(run(check, &d).is_empty());
+        let mut far = utm40(&[(500_000.0, 7_235_000.0), (3_000_000.0, 7_235_000.0)]);
+        far.crs = Some(CrsRef::Epsg { code: 32740 });
+        assert_eq!(codes(&run(check, &far)), ["crs.projected.outside_zone"]);
+    }
+
+    #[test]
+    fn a_position_that_fails_to_convert_is_implausible_not_also_out_of_zone() {
+        let d = utm40(&[(500_000.0, 2e7)]);
+        assert_eq!(codes(&run(check, &d)), ["crs.projected.implausible"]);
+    }
+
+    #[test]
+    fn only_utm_systems_get_the_zone_check() {
+        assert_eq!(epsg::proj4(32640).and_then(utm_zone), Some(40));
+        assert_eq!(epsg::proj4(32740).and_then(utm_zone), Some(40));
+        assert_eq!(epsg::proj4(26917).and_then(utm_zone), Some(17));
+        assert_eq!(epsg::proj4(27700).and_then(utm_zone), None);
+        assert_eq!(epsg::proj4(3857).and_then(utm_zone), None);
+        for bad in [
+            "",
+            "+proj=utm",
+            "+proj=utm +zone=0",
+            "+proj=utm +zone=61",
+            "+proj=utm +zone=x",
+            "+zone=40",
+        ] {
+            assert_eq!(utm_zone(bad), None, "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn distance_from_the_middle_of_a_zone_wraps_around_the_date_line() {
+        assert_eq!(degrees_from_zone_centre(57.0, 40), 0.0);
+        assert_eq!(degrees_from_zone_centre(60.0, 40), 3.0);
+        assert_eq!(degrees_from_zone_centre(45.0, 40), 12.0);
+        // Zone 1 is centred on -177 and zone 60 on 177; they are neighbours.
+        assert!((degrees_from_zone_centre(179.0, 1) - 4.0).abs() < 1e-12);
+        assert!((degrees_from_zone_centre(-179.0, 60) - 4.0).abs() < 1e-12);
+        assert!((degrees_from_zone_centre(-177.0, 1)).abs() < 1e-12);
     }
 
     #[test]

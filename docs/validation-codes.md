@@ -73,6 +73,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Check that you chose the right coordinate system, for example the right UTM zone and hemisphere, and that X is the easting and Y the northing.
 - Example: Some coordinates do not fit EPSG:32640 (WGS 84 / UTM zone 40N): they cannot be converted to valid longitudes and latitudes.
 
+## `crs.projected.outside_zone`
+
+- Severity: warning
+- Step: crs
+- Message: Some coordinates are more than 9 degrees of longitude from the middle of UTM zone {zone} (EPSG:{code}), so they probably belong to another zone or coordinate system.
+- Hint: Each UTM zone is 6 degrees wide. Find the zone for your area and choose its EPSG code, for example 32640 for zone 40 north or 32740 for zone 40 south.
+- Example: Some coordinates are more than 9 degrees of longitude from the middle of UTM zone 40 (EPSG:32640), so they probably belong to another zone or coordinate system.
+
 ## `crs.projected.unchecked`
 
 - Severity: info

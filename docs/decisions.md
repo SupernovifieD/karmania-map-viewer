@@ -315,3 +315,13 @@ was chosen, why.
   built to trip). The fixtures are built so the reports contain no floating point
   numbers and no platform-dependent values. `crates/` is excluded from Prettier,
   since rustfmt formats the Rust and the snapshots are generated.
+- Step 2.23 (owner request): for UTM systems (`+proj=utm`, 1 to 60 zones, north
+  and south) a sample that converts to a longitude more than 9 degrees from the
+  middle of the zone (`6 * zone - 183`) gives the warning
+  `crs.projected.outside_zone`. 9 degrees is the zone's own 3 degrees each side
+  plus one more zone width, so data that straddles a zone edge is accepted. This
+  closes the gap noted at step 2.20 for UTM only (it catches an easting of
+  2.7 million and swapped easting and northing); other projections still have no
+  area-of-use check. It cannot catch a wrong zone with normal-looking eastings,
+  because the numbers alone do not say which zone they came from. The finding
+  count is the number of failing samples, which includes the box corners.

@@ -128,6 +128,12 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.22 Ignored-by-default timing test: validate 1M points; record the result
   in `docs/perf.md`.
 
+Follow-ups requested by the owner after the M2 report (each its own commit):
+
+- [x] 2.23 UTM zone rule: coordinates far from the middle of a UTM zone are a
+  warning.
+- [ ] 2.24 The geographic range check is a warning, not an error.
+
 ## M3: Readers (karmania-io)
 
 - [ ] 3.1 Create `crates/karmania-io` and `fixtures/` with tiny sample files for
