@@ -16,6 +16,7 @@ use karmania_io::geojson::read_geojson;
 use karmania_io::mapping::{ColumnMapping, EmptyCoordinates, ImportMapping, Nodata};
 use karmania_io::numbers::DecimalSeparator;
 use karmania_io::obj::read_obj;
+use karmania_io::preview::preview;
 use karmania_io::prj::read_prj;
 use karmania_io::roles::Role;
 use karmania_io::text::decode;
@@ -222,6 +223,25 @@ fn all_readers(input: &str) {
     assert_eq!(prj, read_prj(input));
 }
 
+/// Previews the bytes as a file called `name`: no panic, the same answer twice, an
+/// error when no format was found, and a result that serializes.
+fn check_preview(name: &str, bytes: &[u8]) {
+    let first = preview(name, bytes, &[]);
+    assert_eq!(
+        first,
+        preview(name, bytes, &[]),
+        "preview of {name} is not deterministic"
+    );
+    if first.format.is_none() {
+        assert!(
+            first.findings.has_errors(),
+            "no format and nothing said: {name}"
+        );
+        assert!(first.table.is_none() && first.crs.is_none());
+    }
+    assert!(serde_json::to_string(&first).is_ok());
+}
+
 /// A small deterministic random number generator.
 struct Rng(u64);
 
@@ -276,6 +296,7 @@ fn every_prefix_of_every_sample_file() {
         let text = text_of(&fixture(name));
         let own = own_reader(name);
         for end in text.char_indices().map(|(i, _)| i).chain([text.len()]) {
+            check_preview(name, &text.as_bytes()[..end]);
             all_readers(&text[..end]);
             if let Some(read) = &own {
                 let out = read(&text[..end]);
@@ -315,6 +336,7 @@ fn random_edits_of_the_sample_files() {
                 }
             }
             let _ = round;
+            check_preview(name, &bytes);
             let text = text_of(&bytes);
             all_readers(&text);
             let _ = detect_format(Some(name), &bytes);
@@ -349,6 +371,9 @@ fn random_bytes() {
         all_readers(&text_of(&bytes));
         let _ = detect_format(None, &bytes);
         let _ = detect_format(Some("a.csv"), &bytes);
+        for name in ["a.csv", "a.geojson", "a.asc", "a.obj", "a.prj", "a"] {
+            check_preview(name, &bytes);
+        }
     }
 }
 

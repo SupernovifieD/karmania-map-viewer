@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 
 use karmania_core::{Finding, FindingCode, Findings};
+use serde::Serialize;
 
 use crate::numbers::looks_numeric;
 
@@ -23,8 +24,10 @@ const CANDIDATES: [Delimiter; 4] = [
     Delimiter::Whitespace,
 ];
 
-/// What separates the fields of a row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// What separates the fields of a row. In JSON: `comma`, `semicolon`, `tab` or
+/// `whitespace`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Delimiter {
     /// A comma.
     Comma,

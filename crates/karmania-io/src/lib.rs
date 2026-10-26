@@ -28,6 +28,7 @@ pub mod nodata;
 pub mod numbers;
 pub mod obj;
 mod output;
+pub mod preview;
 pub mod prj;
 pub mod roles;
 pub mod text;

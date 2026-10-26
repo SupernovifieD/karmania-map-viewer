@@ -1,6 +1,7 @@
 //! Suggesting which values in the data mean "no data".
 
 use karmania_core::ColumnType;
+use serde::Serialize;
 
 use crate::numbers::{DecimalSeparator, parse_number};
 
@@ -13,7 +14,7 @@ pub const NODATA_TOKENS: [&str; 7] = ["", "NA", "N/A", "null", "NaN", "-", "*"];
 pub const NODATA_NUMBERS: [f64; 6] = [-999.0, -9999.0, -99999.0, 1e30, -1e30, 1.70141e38];
 
 /// A word that looks like "no data" and how often it appears.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TokenSuggestion {
     /// The word; the empty string means an empty cell.
     pub token: String,
@@ -22,7 +23,7 @@ pub struct TokenSuggestion {
 }
 
 /// A number that looks like "no data" and how often it appears.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NumberSuggestion {
     /// The number.
     pub value: f64,
@@ -31,7 +32,7 @@ pub struct NumberSuggestion {
 }
 
 /// The values worth offering as "no data", with how often each was seen.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct NodataSuggestions {
     /// Words found, in the order of [`NODATA_TOKENS`].
     pub tokens: Vec<TokenSuggestion>,
