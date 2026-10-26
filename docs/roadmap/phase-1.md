@@ -106,7 +106,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.11 Values: non-finite coordinates (error, aggregated).
 - [x] 2.12 Values: coordinate magnitude above 1e8 (warning: "check units").
 - [x] 2.13 Values: exact duplicate points (warning, hashing on bit patterns).
-- [ ] 2.14 Values: all-null columns (warning); categorical codes within the
+- [x] 2.14 Values: all-null columns (warning); categorical codes within the
   dictionary (error).
 - [ ] 2.15 CRS: missing CRS (error, hint: choose an EPSG code or Local grid,
   step "crs"); Local accepted.

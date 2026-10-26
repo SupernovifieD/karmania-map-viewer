@@ -1,8 +1,10 @@
 //! Value checks: are the numbers and tables sensible?
 
 use crate::codes::FindingCode;
+use crate::column::ColumnData;
 use crate::dataset::{Dataset, Geometry, Kind};
 use crate::findings::{Finding, Findings, Location};
+use crate::table::Table;
 
 /// Coordinates larger than this (in absolute value) suggest the wrong units, for
 /// example millimetres instead of metres.
@@ -13,6 +15,48 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_finite_coordinates(dataset, findings);
     check_coordinate_magnitude(dataset, findings);
     check_duplicate_points(dataset, findings);
+    check_table(&dataset.attributes, "column", findings);
+    if let Some(table) = &dataset.vertex_attributes {
+        check_table(table, "per-vertex column", findings);
+    }
+}
+
+/// Checks every column of a table: a column with only nulls is probably a
+/// mistake, and a category code outside the dictionary cannot be shown.
+/// `label` names the kind of column in messages.
+fn check_table(table: &Table, label: &str, findings: &mut Findings) {
+    for column in table.columns() {
+        let name = column.name();
+        if !column.is_empty() && column.null_count() == column.len() {
+            findings.add(
+                Finding::new(
+                    FindingCode::TableColumnAllNull,
+                    format!("The {label} \"{name}\" has no values: every entry is empty."),
+                )
+                .with_hint("Ignore this column, or check which values you marked as no data.")
+                .at(Location::default().with_column(name)),
+            );
+        }
+        let ColumnData::Categorical { codes, dictionary } = column.data() else {
+            continue;
+        };
+        let mut missing = Finding::new(
+            FindingCode::TableColumnCategoryOutOfRange,
+            format!("Some values in the {label} \"{name}\" refer to categories that do not exist."),
+        )
+        .with_hint("Every category code must point at one of the listed category names.");
+        missing.count = 0;
+        for (row, &code) in codes.iter().enumerate() {
+            let in_dictionary = usize::try_from(code).is_ok_and(|c| c < dictionary.len());
+            if !in_dictionary && column.validity().is_valid(row) == Some(true) {
+                missing.count += 1;
+                missing = missing.at(Location::default().with_column(name).with_row(row as u64));
+            }
+        }
+        if missing.count > 0 {
+            findings.add(missing);
+        }
+    }
 }
 
 /// Warns about points that repeat an earlier point exactly. "Exactly" means the
@@ -321,6 +365,95 @@ mod tests {
     fn other_shapes_are_not_checked_for_duplicate_points() {
         let f = run(check, &lines(4, &[0, 4]));
         assert!(!codes(&f).contains(&"values.points.duplicate"));
+    }
+
+    fn with_columns(mut d: Dataset, columns: Vec<crate::column::Column>) -> Dataset {
+        d.attributes = Table::from_columns(columns, &mut Findings::new()).unwrap();
+        d
+    }
+
+    fn floats_with_nulls(name: &str, flags: &[bool]) -> crate::column::Column {
+        let data = ColumnData::Float64(vec![0.0; flags.len()]);
+        let validity = crate::validity::Validity::from_flags(flags.iter().copied());
+        crate::column::Column::new(name, data, validity).unwrap()
+    }
+
+    fn category(
+        name: &str,
+        codes: Vec<u32>,
+        dictionary: &[&str],
+        flags: &[bool],
+    ) -> crate::column::Column {
+        let dictionary = dictionary.iter().map(|s| (*s).to_string()).collect();
+        let data = ColumnData::Categorical { codes, dictionary };
+        let validity = crate::validity::Validity::from_flags(flags.iter().copied());
+        crate::column::Column::new(name, data, validity).unwrap()
+    }
+
+    #[test]
+    fn a_column_with_every_entry_empty_is_a_warning_that_points_at_nodata() {
+        let d = with_columns(
+            points(3),
+            vec![
+                floats_with_nulls("au", &[true, false, true]),
+                floats_with_nulls("ag", &[false; 3]),
+            ],
+        );
+        let f = run(check, &d);
+        assert_eq!(codes(&f), ["table.column.all_null"]);
+        let one = &f.as_slice()[0];
+        assert_eq!(
+            one.message,
+            "The column \"ag\" has no values: every entry is empty."
+        );
+        assert_eq!(one.step, Some(crate::findings::WizardStep::Nodata));
+        assert_eq!(one.severity, crate::findings::Severity::Warning);
+        assert_eq!(one.examples[0].column.as_deref(), Some("ag"));
+    }
+
+    #[test]
+    fn a_column_with_no_rows_at_all_is_not_all_null() {
+        let d = with_columns(points(0), vec![floats_with_nulls("x", &[])]);
+        assert!(!codes(&run(check, &d)).contains(&"table.column.all_null"));
+    }
+
+    #[test]
+    fn category_codes_outside_the_dictionary_are_counted_per_column() {
+        let c = category(
+            "rock",
+            vec![0, 1, 7, 2, u32::MAX],
+            &["granite", "basalt"],
+            &[true; 5],
+        );
+        let f = run(check, &with_columns(points(5), vec![c]));
+        assert_eq!(codes(&f), ["table.column.category_out_of_range"]);
+        let one = &f.as_slice()[0];
+        assert_eq!(one.count, 3);
+        let rows: Vec<_> = one.examples.iter().map(|l| l.row).collect();
+        assert_eq!(rows, [Some(2), Some(3), Some(4)]);
+        assert_eq!(one.severity, crate::findings::Severity::Error);
+    }
+
+    #[test]
+    fn a_null_category_entry_is_never_checked_even_with_a_junk_code() {
+        let c = category("rock", vec![0, 99], &["granite"], &[true, false]);
+        assert!(run(check, &with_columns(points(2), vec![c])).is_empty());
+    }
+
+    #[test]
+    fn per_vertex_columns_are_checked_and_named_as_such() {
+        let mut d = lines(2, &[0, 2]);
+        let table = Table::from_columns(
+            vec![floats_with_nulls("z", &[false, false])],
+            &mut Findings::new(),
+        )
+        .unwrap();
+        d.vertex_attributes = Some(table);
+        let f = run(check, &d);
+        assert_eq!(
+            f.as_slice()[0].message,
+            "The per-vertex column \"z\" has no values: every entry is empty."
+        );
     }
 
     #[test]

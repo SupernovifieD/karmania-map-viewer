@@ -124,6 +124,10 @@ finding_codes! {
     ValuesPointsDuplicate => "values.points.duplicate", Warning, None;
     /// Some coordinates are so large that the units may be wrong.
     ValuesCoordinatesVeryLarge => "values.coordinates.very_large", Warning, None;
+    /// Every entry of a table column is empty.
+    TableColumnAllNull => "table.column.all_null", Warning, Some(WizardStep::Nodata);
+    /// Some category codes in a column are outside its dictionary.
+    TableColumnCategoryOutOfRange => "table.column.category_out_of_range", Error, None;
     /// A table column has a different number of rows from the first column.
     TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.
