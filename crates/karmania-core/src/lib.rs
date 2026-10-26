@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod blocks;
 pub mod codes;
 pub mod column;
 pub mod crs;
@@ -22,6 +23,7 @@ pub mod table;
 pub mod text;
 pub mod validity;
 
+pub use blocks::Blocks;
 pub use codes::FindingCode;
 pub use column::{Column, ColumnData, ColumnType, LengthMismatch, Value};
 pub use crs::{CrsRef, Units};

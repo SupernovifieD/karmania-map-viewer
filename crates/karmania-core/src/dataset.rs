@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::blocks::Blocks;
 use crate::crs::CrsRef;
 use crate::grid::Grid;
 use crate::lines::Lines;
@@ -63,6 +64,8 @@ pub enum Geometry {
     Mesh(Mesh),
     /// A regular grid, one attribute row per cell.
     Grid(Grid),
+    /// A block model, one attribute row per block.
+    Blocks(Blocks),
 }
 
 impl Geometry {
@@ -75,11 +78,13 @@ impl Geometry {
             Geometry::Polygons(_) => Kind::Polygons,
             Geometry::Mesh(_) => Kind::Mesh,
             Geometry::Grid(_) => Kind::Grid,
+            Geometry::Blocks(_) => Kind::Blocks,
         }
     }
 
     /// Whether the source had real Z values. Points, lines, polygons and meshes
-    /// report their positions' flag.
+    /// report their positions' flag, a grid reports its elevation rule, and a
+    /// block model is always three-dimensional.
     #[must_use]
     pub fn has_z(&self) -> bool {
         match self {
@@ -88,6 +93,7 @@ impl Geometry {
             Geometry::Polygons(polygons) => polygons.positions.has_z(),
             Geometry::Mesh(mesh) => mesh.positions.has_z(),
             Geometry::Grid(grid) => grid.has_z(),
+            Geometry::Blocks(_) => true,
         }
     }
 }
@@ -282,6 +288,25 @@ mod tests {
             Table::empty(),
         );
         assert_eq!((d.kind(), d.has_z()), (Kind::Grid, false));
+    }
+
+    #[test]
+    fn a_block_model_dataset_reports_the_blocks_kind_and_is_always_3d() {
+        let lattice = Lattice {
+            origin: [0.0; 3],
+            spacing: [5.0; 3],
+            dims: [2, 2, 1],
+            rotation: 0.0,
+        };
+        let blocks = Blocks { lattice, ijk: None };
+        let d = Dataset::new(
+            DatasetId(5),
+            "model",
+            None,
+            Geometry::Blocks(blocks),
+            Table::empty(),
+        );
+        assert_eq!((d.kind(), d.has_z()), (Kind::Blocks, true));
     }
 
     #[test]
