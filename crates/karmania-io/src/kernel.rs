@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use karmania_core::{Dataset, Findings};
 
-use crate::build::{PointsInput, build_points};
+use crate::build::{LinesInput, PointsInput, build_lines, build_points};
 use crate::import_run::{ImportRun, Phase, RunStep};
 use crate::mapping::ImportMapping;
 use crate::registry::{LoadResult, Registry};
@@ -100,6 +100,11 @@ impl Kernel {
     /// findings say why.
     pub fn load_points(&mut self, input: PointsInput) -> LoadResult {
         self.load_built(|findings| build_points(input, findings))
+    }
+
+    /// Loads lines made from arrays; see [`Kernel::load_points`].
+    pub fn load_lines(&mut self, input: LinesInput) -> LoadResult {
+        self.load_built(|findings| build_lines(input, findings))
     }
 
     /// Loads what `build` makes, or blocks with its findings if it makes nothing.

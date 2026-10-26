@@ -10,7 +10,7 @@
 use karmania_core::text::format_count;
 use karmania_core::{
     Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Kind,
-    Positions, Table, Validity,
+    Lines, Positions, Table, Validity,
 };
 
 /// The values of one column.
@@ -141,6 +141,60 @@ pub fn build_points(input: PointsInput, findings: &mut Findings) -> Option<Datas
         Geometry::Points(positions?),
         attributes?,
     ))
+}
+
+/// The attribute table for a per-vertex table: none if there are no columns, since
+/// "no table" and "a table with no columns" mean the same and the first is simpler.
+fn optional_table(columns: Vec<ColumnInput>, findings: &mut Findings) -> Option<Option<Table>> {
+    if columns.is_empty() {
+        Some(None)
+    } else {
+        table_from_columns(columns, findings).map(Some)
+    }
+}
+
+/// Lines to load: positions in line order, where each line starts, and attributes
+/// per line and optionally per vertex.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinesInput {
+    /// The dataset's name; blank means `lines`.
+    pub name: String,
+    /// The coordinate system; `None` is reported by validation.
+    pub crs: Option<CrsRef>,
+    /// Easting or longitude of each vertex.
+    pub x: Vec<f64>,
+    /// Northing or latitude of each vertex.
+    pub y: Vec<f64>,
+    /// Elevation of each vertex, or `None` for 2D lines.
+    pub z: Option<Vec<f64>>,
+    /// Where each line starts in the vertex list, plus the end: one more entry than
+    /// there are lines, starting at 0 and never decreasing.
+    pub offsets: Vec<u32>,
+    /// The attribute columns, one value per line.
+    pub columns: Vec<ColumnInput>,
+    /// Attribute columns with one value per vertex; none for no vertex table.
+    pub vertex_columns: Vec<ColumnInput>,
+}
+
+/// Makes a lines dataset. `None`, with a finding, if the coordinate lists differ in
+/// length or the columns cannot be made into tables. Offsets that do not fit the
+/// vertices are left to validation.
+pub fn build_lines(input: LinesInput, findings: &mut Findings) -> Option<Dataset> {
+    let positions = Positions::from_xyz(&input.x, &input.y, input.z.as_deref(), findings);
+    let attributes = table_from_columns(input.columns, findings);
+    let vertex_attributes = optional_table(input.vertex_columns, findings);
+    let mut dataset = Dataset::new(
+        DatasetId(0),
+        name_or_kind(input.name, Kind::Lines),
+        input.crs,
+        Geometry::Lines(Lines {
+            positions: positions?,
+            offsets: input.offsets,
+        }),
+        attributes?,
+    );
+    dataset.vertex_attributes = vertex_attributes?;
+    Some(dataset)
 }
 
 #[cfg(test)]
@@ -316,5 +370,114 @@ mod tests {
         let report = karmania_core::validate(&d);
         let found: Vec<_> = report.findings().map(|f| f.code.as_str()).collect();
         assert!(found.contains(&"values.coordinates.not_finite") && found.contains(&"crs.missing"));
+    }
+
+    fn lines(offsets: Vec<u32>) -> LinesInput {
+        LinesInput {
+            name: "Roads".into(),
+            crs: metres(),
+            x: vec![0.0, 1.0, 2.0, 5.0, 6.0],
+            y: vec![0.0, 1.0, 0.0, 5.0, 6.0],
+            z: None,
+            offsets,
+            columns: vec![column(
+                "name",
+                ColumnValues::Text(vec!["A".into(), "B".into()]),
+            )],
+            vertex_columns: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn lines_become_a_dataset_with_per_line_and_per_vertex_attributes() {
+        let mut input = lines(vec![0, 3, 5]);
+        input.vertex_columns = vec![column(
+            "depth",
+            ColumnValues::Float(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+        )];
+        let mut findings = Findings::new();
+        let d = build_lines(input, &mut findings).unwrap();
+        assert!(findings.is_empty());
+        assert_eq!(
+            (d.kind(), d.element_count(), d.geometry.vertex_count()),
+            (Kind::Lines, Some(2), Some(5))
+        );
+        assert_eq!(d.vertex_attributes.as_ref().map(Table::row_count), Some(5));
+        assert!(karmania_core::validate(&d).is_loadable());
+    }
+
+    #[test]
+    fn no_vertex_columns_means_no_vertex_table() {
+        let d = build_lines(lines(vec![0, 3, 5]), &mut Findings::new()).unwrap();
+        assert!(d.vertex_attributes.is_none());
+        assert_eq!(d.name, "Roads");
+        let mut unnamed = lines(vec![0, 3, 5]);
+        unnamed.name = String::new();
+        assert_eq!(
+            build_lines(unnamed, &mut Findings::new()).unwrap().name,
+            "lines"
+        );
+    }
+
+    #[test]
+    fn offsets_that_do_not_fit_are_left_to_validation_which_names_the_problem() {
+        let cases: [(Vec<u32>, &str); 4] = [
+            (vec![0, 4, 3, 5], "lines.offsets.decreasing"),
+            (vec![1, 3, 5], "lines.offsets.bad_start"),
+            (vec![0, 3, 4], "lines.offsets.bad_end"),
+            (vec![], "lines.offsets.empty"),
+        ];
+        for (offsets, code) in cases {
+            let d = build_lines(lines(offsets), &mut Findings::new()).unwrap();
+            let report = karmania_core::validate(&d);
+            assert!(report.findings().any(|f| f.code.as_str() == code), "{code}");
+            assert!(!report.is_loadable());
+        }
+    }
+
+    #[test]
+    fn a_line_of_one_vertex_loads_with_a_warning() {
+        let mut input = lines(vec![0, 1, 5]);
+        input.columns = vec![column(
+            "name",
+            ColumnValues::Text(vec!["A".into(), "B".into()]),
+        )];
+        let d = build_lines(input, &mut Findings::new()).unwrap();
+        let report = karmania_core::validate(&d);
+        assert!(report.is_loadable());
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "lines.line.too_short")
+        );
+    }
+
+    #[test]
+    fn vertex_columns_with_the_wrong_number_of_rows_are_found_by_validation() {
+        let mut input = lines(vec![0, 3, 5]);
+        input.vertex_columns = vec![column("depth", ColumnValues::Float(vec![1.0, 2.0]))];
+        let d = build_lines(input, &mut Findings::new()).unwrap();
+        assert!(
+            karmania_core::validate(&d)
+                .findings()
+                .any(|f| f.code.as_str() == "dataset.vertex_attributes.rows_mismatch")
+        );
+    }
+
+    #[test]
+    fn lines_with_mismatched_coordinate_lists_or_bad_columns_make_no_dataset() {
+        let mut short = lines(vec![0, 3, 5]);
+        short.y.pop();
+        let mut findings = Findings::new();
+        assert!(build_lines(short, &mut findings).is_none());
+        assert_eq!(codes(&findings), ["dataset.coordinates.length_mismatch"]);
+        let mut bad = lines(vec![0, 3, 5]);
+        bad.vertex_columns = vec![
+            column("a", ColumnValues::Float(vec![1.0])),
+            column("a", ColumnValues::Float(vec![1.0])),
+        ];
+        let mut findings = Findings::new();
+        assert!(build_lines(bad, &mut findings).is_none());
+        assert!(findings.has_errors());
     }
 }

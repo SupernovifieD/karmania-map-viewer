@@ -1,13 +1,12 @@
 //! The kernel object: the loaded datasets and the imports in progress.
 
-use karmania_io::build::PointsInput;
 use karmania_io::kernel::Kernel as CoreKernel;
 use karmania_io::mapping::ImportMapping;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use crate::columns::{ColumnSet, read_crs};
 use crate::convert::to_js;
+use crate::input::{DatasetInput, read_dataset};
 
 /// The kernel: the loaded datasets and the imports in progress.
 ///
@@ -83,33 +82,21 @@ impl Kernel {
         to_js(&self.inner.registry().summaries())
     }
 
-    /// Loads points made from arrays: `x` and `y` (and `z` if given) are
-    /// `Float64Array`s of the same length; `columns` is a `ColumnSet`, which this
-    /// uses up. Returns the same result as an import: `{ status: "loaded", summaries
-    /// }` or `{ status: "blocked", findings }`.
+    /// Loads a dataset made from arrays. `input` is one object: `{ kind, name, crs,
+    /// ... }` with typed arrays for the numbers, in the shape the engine builds (see
+    /// the `KernelDataset` type). Returns the same result as an import: `{ status:
+    /// "loaded", summaries }` or `{ status: "blocked", findings }`.
     ///
     /// # Errors
     ///
-    /// Throws if `crs` is not a coordinate system object, `null` or `undefined`.
-    #[wasm_bindgen(js_name = loadPoints)]
-    pub fn load_points(
-        &mut self,
-        name: &str,
-        crs: &JsValue,
-        x: Vec<f64>,
-        y: Vec<f64>,
-        z: Option<Vec<f64>>,
-        columns: Option<ColumnSet>,
-    ) -> Result<JsValue, JsError> {
-        let input = PointsInput {
-            name: name.to_string(),
-            crs: read_crs(crs)?,
-            x,
-            y,
-            z,
-            columns: columns.map(ColumnSet::into_columns).unwrap_or_default(),
+    /// Throws, naming the field, if `input` is not of the right shape: a missing
+    /// field, an unknown kind, an array of the wrong type.
+    pub fn load(&mut self, input: &JsValue) -> Result<JsValue, JsError> {
+        let result = match read_dataset(input)? {
+            DatasetInput::Points(points) => self.inner.load_points(points),
+            DatasetInput::Lines(lines) => self.inner.load_lines(lines),
         };
-        to_js(&self.inner.load_points(input))
+        to_js(&result)
     }
 }
 

@@ -879,3 +879,20 @@ was chosen, why.
   coordinates, with warnings, and with a coordinate system of the wrong shape (which
   throws, as misuse). Inverting the meaning of the null bytes in the glue makes a test
   fail.
+- Step 4.6: datasets built from arrays are loaded with one call, `kernel.load(input)`,
+  where `input` is one object: `{ kind, name, crs, x, y, z?, ..., columns? }` with typed
+  arrays for the numbers and a list of column objects (`{ name, type, values, nulls? }`;
+  a category column has `codes` and `dictionary`). This replaces the `ColumnSet` class
+  and positional `loadPoints` of step 4.5b, which would not have scaled: lines need
+  eight arguments, grids and blocks more, and the lint against more than seven function
+  arguments is there for a reason. One object is also the shape the engine will build
+  and pass on from the worker. The glue reads it field by field and throws, naming the
+  field, for anything of the wrong shape (a missing field, a plain array where a typed
+  array is needed, an unknown kind or column type). Typed arrays are recognised by their
+  type tag rather than `instanceof`, so arrays that came from another window or worker
+  are accepted, which a test checks with arrays from a separate realm. The TypeScript
+  type of the object is `KernelDataset` (points and lines so far; the other shapes
+  follow in steps 4.7 to 4.10). Lines take `offsets` (a `Uint32Array`, one more entry
+  than there are lines), attribute columns per line and optional `vertexColumns` per
+  vertex. Offsets that do not fit the vertices are left to validation, which names the
+  problem; a one-vertex line loads with a warning.

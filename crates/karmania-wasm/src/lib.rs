@@ -9,12 +9,11 @@
 //! errors thrown are for misuse, such as passing something that is not a list of
 //! files, or asking for a dataset that does not exist.
 
-mod columns;
 mod convert;
+mod input;
 mod kernel;
 mod preview;
 
-pub use columns::ColumnSet;
 pub use kernel::Kernel;
 pub use preview::preview;
 

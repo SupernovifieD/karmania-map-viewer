@@ -249,7 +249,7 @@ Definitions and reprojection can be added later, with the features that need the
     loading them through the kernel.
   - [x] 4.5b The `ColumnSet` and `loadPoints` exported to JavaScript, with the
     TypeScript types and Node tests.
-- [ ] 4.6 Builders: lines.
+- [x] 4.6 Builders: lines.
 - [ ] 4.7 Builders: polygons.
 - [ ] 4.8 Builders: mesh.
 - [ ] 4.9 Builders: grid.
