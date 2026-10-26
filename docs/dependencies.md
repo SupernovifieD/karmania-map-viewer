@@ -52,6 +52,7 @@ BSD-3-Clause or ISC, except:
 | serde (with `derive`) | 1.0.229 | MIT OR Apache-2.0 | Serialization of the wire contracts (findings, CRS, import mapping) in `karmania-core`. | step 1.1a |
 | serde_json (dev, `karmania-core`) | 1.0.154 | MIT OR Apache-2.0 | Tests that pin the exact JSON shape of serialized types. | step 1.1a |
 | crs-definitions | 0.6.0 | CC0-1.0 | EPSG code to definition lookup (name, kind and units are read from the WKT; the PROJ string feeds the plausibility check). `no_std`, no dependencies of its own. Its definition tables are 4.8 MB of source text, so expect a noticeably larger WebAssembly file (not yet measured). | step 2.16 |
+| proj4rs | 0.2.1 | MIT OR Apache-2.0 | Pure-Rust PROJ port, used to inverse-project coordinates to longitude and latitude for the plausibility check (step 2.20). Default features are off: `aeqd` compiles a C file, which a pure-Rust wasm32 build cannot do, so the azimuthal equidistant projection is unavailable. Brings `thiserror`; on `wasm32-unknown-unknown` it also unconditionally brings `wasm-bindgen`, `js-sys`, `web-sys` and `console_log`. | step 2.19 |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
 
 Where the EPSG data comes from: `crs-definitions` is licensed CC0-1.0, but its
@@ -61,9 +62,11 @@ apply to that data. The owner decided to use it regardless of those terms
 (step 2.16). Check the EPSG terms before redistributing the definitions on their
 own, outside this engine.
 
-Rust transitive tree at step 1.1a (12 crates, checked with `cargo metadata`):
-all MIT, Apache-2.0 or `Unlicense OR MIT`, except:
+Rust transitive tree at step 2.19 (33 crates in the resolved graph, checked with
+`cargo metadata`, same for host and `wasm32-unknown-unknown`): all MIT,
+Apache-2.0, `Unlicense OR MIT` (memchr), CC0-1.0 (`crs-definitions`, above), or
+Unicode-3.0 with MIT or Apache-2.0 (`unicode-ident`):
 
 - `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Required by
-  `syn`, which `serde_derive` cannot do without. Approved by the owner
-  (step 1.19).
+  `syn`, which `serde_derive` and `thiserror` cannot do without. Approved by the
+  owner (step 1.19).

@@ -278,3 +278,15 @@ was chosen, why.
   both ways (for example X 35.7, Y 51.4) cannot be told apart and gets no
   finding. The check uses the bounding box, so grids and block models are
   checked by their extent.
+- Step 2.19: `proj4rs` 0.2.1 (the latest; `cargo info` showed 0.1.5 by default)
+  is added with default features off. The `aeqd` feature builds C code through
+  the `cc` crate, which cannot target `wasm32-unknown-unknown` without a wasm C
+  compiler and is not pure Rust. The cost: projections that need it (azimuthal
+  equidistant, e.g. EPSG:3993 for Guam) cannot be plausibility-checked; step
+  2.20 must treat a definition proj4rs rejects as "not checked" and say so.
+  Two side effects, both outside our code: on `wasm32-unknown-unknown` proj4rs
+  depends on `wasm-bindgen`, `js-sys`, `web-sys` and `console_log` whatever the
+  features, so `karmania-core` pulls them in on that target even though none of
+  our core code uses them (the brief wants a wasm-free core; our source is, the
+  dependency tree is not), and a wasm32 check now takes about 80 s on a cold
+  build. Reported to the owner at the M2 checkpoint.

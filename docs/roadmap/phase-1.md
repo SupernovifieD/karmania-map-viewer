@@ -119,7 +119,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   - [x] 2.17b Unknown EPSG code finding.
 - [x] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
   Y may be swapped").
-- [ ] 2.19 Add the proj4rs dependency (dependency-only commit).
+- [x] 2.19 Add the proj4rs dependency (dependency-only commit).
 - [ ] 2.20 CRS: projected plausibility. Inverse-project the bbox corners plus up
   to 1,000 evenly spaced sample points to longitude and latitude. Non-finite or
   out-of-range results give a warning.
