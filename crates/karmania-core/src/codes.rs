@@ -140,6 +140,8 @@ finding_codes! {
     ObjVertexInvalid => "obj.vertex.invalid", Error, Some(WizardStep::File);
     /// Some vertices of an OBJ file have more than three numbers.
     ObjVertexExtraValues => "obj.vertex.extra_values", Info, None;
+    /// The projection file does not name an EPSG code.
+    PrjUnrecognized => "prj.unrecognized", Warning, Some(WizardStep::Crs);
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.

@@ -583,3 +583,15 @@ was chosen, why.
   silently shift the numbers of every later one. Extra numbers on a vertex (a
   weight or a colour) are ignored and counted. A backslash at the end of a line
   continues it. The file has no coordinate system, so it is left unset.
+- Step 3.19: `read_prj` parses the well-known text into a small tree and takes the
+  EPSG code only from the root's own `AUTHORITY[...]` (WKT 1) or `ID[...]` (WKT 2).
+  A projected system contains a geographic one with an authority of its own (4326
+  for WGS 84), and a text search for the last or first `EPSG` would assign the
+  wrong system to projected coordinates, so nested authorities are never used. A
+  file without a root authority (ESRI software writes none) gives no CRS, the
+  system's name for display, and the warning `prj.unrecognized`, so the wizard asks
+  the user. An empty or unreadable file is the same warning with a different
+  message; a sidecar is optional help and never an error. A bare `EPSG:32640` is
+  also accepted. Brackets nested more than 40 deep are not a coordinate system
+  (this also keeps the recursive parser safe from hostile input). Matching a name
+  such as `WGS_1984_UTM_Zone_40N` to an EPSG code is not attempted.
