@@ -265,7 +265,7 @@ Definitions and reprojection can be added later, with the features that need the
     TypeScript `Page` type and Node tests.
 - [x] 4.12 *Dropped (owner decision, 3.25):* export `search_crs(query, limit)`. The
   core has no EPSG definitions, so there is nothing to search.
-- [ ] 4.13 Node smoke test: load the built WASM and round-trip one fixture per
+- [x] 4.13 Node smoke test: load the built WASM and round-trip one fixture per
   format.
 
 ## M5: Engine (packages/engine)

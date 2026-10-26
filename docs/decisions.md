@@ -971,3 +971,13 @@ was chosen, why.
   file that made three datasets, and builder-made datasets of every shape, and check each
   page against a strict contract check (typed arrays of the right length for the number of
   rows, nulls that are only 0 or 1, unique column names).
+- Step 4.13: the Node smoke test takes one sample file per format (a points, a lines
+  and a block-model CSV, a GeoJSON file that makes three datasets, an ASCII grid and a
+  mesh) through the whole path the wizard will use, against the built module: preview,
+  a mapping made from nothing but the preview's own suggestions (its roles, "no data"
+  values and decimal separator), import, the summaries the kernel lists, every row read in
+  pages of three until the count matches, and removal. A second case uses a `.prj`
+  sidecar for the coordinate system, and one whose `.prj` has no EPSG code, which leaves
+  the wizard with no system and the import blocked with `crs.missing` instead of guessing.
+  The suggestions were good enough to import all three CSV samples with no error, so the
+  preview and the import agree. Together with the earlier Node tests this closes M4.
