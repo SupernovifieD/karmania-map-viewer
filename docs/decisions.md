@@ -154,3 +154,18 @@ was chosen, why.
   empty. Constructors that can meet bad user data return `Option<T>` and add
   findings to a `Findings`; this is the pattern for later steps. A thousands
   separator helper (`text::format_count`) was added for messages like `1,204`.
+- Step 1.6: the code for mismatched coordinate lists is
+  `dataset.coordinates.length_mismatch` (area `dataset`, shared by every shape
+  that has positions). `Positions` does not enforce the size limit itself; the
+  readers and builders that create the coordinate lists apply it first
+  (step 1.16).
+- Step 1.7 (logged one commit late): `DatasetId(u64)` is a newtype assigned by
+  the holder of the datasets, not by `Dataset::new`. `Provenance` holds only the
+  source file name for now; the import mapping is added when its type exists
+  (steps 3.7 and 3.8). `Dataset` fields are public, since validation exists to
+  check them; `kind` and `has_z` are methods derived from the geometry, never
+  stored.
+- Step 1.8: geometry types keep their fields public and never trust them:
+  accessors such as `Lines::vertex_range` return `None` for malformed offsets,
+  because checking the offsets is validation's job (step 2.3). Offsets are
+  `u32`, which is enough because the size limit is far below 2^32 elements.
