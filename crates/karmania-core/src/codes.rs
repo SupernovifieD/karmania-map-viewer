@@ -58,10 +58,16 @@ finding_codes! {
     BlocksIjkIncomplete => "blocks.ijk.incomplete", Error, None;
     /// Some blocks are outside the lattice.
     BlocksIjkOutOfRange => "blocks.ijk.out_of_range", Error, None;
+    /// The attribute table does not have one row per element.
+    DatasetAttributesRowsMismatch => "dataset.attributes.rows_mismatch", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
+    /// The per-vertex table does not have one row per vertex.
+    DatasetVertexAttributesRowsMismatch => "dataset.vertex_attributes.rows_mismatch", Error, None;
+    /// A per-vertex table was given for a shape that does not use one.
+    DatasetVertexAttributesUnsupported => "dataset.vertex_attributes.unsupported", Warning, None;
     /// The dataset has no elements at all.
     DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.

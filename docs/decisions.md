@@ -240,3 +240,9 @@ was chosen, why.
   checks that both paths give identical results. Only blocks inside the lattice
   can be duplicates; out-of-range blocks are reported separately. The first copy
   of a repeated block is not blamed, only the later ones.
+- Step 2.10: a table with no columns always passes (a dataset may have no
+  attributes), and a dataset whose elements cannot be counted is not compared
+  (the structure checks already reported why). Beyond the brief, a per-vertex
+  table on a shape that does not use one (anything but lines and meshes) is a
+  warning, `dataset.vertex_attributes.unsupported`, so supplied values are never
+  silently dropped.
