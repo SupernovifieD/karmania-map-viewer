@@ -8,7 +8,7 @@
 
 pub mod findings;
 
-pub use findings::{Finding, Location, MAX_EXAMPLES, Severity, WizardStep};
+pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
 
 #[cfg(test)]
 mod tests {

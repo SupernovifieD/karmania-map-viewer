@@ -3,7 +3,9 @@
 //! Data problems are never panics. They become findings, and nothing is fixed
 //! silently: every conversion, skip or default produces a finding with a count.
 
-use serde::Serialize;
+use std::collections::BTreeMap;
+
+use serde::{Serialize, Serializer};
 
 /// The most example locations a single finding keeps.
 pub const MAX_EXAMPLES: usize = 20;
@@ -168,6 +170,121 @@ impl Finding {
     }
 }
 
+/// An ordered collection of findings that merges repeats.
+///
+/// Two findings with the same code and the same message are one finding: their
+/// counts add up and their examples are appended, keeping at most
+/// [`MAX_EXAMPLES`]. Output order is the order of each finding's first
+/// occurrence, so the same input always gives the same list.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Findings {
+    items: Vec<Finding>,
+    index: BTreeMap<(&'static str, String), usize>,
+}
+
+impl Findings {
+    /// Creates an empty collection.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds a finding, merging it into an earlier one with the same code and
+    /// message. A count of 0 is treated as 1. When merged, the more severe
+    /// severity wins and a missing hint or step is filled in.
+    pub fn add(&mut self, mut finding: Finding) {
+        finding.count = finding.count.max(1);
+        let key = (finding.code, finding.message.clone());
+        let Some(&at) = self.index.get(&key) else {
+            self.index.insert(key, self.items.len());
+            finding.examples.truncate(MAX_EXAMPLES);
+            self.items.push(finding);
+            return;
+        };
+        let Some(existing) = self.items.get_mut(at) else {
+            return;
+        };
+        existing.count = existing.count.saturating_add(finding.count);
+        existing.severity = existing.severity.min(finding.severity);
+        let room = MAX_EXAMPLES.saturating_sub(existing.examples.len());
+        existing
+            .examples
+            .extend(finding.examples.into_iter().take(room));
+        if existing.hint.is_none() {
+            existing.hint = finding.hint;
+        }
+        if existing.step.is_none() {
+            existing.step = finding.step;
+        }
+    }
+
+    /// Adds every finding of `other`, in its order, merging repeats.
+    pub fn extend(&mut self, other: Findings) {
+        for finding in other.items {
+            self.add(finding);
+        }
+    }
+
+    /// Number of distinct findings (after merging).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// True when there are no findings.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// True when at least one finding is an error.
+    #[must_use]
+    pub fn has_errors(&self) -> bool {
+        self.items.iter().any(|f| f.severity == Severity::Error)
+    }
+
+    /// The findings in order of first occurrence.
+    #[must_use]
+    pub fn as_slice(&self) -> &[Finding] {
+        &self.items
+    }
+
+    /// Iterates over the findings in order of first occurrence.
+    pub fn iter(&self) -> std::slice::Iter<'_, Finding> {
+        self.items.iter()
+    }
+
+    /// Consumes the collection and returns the findings in order.
+    #[must_use]
+    pub fn into_vec(self) -> Vec<Finding> {
+        self.items
+    }
+}
+
+impl<'a> IntoIterator for &'a Findings {
+    type Item = &'a Finding;
+    type IntoIter = std::slice::Iter<'a, Finding>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl IntoIterator for Findings {
+    type Item = Finding;
+    type IntoIter = std::vec::IntoIter<Finding>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+impl Serialize for Findings {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.items.serialize(serializer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +352,119 @@ mod tests {
         assert_eq!(
             json,
             r#"{"line":1,"row":2,"element":3,"vertex":4,"column":"c","cell":[5,6,7]}"#
+        );
+    }
+
+    fn at_row(code: &'static str, message: &str, row: u64) -> Finding {
+        Finding::new(code, Severity::Warning, message).at(Location::default().with_row(row))
+    }
+
+    #[test]
+    fn repeats_merge_into_one_finding_with_a_count() {
+        let mut all = Findings::new();
+        for row in [4, 9, 11] {
+            all.add(at_row("values.null", "Empty value.", row));
+        }
+        assert_eq!(all.len(), 1);
+        let f = &all.as_slice()[0];
+        assert_eq!(f.count, 3);
+        let rows: Vec<_> = f.examples.iter().map(|l| l.row).collect();
+        assert_eq!(rows, [Some(4), Some(9), Some(11)]);
+    }
+
+    #[test]
+    fn examples_stay_capped_across_merges() {
+        let mut all = Findings::new();
+        for row in 0..50 {
+            all.add(at_row("values.null", "Empty value.", row));
+        }
+        let f = &all.as_slice()[0];
+        assert_eq!(f.count, 50);
+        assert_eq!(f.examples.len(), MAX_EXAMPLES);
+        assert_eq!(f.examples.last().and_then(|l| l.row), Some(19));
+    }
+
+    #[test]
+    fn different_code_or_message_stays_separate_in_first_seen_order() {
+        let mut all = Findings::new();
+        all.add(at_row("b.code", "Same.", 0));
+        all.add(at_row("a.code", "Same.", 1));
+        all.add(at_row("b.code", "Other message.", 2));
+        all.add(at_row("b.code", "Same.", 3));
+        let order: Vec<_> = all
+            .iter()
+            .map(|f| (f.code, f.message.as_str(), f.count))
+            .collect();
+        assert_eq!(
+            order,
+            [
+                ("b.code", "Same.", 2),
+                ("a.code", "Same.", 1),
+                ("b.code", "Other message.", 1)
+            ]
+        );
+    }
+
+    #[test]
+    fn merging_keeps_the_worst_severity_and_fills_missing_hint_and_step() {
+        let mut all = Findings::new();
+        all.add(Finding::new("x.y", Severity::Info, "m"));
+        all.add(
+            Finding::new("x.y", Severity::Error, "m")
+                .with_hint("Fix.")
+                .with_step(WizardStep::Crs),
+        );
+        let f = &all.as_slice()[0];
+        assert_eq!(f.severity, Severity::Error);
+        assert_eq!(f.hint.as_deref(), Some("Fix."));
+        assert_eq!(f.step, Some(WizardStep::Crs));
+        assert!(all.has_errors());
+    }
+
+    #[test]
+    fn a_zero_count_is_treated_as_one_and_counts_never_overflow() {
+        let mut all = Findings::new();
+        let mut zero = Finding::new("x.y", Severity::Info, "m");
+        zero.count = 0;
+        all.add(zero);
+        assert_eq!(all.as_slice()[0].count, 1);
+        let mut huge = Finding::new("x.y", Severity::Info, "m");
+        huge.count = u64::MAX;
+        all.add(huge);
+        all.add(Finding::new("x.y", Severity::Info, "m"));
+        assert_eq!(all.as_slice()[0].count, u64::MAX);
+    }
+
+    #[test]
+    fn oversized_example_lists_are_trimmed_on_first_add() {
+        let mut f = Finding::new("x.y", Severity::Info, "m");
+        f.examples = vec![Location::default(); 40];
+        let mut all = Findings::new();
+        all.add(f);
+        assert_eq!(all.as_slice()[0].examples.len(), MAX_EXAMPLES);
+    }
+
+    #[test]
+    fn extend_merges_another_collection_in_order() {
+        let mut a = Findings::new();
+        a.add(at_row("x.y", "m", 0));
+        let mut b = Findings::new();
+        b.add(at_row("x.y", "m", 7));
+        b.add(at_row("z.z", "n", 8));
+        a.extend(b);
+        let summary: Vec<_> = a.iter().map(|f| (f.code, f.count)).collect();
+        assert_eq!(summary, [("x.y", 2), ("z.z", 1)]);
+        assert!(!a.has_errors() && !a.is_empty());
+    }
+
+    #[test]
+    fn a_collection_serializes_as_a_json_array() {
+        let mut all = Findings::new();
+        assert_eq!(serde_json::to_string(&all).unwrap(), "[]");
+        all.add(Finding::new("a.b", Severity::Info, "m"));
+        assert_eq!(
+            serde_json::to_string(&all).unwrap(),
+            r#"[{"code":"a.b","severity":"info","message":"m","count":1,"examples":[]}]"#
         );
     }
 }
