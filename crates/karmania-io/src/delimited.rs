@@ -139,15 +139,43 @@ pub struct RecordReader<'a> {
     delimiter: Delimiter,
 }
 
+/// Where a [`RecordReader`] is in its text, so reading can stop and pick up later.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReaderPosition {
+    pos: usize,
+    line: u64,
+}
+
+impl ReaderPosition {
+    /// The start of the text.
+    pub const START: Self = Self { pos: 0, line: 1 };
+}
+
 impl<'a> RecordReader<'a> {
     /// Starts reading `text` with the given delimiter.
     #[must_use]
     pub fn new(text: &'a str, delimiter: Delimiter) -> Self {
+        Self::resume(text, delimiter, ReaderPosition::START)
+    }
+
+    /// Continues reading `text` from a position taken earlier with
+    /// [`RecordReader::position`] on a reader of the same text and delimiter.
+    #[must_use]
+    pub fn resume(text: &'a str, delimiter: Delimiter, at: ReaderPosition) -> Self {
         Self {
             text,
-            pos: 0,
-            line: 1,
+            pos: at.pos,
+            line: at.line,
             delimiter,
+        }
+    }
+
+    /// Where the reader is, to resume from later.
+    #[must_use]
+    pub fn position(&self) -> ReaderPosition {
+        ReaderPosition {
+            pos: self.pos,
+            line: self.line,
         }
     }
 
@@ -781,5 +809,33 @@ mod tests {
                 .collect();
             let _ = sniff(&text, &mut Findings::new());
         }
+    }
+
+    #[test]
+    fn a_reader_can_stop_and_resume_anywhere_with_the_same_rows_and_lines() {
+        // Quoted line breaks, blank lines, a lone \r and CRLF all move the line count.
+        let text = "a,b\r\n\"x\ny\",2\n\n3,4\r5,6\r\n\"7\r\n8\",9\n10,11";
+        let whole = read_all(text, Delimiter::Comma);
+        assert!(whole.len() >= 6);
+        for stop_after in 0..=whole.len() {
+            let mut reader = RecordReader::new(text, Delimiter::Comma);
+            let mut record = Record::new();
+            let mut rows = Vec::new();
+            for _ in 0..stop_after {
+                if reader.read(&mut record) {
+                    rows.push((record.line(), record.iter().map(str::to_string).collect()));
+                }
+            }
+            // A new reader, at the saved position, carries on.
+            let mut reader = RecordReader::resume(text, Delimiter::Comma, reader.position());
+            while reader.read(&mut record) {
+                rows.push((record.line(), record.iter().map(str::to_string).collect()));
+            }
+            assert_eq!(rows, whole, "stopped after {stop_after} rows");
+        }
+        assert_eq!(
+            RecordReader::new("x", Delimiter::Tab).position(),
+            ReaderPosition::START
+        );
     }
 }
