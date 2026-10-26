@@ -166,7 +166,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 - [ ] 3.11 CSV -> blocks, part 2: compute ijk; off-lattice centroids (error with
   lines); duplicate blocks (error); dense vs sparse chosen automatically.
   - [x] 3.11a Share the duplicate-block finder between validation and the reader.
-  - [ ] 3.11b Place block centres on the lattice: off-lattice and duplicate
+  - [x] 3.11b Place block centres on the lattice: off-lattice and duplicate
     errors, dense or sparse.
   - [ ] 3.11c Use it in the CSV importer for block models.
 - [ ] 3.12 GeoJSON: FeatureCollection with Point and MultiPoint gives points;

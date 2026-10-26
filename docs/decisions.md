@@ -451,3 +451,15 @@ was chosen, why.
   one axis (a wrong block size or wrong units) is `csv.blocks.lattice_too_large`.
   Writing the test for absurd spans found an overflow in `count + 1`, now a
   saturating add.
+- Step 3.11b: `place_blocks` turns block centres into cells. A centre is on the
+  lattice if it is within 1% of a block of a whole number of block sizes from the
+  lowest centre on each axis (exported coordinates carry rounding noise, and 1% is
+  far below any real offset between block grids). Anything else is the error
+  `csv.blocks.off_lattice` with the file lines. Two rows in the same cell are
+  `csv.blocks.duplicate`; the first row is not blamed, as in the validator, whose
+  repeat finder (`repeated_blocks`) the reader now shares. No usable rows is
+  `csv.blocks.none`. A model with exactly one block per cell is dense and its rows
+  are put in lattice order (the order is only returned if the rows are not
+  already in it); anything else is sparse with `i, j, k` in file order. A block
+  model with sub-blocks of different sizes is not supported and shows up as
+  off-lattice centres.

@@ -89,6 +89,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: none
 - Example: The coordinates could not be checked against EPSG:3993 (NAD83(NSRS2007) / Guam Dateline) because this tool cannot calculate that projection.
 
+## `csv.blocks.duplicate`
+
+- Severity: error
+- Step: file
+- Message: Some blocks are listed more than once: several rows have the same centre.
+- Hint: List each block once.
+- Example: Some blocks are listed more than once: several rows have the same centre.
+
 ## `csv.blocks.lattice_too_large`
 
 - Severity: error
@@ -96,6 +104,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: The block centres span {nx} x {ny} x {nz} blocks, more than a block model can hold along one axis.
 - Hint: Check the block size and the units of the coordinates.
 - Example: The block centres span 1,000,000,000,001 x 1 x 1 blocks, more than a block model can hold along one axis.
+
+## `csv.blocks.none`
+
+- Severity: error
+- Step: file
+- Message: There are no rows to build a block model from.
+- Hint: Check that the file has blocks in it and that no rows were left out.
+- Example: There are no rows to build a block model from.
+
+## `csv.blocks.off_lattice`
+
+- Severity: error
+- Step: mapping
+- Message: Some blocks are not on the same grid as the others: their centres are not a whole number of block sizes away from the first block.
+- Hint: Check the block size, and that the coordinate columns hold block centres, not corners.
+- Example: Some blocks are not on the same grid as the others: their centres are not a whole number of block sizes away from the first block.
 
 ## `csv.coordinate.missing`
 

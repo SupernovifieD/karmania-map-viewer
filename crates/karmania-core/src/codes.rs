@@ -72,6 +72,12 @@ finding_codes! {
     CsvCoordinateMissing => "csv.coordinate.missing", Error, Some(WizardStep::Nodata);
     /// The block centres span too many blocks along one axis.
     CsvBlocksLatticeTooLarge => "csv.blocks.lattice_too_large", Error, Some(WizardStep::Mapping);
+    /// Several rows of a block-model file are the same block.
+    CsvBlocksDuplicate => "csv.blocks.duplicate", Error, Some(WizardStep::File);
+    /// There are no rows to build a block model from.
+    CsvBlocksNone => "csv.blocks.none", Error, Some(WizardStep::File);
+    /// Some block centres do not sit on the same grid as the others.
+    CsvBlocksOffLattice => "csv.blocks.off_lattice", Error, Some(WizardStep::Mapping);
     /// Rows were left out because they have no line identifier.
     CsvLineIdMissing => "csv.line_id.missing", Warning, Some(WizardStep::Mapping);
     /// The rows of some lines are not next to each other in the file.
