@@ -177,6 +177,8 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
     GeoJSON reader needs.
 - [ ] 3.13 GeoJSON: LineString and MultiLineString give lines; each part is a
   line and copies the feature's attributes plus a `feature_id` column.
+  - [x] 3.13a Move the shapes of a GeoJSON file into their own module.
+  - [ ] 3.13b Read LineString and MultiLineString as lines.
 - [ ] 3.14 GeoJSON: Polygon and MultiPolygon give polygons; drop closing
   vertices; `feature_id` column.
 - [ ] 3.15 GeoJSON: mixed geometry types give one dataset per kind (info); CRS

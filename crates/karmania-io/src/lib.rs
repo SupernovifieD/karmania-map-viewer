@@ -17,6 +17,7 @@ pub mod delimited;
 mod fixtures;
 pub mod geojson;
 mod geojson_properties;
+mod geojson_shapes;
 pub mod infer;
 pub mod mapping;
 pub mod nodata;
