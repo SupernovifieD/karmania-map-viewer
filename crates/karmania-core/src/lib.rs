@@ -6,6 +6,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod findings;
+
+pub use findings::{Finding, Location, MAX_EXAMPLES, Severity, WizardStep};
+
 #[cfg(test)]
 mod tests {
     #[test]

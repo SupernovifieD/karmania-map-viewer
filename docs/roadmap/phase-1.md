@@ -47,7 +47,10 @@ M0; each is its own commit):
 ## M1: Core data model (karmania-core)
 
 - [ ] 1.1 Severity, Location and Finding types, plus a Findings collector that
-  aggregates repeats (count plus at most 20 examples).
+  aggregates repeats (count plus at most 20 examples). Split to stay under the
+  commit size guideline:
+  - [x] 1.1a Severity, WizardStep, Location and Finding types (adds serde).
+  - [ ] 1.1b Findings collector that aggregates repeats.
 - [ ] 1.2 FindingCode: a registry of stable codes with `as_str()`, plus
   `docs/validation-codes.md` with its "every code documented" test.
 - [ ] 1.3 CrsRef (Epsg, Local) and Units, with serde.

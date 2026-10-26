@@ -122,3 +122,11 @@ was chosen, why.
   added to CI, it must not use `pnpm licenses list`.
 - Step 0.14: `pnpm check` also runs `pnpm format:check` as its last stage, an
   owner-approved addition to the section 5 list, so local runs match CI.
+- Step 1.1: split into 1.1a (types, adds serde) and 1.1b (collector) to stay
+  under the commit size guideline. serde arrives in 1.1a, not 1.3, because
+  `Finding` is a wire contract and its JSON shape is pinned by tests from the
+  start. Findings only serialize; nothing deserializes them. `Finding.code` is a
+  `&'static str` until step 1.2 introduces the code registry.
+- Step 1.1: `unicode-ident` (`Unicode-3.0`) is in the serde tree and is outside
+  the written license policy. It is permissive and unavoidable with serde's
+  derive macros, so work continues; approval is requested in the M1 report.

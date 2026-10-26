@@ -8,6 +8,10 @@ edition = "2024"
 rust-version = "1.99"
 publish = false
 
+[workspace.dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
 # `unsafe_code` is forbidden per crate (`#![forbid(unsafe_code)]` in karmania-core
 # and karmania-io), not here, because wasm-bindgen generates unsafe code.
 [workspace.lints.rust]
