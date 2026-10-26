@@ -120,6 +120,8 @@ finding_codes! {
     PolygonsRingTooShort => "polygons.ring.too_short", Error, None;
     /// Some coordinates are not finite numbers.
     ValuesCoordinatesNotFinite => "values.coordinates.not_finite", Error, None;
+    /// Some coordinates are so large that the units may be wrong.
+    ValuesCoordinatesVeryLarge => "values.coordinates.very_large", Warning, None;
     /// A table column has a different number of rows from the first column.
     TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.
