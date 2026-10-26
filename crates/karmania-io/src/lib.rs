@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod delimited;
 #[cfg(test)]
 mod fixtures;
 pub mod text;

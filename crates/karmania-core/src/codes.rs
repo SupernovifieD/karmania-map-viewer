@@ -62,6 +62,8 @@ finding_codes! {
     DatasetAttributesRowsMismatch => "dataset.attributes.rows_mismatch", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
+    /// The file has no content.
+    FileEmpty => "file.empty", Error, Some(WizardStep::File);
     /// The text file is not valid UTF-8 and was read as Windows-1252.
     FileEncodingFallback => "file.encoding.fallback", Warning, Some(WizardStep::File);
     /// Some UTF-16 characters could not be read.

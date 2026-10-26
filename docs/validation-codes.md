@@ -145,6 +145,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Move those values to the attribute table, or remove them.
 - Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
 
+## `file.empty`
+
+- Severity: error
+- Step: file
+- Message: The file has no data in it.
+- Hint: Check that you chose the right file.
+- Example: The file has no data in it.
+
 ## `file.encoding.fallback`
 
 - Severity: warning
