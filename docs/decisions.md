@@ -217,3 +217,11 @@ was chosen, why.
   arithmetic, so they already agree everywhere.
 - Step 1.19: the owner approved `unicode-ident` (Unicode-3.0), so Unicode-3.0 is
   now in the license policy in `docs/dependencies.md`.
+- Step 2.5: beyond the brief's list, a polygon with no rings is an error
+  (`polygons.polygon.no_rings`): the offsets can be valid and the polygon still
+  has no outline to draw. Ring orientation and repeated closing vertices are not
+  checked (the model stores rings open and does not enforce orientation).
+- Steps 2.3 to 2.5: every offsets list (lines, rings, polygons) is checked by one
+  shared function giving up to four codes (`empty`, `bad_start`, `bad_end`,
+  `decreasing`). Backwards steps are one finding with a count and the first 20
+  examples, so a bad file does not produce thousands of findings.

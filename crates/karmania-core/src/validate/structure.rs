@@ -12,6 +12,89 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_position_lists(dataset, findings);
     check_line_offsets(dataset, findings);
     check_short_lines(dataset, findings);
+    check_polygon_offsets(dataset, findings);
+    check_polygon_rings(dataset, findings);
+}
+
+/// The two offsets lists of a polygon set: vertices into rings, rings into
+/// polygons.
+fn check_polygon_offsets(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Polygons(polygons) = &dataset.geometry else {
+        return;
+    };
+    let rings = OffsetsSpec {
+        codes: OffsetCodes {
+            empty: FindingCode::PolygonsRingOffsetsEmpty,
+            bad_start: FindingCode::PolygonsRingOffsetsBadStart,
+            bad_end: FindingCode::PolygonsRingOffsetsBadEnd,
+            decreasing: FindingCode::PolygonsRingOffsetsDecreasing,
+        },
+        list: "The list that says where each ring starts",
+        item: "ring",
+        target: "vertices",
+    };
+    offset_lists::check(
+        &polygons.ring_offsets,
+        polygons.vertex_count(),
+        &rings,
+        findings,
+    );
+    let polygon_spec = OffsetsSpec {
+        codes: OffsetCodes {
+            empty: FindingCode::PolygonsPolygonOffsetsEmpty,
+            bad_start: FindingCode::PolygonsPolygonOffsetsBadStart,
+            bad_end: FindingCode::PolygonsPolygonOffsetsBadEnd,
+            decreasing: FindingCode::PolygonsPolygonOffsetsDecreasing,
+        },
+        list: "The list that says which rings belong to each polygon",
+        item: "polygon",
+        target: "rings",
+    };
+    let ring_count = polygons.ring_count().unwrap_or(0);
+    offset_lists::check(
+        &polygons.polygon_offsets,
+        ring_count,
+        &polygon_spec,
+        findings,
+    );
+}
+
+/// Every polygon needs an exterior ring, and every ring needs 3 vertices to
+/// enclose an area. Malformed offsets are skipped; they are reported above.
+fn check_polygon_rings(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Polygons(polygons) = &dataset.geometry else {
+        return;
+    };
+    let mut short = Finding::new(
+        FindingCode::PolygonsRingTooShort,
+        "Some rings have fewer than 3 vertices, so they cannot enclose an area.",
+    )
+    .with_hint("Remove those rings or add the missing vertices.");
+    short.count = 0;
+    for index in 0..polygons.ring_count().unwrap_or(0) {
+        if polygons.vertex_range(index).is_some_and(|r| r.len() < 3) {
+            short.count += 1;
+            short = short.at(Location::default().with_element(index as u64));
+        }
+    }
+    if short.count > 0 {
+        findings.add(short);
+    }
+    let mut bare = Finding::new(
+        FindingCode::PolygonsPolygonNoRings,
+        "Some polygons have no rings, so they have no outline.",
+    )
+    .with_hint("Remove those polygons or give each one an outer ring.");
+    bare.count = 0;
+    for index in 0..polygons.polygon_count().unwrap_or(0) {
+        if polygons.ring_range(index).is_some_and(|r| r.is_empty()) {
+            bare.count += 1;
+            bare = bare.at(Location::default().with_element(index as u64));
+        }
+    }
+    if bare.count > 0 {
+        findings.add(bare);
+    }
 }
 
 /// A line needs at least two vertices to be a line. Lines whose offsets are
@@ -218,6 +301,80 @@ mod tests {
         assert!(check_all(&lines(5, &[0, 2, 5])).is_empty());
         // Decreasing offsets are the offsets check's job, not "too short".
         assert!(!codes(&run(check, &lines(5, &[0, 4, 2, 5]))).contains(&"lines.line.too_short"));
+    }
+
+    #[test]
+    fn valid_polygons_with_and_without_holes_pass() {
+        assert!(check_all(&polygons(8, &[0, 4, 8], &[0, 2])).is_empty());
+        assert!(check_all(&polygons(9, &[0, 3, 6, 9], &[0, 1, 3])).is_empty());
+    }
+
+    #[test]
+    fn both_polygon_offsets_lists_get_the_same_four_checks() {
+        let found = run(check, &polygons(3, &[], &[]));
+        assert_eq!(
+            codes(&found),
+            [
+                "polygons.ring_offsets.empty",
+                "polygons.polygon_offsets.empty"
+            ]
+        );
+        // Ring list starts at 1 and ends early; polygon list starts at 1 and ends early.
+        let found = run(check, &polygons(9, &[1, 4, 7], &[1, 1]));
+        assert_eq!(
+            codes(&found),
+            [
+                "polygons.ring_offsets.bad_start",
+                "polygons.ring_offsets.bad_end",
+                "polygons.polygon_offsets.bad_start",
+                "polygons.polygon_offsets.bad_end",
+                // The polygon list [1, 1] is a polygon with no rings.
+                "polygons.polygon.no_rings",
+            ]
+        );
+        assert_eq!(
+            found.as_slice()[3].message,
+            "The list that says which rings belong to each polygon must end with the number of rings (2), but it ends with 1."
+        );
+    }
+
+    #[test]
+    fn rings_or_polygons_going_backwards_are_counted() {
+        let found = run(check, &polygons(9, &[0, 6, 3, 9], &[0, 3, 2, 3]));
+        let ring = found
+            .iter()
+            .find(|f| f.code.as_str() == "polygons.ring_offsets.decreasing");
+        let polygon = found
+            .iter()
+            .find(|f| f.code.as_str() == "polygons.polygon_offsets.decreasing");
+        assert_eq!(ring.map(|f| f.count), Some(1));
+        assert_eq!(polygon.map(|f| f.count), Some(1));
+        assert_eq!(ring.unwrap().message, "Some rings end before they start.");
+    }
+
+    #[test]
+    fn rings_with_fewer_than_three_vertices_are_an_error() {
+        let found = run(check, &polygons(8, &[0, 2, 5, 8], &[0, 3]));
+        assert_eq!(codes(&found), ["polygons.ring.too_short"]);
+        let f = &found.as_slice()[0];
+        assert_eq!(f.severity, crate::findings::Severity::Error);
+        assert_eq!(f.count, 1);
+        assert_eq!(f.examples[0].element, Some(0));
+    }
+
+    #[test]
+    fn a_polygon_without_rings_has_no_outline() {
+        let found = run(check, &polygons(3, &[0, 3], &[0, 0, 1]));
+        assert_eq!(codes(&found), ["polygons.polygon.no_rings"]);
+        assert_eq!(found.as_slice()[0].examples[0].element, Some(0));
+    }
+
+    #[test]
+    fn malformed_polygon_offsets_do_not_panic_the_ring_checks() {
+        let found = run(check, &polygons(3, &[0, 9, 2], &[0, 7]));
+        assert!(!found.is_empty());
+        let found = run(check, &polygons(3, &[0, u32::MAX], &[u32::MAX, 0]));
+        assert!(found.has_errors());
     }
 
     #[test]

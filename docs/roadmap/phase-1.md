@@ -94,7 +94,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.3 Structure: line offsets (length L+1, start 0, end = vertex count,
   non-decreasing).
 - [x] 2.4 Structure: lines with fewer than 2 vertices (warning).
-- [ ] 2.5 Structure: polygon ring and polygon offsets; rings with fewer than 3
+- [x] 2.5 Structure: polygon ring and polygon offsets; rings with fewer than 3
   vertices (error).
 - [ ] 2.6 Structure: mesh indices are a multiple of 3 and in range.
 - [ ] 2.7 Structure: degenerate triangles (warning); unused vertices (info).
