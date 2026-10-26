@@ -359,5 +359,22 @@ export interface KernelGrid extends KernelLattice {
   readonly columns?: readonly KernelColumn[];
 }
 
+/**
+ * A block model as the kernel takes it. Without `ijk` it is dense: one block in every
+ * cell, with the attribute values in lattice order (X fastest, then Y, then Z). With
+ * `ijk` it is sparse: three numbers `i, j, k` for each block, in the order of the
+ * attribute values.
+ */
+export interface KernelBlocks extends KernelLattice {
+  readonly kind: 'blocks';
+  /** Blank means `blocks`. */
+  readonly name: string;
+  readonly crs: CrsRef | null;
+  readonly ijk?: Uint32Array;
+  /** One value per block. */
+  readonly columns?: readonly KernelColumn[];
+}
+
 /** A dataset made from arrays, as the kernel takes it. */
-export type KernelDataset = KernelPoints | KernelLines | KernelPolygons | KernelMesh | KernelGrid;
+export type KernelDataset =
+  KernelPoints | KernelLines | KernelPolygons | KernelMesh | KernelGrid | KernelBlocks;

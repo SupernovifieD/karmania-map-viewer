@@ -9,8 +9,8 @@
 use js_sys::{Array, BigInt64Array, Float64Array, Reflect, Symbol, Uint8Array, Uint32Array};
 use karmania_core::CrsRef;
 use karmania_io::build::{
-    ColumnInput, ColumnValues, GridInput, LatticeInput, LinesInput, MeshInput, PointsInput,
-    PolygonsInput,
+    BlocksInput, ColumnInput, ColumnValues, GridInput, LatticeInput, LinesInput, MeshInput,
+    PointsInput, PolygonsInput,
 };
 use wasm_bindgen::{JsCast, JsError, JsValue};
 
@@ -26,6 +26,8 @@ pub(crate) enum DatasetInput {
     Mesh(MeshInput),
     /// A regular grid.
     Grid(GridInput),
+    /// A block model.
+    Blocks(BlocksInput),
 }
 
 /// Reads a description of a dataset.
@@ -88,6 +90,17 @@ pub(crate) fn read_dataset(value: &JsValue) -> Result<DatasetInput, JsError> {
                 columns: object.columns("columns")?,
             }))
         }
+        "blocks" => Ok(DatasetInput::Blocks(BlocksInput {
+            name: object.string("name")?,
+            crs: object.crs()?,
+            lattice: object.lattice()?,
+            ijk: object
+                .field("ijk")?
+                .map(|value| typed::<Uint32Array>(&value, "Uint32Array", &object.what, "ijk"))
+                .transpose()?
+                .map(|array| array.to_vec()),
+            columns: object.columns("columns")?,
+        })),
         other => Err(JsError::new(&format!(
             "the dataset has an unknown kind: \"{other}\""
         ))),

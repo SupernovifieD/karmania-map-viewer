@@ -9,8 +9,8 @@
 
 use karmania_core::text::format_count;
 use karmania_core::{
-    Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Grid,
-    GridZ, Kind, Lattice, Lines, Mesh, Polygons, Positions, Table, Validity,
+    Blocks, Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings,
+    Geometry, Grid, GridZ, Kind, Lattice, Lines, Mesh, Polygons, Positions, Table, Validity,
 };
 
 /// The values of one column.
@@ -345,6 +345,41 @@ pub fn build_grid(input: GridInput, findings: &mut Findings) -> Option<Dataset> 
         Geometry::Grid(Grid {
             lattice: input.lattice.into(),
             z,
+        }),
+        attributes,
+    ))
+}
+
+/// A block model to load: a lattice and attributes with one value per block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlocksInput {
+    /// The dataset's name; blank means `blocks`.
+    pub name: String,
+    /// The coordinate system; `None` is reported by validation.
+    pub crs: Option<CrsRef>,
+    /// The cells that blocks can occupy.
+    pub lattice: LatticeInput,
+    /// For a sparse model, the cell of each block as three numbers `i, j, k`, in the
+    /// order of the attribute rows. `None` for a dense model, which has a block in
+    /// every cell, ordered with `i` fastest, then `j`, then `k`.
+    pub ijk: Option<Vec<u32>>,
+    /// The attribute columns, one value per block.
+    pub columns: Vec<ColumnInput>,
+}
+
+/// Makes a block model dataset. `None`, with a finding, if the columns cannot be made
+/// into a table. A lattice that cannot be used, blocks outside it or listed twice, an
+/// incomplete last triplet and values for the wrong number of blocks are left to
+/// validation.
+pub fn build_blocks(input: BlocksInput, findings: &mut Findings) -> Option<Dataset> {
+    let attributes = table_from_columns(input.columns, findings)?;
+    Some(Dataset::new(
+        DatasetId(0),
+        name_or_kind(input.name, Kind::Blocks),
+        input.crs,
+        Geometry::Blocks(Blocks {
+            lattice: input.lattice.into(),
+            ijk: input.ijk,
         }),
         attributes,
     ))
@@ -973,6 +1008,121 @@ mod tests {
             .push(column("value", ColumnValues::Float(vec![0.0; 6])));
         let mut findings = Findings::new();
         assert!(build_grid(bad, &mut findings).is_none());
+        assert_eq!(codes(&findings), ["table.column.name_duplicate"]);
+    }
+
+    /// A 2 x 2 x 2 block model of 10-metre blocks.
+    fn blocks(ijk: Option<Vec<u32>>, values: usize) -> BlocksInput {
+        BlocksInput {
+            name: "Model".into(),
+            crs: metres(),
+            lattice: LatticeInput {
+                origin: [500_000.0, 2_765_000.0, 90.0],
+                spacing: [10.0; 3],
+                dims: [2, 2, 2],
+                rotation: 0.0,
+            },
+            ijk,
+            columns: vec![column(
+                "grade",
+                ColumnValues::Float((0..values).map(|v| v as f64).collect()),
+            )],
+        }
+    }
+
+    fn found(input: BlocksInput) -> Vec<&'static str> {
+        let d = build_blocks(input, &mut Findings::new()).unwrap();
+        karmania_core::validate(&d)
+            .findings()
+            .map(|f| f.code.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn a_dense_model_has_a_block_in_every_cell() {
+        let d = build_blocks(blocks(None, 8), &mut Findings::new()).unwrap();
+        assert_eq!(
+            (d.kind(), d.element_count(), d.has_z(), d.name.as_str()),
+            (Kind::Blocks, Some(8), true, "Model")
+        );
+        let bbox = d.bbox().unwrap();
+        assert_eq!(
+            (bbox.min, bbox.max),
+            (
+                [500_000.0, 2_765_000.0, 90.0],
+                [500_020.0, 2_765_020.0, 110.0]
+            )
+        );
+        assert!(karmania_core::validate(&d).is_loadable());
+        let mut unnamed = blocks(None, 8);
+        unnamed.name = " ".into();
+        assert_eq!(
+            build_blocks(unnamed, &mut Findings::new()).unwrap().name,
+            "blocks"
+        );
+    }
+
+    #[test]
+    fn a_sparse_model_lists_the_cell_of_each_block() {
+        let d = build_blocks(
+            blocks(Some(vec![0, 0, 0, 1, 1, 1, 0, 1, 0]), 3),
+            &mut Findings::new(),
+        )
+        .unwrap();
+        assert_eq!(d.element_count(), Some(3));
+        assert!(karmania_core::validate(&d).is_loadable());
+        // The box still covers the whole lattice.
+        assert_eq!(d.bbox().unwrap().max, [500_020.0, 2_765_020.0, 110.0]);
+    }
+
+    #[test]
+    fn blocks_that_do_not_fit_the_lattice_are_left_to_validation_which_names_the_problem() {
+        assert!(
+            found(blocks(Some(vec![0, 0, 0, 2, 0, 0]), 2)).contains(&"blocks.ijk.out_of_range")
+        );
+        assert!(found(blocks(Some(vec![1, 1, 1, 1, 1, 1]), 2)).contains(&"blocks.ijk.duplicate"));
+        assert!(found(blocks(Some(vec![0, 0, 0, 1, 1]), 1)).contains(&"blocks.ijk.incomplete"));
+        assert!(found(blocks(None, 5)).contains(&"dataset.attributes.rows_mismatch"));
+        assert!(
+            found(blocks(Some(vec![0, 0, 0, 1, 1, 1]), 3))
+                .contains(&"dataset.attributes.rows_mismatch")
+        );
+        let mut empty_lattice = blocks(None, 0);
+        empty_lattice.lattice.dims = [2, 0, 2];
+        assert!(found(empty_lattice).contains(&"lattice.dims.zero"));
+    }
+
+    #[test]
+    fn a_sparse_model_on_a_huge_lattice_loads_because_only_its_blocks_exist() {
+        let mut input = blocks(Some(vec![0, 0, 0, 99_999, 99_999, 99_999, 5, 6, 7]), 3);
+        input.lattice.dims = [100_000, 100_000, 100_000];
+        let d = build_blocks(input, &mut Findings::new()).unwrap();
+        let report = karmania_core::validate(&d);
+        assert!(
+            report.is_loadable(),
+            "{:?}",
+            report
+                .findings()
+                .map(|f| f.code.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn a_dense_model_too_big_to_hold_is_refused_by_the_size_guard() {
+        let mut input = blocks(None, 0);
+        input.lattice.dims = [u32::MAX, u32::MAX, 2];
+        input.columns = Vec::new();
+        assert!(found(input).contains(&"dataset.too_large"));
+    }
+
+    #[test]
+    fn column_problems_make_no_model() {
+        let mut bad = blocks(None, 8);
+        bad.columns
+            .push(column("grade", ColumnValues::Float(vec![0.0; 8])));
+        let mut findings = Findings::new();
+        assert!(build_blocks(bad, &mut findings).is_none());
         assert_eq!(codes(&findings), ["table.column.name_duplicate"]);
     }
 }

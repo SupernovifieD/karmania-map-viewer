@@ -98,6 +98,7 @@ impl Kernel {
             DatasetInput::Polygons(polygons) => self.inner.load_polygons(polygons),
             DatasetInput::Mesh(mesh) => self.inner.load_mesh(mesh),
             DatasetInput::Grid(grid) => self.inner.load_grid(grid),
+            DatasetInput::Blocks(blocks) => self.inner.load_blocks(blocks),
         };
         to_js(&result)
     }
