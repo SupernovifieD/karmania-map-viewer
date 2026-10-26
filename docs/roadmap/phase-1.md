@@ -140,7 +140,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   every format.
 - [x] 3.2 Text decoding: UTF-8 with BOM strip; Windows-1252 fallback with a
   warning finding.
-- [ ] 3.3 Delimited text sniffing: delimiter (comma, semicolon, tab,
+- [x] 3.3 Delimited text sniffing: delimiter (comma, semicolon, tab,
   whitespace), header detection, first 200 rows, estimated row count.
 - [ ] 3.4 Column type inference from a sample (float, int, bool, text,
   category). Decimal comma detection when the delimiter is a semicolon.

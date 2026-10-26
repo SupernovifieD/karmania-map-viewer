@@ -347,3 +347,20 @@ was chosen, why.
   Python's codec; the five undefined bytes map to the control character with the
   same number (WHATWG behaviour). A file that mixes valid UTF-8 and stray bad
   bytes is read as Windows-1252 as a whole, which is the brief's rule.
+- Step 3.3: the delimited-text reader is written in `karmania-io`, not taken from
+  the `csv` crate as step 3.1 planned. The `csv` crate reports a record's start as
+  the first blank line before it, and the brief needs exact source line numbers
+  ("Line 1,203: Easting is empty"). Writing it also gives whitespace-delimited
+  files, blank-line rules and an incremental reader for step 3.22 without a second
+  code path. To make up for not using a proven library, `csv` is a dev-dependency
+  used only to cross-check the reader on 300 random well-formed texts, and a
+  second random test writes records with awkward content (delimiters, quotes, line
+  breaks, blank lines, CR and CRLF) and requires the same fields and the exact
+  start line back. That test found a real bug during the work (a CRLF inside a
+  quoted field was not counted as a line); the test was strengthened so it fails
+  against that bug. Rules: a line of only spaces or tabs that are not the delimiter
+  is blank; a quote that never closes runs to the end of the text; text after a
+  closing quote stays in the field. The delimiter is the candidate (comma,
+  semicolon, tab, whitespace) that splits the first 50 rows into the same number of
+  fields most consistently, ties going to the earlier candidate; a text with only
+  white space is empty (`file.empty`, an error).
