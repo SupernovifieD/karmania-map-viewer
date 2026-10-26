@@ -773,3 +773,11 @@ was chosen, why.
   and cover the sidecar path, files that cannot be read and misuse. I broke the
   sidecar handling in the glue to see the tests fail, and they did. The release
   module is 219 KB.
+- Step 4.4a: `Dataset::summary(findings)` in `karmania-core` gives a `Summary`: id,
+  name, kind, element count, vertex count (lines, polygons and meshes), CRS (the code,
+  or Local with units: there is no name or units lookup any more), `has_z`, bounding
+  box, attribute columns (name, type, null count) and the findings. It was planned for
+  step 4.11 but a load result carries summaries, so it comes first. Per-vertex
+  attribute columns are not listed: nothing shows them in phase 1. The JSON uses
+  camelCase and leaves out what is absent, so `crs`, `bbox` and `vertexCount` are
+  omitted rather than null.

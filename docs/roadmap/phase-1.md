@@ -233,6 +233,15 @@ Definitions and reprojection can be added later, with the features that need the
     TypeScript `Preview` type, tested against the real module in Node.
 - [ ] 4.4 Export a dataset store inside the WASM instance (handles) plus
   ImportJob creation and `step()`.
+  - [x] 4.4a The dataset summary, in `karmania-core` (moved up from 4.11, since a
+    load result carries summaries).
+  - [ ] 4.4b The registry in `karmania-io`: validates datasets and stores them, or
+    blocks them.
+  - [ ] 4.4c An import job made from a file's bytes: format, encoding and CSV
+    layout detected the same way as in the preview.
+  - [ ] 4.4d The staged run: parsing, then validating, with progress for each.
+  - [ ] 4.4e The `Kernel` object exported to JavaScript, with the TypeScript types
+    and Node tests.
 - [ ] 4.5 Export builders from typed arrays: points.
 - [ ] 4.6 Builders: lines.
 - [ ] 4.7 Builders: polygons.
@@ -240,7 +249,8 @@ Definitions and reprojection can be added later, with the features that need the
 - [ ] 4.9 Builders: grid.
 - [ ] 4.10 Builders: blocks.
 - [ ] 4.11 Export `summary(handle)`, `rows(handle, start, count)` with
-  geometry-derived columns, and `remove(handle)`.
+  geometry-derived columns, and `remove(handle)`. (The summary itself is built in
+  4.4a and the store in 4.4b.)
 - [x] 4.12 *Dropped (owner decision, 3.25):* export `search_crs(query, limit)`. The
   core has no EPSG definitions, so there is nothing to search.
 - [ ] 4.13 Node smoke test: load the built WASM and round-trip one fixture per
