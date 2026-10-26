@@ -463,3 +463,11 @@ was chosen, why.
   already in it); anything else is sparse with `i, j, k` in file order. A block
   model with sub-blocks of different sizes is not supported and shows up as
   off-lattice centres.
+- Step 3.11c: the CSV importer now reads block models (the "cannot import blocks
+  yet" guard is gone). The blocks are placed when the file ends, once the other
+  findings are known: if a coordinate error already stops the import, the model is
+  not placed, so the user is not also told there are no blocks. The attribute
+  columns are reordered together with the rows for a dense model. Rows left out
+  with `emptyCoordinates=skip` leave gaps, so the model becomes sparse. The
+  reader keeps the three centre columns and the line of every kept row until the
+  end, like points, plus 12 bytes per row for the cells.

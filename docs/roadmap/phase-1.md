@@ -163,12 +163,12 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   in row order; info finding if IDs are not contiguous.
 - [x] 3.10 CSV -> blocks, part 1: centroid columns plus block size give the
   lattice origin and dims (rotation 0).
-- [ ] 3.11 CSV -> blocks, part 2: compute ijk; off-lattice centroids (error with
+- [x] 3.11 CSV -> blocks, part 2: compute ijk; off-lattice centroids (error with
   lines); duplicate blocks (error); dense vs sparse chosen automatically.
   - [x] 3.11a Share the duplicate-block finder between validation and the reader.
   - [x] 3.11b Place block centres on the lattice: off-lattice and duplicate
     errors, dense or sparse.
-  - [ ] 3.11c Use it in the CSV importer for block models.
+  - [x] 3.11c Use it in the CSV importer for block models.
 - [ ] 3.12 GeoJSON: FeatureCollection with Point and MultiPoint gives points;
   properties become attributes with type inference across features.
 - [ ] 3.13 GeoJSON: LineString and MultiLineString give lines; each part is a

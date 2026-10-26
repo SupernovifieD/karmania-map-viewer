@@ -21,10 +21,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use karmania_core::{
-    Column, ColumnData, ColumnType, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry,
-    Kind, Lines, Location, Positions, Provenance, Table, Validity, check_size,
+    Blocks, Column, ColumnData, ColumnType, Dataset, DatasetId, Finding, FindingCode, Findings,
+    Geometry, Kind, Lines, Location, Positions, Provenance, Table, Validity, check_size,
 };
 
+use crate::csv_blocks::place_blocks;
 use crate::delimited::{Delimiter, PREVIEW_ROWS, Record, RecordReader};
 use crate::infer::infer_types;
 use crate::mapping::{EmptyCoordinates, ImportMapping, validate_mapping};
@@ -388,6 +389,8 @@ pub struct CsvImport<'a> {
     conversion: Conversion,
     coordinates: [Option<CoordinateColumn>; 3],
     lines: Option<LineState>,
+    /// For a block model, the file line of each kept row.
+    block_lines: Option<Vec<u64>>,
     builders: Vec<Builder>,
     positions: [Vec<f64>; 3],
     header_len: usize,
@@ -429,18 +432,12 @@ impl<'a> CsvImport<'a> {
                     .with_hint("Check that you chose the right file."),
             );
         }
-        if mapping.kind == Kind::Blocks && !findings.has_errors() {
-            findings.add(Finding::new(
-                FindingCode::MappingKindUnsupported,
-                "This version cannot import a CSV file as a block model yet.",
-            ));
-        }
         let lines = text.lines().filter(|l| !l.trim().is_empty()).count() as u64;
         let data_rows = lines.saturating_sub(u64::from(options.has_header));
-        let things = if mapping.kind == Kind::Lines {
-            "vertices"
-        } else {
-            "points"
+        let things = match mapping.kind {
+            Kind::Lines => "vertices",
+            Kind::Blocks => "blocks",
+            _ => "points",
         };
         check_size(Some(data_rows), things, &mut findings);
 
@@ -520,6 +517,7 @@ impl<'a> CsvImport<'a> {
                 coordinate(Role::Z),
             ],
             lines: line_state,
+            block_lines: (mapping.kind == Kind::Blocks).then(Vec::new),
             builders,
             positions: [Vec::new(), Vec::new(), Vec::new()],
             header_len: header.len(),
@@ -605,6 +603,9 @@ impl CsvImport<'_> {
                 store.push(values[axis]);
             }
         }
+        if let Some(block_lines) = &mut self.block_lines {
+            block_lines.push(line);
+        }
         for builder in &mut self.builders {
             builder.push(self.record.get(builder.source), &self.conversion, line);
         }
@@ -656,6 +657,20 @@ impl CsvImport<'_> {
                 permute(axis, &g.order);
             }
         }
+        // Earlier errors come first: a file with unusable coordinates should not
+        // also be told it has no blocks.
+        let placement = match (&self.block_lines, self.mapping.block_size) {
+            (Some(lines), Some(size)) if !self.findings.has_errors() => {
+                let [x, y, z] = &positions;
+                place_blocks([x, y, z], lines, size, &mut self.findings)
+            }
+            _ => None,
+        };
+        if let Some(order) = placement.as_ref().and_then(|p| p.order.as_ref()) {
+            for builder in &mut builders {
+                builder.permute(order);
+            }
+        }
         let mut columns = Vec::new();
         for builder in builders {
             let (column, finding) = builder.finish();
@@ -670,34 +685,40 @@ impl CsvImport<'_> {
                 findings: self.findings,
             };
         }
-        let [x, y, z] = positions;
-        let Some(positions) =
-            Positions::from_xyz(&x, &y, has_z.then_some(z.as_slice()), &mut self.findings)
-        else {
-            return ReadOutput {
-                datasets: Vec::new(),
-                findings: self.findings,
-            };
-        };
-        let built = match grouped {
-            None => Table::from_columns(columns, &mut self.findings)
-                .map(|attributes| (Geometry::Points(positions), attributes, None, "points")),
-            Some(g) => {
-                let ids = Column::without_nulls(g.name, ColumnData::Utf8(g.ids));
-                let attributes = Table::from_columns(vec![ids], &mut self.findings);
-                let vertex_attributes = if columns.is_empty() {
-                    Some(None)
-                } else {
-                    Table::from_columns(columns, &mut self.findings).map(Some)
+        let built = if self.mapping.kind == Kind::Blocks {
+            placement.and_then(|placed| {
+                let blocks = Blocks {
+                    lattice: placed.lattice,
+                    ijk: placed.ijk,
                 };
-                let lines = Lines {
-                    positions,
-                    offsets: g.offsets,
-                };
-                attributes
-                    .zip(vertex_attributes)
-                    .map(|(a, v)| (Geometry::Lines(lines), a, v, "lines"))
-            }
+                Table::from_columns(columns, &mut self.findings)
+                    .map(|attributes| (Geometry::Blocks(blocks), attributes, None, "blocks"))
+            })
+        } else {
+            let [x, y, z] = positions;
+            Positions::from_xyz(&x, &y, has_z.then_some(z.as_slice()), &mut self.findings).and_then(
+                |positions| match grouped {
+                    None => Table::from_columns(columns, &mut self.findings).map(|attributes| {
+                        (Geometry::Points(positions), attributes, None, "points")
+                    }),
+                    Some(g) => {
+                        let ids = Column::without_nulls(g.name, ColumnData::Utf8(g.ids));
+                        let attributes = Table::from_columns(vec![ids], &mut self.findings);
+                        let vertex_attributes = if columns.is_empty() {
+                            Some(None)
+                        } else {
+                            Table::from_columns(columns, &mut self.findings).map(Some)
+                        };
+                        let lines = Lines {
+                            positions,
+                            offsets: g.offsets,
+                        };
+                        attributes
+                            .zip(vertex_attributes)
+                            .map(|(a, v)| (Geometry::Lines(lines), a, v, "lines"))
+                    }
+                },
+            )
         };
         let Some((geometry, attributes, vertex_attributes, default_name)) = built else {
             return ReadOutput {
@@ -783,7 +804,7 @@ mod tests {
     use super::*;
     use crate::fixtures;
     use crate::mapping::{ColumnMapping, Nodata};
-    use karmania_core::{CrsRef, Value};
+    use karmania_core::{Blocks, CrsRef, Value};
 
     const COMMA: CsvOptions = CsvOptions {
         delimiter: Delimiter::Comma,
@@ -1360,5 +1381,237 @@ mod tests {
         assert_eq!(import.rows_read(), 8);
         assert_eq!(import.finish(), whole);
         assert_eq!(steps, 2);
+    }
+
+    fn block_mapping() -> ImportMapping {
+        let mut mapping = collars();
+        mapping.dataset_name = "Model".into();
+        mapping.kind = Kind::Blocks;
+        mapping.columns = vec![
+            col("XC", Role::X, None),
+            col("YC", Role::Y, None),
+            col("ZC", Role::Z, None),
+            col("Density", Role::Attribute, None),
+            col("Domain", Role::Attribute, None),
+        ];
+        mapping.block_size = Some([10.0; 3]);
+        mapping
+    }
+
+    fn as_blocks(d: &Dataset) -> &Blocks {
+        let Geometry::Blocks(blocks) = &d.geometry else {
+            panic!("not blocks")
+        };
+        blocks
+    }
+
+    /// The sample block file with the given data lines (1-based, the header is
+    /// line 1) removed or replaced.
+    fn blocks_file(change: impl Fn(usize, &str) -> Option<String>) -> String {
+        let text = fixtures::text("blocks.csv");
+        let mut out = String::new();
+        for (n, row) in text.lines().enumerate() {
+            let kept = if n == 0 {
+                Some(row.to_string())
+            } else {
+                change(n + 1, row)
+            };
+            if let Some(row) = kept {
+                out.push_str(&row);
+                out.push('\n');
+            }
+        }
+        out
+    }
+
+    fn density(d: &Dataset, block: usize) -> Option<Value<'_>> {
+        d.attributes.column("Density").unwrap().get(block)
+    }
+
+    #[test]
+    fn the_sample_file_becomes_a_dense_three_by_three_by_two_model() {
+        let out = read_csv(
+            &fixtures::text("blocks.csv"),
+            COMMA,
+            &block_mapping(),
+            Some("blocks.csv"),
+        );
+        assert!(out.findings.is_empty(), "{:?}", codes(&out));
+        let d = only(&out);
+        assert_eq!(
+            (d.name.as_str(), d.kind(), d.has_z()),
+            ("Model", Kind::Blocks, true)
+        );
+        assert_eq!(d.element_count(), Some(18));
+        let blocks = as_blocks(d);
+        assert!(blocks.is_dense());
+        assert_eq!(blocks.lattice.dims, [3, 3, 2]);
+        assert_eq!(blocks.lattice.origin, [500_000.0, 2_765_000.0, 90.0]);
+        assert_eq!(blocks.lattice.spacing, [10.0; 3]);
+        let names: Vec<_> = d.attributes.columns().iter().map(Column::name).collect();
+        assert_eq!(names, ["Density", "Domain"]);
+        assert_eq!(density(d, 0), Some(Value::Float64(2.5)));
+        assert_eq!(density(d, 17), Some(Value::Float64(4.2)));
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn rows_in_another_order_are_put_in_lattice_order_with_their_values() {
+        let text = fixtures::text("blocks.csv");
+        let mut rows: Vec<&str> = text.lines().skip(1).collect();
+        rows.reverse();
+        let reversed = format!("XC,YC,ZC,Density,Domain\n{}\n", rows.join("\n"));
+        let out = read_csv(&reversed, COMMA, &block_mapping(), None);
+        let d = only(&out);
+        assert!(as_blocks(d).is_dense());
+        // Block 0 is still the one at the lowest corner, with its own density.
+        assert_eq!(density(d, 0), Some(Value::Float64(2.5)));
+        assert_eq!(density(d, 1), Some(Value::Float64(2.6)));
+        assert_eq!(density(d, 17), Some(Value::Float64(4.2)));
+        // Every block keeps its own domain label (the codes differ, since the
+        // first label seen differs).
+        let domain = d.attributes.column("Domain").unwrap();
+        let label = |block: usize| match domain.get(block) {
+            Some(Value::Category { label, .. }) => label,
+            other => panic!("unexpected {other:?}"),
+        };
+        assert_eq!((label(0), label(8)), (Some("ore"), Some("ore")));
+        assert_eq!((label(9), label(17)), (Some("waste"), Some("waste")));
+    }
+
+    #[test]
+    fn missing_blocks_make_a_sparse_model_in_file_order() {
+        // Leave out the block at (1, 1, 0) (line 6) and the last one (line 19).
+        let text = blocks_file(|line, row| (line != 6 && line != 19).then(|| row.to_string()));
+        let out = read_csv(&text, COMMA, &block_mapping(), None);
+        assert!(out.findings.is_empty(), "{:?}", codes(&out));
+        let d = only(&out);
+        assert_eq!(d.element_count(), Some(16));
+        let blocks = as_blocks(d);
+        assert_eq!(blocks.lattice.dims, [3, 3, 2]);
+        let ijk = blocks.ijk.as_ref().expect("sparse");
+        assert_eq!(ijk.len(), 48);
+        assert_eq!(blocks.block_ijk(0), Some([0, 0, 0]));
+        // The block after the missing (1, 1, 0) is (2, 1, 0), now the fifth in the list.
+        assert_eq!(blocks.block_ijk(4), Some([2, 1, 0]));
+        assert_eq!(density(d, 4), Some(Value::Float64(3.0)));
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn a_centre_off_the_grid_is_an_error_with_its_line_and_no_dataset() {
+        let text = blocks_file(|line, row| {
+            Some(if line == 4 {
+                row.replacen("500025", "500022", 1)
+            } else {
+                row.to_string()
+            })
+        });
+        let out = read_csv(&text, COMMA, &block_mapping(), None);
+        assert!(out.datasets.is_empty());
+        assert_eq!(codes(&out), ["csv.blocks.off_lattice"]);
+        let at: Vec<_> = out.findings.as_slice()[0]
+            .examples
+            .iter()
+            .map(|l| l.line)
+            .collect();
+        assert_eq!(at, [Some(4)]);
+    }
+
+    #[test]
+    fn a_repeated_block_is_an_error_with_its_line_and_cell() {
+        // Line 4 becomes a copy of line 2, so there are 18 rows for 18 cells but
+        // one cell is empty and another is doubled.
+        let first = fixtures::text("blocks.csv")
+            .lines()
+            .nth(1)
+            .unwrap()
+            .to_string();
+        let text =
+            blocks_file(|line, row| Some(if line == 4 { first.clone() } else { row.into() }));
+        let out = read_csv(&text, COMMA, &block_mapping(), None);
+        assert!(out.datasets.is_empty());
+        assert_eq!(codes(&out), ["csv.blocks.duplicate"]);
+        let example = &out.findings.as_slice()[0].examples[0];
+        assert_eq!((example.line, example.cell), (Some(4), Some([0, 0, 0])));
+    }
+
+    #[test]
+    fn a_block_size_that_does_not_fit_the_centres_is_reported() {
+        let text = fixtures::text("blocks.csv");
+        let mut mapping = block_mapping();
+        mapping.block_size = Some([3.0; 3]);
+        assert_eq!(
+            codes(&read_csv(&text, COMMA, &mapping, None)),
+            ["csv.blocks.off_lattice"]
+        );
+        mapping.block_size = Some([1e-9; 3]);
+        assert_eq!(
+            codes(&read_csv(&text, COMMA, &mapping, None)),
+            ["csv.blocks.lattice_too_large"]
+        );
+        mapping.block_size = None;
+        let out = read_csv(&text, COMMA, &mapping, None);
+        assert_eq!(codes(&out), ["mapping.block_size.missing"]);
+        assert!(out.datasets.is_empty());
+    }
+
+    #[test]
+    fn rows_with_a_missing_coordinate_follow_the_mapping_before_the_model_is_built() {
+        let text = blocks_file(|line, row| {
+            Some(if line == 6 {
+                row.replacen(",95,", ",,", 1)
+            } else {
+                row.to_string()
+            })
+        });
+        let mut mapping = block_mapping();
+        let out = read_csv(&text, COMMA, &mapping, None);
+        assert!(out.datasets.is_empty());
+        assert_eq!(codes(&out), ["csv.coordinate.missing"]);
+
+        mapping.empty_coordinates = EmptyCoordinates::Skip;
+        let out = read_csv(&text, COMMA, &mapping, None);
+        assert_eq!(codes(&out), ["csv.rows.skipped"]);
+        let d = only(&out);
+        assert_eq!(d.element_count(), Some(17));
+        assert!(!as_blocks(d).is_dense());
+    }
+
+    #[test]
+    fn a_file_with_no_usable_rows_has_no_blocks() {
+        let header_only = read_csv("XC,YC,ZC,Density,Domain\n", COMMA, &block_mapping(), None);
+        assert!(header_only.datasets.is_empty());
+        assert_eq!(codes(&header_only), ["csv.blocks.none"]);
+
+        let all_skipped =
+            blocks_file(|_, row| Some(row.replacen(",95,", ",,", 1).replacen(",105,", ",,", 1)));
+        let mut mapping = block_mapping();
+        mapping.empty_coordinates = EmptyCoordinates::Skip;
+        let out = read_csv(&all_skipped, COMMA, &mapping, None);
+        assert!(out.datasets.is_empty());
+        assert_eq!(codes(&out), ["csv.rows.skipped", "csv.blocks.none"]);
+    }
+
+    #[test]
+    fn a_block_model_without_attribute_columns_is_valid() {
+        let mut mapping = block_mapping();
+        mapping.columns.truncate(3);
+        let out = read_csv(&fixtures::text("blocks.csv"), COMMA, &mapping, None);
+        assert!(out.findings.is_empty(), "{:?}", codes(&out));
+        let d = only(&out);
+        assert_eq!(d.attributes.column_count(), 0);
+        assert!(karmania_core::validate(d).is_loadable());
+    }
+
+    #[test]
+    fn stepping_through_a_block_file_gives_the_same_result_as_reading_it_at_once() {
+        let text = fixtures::text("blocks.csv");
+        let mapping = block_mapping();
+        let whole = read_csv(&text, COMMA, &mapping, Some("b.csv"));
+        let mut import = CsvImport::new(&text, COMMA, &mapping, Some("b.csv"));
+        while !import.step(1) {}
+        assert_eq!(import.rows_read(), 18);
+        assert_eq!(import.finish(), whole);
     }
 }
