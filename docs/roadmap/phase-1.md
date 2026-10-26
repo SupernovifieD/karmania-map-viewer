@@ -225,7 +225,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 - [x] 4.1 Crate with wasm-bindgen and an exported `version()`; scripts/
   build-wasm script; output gitignored; root `pnpm build:wasm`.
-- [ ] 4.2 Serialize findings, report and preview to JS with serde-wasm-bindgen;
+- [x] 4.2 Serialize findings, report and preview to JS with serde-wasm-bindgen;
   matching TS types in `packages/engine`.
 - [ ] 4.3 Export `preview(bytes, filename, sidecars)`.
 - [ ] 4.4 Export a dataset store inside the WASM instance (handles) plus

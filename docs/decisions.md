@@ -721,3 +721,18 @@ was chosen, why.
   and io crates, because the generated bindings contain `unsafe`; the crate's own code
   writes none. The build output `pkg/` stays out of git. Loaded in Node with
   `initSync`, the built module returns its version; the empty module is 13.7 KB.
+- Step 4.2: the findings and the validation report already serialize to JSON in
+  exactly the shape the engine wants (optional fields are left out, never
+  `undefined`, which is what `exactOptionalPropertyTypes` needs), so this step adds
+  the TypeScript side: `packages/engine/src/types.ts` (`Finding`, `Location`,
+  `ValidationReport`, ...) and a contract test. The test runs the committed Rust
+  snapshot reports (`crates/karmania-core/src/validate/snapshots/*.json`, real kernel
+  output) through strict checks that reject unknown keys, unknown severities and
+  steps, a count below 1, more than 20 examples and the like, so a field added on
+  the Rust side without a TypeScript type fails a test. The checks themselves are
+  tested with bad input. The lists of severities, steps and check groups are
+  defined once, in `types.ts`. The conversion to JavaScript values with
+  `serde-wasm-bindgen` is not here: nothing can use it until there is an export that
+  returns data, so the dependency and the helper arrive with `preview` in step 4.3,
+  as the rule is to add a dependency in the step that first needs it. When they do,
+  maps must be serialized as plain objects, not JavaScript `Map`s.
