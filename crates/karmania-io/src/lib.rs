@@ -24,6 +24,7 @@ mod geojson_shapes;
 pub mod import_job;
 pub mod import_run;
 pub mod infer;
+pub mod kernel;
 pub mod mapping;
 pub mod nodata;
 pub mod numbers;
