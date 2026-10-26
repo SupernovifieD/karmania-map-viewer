@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use crate::offsets;
 use crate::positions::Positions;
 
 /// A set of polylines.
@@ -36,9 +37,7 @@ impl Lines {
     /// or its offsets are out of order or past the last vertex.
     #[must_use]
     pub fn vertex_range(&self, index: usize) -> Option<Range<usize>> {
-        let start = usize::try_from(*self.offsets.get(index)?).ok()?;
-        let end = usize::try_from(*self.offsets.get(index.checked_add(1)?)?).ok()?;
-        (start <= end && end <= self.vertex_count()).then_some(start..end)
+        offsets::range(&self.offsets, index, self.vertex_count())
     }
 }
 
