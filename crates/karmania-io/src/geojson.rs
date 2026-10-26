@@ -702,20 +702,6 @@ mod tests {
     }
 
     #[test]
-    fn projected_coordinates_in_a_file_with_no_crs_are_caught_by_validation() {
-        let out = read(&collection(vec![point(
-            json!([500_000.0, 2_765_000.0]),
-            json!({}),
-        )]));
-        let report = karmania_core::validate(only(&out));
-        assert!(
-            report
-                .findings()
-                .any(|f| f.code.as_str() == "crs.geographic.out_of_range")
-        );
-    }
-
-    #[test]
     fn reading_twice_gives_the_same_result() {
         let text = fixtures::text("mixed.geojson");
         assert_eq!(
@@ -1137,12 +1123,6 @@ mod tests {
         assert_eq!(out.datasets.len(), 2);
         for d in &out.datasets {
             assert_eq!(d.crs, Some(CrsRef::Epsg { code: 32640 }));
-            // These are valid UTM coordinates, so validation has no range complaint.
-            assert!(
-                karmania_core::validate(d)
-                    .findings()
-                    .all(|f| f.code.as_str() != "crs.geographic.out_of_range")
-            );
         }
     }
 

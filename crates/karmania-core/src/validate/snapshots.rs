@@ -1,11 +1,12 @@
 //! Snapshot tests: one complete validation report per kind of dataset.
 //!
-//! Each fixture is built to trip checks in all three groups. The report is
-//! written as pretty JSON and compared with a committed file in `snapshots/`,
-//! so any change to a finding's code, wording, count, example or order shows up
-//! as a diff. After an intended change, regenerate the files with
-//! `KARMANIA_UPDATE_SNAPSHOTS=1 cargo test -p karmania-core snapshots` and read
-//! the diff before committing it.
+//! Each fixture is built to trip checks in the structure and values groups; the
+//! crs group has one check, tripped by the fixtures that name no coordinate
+//! system. The report is written as pretty JSON and compared with a committed
+//! file in `snapshots/`, so any change to a finding's code, wording, count,
+//! example or order shows up as a diff. After an intended change, regenerate the
+//! files with `KARMANIA_UPDATE_SNAPSHOTS=1 cargo test -p karmania-core snapshots`
+//! and read the diff before committing it.
 
 use std::path::PathBuf;
 
@@ -146,7 +147,6 @@ fn fixture(name: &str) -> Dataset {
                 z: GridZ::Flat { elevation: 100.0 },
             };
             let mut d = dataset(Geometry::Grid(grid));
-            d.crs = Some(CrsRef::Epsg { code: 99_999 });
             let column = Column::without_nulls("elev", ColumnData::Float64(vec![1.0; 11]));
             d.attributes = table(vec![column]);
             d

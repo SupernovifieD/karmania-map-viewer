@@ -69,24 +69,7 @@
     },
     {
       "name": "crs",
-      "findings": [
-        {
-          "code": "crs.geographic.out_of_range",
-          "severity": "warning",
-          "message": "Some coordinates are not valid longitudes and latitudes: X runs from 10 to 200000000 and Y from 1 to 95, but longitude must be between -180 and 360 and latitude between -90 and 90.",
-          "hint": "Check the coordinate system. Values this large usually belong to a projected system such as UTM.",
-          "count": 2,
-          "examples": [
-            {
-              "element": 3
-            },
-            {
-              "element": 4
-            }
-          ],
-          "step": "crs"
-        }
-      ]
+      "findings": []
     }
   ]
 }

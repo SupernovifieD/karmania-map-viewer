@@ -111,14 +111,14 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 - [x] 2.15 CRS: missing CRS (error, hint: choose an EPSG code or Local grid,
   step "crs"); Local accepted.
 - [x] 2.16 Add the EPSG definitions dependency (dependency-only commit, with
-  `docs/dependencies.md`).
+  `docs/dependencies.md`). *Removed again in 3.25b, by the owner's decision.*
 - [x] 2.17 CRS: unknown EPSG code (error); expose a lookup with code, name,
-  kind (geographic or projected) and units.
+  kind (geographic or projected) and units. *Removed in 3.25b.*
   Split to stay under the commit size guideline:
   - [x] 2.17a EPSG lookup: code, name, kind and units (reads the WKT).
   - [x] 2.17b Unknown EPSG code finding.
 - [x] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
-  Y may be swapped").
+  Y may be swapped"). *Removed in 3.25b.*
 - [x] 2.19 Add the proj4rs dependency (dependency-only commit). *Removed again in
   3.25a, by the owner's decision.*
 - [x] 2.20 CRS: projected plausibility. Inverse-project the bbox corners plus up
@@ -133,7 +133,8 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 
 - [x] 2.23 UTM zone rule: coordinates far from the middle of a UTM zone are a
   warning. *Removed in 3.25a.*
-- [x] 2.24 The geographic range check is a warning, not an error.
+- [x] 2.24 The geographic range check is a warning, not an error. *Removed in
+  3.25b along with the check.*
 
 ## M3: Readers (karmania-io)
 
@@ -216,7 +217,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 - [x] 3.25a Remove the projected plausibility check and the UTM zone rule, and
   the `proj4rs` dependency.
-- [ ] 3.25b Remove the EPSG lookup, the unknown-code check, the geographic range
+- [x] 3.25b Remove the EPSG lookup, the unknown-code check, the geographic range
   and swapped-axes checks, and the `crs-definitions` dependency.
 - [ ] 3.25c Update the plan for the later milestones that expected a CRS search.
 

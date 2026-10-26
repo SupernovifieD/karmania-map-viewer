@@ -687,3 +687,18 @@ was chosen, why.
   `crs` group fell from 6 to 0.1 ms). Step 3.25b removes the rest of what needs the
   definitions. The earlier decision entries for steps 2.16 to 2.24 describe how
   these checks worked and are kept as history.
+- Step 3.25b (owner decision): the EPSG definitions are out of the core. Removed the
+  lookup (`epsg::lookup`, `CrsInfo`, `CrsKind`, `CrsUnit`), the `crs.epsg.unknown`
+  check and the `crs.geographic.out_of_range` and `crs.geographic.axes_swapped`
+  checks, and the `crs-definitions` dependency. Those checks need to know what a code
+  means: whether it exists, and whether it is a longitude and latitude system.
+  What is left of the CRS group is `crs.missing`, and any EPSG code is accepted as
+  given (the readers still refuse code 0 and read the code out of GeoJSON `crs`
+  members and `.prj` files, which needs no table). A GeoJSON file read with the
+  assumed EPSG:4326 is therefore no longer checked for values that cannot be
+  longitudes and latitudes, and the two checks the owner asked for after M2 (the
+  UTM zone rule, and the range check as a warning) are gone with the data they
+  relied on. If wanted later, a range check for EPSG:4326 alone needs no table and is
+  about thirty lines. The resolved dependency graph fell from 36 crates to 15 and
+  the core's WebAssembly build no longer carries about 4.8 MB of definitions, which
+  settles the question of the size of the EPSG data.

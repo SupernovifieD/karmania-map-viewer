@@ -73,30 +73,6 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
-## `crs.epsg.unknown`
-
-- Severity: error
-- Step: crs
-- Message: The EPSG code {code} is not in the list of coordinate systems this tool knows.
-- Hint: Check the code. For example, 4326 is WGS 84 and 32640 is WGS 84 / UTM zone 40N.
-- Example: The EPSG code 99999 is not in the list of coordinate systems this tool knows.
-
-## `crs.geographic.axes_swapped`
-
-- Severity: warning
-- Step: crs
-- Message: X and Y may be swapped: X runs from {min_x} to {max_x}, which fits latitude, and Y runs from {min_y} to {max_y}, which does not.
-- Hint: In a longitude and latitude system, X is longitude and Y is latitude. Swap the two columns in the mapping step.
-- Example: X and Y may be swapped: X runs from -33.9 to 25.2, which fits latitude, and Y runs from 121.5 to 151.2, which does not.
-
-## `crs.geographic.out_of_range`
-
-- Severity: warning
-- Step: crs
-- Message: Some coordinates are not valid longitudes and latitudes: X runs from {min_x} to {max_x} and Y from {min_y} to {max_y}, but longitude must be between -180 and 360 and latitude between -90 and 90.
-- Hint: Check the coordinate system. Values this large usually belong to a projected system such as UTM.
-- Example: Some coordinates are not valid longitudes and latitudes: X runs from 500000 to 510000 and Y from 2800000 to 2810000, but longitude must be between -180 and 360 and latitude between -90 and 90.
-
 ## `crs.missing`
 
 - Severity: error
