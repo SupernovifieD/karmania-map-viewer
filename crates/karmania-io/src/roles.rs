@@ -112,6 +112,24 @@ fn normalise(name: &str) -> String {
         .collect()
 }
 
+/// Sets of three coordinate names that block models use for the block centre.
+const CENTRE_NAMES: [[&str; 3]; 3] = [
+    ["xc", "yc", "zc"],
+    ["xcentre", "ycentre", "zcentre"],
+    ["xcenter", "ycenter", "zcenter"],
+];
+
+/// Whether the header has the coordinate names that block models use for the
+/// centre of a block (`XC`, `YC`, `ZC` and the like). Points and lines do not
+/// usually name their coordinates that way.
+#[must_use]
+pub fn suggests_block_centres(header: &[String]) -> bool {
+    let names: Vec<String> = header.iter().map(|name| normalise(name)).collect();
+    CENTRE_NAMES
+        .iter()
+        .any(|set| set.iter().all(|wanted| names.iter().any(|n| n == wanted)))
+}
+
 /// Suggests a role for each column from its name and type.
 ///
 /// Coordinates must be numeric columns. Each of X, Y, Z and the line identifier
@@ -326,5 +344,29 @@ mod tests {
         ];
         let names: Vec<_> = all.iter().map(|r| r.as_str()).collect();
         assert_eq!(names, ["x", "y", "z", "line_id", "attribute", "ignore"]);
+    }
+
+    #[test]
+    fn centre_style_coordinate_names_suggest_a_block_model() {
+        let names = |list: &[&str]| list.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        assert!(suggests_block_centres(&names(&[
+            "XC", "YC", "ZC", "Density"
+        ])));
+        assert!(suggests_block_centres(&names(&[
+            "Domain",
+            "XCentre (m)",
+            "YCentre",
+            "ZCentre"
+        ])));
+        assert!(suggests_block_centres(&names(&[
+            "zcenter", "ycenter", "xcenter"
+        ])));
+        // All three are needed, and in one style.
+        assert!(!suggests_block_centres(&names(&["XC", "YC"])));
+        assert!(!suggests_block_centres(&names(&["XC", "YCentre", "ZC"])));
+        assert!(!suggests_block_centres(&names(&[
+            "Easting", "Northing", "RL"
+        ])));
+        assert!(!suggests_block_centres(&[]));
     }
 }

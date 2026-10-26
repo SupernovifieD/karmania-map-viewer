@@ -14,6 +14,7 @@ pub mod asc;
 pub mod csv_blocks;
 pub mod csv_import;
 pub mod delimited;
+pub mod detect;
 #[cfg(test)]
 mod fixtures;
 pub mod geojson;

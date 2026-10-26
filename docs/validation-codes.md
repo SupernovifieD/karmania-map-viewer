@@ -289,6 +289,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Save the file as UTF-8 and import it again.
 - Example: Some UTF-16 characters could not be read and were replaced with a question-mark symbol.
 
+## `file.format.mismatch`
+
+- Severity: info
+- Step: file
+- Message: The file name ends in .{extension}, but the content looks like {format}, so it was treated as {format}.
+- Hint: none
+- Example: The file name ends in .csv, but the content looks like an ESRI ASCII grid, so it was treated as an ESRI ASCII grid.
+
+## `file.format.unrecognized`
+
+- Severity: error
+- Step: file
+- Message: {Karmania cannot read .{extension} files yet. | The file is a binary file, not text. | The file is not in a format Karmania can read.}
+- Hint: Karmania reads CSV, GeoJSON, ESRI ASCII grid, OBJ and .prj files. (For a named format: Export the data as CSV or GeoJSON.)
+- Example: Karmania cannot read .shp files yet.
+
 ## `geojson.crs.assumed`
 
 - Severity: info
