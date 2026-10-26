@@ -62,6 +62,10 @@ finding_codes! {
     DatasetTooLarge => "dataset.too_large", Error, None;
     /// A line has fewer than two vertices.
     LinesLineTooShort => "lines.line.too_short", Warning, None;
+    /// The triangle index list ends with an incomplete triangle.
+    MeshIndicesIncomplete => "mesh.indices.incomplete", Error, None;
+    /// Some triangles use vertex numbers that do not exist.
+    MeshIndicesOutOfRange => "mesh.indices.out_of_range", Error, None;
     /// The offsets list of a line set ends at the wrong vertex.
     LinesOffsetsBadEnd => "lines.offsets.bad_end", Error, None;
     /// The offsets list of a line set does not start at 0.

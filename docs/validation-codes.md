@@ -81,6 +81,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Start with 0, end with the number of vertices, and never go backwards.
 - Example: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3).
 
+## `mesh.indices.incomplete`
+
+- Severity: error
+- Step: none
+- Message: The triangle list ends with an incomplete triangle: it has {count} vertex numbers, which is not a multiple of 3.
+- Hint: Give three vertex numbers for every triangle.
+- Example: The triangle list ends with an incomplete triangle: it has 5 vertex numbers, which is not a multiple of 3.
+
+## `mesh.indices.out_of_range`
+
+- Severity: error
+- Step: none
+- Message: Some triangles use vertex numbers that do not exist: the mesh has {count} vertices.
+- Hint: Vertex numbers start at 0 and must be lower than the number of vertices.
+- Example: Some triangles use vertex numbers that do not exist: the mesh has 3 vertices.
+
 ## `polygons.polygon.no_rings`
 
 - Severity: error
