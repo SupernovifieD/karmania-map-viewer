@@ -7,11 +7,13 @@
 #![forbid(unsafe_code)]
 
 pub mod codes;
+pub mod column;
 pub mod crs;
 pub mod findings;
 pub mod validity;
 
 pub use codes::FindingCode;
+pub use column::{Column, ColumnData, ColumnType, LengthMismatch, Value};
 pub use crs::{CrsRef, Units};
 pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
 pub use validity::Validity;
