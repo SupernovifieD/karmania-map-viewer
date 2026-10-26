@@ -60,6 +60,14 @@ finding_codes! {
     DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
+    /// The offsets list of a line set ends at the wrong vertex.
+    LinesOffsetsBadEnd => "lines.offsets.bad_end", Error, None;
+    /// The offsets list of a line set does not start at 0.
+    LinesOffsetsBadStart => "lines.offsets.bad_start", Error, None;
+    /// Some lines end before they start.
+    LinesOffsetsDecreasing => "lines.offsets.decreasing", Error, None;
+    /// The offsets list of a line set is empty.
+    LinesOffsetsEmpty => "lines.offsets.empty", Error, None;
     /// A table column has a different number of rows from the first column.
     TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.

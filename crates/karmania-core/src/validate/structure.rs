@@ -1,5 +1,6 @@
 //! Structure checks: is the geometry well formed?
 
+use super::offset_lists::{self, OffsetCodes, OffsetsSpec};
 use crate::codes::FindingCode;
 use crate::dataset::{Dataset, Geometry};
 use crate::findings::{Finding, Findings};
@@ -9,6 +10,26 @@ use crate::text::format_count;
 pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_not_empty(dataset, findings);
     check_position_lists(dataset, findings);
+    check_line_offsets(dataset, findings);
+}
+
+/// The offsets that split a line set's vertices into lines.
+fn check_line_offsets(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Lines(lines) = &dataset.geometry else {
+        return;
+    };
+    let spec = OffsetsSpec {
+        codes: OffsetCodes {
+            empty: FindingCode::LinesOffsetsEmpty,
+            bad_start: FindingCode::LinesOffsetsBadStart,
+            bad_end: FindingCode::LinesOffsetsBadEnd,
+            decreasing: FindingCode::LinesOffsetsDecreasing,
+        },
+        list: "The list that says where each line starts",
+        item: "line",
+        target: "vertices",
+    };
+    offset_lists::check(&lines.offsets, lines.vertex_count(), &spec, findings);
 }
 
 /// A dataset must have at least one element. Grids and dense block models are
@@ -79,6 +100,75 @@ mod tests {
     }
 
     #[test]
+    fn valid_line_offsets_pass_including_empty_lines() {
+        assert!(check_all(&lines(5, &[0, 2, 2, 5])).is_empty());
+        assert!(check_all(&lines(0, &[0, 0])).is_empty());
+    }
+
+    #[test]
+    fn an_empty_offsets_list_is_reported_once() {
+        let found = run(check, &lines(3, &[]));
+        assert_eq!(codes(&found), ["lines.offsets.empty"]);
+        assert_eq!(
+            found.as_slice()[0].message,
+            "The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3)."
+        );
+    }
+
+    #[test]
+    fn a_wrong_start_and_a_wrong_end_are_each_reported() {
+        let found = run(check, &lines(5, &[1, 3, 4]));
+        assert_eq!(
+            codes(&found),
+            ["lines.offsets.bad_start", "lines.offsets.bad_end"]
+        );
+        assert_eq!(
+            found.as_slice()[0].message,
+            "The list that says where each line starts must start with 0, but it starts with 1."
+        );
+        assert_eq!(
+            found.as_slice()[1].message,
+            "The list that says where each line starts must end with the number of vertices (5), but it ends with 4."
+        );
+    }
+
+    #[test]
+    fn offsets_going_backwards_are_counted_with_the_first_examples() {
+        let found = run(check, &lines(9, &[0, 4, 2, 6, 5, 9]));
+        assert_eq!(codes(&found), ["lines.offsets.decreasing"]);
+        let f = &found.as_slice()[0];
+        assert_eq!(
+            (f.count, f.message.as_str()),
+            (2, "Some lines end before they start.")
+        );
+        let at: Vec<_> = f.examples.iter().map(|l| l.element).collect();
+        assert_eq!(at, [Some(1), Some(3)]);
+    }
+
+    #[test]
+    fn many_backwards_steps_keep_at_most_twenty_examples() {
+        let mut offsets = vec![0u32];
+        for i in 0..50u32 {
+            offsets.push(if i % 2 == 0 { 100 } else { 50 });
+        }
+        offsets.push(10);
+        let found = run(check, &lines(10, &offsets));
+        let f = found
+            .iter()
+            .find(|f| f.code.as_str() == "lines.offsets.decreasing")
+            .unwrap();
+        // 25 drops from 100 to 50, plus the last step from 50 down to 10.
+        assert_eq!(f.count, 26);
+        assert_eq!(f.examples.len(), 20);
+    }
+
+    #[test]
+    fn huge_offsets_are_reported_without_overflow() {
+        let found = run(check, &lines(3, &[0, u32::MAX, 3]));
+        assert_eq!(codes(&found), ["lines.offsets.decreasing"]);
+    }
+
+    #[test]
     fn a_geometry_with_no_elements_is_reported_with_its_own_name() {
         let cases = [
             (points(0), "The dataset has no points."),
@@ -104,8 +194,8 @@ mod tests {
     }
 
     #[test]
-    fn malformed_offsets_do_not_count_as_empty() {
-        assert!(check_all(&lines(0, &[])).is_empty());
+    fn missing_offsets_are_reported_as_such_not_as_an_empty_dataset() {
+        assert_eq!(check_all(&lines(0, &[])), ["lines.offsets.empty"]);
     }
 
     #[test]

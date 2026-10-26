@@ -6,6 +6,7 @@
 //! loadable.
 
 mod crs_checks;
+mod offset_lists;
 mod structure;
 #[cfg(test)]
 mod testutil;
