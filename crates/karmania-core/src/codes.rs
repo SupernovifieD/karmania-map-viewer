@@ -108,6 +108,10 @@ finding_codes! {
     GeojsonZPartial => "geojson.z.partial", Warning, Some(WizardStep::File);
     /// Positions have more than three values and the extra ones were ignored.
     GeojsonPositionExtraValues => "geojson.position.extra_values", Info, None;
+    /// The file names a coordinate system that could not be recognized.
+    GeojsonCrsUnrecognized => "geojson.crs.unrecognized", Warning, Some(WizardStep::Crs);
+    /// The file holds more than one kind of shape and became several datasets.
+    GeojsonKindsMixed => "geojson.kinds.mixed", Info, None;
     /// The file has no coordinate system, so WGS 84 was assumed.
     GeojsonCrsAssumed => "geojson.crs.assumed", Info, Some(WizardStep::Crs);
     /// A GeoJSON property was read as text because its values are of different kinds.

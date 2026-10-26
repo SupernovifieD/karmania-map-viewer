@@ -257,6 +257,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Choose another coordinate system if the coordinates are not longitude and latitude.
 - Example: The file does not say which coordinate system it uses, so longitude and latitude on WGS 84 (EPSG:4326) were assumed, as the GeoJSON standard says.
 
+## `geojson.crs.unrecognized`
+
+- Severity: warning
+- Step: crs
+- Message: The file names the coordinate system "{name}", which could not be recognized, so none was set.
+- Hint: Choose the coordinate system yourself.
+- Example: The file names the coordinate system "My mine grid", which could not be recognized, so none was set.
+
 ## `geojson.feature.invalid`
 
 - Severity: warning
@@ -305,12 +313,20 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Check that the file is complete and was not edited by hand.
 - Example: The file is not valid JSON: it ends too early (line 40, column 3).
 
+## `geojson.kinds.mixed`
+
+- Severity: info
+- Step: none
+- Message: The file holds {kinds}, so it was imported as {n} datasets, one for each.
+- Hint: none
+- Example: The file holds points, lines and polygons, so it was imported as 3 datasets, one for each.
+
 ## `geojson.position.extra_values`
 
 - Severity: info
 - Step: none
 - Message: Some positions have more than three values (such as a measure); only the first three were used.
-- Hint: Nothing to do unless the extra values matter.
+- Hint: none
 - Example: Some positions have more than three values (such as a measure); only the first three were used.
 
 ## `geojson.property.as_text`
