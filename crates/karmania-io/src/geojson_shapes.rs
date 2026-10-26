@@ -5,8 +5,8 @@
 //! checks they share: the size limit, partial elevations and extra values.
 
 use karmania_core::{
-    CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Location, Positions,
-    Provenance, Table, check_size,
+    Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry,
+    Lines, Location, Positions, Provenance, Table, check_size,
 };
 use serde_json::Value;
 
@@ -53,9 +53,15 @@ fn position(value: &Value) -> Option<Position> {
     })
 }
 
+fn line(value: &Value) -> Option<Vec<Position>> {
+    value.as_array()?.iter().map(position).collect()
+}
+
 /// What a geometry turned out to be.
 pub(crate) enum Parsed {
     Points(Vec<Position>),
+    /// One line for a LineString, one per part for a MultiLineString.
+    Lines(Vec<Vec<Position>>),
     /// A valid GeoJSON type this reader does not import.
     Unsupported(&'static str),
     Invalid,
@@ -74,6 +80,13 @@ pub(crate) fn parse_geometry(geometry: &Value) -> Parsed {
             .and_then(Value::as_array)
             .and_then(|list| list.iter().map(position).collect::<Option<Vec<_>>>())
             .map_or(Parsed::Invalid, Parsed::Points),
+        "LineString" => coordinates
+            .and_then(line)
+            .map_or(Parsed::Invalid, |l| Parsed::Lines(vec![l])),
+        "MultiLineString" => coordinates
+            .and_then(Value::as_array)
+            .and_then(|parts| parts.iter().map(line).collect::<Option<Vec<_>>>())
+            .map_or(Parsed::Invalid, Parsed::Lines),
         other => GEOMETRY_TYPES
             .iter()
             .find(|known| **known == other)
@@ -110,6 +123,10 @@ impl Coords {
                 "Some positions have more than three values (such as a measure); only the first three were used.",
             )),
         }
+    }
+
+    fn len(&self) -> usize {
+        self.x.len()
     }
 
     /// Adds a position of the feature at `at`.
@@ -221,6 +238,88 @@ impl<'a> PointsAcc<'a> {
             file_name,
             "points",
             Geometry::Points(positions),
+            attributes,
+        ))
+    }
+}
+
+/// The column that says which feature of the file each row came from, counting
+/// features from 1. Named `feature_id`, or `feature_id_2` and so on if a
+/// property already has that name.
+fn feature_id_column(features: &[Properties<'_>], rows: &[usize], taken: &[Column]) -> Column {
+    let mut name = "feature_id".to_string();
+    let mut next = 2;
+    while taken.iter().any(|c| c.name() == name) {
+        name = format!("feature_id_{next}");
+        next += 1;
+    }
+    let ids = rows
+        .iter()
+        .map(|&slot| {
+            features.get(slot).map_or(0, |f| {
+                i64::try_from(f.index).unwrap_or(i64::MAX).saturating_add(1)
+            })
+        })
+        .collect();
+    Column::without_nulls(name, ColumnData::Int64(ids))
+}
+
+/// The lines of a file, with the features they came from.
+pub(crate) struct LinesAcc<'a> {
+    coords: Coords,
+    /// Where each line starts in the vertex list, plus the end.
+    offsets: Vec<u32>,
+    /// For each line, the position in `features` of the feature it belongs to.
+    rows: Vec<usize>,
+    features: Vec<Properties<'a>>,
+}
+
+impl<'a> LinesAcc<'a> {
+    pub(crate) fn new() -> Self {
+        Self {
+            coords: Coords::new(),
+            offsets: vec![0],
+            rows: Vec::new(),
+            features: Vec::new(),
+        }
+    }
+
+    /// Adds the parts of a feature, each as a line of its own.
+    pub(crate) fn add(&mut self, feature: Properties<'a>, parts: &[Vec<Position>]) {
+        if parts.is_empty() {
+            return;
+        }
+        let at = Location::default().with_element(feature.index);
+        let slot = self.features.len();
+        self.features.push(feature);
+        for part in parts {
+            for p in part {
+                self.coords.push(p, &at);
+            }
+            // A count past u32 is far beyond the size limit, which `finish` reports.
+            self.offsets
+                .push(u32::try_from(self.coords.len()).unwrap_or(u32::MAX));
+            self.rows.push(slot);
+        }
+    }
+
+    pub(crate) fn finish(
+        self,
+        file_name: Option<&str>,
+        findings: &mut Findings,
+    ) -> Option<Dataset> {
+        let positions = self.coords.finish("vertices", findings)?;
+        let mut columns = property_columns(&self.features, &self.rows, findings);
+        columns.insert(0, feature_id_column(&self.features, &self.rows, &columns));
+        let attributes = Table::from_columns(columns, findings)?;
+        let lines = Lines {
+            positions,
+            offsets: self.offsets,
+        };
+        Some(dataset(
+            file_name,
+            "lines",
+            Geometry::Lines(lines),
             attributes,
         ))
     }

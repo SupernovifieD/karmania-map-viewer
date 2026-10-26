@@ -504,3 +504,15 @@ was chosen, why.
   longitudes and latitudes. Truncated or malformed JSON is `geojson.json.invalid`
   with serde_json's line; very deep nesting hits its recursion limit and gives the
   same error rather than a crash.
+- Step 3.13: a LineString is one line and each part of a MultiLineString is a line
+  of its own, so a feature with several parts gives several rows that share the
+  feature's property values. The first attribute column is `feature_id`: the
+  feature's position in the file counting from 1 (the same numbering a user would
+  count by), so rows from one feature can be told apart from rows of another. A
+  property that is already called `feature_id` keeps its name and the added column
+  becomes `feature_id_2` (or `_3`, ...). GeoJSON has no per-vertex values, so the
+  lines have no vertex table. Lines with fewer than two positions, including an
+  empty LineString, are read as they are and left to validation
+  (`lines.line.too_short`), as for CSV; a MultiLineString with no parts has no
+  lines at all. A file that gives datasets of several kinds names them
+  `<file> (points)`, `<file> (lines)`, and so on; with no file name the kind alone.
