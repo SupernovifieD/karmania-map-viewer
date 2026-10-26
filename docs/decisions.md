@@ -261,3 +261,10 @@ was chosen, why.
   derived from the IOGP EPSG registry) is written down in
   `docs/dependencies.md`. Its size in the WebAssembly build is to be measured
   at step 4.1 and reported at the M4 checkpoint.
+- Step 2.17a: `epsg::lookup` reads each definition's WKT with a small parser (no
+  dependency), because `crs-definitions` gives only PROJ and WKT strings. A
+  compound or bound system reports the kind and unit of its horizontal part and
+  keeps its full name; geocentric systems and the 8 entries with no WKT are kind
+  `other`. A test describes all 6,184 definitions and requires a unit for every
+  geographic and projected one. The names are the registry's own wording, for
+  example "OSGB 1936 / British National Grid".
