@@ -325,3 +325,9 @@ was chosen, why.
   area-of-use check. It cannot catch a wrong zone with normal-looking eastings,
   because the numbers alone do not say which zone they came from. The finding
   count is the number of failing samples, which includes the box corners.
+- Step 2.24 (owner request): `crs.geographic.out_of_range` is a warning, not an
+  error, so a dataset whose longitude or latitude fall outside the valid range
+  still loads and the user is told. This replaces the "error" choice logged at
+  step 2.18; the swapped-axes warning and the 0 to 360 longitude allowance are
+  unchanged. Anything that later draws such a dataset must cope with positions
+  outside longitude -180 to 360 or latitude -90 to 90.

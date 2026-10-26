@@ -132,7 +132,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 
 - [x] 2.23 UTM zone rule: coordinates far from the middle of a UTM zone are a
   warning.
-- [ ] 2.24 The geographic range check is a warning, not an error.
+- [x] 2.24 The geographic range check is a warning, not an error.
 
 ## M3: Readers (karmania-io)
 
