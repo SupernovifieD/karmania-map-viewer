@@ -595,3 +595,23 @@ was chosen, why.
   also accepted. Brackets nested more than 40 deep are not a coordinate system
   (this also keeps the recursive parser safe from hostile input). Matching a name
   such as `WGS_1984_UTM_Zone_40N` to an EPSG code is not attempted.
+- Step 3.20: `detect_format(file_name, bytes)` looks at the extension and at most
+  the first 64 KiB. The content wins over the extension (a `.csv` that is really an
+  ASCII grid is read as one) and the mismatch is an info finding; `.txt`, `.dat`
+  and a missing extension make no claim, so they never mismatch. When the content
+  says nothing the specific extensions decide (`.json` that is not GeoJSON goes to
+  the GeoJSON reader, which explains what is wrong). Extensions of formats we
+  cannot read (shapefile, Excel, zip, KML, ...) are refused by name before any
+  sniffing, since KML text would otherwise pass for a comma-separated table; a file
+  with NUL bytes (except UTF-16) is refused as binary. Content is recognized, in
+  this order, as well-known text, GeoJSON (starts with `{` and names a GeoJSON
+  type), an ASCII grid (starts with `ncols` or `nrows` and a number), an OBJ (the
+  first record is an OBJ record and a vertex line has three numbers) and a table.
+  A table needs at least two columns, a data row and four rows in five as wide as
+  the header; prose with a comma, JSON and XML are not tables (a first version
+  read a letter as a two-column CSV). The suggested kind is a grid for an ASCII
+  grid, a mesh for an OBJ and, for a table, lines if a line-identifier column is
+  suggested, block model if the header has centre-style names (`XC YC ZC`,
+  `XCentre YCentre ZCentre`) and points otherwise. GeoJSON gets none: its kinds
+  come from its features. Cutting the examined bytes inside a UTF-8 character is
+  handled so it does not make the text look invalid.

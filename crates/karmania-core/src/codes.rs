@@ -64,6 +64,10 @@ finding_codes! {
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
     /// The file has no content.
     FileEmpty => "file.empty", Error, Some(WizardStep::File);
+    /// The file name and the content point to different formats.
+    FileFormatMismatch => "file.format.mismatch", Info, Some(WizardStep::File);
+    /// The file is in a format that cannot be read.
+    FileFormatUnrecognized => "file.format.unrecognized", Error, Some(WizardStep::File);
     /// The text file is not valid UTF-8 and was read as Windows-1252.
     FileEncodingFallback => "file.encoding.fallback", Warning, Some(WizardStep::File);
     /// Some UTF-16 characters could not be read.
