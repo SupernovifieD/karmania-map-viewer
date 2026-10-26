@@ -112,11 +112,11 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   step "crs"); Local accepted.
 - [x] 2.16 Add the EPSG definitions dependency (dependency-only commit, with
   `docs/dependencies.md`).
-- [ ] 2.17 CRS: unknown EPSG code (error); expose a lookup with code, name,
+- [x] 2.17 CRS: unknown EPSG code (error); expose a lookup with code, name,
   kind (geographic or projected) and units.
   Split to stay under the commit size guideline:
   - [x] 2.17a EPSG lookup: code, name, kind and units (reads the WKT).
-  - [ ] 2.17b Unknown EPSG code finding.
+  - [x] 2.17b Unknown EPSG code finding.
 - [ ] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
   Y may be swapped").
 - [ ] 2.19 Add the proj4rs dependency (dependency-only commit).

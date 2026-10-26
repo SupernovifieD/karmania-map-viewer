@@ -62,6 +62,8 @@ finding_codes! {
     DatasetAttributesRowsMismatch => "dataset.attributes.rows_mismatch", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
+    /// The EPSG code is not in the list of known coordinate systems.
+    CrsEpsgUnknown => "crs.epsg.unknown", Error, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.

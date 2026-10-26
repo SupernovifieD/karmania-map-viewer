@@ -33,6 +33,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `crs.epsg.unknown`
+
+- Severity: error
+- Step: crs
+- Message: The EPSG code {code} is not in the list of coordinate systems this tool knows.
+- Hint: Check the code. For example, 4326 is WGS 84 and 32640 is WGS 84 / UTM zone 40N.
+- Example: The EPSG code 99999 is not in the list of coordinate systems this tool knows.
+
 ## `crs.missing`
 
 - Severity: error
