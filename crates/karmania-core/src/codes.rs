@@ -62,6 +62,10 @@ finding_codes! {
     DatasetAttributesRowsMismatch => "dataset.attributes.rows_mismatch", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
+    /// The text file is not valid UTF-8 and was read as Windows-1252.
+    FileEncodingFallback => "file.encoding.fallback", Warning, Some(WizardStep::File);
+    /// Some UTF-16 characters could not be read.
+    FileEncodingInvalidUtf16 => "file.encoding.invalid_utf16", Warning, Some(WizardStep::File);
     /// The EPSG code is not in the list of known coordinate systems.
     CrsEpsgUnknown => "crs.epsg.unknown", Error, Some(WizardStep::Crs);
     /// X and Y fit latitude and longitude only if they are swapped.

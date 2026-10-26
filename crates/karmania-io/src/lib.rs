@@ -12,3 +12,4 @@
 
 #[cfg(test)]
 mod fixtures;
+pub mod text;

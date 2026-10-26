@@ -145,6 +145,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Move those values to the attribute table, or remove them.
 - Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
 
+## `file.encoding.fallback`
+
+- Severity: warning
+- Step: file
+- Message: The file is not valid UTF-8, so it was read as Windows-1252 (Western European text). Letters with accents may look wrong if it uses a different encoding.
+- Hint: Save the file as UTF-8 and import it again.
+- Example: The file is not valid UTF-8, so it was read as Windows-1252 (Western European text). Letters with accents may look wrong if it uses a different encoding.
+
+## `file.encoding.invalid_utf16`
+
+- Severity: warning
+- Step: file
+- Message: Some UTF-16 characters could not be read and were replaced with a question-mark symbol.
+- Hint: Save the file as UTF-8 and import it again.
+- Example: Some UTF-16 characters could not be read and were replaced with a question-mark symbol.
+
 ## `lattice.dims.zero`
 
 - Severity: error

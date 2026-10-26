@@ -339,3 +339,11 @@ was chosen, why.
   dependencies for no gain. Fixtures are small hand-written files in `fixtures/`
   (one per format, plus a second `.prj` without an EPSG code, the common ESRI
   style); a test keeps each under 50 KB and the directory in step with its list.
+- Step 3.2: besides UTF-8 (with or without a byte-order mark) and the
+  Windows-1252 fallback the brief asks for, UTF-16 with a byte-order mark is read
+  too, because Excel's "Unicode text" export is UTF-16 and would otherwise come
+  out as Windows-1252 garbage. UTF-16 without a mark is not guessed. Files that
+  are valid UTF-8 are not copied. The Windows-1252 table was generated from
+  Python's codec; the five undefined bytes map to the control character with the
+  same number (WHATWG behaviour). A file that mixes valid UTF-8 and stray bad
+  bytes is read as Windows-1252 as a whole, which is the brief's rule.

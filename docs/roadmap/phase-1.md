@@ -138,7 +138,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 
 - [x] 3.1 Create `crates/karmania-io` and `fixtures/` with tiny sample files for
   every format.
-- [ ] 3.2 Text decoding: UTF-8 with BOM strip; Windows-1252 fallback with a
+- [x] 3.2 Text decoding: UTF-8 with BOM strip; Windows-1252 fallback with a
   warning finding.
 - [ ] 3.3 Delimited text sniffing: delimiter (comma, semicolon, tab,
   whitespace), header detection, first 200 rows, estimated row count.
