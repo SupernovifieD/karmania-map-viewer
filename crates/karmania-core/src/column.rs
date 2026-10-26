@@ -219,6 +219,22 @@ impl Column {
         self.data.column_type()
     }
 
+    /// The smallest and largest valid, finite number in a float or integer
+    /// column. Nulls, NaN and infinities are ignored. `None` for other column
+    /// types or when no such number exists.
+    #[must_use]
+    pub fn finite_range(&self) -> Option<(f64, f64)> {
+        let numbers = (0..self.len()).filter_map(|i| match self.get(i)? {
+            Value::Float64(v) if v.is_finite() => Some(v),
+            Value::Int64(v) => Some(v as f64),
+            _ => None,
+        });
+        numbers.fold(None, |range, v| match range {
+            None => Some((v, v)),
+            Some((lo, hi)) => Some((lo.min(v), hi.max(v))),
+        })
+    }
+
     /// The value at `index`, or `None` if it is null or `index` is out of range.
     #[must_use]
     pub fn get(&self, index: usize) -> Option<Value<'_>> {
@@ -361,6 +377,29 @@ mod tests {
         let col = Column::without_nulls("c", ColumnData::Float64(vec![f64::NAN]));
         assert_eq!(col.null_count(), 0);
         assert!(matches!(col.get(0), Some(Value::Float64(x)) if x.is_nan()));
+    }
+
+    #[test]
+    fn the_finite_range_ignores_nulls_nan_and_infinities() {
+        let data = ColumnData::Float64(vec![5.0, f64::NAN, -2.0, f64::INFINITY, 99.0, 0.5]);
+        let validity = Validity::from_flags([true, true, true, true, false, true]);
+        let col = Column::new("z", data, validity).unwrap();
+        assert_eq!(col.finite_range(), Some((-2.0, 5.0)));
+    }
+
+    #[test]
+    fn the_finite_range_covers_integers_and_skips_other_types() {
+        let ints = Column::without_nulls("i", ColumnData::Int64(vec![3, -7, 10]));
+        assert_eq!(ints.finite_range(), Some((-7.0, 10.0)));
+        let text = Column::without_nulls("t", ColumnData::Utf8(strings(&["1", "2"])));
+        let flags = Column::without_nulls("b", ColumnData::Bool(vec![true]));
+        assert_eq!((text.finite_range(), flags.finite_range()), (None, None));
+        let none = Column::without_nulls("n", ColumnData::Float64(vec![f64::NAN]));
+        assert_eq!(none.finite_range(), None);
+        assert_eq!(
+            Column::without_nulls("e", ColumnData::Int64(vec![])).finite_range(),
+            None
+        );
     }
 
     #[test]

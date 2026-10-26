@@ -188,3 +188,13 @@ was chosen, why.
   says. Every count returns `None` rather than a guess when the geometry is too
   malformed to count; the expected attribute rows equal the element count for
   every kind.
+- Step 1.15: the bounding box is computed on demand (`Dataset::bbox()`), not
+  stored, so it cannot go stale. Points with any non-finite coordinate are
+  skipped; `Lattice::bbox` instead returns `None` unless all eight corners are
+  finite, because a partial box would be misleading. Block models report the
+  whole lattice even when sparse (a CSV import builds the lattice from the
+  blocks, so the two agree). A grid's Z is its flat elevation (one layer), or
+  the finite range of its elevation column, and falls back to the lattice's own
+  Z extent when neither is usable; a dataset without Z reports Z as 0. The
+  helper `Column::finite_range` (min and max of valid, finite numbers) was added
+  for this and is reusable by validation.
