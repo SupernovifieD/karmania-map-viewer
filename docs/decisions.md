@@ -112,3 +112,11 @@ was chosen, why.
   narrow reading of "go with copyleft": GPL, LGPL and AGPL, and any license not
   listed in `docs/dependencies.md`, still need approval. If the owner wants a
   broader rule, change it there.
+- Step 0.13: Vite is `^8.3.5` (Rolldown-based) in `@karmania/engine`, replacing
+  the 7.x pin from step 0.7. The lockfile was re-resolved from scratch because
+  pnpm otherwise keeps stale optional-peer packages (esbuild) from the old tree.
+  esbuild is gone, so the `allowBuilds` entry from step 0.11 was removed.
+  `pnpm licenses list` under pnpm 12 undercounts (it omitted `lightningcss` and
+  `rolldown`), so licenses are now audited by reading each installed package's
+  `license` field; result in `docs/dependencies.md`. If a license check is ever
+  added to CI, it must not use `pnpm licenses list`.

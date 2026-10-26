@@ -41,7 +41,7 @@ M0; each is its own commit):
 - [x] 0.12 License policy: accept BlueOak-1.0.0 and, for dev-only build tools,
   MPL-2.0 (weak copyleft); update `docs/dependencies.md` and
   `docs/conventions.md`.
-- [ ] 0.13 Move Vite from 7 to 8 now that MPL-2.0 build tools are accepted.
+- [x] 0.13 Move Vite from 7 to 8 now that MPL-2.0 build tools are accepted.
 - [ ] 0.14 Add `pnpm format:check` to `pnpm check`.
 
 ## M1: Core data model (karmania-core)
