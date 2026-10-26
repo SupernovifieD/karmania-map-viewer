@@ -442,3 +442,12 @@ was chosen, why.
   becomes a per-vertex attribute, since the file gives no way to know which values
   are constant along a line. With no attribute columns there is no vertex table.
   Lines with fewer than two vertices are left to validation (`lines.line.too_short`).
+- Step 3.10: the lattice of a block-model CSV starts half a block before the lowest
+  centre on each axis (origin = outer corner of cell 0,0,0), has no rotation, and
+  has `round(span / size) + 1` cells per axis, so the lowest and highest centres
+  are the centres of the first and last cells. `lattice_from_centres` is public
+  and tested on its own; step 3.11 uses it in the importer and checks that every
+  centre really sits on the lattice. A span needing more than `u32::MAX` cells on
+  one axis (a wrong block size or wrong units) is `csv.blocks.lattice_too_large`.
+  Writing the test for absurd spans found an overflow in `count + 1`, now a
+  saturating add.
