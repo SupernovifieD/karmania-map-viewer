@@ -88,6 +88,26 @@ finding_codes! {
     CsvRowsSkipped => "csv.rows.skipped", Warning, Some(WizardStep::Nodata);
     /// Some values could not be read as the column's type and were left empty.
     CsvValueUnreadable => "csv.value.unreadable", Warning, Some(WizardStep::Mapping);
+    /// The file is not valid JSON.
+    GeojsonJsonInvalid => "geojson.json.invalid", Error, Some(WizardStep::File);
+    /// The JSON is not a GeoJSON FeatureCollection, Feature or geometry.
+    GeojsonStructureInvalid => "geojson.structure.invalid", Error, Some(WizardStep::File);
+    /// Nothing in the GeoJSON file can be imported.
+    GeojsonFeaturesNone => "geojson.features.none", Error, Some(WizardStep::File);
+    /// Items in the list of features are not features.
+    GeojsonFeatureInvalid => "geojson.feature.invalid", Warning, Some(WizardStep::File);
+    /// Features have no geometry.
+    GeojsonGeometryMissing => "geojson.geometry.missing", Warning, Some(WizardStep::File);
+    /// Features have a geometry type that cannot be imported.
+    GeojsonGeometryUnsupported => "geojson.geometry.unsupported", Warning, Some(WizardStep::File);
+    /// Features have a geometry that could not be read.
+    GeojsonGeometryInvalid => "geojson.geometry.invalid", Warning, Some(WizardStep::File);
+    /// Only some positions have an elevation, so the elevations were ignored.
+    GeojsonZPartial => "geojson.z.partial", Warning, Some(WizardStep::File);
+    /// Positions have more than three values and the extra ones were ignored.
+    GeojsonPositionExtraValues => "geojson.position.extra_values", Info, None;
+    /// The file has no coordinate system, so WGS 84 was assumed.
+    GeojsonCrsAssumed => "geojson.crs.assumed", Info, Some(WizardStep::Crs);
     /// A GeoJSON property was read as text because its values are of different kinds.
     GeojsonPropertyAsText => "geojson.property.as_text", Warning, Some(WizardStep::Mapping);
     /// Some GeoJSON features have a property with no name.

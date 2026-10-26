@@ -249,6 +249,70 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Save the file as UTF-8 and import it again.
 - Example: Some UTF-16 characters could not be read and were replaced with a question-mark symbol.
 
+## `geojson.crs.assumed`
+
+- Severity: info
+- Step: crs
+- Message: The file does not say which coordinate system it uses, so longitude and latitude on WGS 84 (EPSG:4326) were assumed, as the GeoJSON standard says.
+- Hint: Choose another coordinate system if the coordinates are not longitude and latitude.
+- Example: The file does not say which coordinate system it uses, so longitude and latitude on WGS 84 (EPSG:4326) were assumed, as the GeoJSON standard says.
+
+## `geojson.feature.invalid`
+
+- Severity: warning
+- Step: file
+- Message: Some items in the list of features are not features, so they were left out.
+- Hint: Each item should be an object with "type": "Feature".
+- Example: Some items in the list of features are not features, so they were left out.
+
+## `geojson.features.none`
+
+- Severity: error
+- Step: file
+- Message: The file has no features that can be imported.
+- Hint: The file should have points, lines or polygons in it.
+- Example: The file has no features that can be imported.
+
+## `geojson.geometry.invalid`
+
+- Severity: warning
+- Step: file
+- Message: Some features have a geometry that could not be read, so they were left out.
+- Hint: Check that the coordinates are lists of numbers (longitude, latitude and optionally elevation).
+- Example: Some features have a geometry that could not be read, so they were left out.
+
+## `geojson.geometry.missing`
+
+- Severity: warning
+- Step: file
+- Message: Some features have no geometry, so they were left out.
+- Hint: Give the features a geometry, or ignore them.
+- Example: Some features have no geometry, so they were left out.
+
+## `geojson.geometry.unsupported`
+
+- Severity: warning
+- Step: file
+- Message: Features of type {type} cannot be imported, so they were left out.
+- Hint: Convert them to points, lines or polygons, or ignore them.
+- Example: Features of type GeometryCollection cannot be imported, so they were left out.
+
+## `geojson.json.invalid`
+
+- Severity: error
+- Step: file
+- Message: The file is not valid JSON: {reason} (line {line}, column {column}).
+- Hint: Check that the file is complete and was not edited by hand.
+- Example: The file is not valid JSON: it ends too early (line 40, column 3).
+
+## `geojson.position.extra_values`
+
+- Severity: info
+- Step: none
+- Message: Some positions have more than three values (such as a measure); only the first three were used.
+- Hint: Nothing to do unless the extra values matter.
+- Example: Some positions have more than three values (such as a measure); only the first three were used.
+
 ## `geojson.property.as_text`
 
 - Severity: warning
@@ -264,6 +328,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: Some features have a property with no name; it was left out.
 - Hint: Give every property a name.
 - Example: Some features have a property with no name; it was left out.
+
+## `geojson.structure.invalid`
+
+- Severity: error
+- Step: file
+- Message: The file is JSON but not GeoJSON: {what is wrong}.
+- Hint: A GeoJSON file holds a FeatureCollection, a Feature or a geometry.
+- Example: The FeatureCollection has no list of "features".
+
+## `geojson.z.partial`
+
+- Severity: warning
+- Step: file
+- Message: Some positions have no elevation, so the elevations of the others were ignored.
+- Hint: Give every position an elevation, or none.
+- Example: Some positions have no elevation, so the elevations of the others were ignored.
 
 ## `lattice.dims.zero`
 
