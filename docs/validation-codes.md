@@ -33,6 +33,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `crs.missing`
+
+- Severity: error
+- Step: crs
+- Message: The coordinate reference system is missing, so the positions have no meaning on the Earth.
+- Hint: Choose an EPSG code, or choose a local grid and its units.
+- Example: The coordinate reference system is missing, so the positions have no meaning on the Earth.
+
 ## `dataset.attributes.rows_mismatch`
 
 - Severity: error
