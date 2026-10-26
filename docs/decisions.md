@@ -403,3 +403,12 @@ was chosen, why.
   as `.` or `,`; a test pins each. One leniency: `crs` may be absent as well as
   `null`, and both mean "not chosen yet". Everything else listed as required is
   required.
+- Step 3.7b: `validate_mapping` is for CSV mappings (the other formats do not use
+  columns). It returns nine error codes, all with the mapping wizard step except
+  `mapping.kind.unsupported`, which points at the file step because the fix is to
+  choose a different kind. Z is required only for block models; a line identifier
+  only for lines; the block size only for blocks. A role held by two columns, a
+  column mapped twice, a mapped column missing from the file (names match exactly,
+  including case) and a coordinate typed as text, bool or category are reported
+  too. It does not look at the data, so numbers that fail to parse are reported by
+  the readers (step 3.8).

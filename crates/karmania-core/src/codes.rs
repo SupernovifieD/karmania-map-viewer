@@ -68,6 +68,24 @@ finding_codes! {
     FileEncodingFallback => "file.encoding.fallback", Warning, Some(WizardStep::File);
     /// Some UTF-16 characters could not be read.
     FileEncodingInvalidUtf16 => "file.encoding.invalid_utf16", Warning, Some(WizardStep::File);
+    /// The block size of a block model is missing.
+    MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
+    /// The block size is not greater than 0 in all directions.
+    MappingBlockSizeInvalid => "mapping.block_size.invalid", Error, Some(WizardStep::Mapping);
+    /// A coordinate column that is needed is not mapped.
+    MappingCoordinateMissing => "mapping.coordinate.missing", Error, Some(WizardStep::Mapping);
+    /// A coordinate column is typed as something other than a number.
+    MappingCoordinateNotNumeric => "mapping.coordinate.not_numeric", Error, Some(WizardStep::Mapping);
+    /// The shape cannot be built from this kind of file.
+    MappingKindUnsupported => "mapping.kind.unsupported", Error, Some(WizardStep::File);
+    /// No column is set as the line identifier.
+    MappingLineIdMissing => "mapping.line_id.missing", Error, Some(WizardStep::Mapping);
+    /// Several columns have the same role.
+    MappingRoleDuplicate => "mapping.role.duplicate", Error, Some(WizardStep::Mapping);
+    /// The same column is mapped more than once.
+    MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
+    /// The mapping names a column that is not in the file.
+    MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
     /// The EPSG code is not in the list of known coordinate systems.
     CrsEpsgUnknown => "crs.epsg.unknown", Error, Some(WizardStep::Crs);
     /// X and Y fit latitude and longitude only if they are swapped.

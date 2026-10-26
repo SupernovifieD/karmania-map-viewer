@@ -241,6 +241,78 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Start with 0, end with the number of vertices, and never go backwards.
 - Example: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3).
 
+## `mapping.block_size.invalid`
+
+- Severity: error
+- Step: mapping
+- Message: The block size must be greater than 0 in all three directions, but it is {dx} x {dy} x {dz}.
+- Hint: Use positive numbers, such as 10 for 10-metre blocks.
+- Example: The block size must be greater than 0 in all three directions, but it is 10 x 0 x 5.
+
+## `mapping.block_size.missing`
+
+- Severity: error
+- Step: mapping
+- Message: The block size is missing.
+- Hint: Enter the size of a block along X, Y and Z.
+- Example: The block size is missing.
+
+## `mapping.coordinate.missing`
+
+- Severity: error
+- Step: mapping
+- Message: No column is set as {X (easting or longitude), Y (northing or latitude) or Z (elevation)}.
+- Hint: Choose the column that holds this coordinate.
+- Example: No column is set as X (easting or longitude).
+
+## `mapping.coordinate.not_numeric`
+
+- Severity: error
+- Step: mapping
+- Message: The column "{name}" is set as {X, Y or Z} but its type is {type}; coordinates must be numbers.
+- Hint: Set the column's type to float or int, or choose another column.
+- Example: The column "E" is set as X (easting or longitude) but its type is text; coordinates must be numbers.
+
+## `mapping.kind.unsupported`
+
+- Severity: error
+- Step: file
+- Message: A CSV file can be imported as points, lines or a block model, not as {kind}.
+- Hint: Choose points, lines or a block model.
+- Example: A CSV file can be imported as points, lines or a block model, not as grid.
+
+## `mapping.line_id.missing`
+
+- Severity: error
+- Step: mapping
+- Message: No column is set as the line identifier, so rows cannot be grouped into lines.
+- Hint: Choose the column that says which line each row belongs to.
+- Example: No column is set as the line identifier, so rows cannot be grouped into lines.
+
+## `mapping.role.duplicate`
+
+- Severity: error
+- Step: mapping
+- Message: More than one column is set as {role}.
+- Hint: Keep one column for this role and set the others to attribute or ignore.
+- Example: More than one column is set as X (easting or longitude).
+
+## `mapping.source.duplicate`
+
+- Severity: error
+- Step: mapping
+- Message: The column "{name}" is mapped more than once.
+- Hint: Give each column of the file one role.
+- Example: The column "N" is mapped more than once.
+
+## `mapping.source.unknown`
+
+- Severity: error
+- Step: mapping
+- Message: The mapping refers to a column that is not in the file: "{name}".
+- Hint: Check the column names, or map the columns again.
+- Example: The mapping refers to a column that is not in the file: "Au".
+
 ## `mesh.indices.incomplete`
 
 - Severity: error
