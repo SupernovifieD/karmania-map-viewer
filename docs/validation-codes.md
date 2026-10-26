@@ -41,6 +41,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Use fewer {things}, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
 
+## `lines.offsets.bad_end`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each line starts must end with the number of vertices ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each line starts must end with the number of vertices (5), but it ends with 4.
+
+## `lines.offsets.bad_start`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each line starts must start with 0, but it starts with {actual}.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each line starts must start with 0, but it starts with 1.
+
+## `lines.offsets.decreasing`
+
+- Severity: error
+- Step: none
+- Message: Some lines end before they start.
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: Some lines end before they start.
+
+## `lines.offsets.empty`
+
+- Severity: error
+- Step: none
+- Message: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices ({expected}).
+- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Example: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3).
+
 ## `table.column.length_mismatch`
 
 - Severity: error
