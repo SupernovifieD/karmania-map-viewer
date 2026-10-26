@@ -45,6 +45,20 @@ impl Kind {
             Kind::Blocks => "blocks",
         }
     }
+
+    /// What one element of this shape is called, in the plural, for messages:
+    /// `points`, `lines`, `polygons`, `triangles`, `cells` or `blocks`.
+    #[must_use]
+    pub const fn element_name(self) -> &'static str {
+        match self {
+            Kind::Points => "points",
+            Kind::Lines => "lines",
+            Kind::Polygons => "polygons",
+            Kind::Mesh => "triangles",
+            Kind::Grid => "cells",
+            Kind::Blocks => "blocks",
+        }
+    }
 }
 
 /// An identifier for a dataset, assigned by whoever holds the datasets (the
@@ -96,6 +110,19 @@ impl Geometry {
             Geometry::Mesh(mesh) => mesh.positions.has_z(),
             Geometry::Grid(grid) => grid.has_z(),
             Geometry::Blocks(_) => true,
+        }
+    }
+
+    /// The vertex list, for the shapes that have one: points, lines, polygons
+    /// and meshes. `None` for grids and block models.
+    #[must_use]
+    pub fn positions(&self) -> Option<&Positions> {
+        match self {
+            Geometry::Points(positions) => Some(positions),
+            Geometry::Lines(lines) => Some(&lines.positions),
+            Geometry::Polygons(polygons) => Some(&polygons.positions),
+            Geometry::Mesh(mesh) => Some(&mesh.positions),
+            Geometry::Grid(_) | Geometry::Blocks(_) => None,
         }
     }
 
