@@ -2,9 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::bbox::BBox;
 use crate::blocks::Blocks;
+use crate::column::Column;
 use crate::crs::CrsRef;
-use crate::grid::Grid;
+use crate::grid::{Grid, GridZ};
 use crate::lines::Lines;
 use crate::mesh::Mesh;
 use crate::polygons::Polygons;
@@ -141,6 +143,26 @@ fn to_u64(n: usize) -> Option<u64> {
     u64::try_from(n).ok()
 }
 
+/// The bounding box of a grid: the rotated lattice footprint for X and Y, and
+/// for Z the elevation. Elevations come from the column or the flat value; when
+/// there is none to use (missing column, no finite values, or a flat grid with
+/// several layers) the lattice's own Z extent is used.
+fn grid_bbox(grid: &Grid, attributes: &Table) -> Option<BBox> {
+    let footprint = grid.lattice.bbox()?;
+    let z_range = match &grid.z {
+        GridZ::Flat { elevation } if grid.lattice.dims[2] == 1 && elevation.is_finite() => {
+            Some((*elevation, *elevation))
+        }
+        GridZ::FromColumn { name } => attributes.column(name).and_then(Column::finite_range),
+        GridZ::Flat { .. } => None,
+    };
+    let (z_min, z_max) = z_range.unwrap_or((footprint.min[2], footprint.max[2]));
+    Some(BBox {
+        min: [footprint.min[0], footprint.min[1], z_min],
+        max: [footprint.max[0], footprint.max[1], z_max],
+    })
+}
+
 /// Where a dataset came from.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Provenance {
@@ -203,6 +225,25 @@ impl Dataset {
         self.geometry.has_z()
     }
 
+    /// The bounding box in CRS units, computed from the geometry.
+    ///
+    /// Points, lines, polygons and meshes use every position with finite
+    /// coordinates (Z is 0 when the source has none). Grids and block models
+    /// use their rotated lattice; a grid's Z comes from its elevations. Block
+    /// models cover the whole lattice, even when sparse. `None` if there is
+    /// nothing finite to measure.
+    #[must_use]
+    pub fn bbox(&self) -> Option<BBox> {
+        match &self.geometry {
+            Geometry::Points(positions) => BBox::from_points(positions.iter()),
+            Geometry::Lines(lines) => BBox::from_points(lines.positions.iter()),
+            Geometry::Polygons(polygons) => BBox::from_points(polygons.positions.iter()),
+            Geometry::Mesh(mesh) => BBox::from_points(mesh.positions.iter()),
+            Geometry::Grid(grid) => grid_bbox(grid, &self.attributes),
+            Geometry::Blocks(blocks) => blocks.lattice.bbox(),
+        }
+    }
+
     /// The number of elements; see [`Geometry::element_count`].
     #[must_use]
     pub fn element_count(&self) -> Option<u64> {
@@ -227,10 +268,11 @@ impl Dataset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::column::ColumnData;
     use crate::crs::Units;
     use crate::findings::Findings;
-    use crate::grid::GridZ;
     use crate::lattice::Lattice;
+    use crate::validity::Validity;
 
     fn points(z: Option<&[f64]>) -> Geometry {
         let mut findings = Findings::new();
@@ -466,6 +508,140 @@ mod tests {
             indices: vec![0, 1, 2, 0],
         });
         assert_eq!(partial.element_count(), Some(1));
+    }
+
+    fn bbox_of(geometry: Geometry, attributes: Table) -> Option<BBox> {
+        Dataset::new(DatasetId(1), "d", None, geometry, attributes).bbox()
+    }
+
+    fn corners(b: Option<BBox>) -> Option<([f64; 3], [f64; 3])> {
+        b.map(|b| (b.min, b.max))
+    }
+
+    #[test]
+    fn vertex_shapes_use_their_finite_positions_and_z_is_zero_without_z() {
+        let xs = [1.0, f64::NAN, -3.0, 5.0];
+        let ys = [2.0, 0.0, 4.0, -6.0];
+        let mut findings = Findings::new();
+        let p = Positions::from_xyz(&xs, &ys, None, &mut findings).unwrap();
+        let expected = Some(([-3.0, -6.0, 0.0], [5.0, 4.0, 0.0]));
+        assert_eq!(
+            corners(bbox_of(Geometry::Points(p.clone()), Table::empty())),
+            expected
+        );
+        let lines = Geometry::Lines(Lines {
+            positions: p.clone(),
+            offsets: vec![0, 4],
+        });
+        assert_eq!(corners(bbox_of(lines, Table::empty())), expected);
+        let polygons = Geometry::Polygons(Polygons {
+            positions: p.clone(),
+            ring_offsets: vec![0, 4],
+            polygon_offsets: vec![0, 1],
+        });
+        assert_eq!(corners(bbox_of(polygons, Table::empty())), expected);
+        let mesh = Geometry::Mesh(Mesh {
+            positions: p,
+            indices: vec![0, 2, 3],
+        });
+        assert_eq!(corners(bbox_of(mesh, Table::empty())), expected);
+    }
+
+    #[test]
+    fn no_finite_position_means_no_box() {
+        let all_bad = Positions::from_interleaved(vec![f64::NAN; 6], false);
+        assert_eq!(bbox_of(Geometry::Points(all_bad), Table::empty()), None);
+        assert_eq!(
+            bbox_of(Geometry::Points(Positions::default()), Table::empty()),
+            None
+        );
+    }
+
+    fn grid_with(z: GridZ, dims: [u32; 3], rotation: f64) -> Geometry {
+        let lattice = Lattice {
+            origin: [100.0, 200.0, 50.0],
+            spacing: [10.0, 10.0, 10.0],
+            dims,
+            rotation,
+        };
+        Geometry::Grid(Grid { lattice, z })
+    }
+
+    fn column_table(name: &str, data: ColumnData, flags: &[bool]) -> Table {
+        let column = Column::new(name, data, Validity::from_flags(flags.iter().copied())).unwrap();
+        Table::from_columns(vec![column], &mut Findings::new()).unwrap()
+    }
+
+    #[test]
+    fn a_flat_grid_sits_at_its_elevation() {
+        let g = grid_with(flat_at(120.5), [3, 2, 1], 0.0);
+        let expected = Some(([100.0, 200.0, 120.5], [130.0, 220.0, 120.5]));
+        assert_eq!(corners(bbox_of(g, Table::empty())), expected);
+    }
+
+    fn flat_at(elevation: f64) -> GridZ {
+        GridZ::Flat { elevation }
+    }
+
+    #[test]
+    fn a_grid_with_elevations_uses_the_finite_valid_values() {
+        let data = ColumnData::Float64(vec![5.0, f64::NAN, 80.0, -9999.0, 20.0, 1.0]);
+        let table = column_table("z", data, &[true, true, true, false, true, true]);
+        let z = GridZ::FromColumn {
+            name: "z".to_string(),
+        };
+        let b = corners(bbox_of(grid_with(z, [3, 2, 1], 0.0), table));
+        assert_eq!(b, Some(([100.0, 200.0, 1.0], [130.0, 220.0, 80.0])));
+    }
+
+    #[test]
+    fn a_grid_without_usable_elevations_falls_back_to_the_lattice_z_extent() {
+        let z = GridZ::FromColumn {
+            name: "missing".to_string(),
+        };
+        let b = corners(bbox_of(grid_with(z, [3, 2, 1], 0.0), Table::empty()));
+        assert_eq!(b, Some(([100.0, 200.0, 50.0], [130.0, 220.0, 60.0])));
+        // A flat grid with several layers uses the lattice's Z extent too.
+        let layered = corners(bbox_of(
+            grid_with(flat_at(7.0), [3, 2, 4], 0.0),
+            Table::empty(),
+        ));
+        assert_eq!(layered, Some(([100.0, 200.0, 50.0], [130.0, 220.0, 90.0])));
+        // So does a flat grid whose elevation is not a finite number.
+        let nan = corners(bbox_of(
+            grid_with(flat_at(f64::NAN), [3, 2, 1], 0.0),
+            Table::empty(),
+        ));
+        assert_eq!(nan, Some(([100.0, 200.0, 50.0], [130.0, 220.0, 60.0])));
+    }
+
+    #[test]
+    fn a_rotated_grid_uses_the_rotated_footprint() {
+        let b = bbox_of(grid_with(flat_at(1.0), [3, 2, 1], 90.0), Table::empty()).unwrap();
+        // Local 30 x 20 turned 90 degrees about the corner spans x -20..0, y 0..30.
+        assert_eq!((b.min, b.max), ([80.0, 200.0, 1.0], [100.0, 230.0, 1.0]));
+    }
+
+    #[test]
+    fn block_models_cover_the_whole_lattice_even_when_sparse() {
+        let lattice = lattice([4, 2, 3]);
+        let dense = Geometry::Blocks(Blocks { lattice, ijk: None });
+        let sparse = Geometry::Blocks(Blocks {
+            lattice,
+            ijk: Some(vec![0, 0, 0]),
+        });
+        let expected = Some(([0.0, 0.0, 0.0], [4.0, 2.0, 3.0]));
+        assert_eq!(corners(bbox_of(dense, Table::empty())), expected);
+        assert_eq!(corners(bbox_of(sparse, Table::empty())), expected);
+        let bad = Lattice {
+            rotation: f64::NAN,
+            ..lattice
+        };
+        let broken = Geometry::Blocks(Blocks {
+            lattice: bad,
+            ijk: None,
+        });
+        assert_eq!(bbox_of(broken, Table::empty()), None);
     }
 
     #[test]
