@@ -13,4 +13,6 @@
 pub mod delimited;
 #[cfg(test)]
 mod fixtures;
+pub mod infer;
+pub mod numbers;
 pub mod text;
