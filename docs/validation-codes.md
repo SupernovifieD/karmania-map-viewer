@@ -329,6 +329,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Give every property a name.
 - Example: Some features have a property with no name; it was left out.
 
+## `geojson.ring.not_closed`
+
+- Severity: warning
+- Step: file
+- Message: Some polygon rings do not end where they start; they were closed.
+- Hint: In GeoJSON the last position of a ring repeats the first.
+- Example: Some polygon rings do not end where they start; they were closed.
+
 ## `geojson.structure.invalid`
 
 - Severity: error

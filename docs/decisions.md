@@ -516,3 +516,13 @@ was chosen, why.
   (`lines.line.too_short`), as for CSV; a MultiLineString with no parts has no
   lines at all. A file that gives datasets of several kinds names them
   `<file> (points)`, `<file> (lines)`, and so on; with no file name the kind alone.
+- Step 3.14: a Polygon is one polygon and each part of a MultiPolygon is a polygon
+  of its own, with `feature_id` and the feature's properties on each, as for
+  lines. GeoJSON rings are closed (the last position repeats the first) but the
+  core stores them open, so the closing position is dropped only when it repeats
+  the first one in every value, elevation included. A ring that does not close is
+  kept whole and counted in `geojson.ring.not_closed` (a warning, "they were
+  closed", since an open ring is closed implicitly when stored); it is not
+  dropped or repaired beyond that. Empty polygons give nothing, as an empty
+  MultiPoint does; rings with too few vertices are left to validation. Ring
+  orientation is not changed, because the core does not enforce one.
