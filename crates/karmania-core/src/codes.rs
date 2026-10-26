@@ -64,6 +64,10 @@ finding_codes! {
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
     /// The EPSG code is not in the list of known coordinate systems.
     CrsEpsgUnknown => "crs.epsg.unknown", Error, Some(WizardStep::Crs);
+    /// X and Y fit latitude and longitude only if they are swapped.
+    CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
+    /// Some coordinates are outside the range of longitude and latitude.
+    CrsGeographicOutOfRange => "crs.geographic.out_of_range", Error, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.
