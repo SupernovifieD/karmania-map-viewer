@@ -118,6 +118,8 @@ finding_codes! {
     PolygonsRingOffsetsEmpty => "polygons.ring_offsets.empty", Error, None;
     /// Some rings have fewer than three vertices.
     PolygonsRingTooShort => "polygons.ring.too_short", Error, None;
+    /// Some coordinates are not finite numbers.
+    ValuesCoordinatesNotFinite => "values.coordinates.not_finite", Error, None;
     /// A table column has a different number of rows from the first column.
     TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.
