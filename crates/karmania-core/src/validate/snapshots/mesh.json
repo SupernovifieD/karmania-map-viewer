@@ -1,0 +1,61 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": [
+        {
+          "code": "mesh.indices.incomplete",
+          "severity": "error",
+          "message": "The triangle list ends with an incomplete triangle: it has 10 vertex numbers, which is not a multiple of 3.",
+          "hint": "Give three vertex numbers for every triangle.",
+          "count": 1,
+          "examples": []
+        },
+        {
+          "code": "mesh.indices.out_of_range",
+          "severity": "error",
+          "message": "Some triangles use vertex numbers that do not exist: the mesh has 5 vertices.",
+          "hint": "Vertex numbers start at 0 and must be lower than the number of vertices.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 2,
+              "vertex": 9
+            }
+          ]
+        },
+        {
+          "code": "mesh.triangle.degenerate",
+          "severity": "warning",
+          "message": "Some triangles have no area: two corners are the same point, or all three are in a straight line.",
+          "hint": "Remove those triangles; they cannot be shaded.",
+          "count": 1,
+          "examples": [
+            {
+              "element": 1
+            }
+          ]
+        },
+        {
+          "code": "mesh.vertices.unused",
+          "severity": "info",
+          "message": "Some vertices are not used by any triangle.",
+          "count": 1,
+          "examples": [
+            {
+              "vertex": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "findings": []
+    },
+    {
+      "name": "crs",
+      "findings": []
+    }
+  ]
+}

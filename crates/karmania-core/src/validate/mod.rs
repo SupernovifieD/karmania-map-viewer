@@ -9,6 +9,8 @@ mod attribute_rows;
 mod crs_checks;
 mod offset_lists;
 mod projected;
+#[cfg(test)]
+mod snapshots;
 mod sparse_blocks;
 mod structure;
 #[cfg(test)]

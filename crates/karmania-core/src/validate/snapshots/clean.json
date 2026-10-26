@@ -1,0 +1,16 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": []
+    },
+    {
+      "name": "values",
+      "findings": []
+    },
+    {
+      "name": "crs",
+      "findings": []
+    }
+  ]
+}

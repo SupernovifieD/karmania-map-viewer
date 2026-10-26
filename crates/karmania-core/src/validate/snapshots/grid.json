@@ -1,0 +1,43 @@
+{
+  "groups": [
+    {
+      "name": "structure",
+      "findings": [
+        {
+          "code": "lattice.spacing.invalid",
+          "severity": "error",
+          "message": "The cell size of the grid must be greater than 0 on every axis, but it is 10 x 0 x 10.",
+          "hint": "Use a positive cell size, such as 10 for 10-metre cells.",
+          "count": 1,
+          "examples": []
+        },
+        {
+          "code": "dataset.attributes.rows_mismatch",
+          "severity": "error",
+          "message": "The attribute table has 11 rows, but the dataset has 12 cells.",
+          "hint": "Give every one of the cells exactly one value in each column.",
+          "count": 1,
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "values",
+      "findings": []
+    },
+    {
+      "name": "crs",
+      "findings": [
+        {
+          "code": "crs.epsg.unknown",
+          "severity": "error",
+          "message": "The EPSG code 99999 is not in the list of coordinate systems this tool knows.",
+          "hint": "Check the code. For example, 4326 is WGS 84 and 32640 is WGS 84 / UTM zone 40N.",
+          "count": 1,
+          "examples": [],
+          "step": "crs"
+        }
+      ]
+    }
+  ]
+}
