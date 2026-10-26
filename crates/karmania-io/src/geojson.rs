@@ -12,35 +12,21 @@
 //!   three and are counted;
 //! - if only some positions have an elevation, the elevations are ignored.
 //!
+//! The shapes themselves are in [`crate::geojson_shapes`].
+//!
 //! GeoJSON has no column mapping: the shape of the data decides the kind of
 //! dataset. A file with no coordinate system is read as WGS 84 longitude and
 //! latitude, as RFC 7946 says, with an info finding saying so.
 
 use std::collections::BTreeMap;
 
-use karmania_core::{
-    CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Location, Positions,
-    Provenance, Table, check_size,
-};
+use karmania_core::{Dataset, Finding, FindingCode, Findings, Location};
 use serde_json::error::Category;
 use serde_json::{Map, Value};
 
-use crate::geojson_properties::{Properties, property_columns};
+use crate::geojson_properties::Properties;
+use crate::geojson_shapes::{GEOMETRY_TYPES, Parsed, PointsAcc, parse_geometry};
 use crate::output::{ReadOutput, Tally};
-
-/// The coordinate system GeoJSON uses unless the file says otherwise (RFC 7946).
-const WGS84: CrsRef = CrsRef::Epsg { code: 4326 };
-
-/// Every geometry type GeoJSON defines.
-const GEOMETRY_TYPES: [&str; 7] = [
-    "Point",
-    "MultiPoint",
-    "LineString",
-    "MultiLineString",
-    "Polygon",
-    "MultiPolygon",
-    "GeometryCollection",
-];
 
 /// One feature (or a bare geometry): where it is in the file, its geometry and
 /// its properties.
@@ -63,67 +49,12 @@ impl<'a> Item<'a> {
     }
 }
 
-/// One position of a geometry.
-struct Position {
-    x: f64,
-    y: f64,
-    z: Option<f64>,
-    /// True if the position had more than three values.
-    extra: bool,
-}
-
-fn position(value: &Value) -> Option<Position> {
-    let items = value.as_array()?;
-    if items.len() < 2 {
-        return None;
-    }
-    let mut numbers = [0.0f64; 3];
-    for (slot, item) in numbers.iter_mut().zip(items) {
-        *slot = item.as_f64()?;
-    }
-    Some(Position {
-        x: numbers[0],
-        y: numbers[1],
-        z: (items.len() >= 3).then_some(numbers[2]),
-        extra: items.len() > 3,
-    })
-}
-
-/// What a geometry turned out to be.
-enum Parsed {
-    Points(Vec<Position>),
-    /// A valid GeoJSON type this reader does not import.
-    Unsupported(&'static str),
-    Invalid,
-}
-
-fn parse_geometry(geometry: &Value) -> Parsed {
-    let Some(kind) = geometry.get("type").and_then(Value::as_str) else {
-        return Parsed::Invalid;
-    };
-    let coordinates = geometry.get("coordinates");
-    match kind {
-        "Point" => coordinates
-            .and_then(position)
-            .map_or(Parsed::Invalid, |p| Parsed::Points(vec![p])),
-        "MultiPoint" => coordinates
-            .and_then(Value::as_array)
-            .and_then(|list| list.iter().map(position).collect::<Option<Vec<_>>>())
-            .map_or(Parsed::Invalid, Parsed::Points),
-        other => GEOMETRY_TYPES
-            .iter()
-            .find(|known| **known == other)
-            .map_or(Parsed::Invalid, |known| Parsed::Unsupported(known)),
-    }
-}
-
 /// Features left out, and values ignored, counted by reason.
 struct Skips {
     not_a_feature: Tally,
     no_geometry: Tally,
     unsupported: BTreeMap<&'static str, Tally>,
     invalid_geometry: Tally,
-    extra_values: Tally,
 }
 
 impl Skips {
@@ -148,10 +79,6 @@ impl Skips {
                 )
                 .with_hint("Check that the coordinates are lists of numbers (longitude, latitude and optionally elevation)."),
             ),
-            extra_values: Tally::new(Finding::new(
-                FindingCode::GeojsonPositionExtraValues,
-                "Some positions have more than three values (such as a measure); only the first three were used.",
-            )),
         }
     }
 
@@ -176,108 +103,11 @@ impl Skips {
         let tallies = [self.not_a_feature, self.no_geometry]
             .into_iter()
             .chain(self.unsupported.into_values())
-            .chain([self.invalid_geometry, self.extra_values]);
+            .chain([self.invalid_geometry]);
         for finding in tallies.filter_map(Tally::into_finding) {
             findings.add(finding);
         }
     }
-}
-
-/// The points of a file, with the features they came from.
-struct PointsAcc<'a> {
-    x: Vec<f64>,
-    y: Vec<f64>,
-    z: Vec<f64>,
-    with_z: usize,
-    without_z: Tally,
-    /// For each point, the position in `features` of the feature it belongs to.
-    rows: Vec<usize>,
-    features: Vec<Properties<'a>>,
-}
-
-impl<'a> PointsAcc<'a> {
-    fn new() -> Self {
-        Self {
-            x: Vec::new(),
-            y: Vec::new(),
-            z: Vec::new(),
-            with_z: 0,
-            without_z: Tally::new(
-                Finding::new(
-                    FindingCode::GeojsonZPartial,
-                    "Some positions have no elevation, so the elevations of the others were ignored.",
-                )
-                .with_hint("Give every position an elevation, or none."),
-            ),
-            rows: Vec::new(),
-            features: Vec::new(),
-        }
-    }
-
-    fn add(&mut self, item: &Item<'a>, positions: &[Position], skips: &mut Skips) {
-        if positions.is_empty() {
-            return;
-        }
-        let slot = self.features.len();
-        self.features.push(item.properties());
-        for p in positions {
-            self.x.push(p.x);
-            self.y.push(p.y);
-            match p.z {
-                Some(z) => {
-                    self.z.push(z);
-                    self.with_z += 1;
-                }
-                None => {
-                    self.z.push(0.0);
-                    self.without_z.hit(item.at());
-                }
-            }
-            if p.extra {
-                skips.extra_values.hit(item.at());
-            }
-            self.rows.push(slot);
-        }
-    }
-
-    fn finish(self, file_name: Option<&str>, findings: &mut Findings) -> Option<Dataset> {
-        if self.x.is_empty() {
-            return None;
-        }
-        if !check_size(Some(self.x.len() as u64), "points", findings) {
-            return None;
-        }
-        let has_z = self.with_z == self.x.len();
-        if self.with_z > 0
-            && !has_z
-            && let Some(finding) = self.without_z.into_finding()
-        {
-            findings.add(finding);
-        }
-        let positions =
-            Positions::from_xyz(&self.x, &self.y, has_z.then_some(&self.z[..]), findings)?;
-        let columns = property_columns(&self.features, &self.rows, findings);
-        let attributes = Table::from_columns(columns, findings)?;
-        let mut dataset = Dataset::new(
-            DatasetId(0),
-            name_of(file_name, "points"),
-            Some(WGS84),
-            Geometry::Points(positions),
-            attributes,
-        );
-        dataset.provenance = Provenance {
-            source_file_name: file_name.map(str::to_string),
-        };
-        Some(dataset)
-    }
-}
-
-/// The dataset name: the file's name, or `fallback` if there is none.
-fn name_of(file_name: Option<&str>, fallback: &str) -> String {
-    file_name
-        .filter(|n| !n.trim().is_empty())
-        .unwrap_or(fallback)
-        .to_string()
 }
 
 /// Reads a GeoJSON file into datasets.
@@ -313,7 +143,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
             continue;
         };
         match parse_geometry(geometry) {
-            Parsed::Points(positions) => points.add(item, &positions, &mut skips),
+            Parsed::Points(positions) => points.add(item.properties(), &positions),
             Parsed::Unsupported(kind) => skips.unsupported(kind, item.at()),
             Parsed::Invalid => skips.invalid_geometry.hit(item.at()),
         }
@@ -442,7 +272,7 @@ fn feature(value: &Value, index: u64) -> Option<Item<'_>> {
 mod tests {
     use super::*;
     use crate::fixtures;
-    use karmania_core::{ColumnType, Kind, Value as Cell};
+    use karmania_core::{ColumnType, CrsRef, Geometry, Kind, Positions, Value as Cell};
     use serde_json::json;
 
     fn codes(out: &ReadOutput) -> Vec<&'static str> {
