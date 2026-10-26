@@ -9,6 +9,30 @@ severity or step disagrees with the registry, or if this file lists a code that
 is not registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
+## `blocks.ijk.duplicate`
+
+- Severity: error
+- Step: none
+- Message: Some blocks are listed more than once.
+- Hint: List each block once.
+- Example: Some blocks are listed more than once.
+
+## `blocks.ijk.incomplete`
+
+- Severity: error
+- Step: none
+- Message: The list of block positions ends with an incomplete triplet: it has {count} numbers, which is not a multiple of 3.
+- Hint: Give three numbers (i, j, k) for every block.
+- Example: The list of block positions ends with an incomplete triplet: it has 5 numbers, which is not a multiple of 3.
+
+## `blocks.ijk.out_of_range`
+
+- Severity: error
+- Step: none
+- Message: Some blocks are outside the model, which has {nx} x {ny} x {nz} cells.
+- Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
+- Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
+
 ## `dataset.coordinates.incomplete`
 
 - Severity: error

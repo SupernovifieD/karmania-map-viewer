@@ -52,6 +52,12 @@ macro_rules! finding_codes {
 }
 
 finding_codes! {
+    /// Some blocks are listed more than once.
+    BlocksIjkDuplicate => "blocks.ijk.duplicate", Error, None;
+    /// The block list ends with an incomplete i, j, k triplet.
+    BlocksIjkIncomplete => "blocks.ijk.incomplete", Error, None;
+    /// Some blocks are outside the lattice.
+    BlocksIjkOutOfRange => "blocks.ijk.out_of_range", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
     /// The X, Y and Z coordinate lists have different lengths.

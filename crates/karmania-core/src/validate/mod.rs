@@ -7,6 +7,7 @@
 
 mod crs_checks;
 mod offset_lists;
+mod sparse_blocks;
 mod structure;
 #[cfg(test)]
 mod testutil;
