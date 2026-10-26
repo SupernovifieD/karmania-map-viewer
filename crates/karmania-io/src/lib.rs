@@ -30,6 +30,7 @@ pub mod obj;
 mod output;
 pub mod preview;
 pub mod prj;
+pub mod registry;
 pub mod roles;
 pub mod text;
 
