@@ -23,6 +23,7 @@ pub mod polygons;
 pub mod positions;
 pub mod table;
 pub mod text;
+pub mod validate;
 pub mod validity;
 
 pub use bbox::BBox;
@@ -40,6 +41,7 @@ pub use mesh::Mesh;
 pub use polygons::Polygons;
 pub use positions::Positions;
 pub use table::Table;
+pub use validate::{CheckGroup, ValidationReport, validate};
 pub use validity::Validity;
 
 #[cfg(test)]

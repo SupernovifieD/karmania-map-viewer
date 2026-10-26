@@ -88,7 +88,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 
 ## M2: Validation (karmania-core)
 
-- [ ] 2.1 `validate(&Dataset) -> ValidationReport`: an ordered list of check
+- [x] 2.1 `validate(&Dataset) -> ValidationReport`: an ordered list of check
   groups; `is_loadable()`; deterministic ordering.
 - [ ] 2.2 Structure: non-empty geometry; positions length is a multiple of 3.
 - [ ] 2.3 Structure: line offsets (length L+1, start 0, end = vertex count,
