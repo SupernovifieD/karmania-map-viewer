@@ -25,6 +25,30 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: A grid file starts with ncols, nrows, xllcorner (or xllcenter), yllcorner (or yllcenter) and cellsize.
 - Example: The grid header is missing ncols and nrows.
 
+## `asc.values.count`
+
+- Severity: error
+- Step: file
+- Message: The grid has {n} values, but its header says {ncols} x {nrows} = {cells}.
+- Hint: Check that ncols and nrows in the header match the values.
+- Example: The grid has 11 values, but its header says 4 x 3 = 12.
+
+## `asc.values.nodata`
+
+- Severity: warning
+- Step: nodata
+- Message: Some cells have no data, so they were left empty.
+- Hint: none
+- Example: Some cells have no data, so they were left empty.
+
+## `asc.values.unreadable`
+
+- Severity: warning
+- Step: file
+- Message: Some cells could not be read as numbers, so they were left empty.
+- Hint: Check the file for stray text among the values.
+- Example: Some cells could not be read as numbers, so they were left empty.
+
 ## `blocks.ijk.duplicate`
 
 - Severity: error

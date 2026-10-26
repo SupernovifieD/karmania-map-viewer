@@ -186,7 +186,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   names an EPSG code.
 - [x] 3.16 ESRI ASCII grid header: ncols, nrows, xllcorner or xllcenter,
   yllcorner or yllcenter, cellsize or dx/dy, NODATA_value.
-- [ ] 3.17 ESRI ASCII grid values: flip rows to south-first; normalize centre
+- [x] 3.17 ESRI ASCII grid values: flip rows to south-first; normalize centre
   registration to corner; check value count; nodata to null with a warning
   count.
 - [ ] 3.18 OBJ mesh: v and f records, 1-based and negative indices, fan

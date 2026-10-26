@@ -9,10 +9,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use karmania_core::{Finding, FindingCode, Findings, Location};
+use karmania_core::text::format_count;
+use karmania_core::{
+    Column, ColumnData, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Grid, GridZ,
+    Lattice, Location, Provenance, Table, Validity, check_size,
+};
 
-use crate::numbers::{DecimalSeparator, parse_number};
-use crate::output::join_and;
+use crate::numbers::{DecimalSeparator, is_missing_token, parse_number};
+use crate::output::{ReadOutput, Tally, join_and};
 
 /// The header of an ESRI ASCII grid.
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +240,144 @@ pub fn read_header(text: &str, findings: &mut Findings) -> Option<AscHeader> {
     })
 }
 
+/// The name of the column that holds the cell values.
+const VALUE_COLUMN: &str = "value";
+
+/// Whether `value` is the header's "no data" value. Values written with fewer
+/// digits than a huge nodata value (-3.4e38 for single precision floats) still
+/// count.
+fn is_nodata(value: f64, nodata: Option<f64>) -> bool {
+    nodata.is_some_and(|nodata| {
+        value == nodata || (nodata.abs() > 1e30 && (value - nodata).abs() <= nodata.abs() * 1e-6)
+    })
+}
+
+/// Reads an ESRI ASCII grid into a grid dataset.
+///
+/// The cell values go into one column, `value`, in lattice order: the first row
+/// of the file is the northernmost, so the rows are put in south-to-north order.
+/// Cells with the header's nodata value, or a word such as `NaN`, are null and
+/// counted; values that are not numbers are null and counted separately. The
+/// number of values must be `ncols` times `nrows`. The coordinate system is left
+/// unset (a `.prj` file next to the grid may give it), and the cell elevations
+/// are flat at 0 until the user says the values are elevations.
+#[must_use]
+pub fn read_asc(text: &str, file_name: Option<&str>) -> ReadOutput {
+    let mut findings = Findings::new();
+    let dataset = read(text, file_name, &mut findings);
+    ReadOutput {
+        datasets: if findings.has_errors() {
+            Vec::new()
+        } else {
+            dataset.into_iter().collect()
+        },
+        findings,
+    }
+}
+
+fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<Dataset> {
+    let header = read_header(text, findings)?;
+    let (columns, rows) = (header.columns as usize, header.rows as usize);
+    let expected = u64::from(header.columns) * u64::from(header.rows);
+    if !check_size(Some(expected), "cells", findings) {
+        return None;
+    }
+    let expected = expected as usize;
+    let mut values = vec![0.0f64; expected];
+    let mut valid = vec![true; expected];
+    let mut no_data = Tally::new(Finding::new(
+        FindingCode::AscValuesNodata,
+        "Some cells have no data, so they were left empty.",
+    ));
+    let mut unreadable = Tally::new(
+        Finding::new(
+            FindingCode::AscValuesUnreadable,
+            "Some cells could not be read as numbers, so they were left empty.",
+        )
+        .with_hint("Check the file for stray text among the values."),
+    );
+    let mut seen = 0usize;
+    for (index, line) in text.lines().enumerate().skip(header.header_lines) {
+        for token in line.split_ascii_whitespace() {
+            let n = seen;
+            seen += 1;
+            if n >= expected {
+                continue;
+            }
+            // The file lists the northernmost row first; the lattice starts in the south.
+            let (row, column) = (n / columns, n % columns);
+            let south_row = rows - 1 - row;
+            let slot = south_row * columns + column;
+            let at = Location::default().with_line(index as u64 + 1).with_cell([
+                column as u32,
+                south_row as u32,
+                0,
+            ]);
+            match parse_number(token, DecimalSeparator::Point) {
+                Some(v) if !is_nodata(v, header.nodata) => values[slot] = v,
+                Some(_) => {
+                    valid[slot] = false;
+                    no_data.hit(at);
+                }
+                None if is_missing_token(token) => {
+                    valid[slot] = false;
+                    no_data.hit(at);
+                }
+                None => {
+                    valid[slot] = false;
+                    unreadable.hit(at);
+                }
+            }
+        }
+    }
+    if seen != expected {
+        findings.add(
+            Finding::new(
+                FindingCode::AscValuesCount,
+                format!(
+                    "The grid has {} values, but its header says {} x {} = {}.",
+                    format_count(seen as u64),
+                    format_count(u64::from(header.columns)),
+                    format_count(u64::from(header.rows)),
+                    format_count(expected as u64),
+                ),
+            )
+            .with_hint("Check that ncols and nrows in the header match the values."),
+        );
+        return None;
+    }
+    for tally in [unreadable, no_data] {
+        if let Some(finding) = tally.into_finding() {
+            findings.add(finding);
+        }
+    }
+    let column = Column::new(
+        VALUE_COLUMN,
+        ColumnData::Float64(values),
+        Validity::from_flags(valid),
+    )
+    .ok()?;
+    let attributes = Table::from_columns(vec![column], findings)?;
+    let grid = Grid {
+        lattice: Lattice {
+            origin: [header.origin[0], header.origin[1], 0.0],
+            spacing: [header.cell_size[0], header.cell_size[1], 1.0],
+            dims: [header.columns, header.rows, 1],
+            rotation: 0.0,
+        },
+        z: GridZ::Flat { elevation: 0.0 },
+    };
+    let name = file_name
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or("grid")
+        .to_string();
+    let mut dataset = Dataset::new(DatasetId(0), name, None, Geometry::Grid(grid), attributes);
+    dataset.provenance = Provenance {
+        source_file_name: file_name.map(str::to_string),
+    };
+    Some(dataset)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,5 +568,221 @@ mod tests {
         assert!(h.is_none());
         let h = header("ncols 1\nnrows 1\nxllcorner 1e308\nyllcorner -1e308\ncellsize 1e-320\n").0;
         assert_eq!(h.unwrap().cell_size, [1e-320, 1e-320]);
+    }
+
+    use karmania_core::{Kind, Value as Cell};
+
+    /// A grid file with the given size, extra header lines and body.
+    fn grid_file(columns: u32, rows: u32, extra_header: &str, body: &str) -> String {
+        format!(
+            "ncols {columns}\nnrows {rows}\nxllcorner 100\nyllcorner 200\ncellsize 5\n{extra_header}{body}\n"
+        )
+    }
+
+    fn values(d: &Dataset) -> Vec<Option<f64>> {
+        let column = d.attributes.column("value").unwrap();
+        (0..column.len())
+            .map(|i| match column.get(i) {
+                Some(Cell::Float64(v)) => Some(v),
+                None => None,
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect()
+    }
+
+    fn grid_of(d: &Dataset) -> &Grid {
+        let Geometry::Grid(g) = &d.geometry else {
+            panic!("not a grid")
+        };
+        g
+    }
+
+    #[test]
+    fn the_sample_becomes_a_grid_with_the_southern_row_first() {
+        let out = read_asc(&fixtures::text("grid.asc"), Some("grid.asc"));
+        let d = &out.datasets[0];
+        assert_eq!(
+            (d.name.as_str(), d.kind(), d.has_z(), d.element_count()),
+            ("grid.asc", Kind::Grid, false, Some(12))
+        );
+        assert_eq!(d.crs, None);
+        assert_eq!(d.provenance.source_file_name.as_deref(), Some("grid.asc"));
+        let g = grid_of(d);
+        assert_eq!(g.lattice.dims, [4, 3, 1]);
+        assert_eq!(g.lattice.origin, [500_000.0, 2_765_000.0, 0.0]);
+        assert_eq!(g.lattice.spacing, [10.0, 10.0, 1.0]);
+        assert_eq!(g.z, GridZ::Flat { elevation: 0.0 });
+        // The last row of the file is the first row of the grid.
+        assert_eq!(
+            values(d),
+            [
+                Some(30.0),
+                Some(31.0),
+                Some(32.0),
+                Some(33.0),
+                Some(20.0),
+                Some(21.0),
+                None,
+                Some(23.0),
+                Some(10.0),
+                Some(11.0),
+                Some(12.0),
+                Some(13.0),
+            ]
+        );
+        assert_eq!(codes(&out.findings), ["asc.values.nodata"]);
+        // The one nodata cell is on file line 8, column 3 of 4, in the middle row.
+        let f = &out.findings.as_slice()[0];
+        assert_eq!(
+            (f.count, f.examples[0].line, f.examples[0].cell),
+            (1, Some(8), Some([2, 1, 0]))
+        );
+        // The grid is otherwise valid; the coordinate system comes from the wizard
+        // or a .prj file.
+        let report = karmania_core::validate(d);
+        let problems: Vec<_> = report.findings().map(|f| f.code.as_str()).collect();
+        assert_eq!(problems, ["crs.missing"]);
+    }
+
+    #[test]
+    fn a_centre_registered_grid_is_moved_to_the_corner() {
+        let text = "ncols 2\nnrows 1\nxllcenter 105\nyllcenter 202.5\ncellsize 5\n1 2\n";
+        let out = read_asc(text, None);
+        assert_eq!(
+            grid_of(&out.datasets[0]).lattice.origin,
+            [102.5, 200.0, 0.0]
+        );
+        assert_eq!(out.datasets[0].name, "grid");
+    }
+
+    #[test]
+    fn values_may_be_split_across_lines_any_way_and_lines_end_any_way() {
+        let text = "ncols 3\r\nnrows 2\r\nxllcorner 0\r\nyllcorner 0\r\ncellsize 1\r\n1 2\r\n3\t4  5   \r\n\r\n6\r\n\r\n";
+        let out = read_asc(text, None);
+        assert!(out.findings.is_empty());
+        // Rows 1 2 3 and 4 5 6 from the north, so the grid starts with 4 5 6.
+        assert_eq!(
+            values(&out.datasets[0]),
+            [4.0, 5.0, 6.0, 1.0, 2.0, 3.0].map(Some)
+        );
+    }
+
+    #[test]
+    fn the_wrong_number_of_values_is_an_error_with_both_numbers() {
+        let cases = [
+            (grid_file(3, 2, "", "1 2 3\n4 5"), "5", "3 x 2 = 6"),
+            (grid_file(2, 2, "", "1 2\n3 4\n5"), "5", "2 x 2 = 4"),
+            (grid_file(2, 2, "", ""), "0", "2 x 2 = 4"),
+        ];
+        for (text, seen, expected) in cases {
+            let out = read_asc(&text, None);
+            assert!(out.datasets.is_empty(), "{text}");
+            assert_eq!(codes(&out.findings), ["asc.values.count"], "{text}");
+            assert_eq!(
+                out.findings.as_slice()[0].message,
+                format!("The grid has {seen} values, but its header says {expected}.")
+            );
+        }
+        // The header with no values at all (not even a trailing newline).
+        let out = read_asc(
+            "ncols 1\nnrows 1\nxllcorner 0\nyllcorner 0\ncellsize 1",
+            None,
+        );
+        assert_eq!(codes(&out.findings), ["asc.values.count"]);
+    }
+
+    #[test]
+    fn words_for_no_data_and_unreadable_values_are_counted_apart() {
+        let out = read_asc(
+            &grid_file(3, 3, "", "1 abc 1,5\n1e999 0x10 NaN\nnan NA -"),
+            None,
+        );
+        assert_eq!(
+            codes(&out.findings),
+            ["asc.values.unreadable", "asc.values.nodata"]
+        );
+        let counts: Vec<_> = out.findings.iter().map(|f| f.count).collect();
+        assert_eq!(counts, [4, 4]);
+        // Only the 1 is a number; it is in the northernmost row, so the last row of the grid.
+        let v = values(&out.datasets[0]);
+        assert_eq!(v.iter().flatten().count(), 1);
+        assert_eq!(v[6], Some(1.0));
+        let lines: Vec<_> = out.findings.as_slice()[0]
+            .examples
+            .iter()
+            .map(|l| l.line)
+            .collect();
+        assert_eq!(lines, [Some(6), Some(6), Some(7), Some(7)]);
+    }
+
+    #[test]
+    fn the_nodata_value_matches_however_it_is_written() {
+        let out = read_asc(
+            &grid_file(
+                4,
+                1,
+                "NODATA_value -9999\n",
+                "-9999 -9999.0 -9999.5 -9.999e3",
+            ),
+            None,
+        );
+        assert_eq!(values(&out.datasets[0]), [None, None, Some(-9999.5), None]);
+
+        // A huge nodata value written with fewer digits still matches.
+        let out = read_asc(
+            &grid_file(
+                3,
+                1,
+                "NODATA_value -3.4028234663852886e+38\n",
+                "-3.4028235e+38 5 -3.4e38",
+            ),
+            None,
+        );
+        assert_eq!(values(&out.datasets[0]), [None, Some(5.0), Some(-3.4e38)]);
+    }
+
+    #[test]
+    fn without_a_nodata_line_every_number_is_a_value() {
+        let out = read_asc(&grid_file(2, 1, "", "-9999 7"), None);
+        assert!(out.findings.is_empty());
+        assert_eq!(values(&out.datasets[0]), [Some(-9999.0), Some(7.0)]);
+    }
+
+    #[test]
+    fn extreme_values_are_kept() {
+        let out = read_asc(&grid_file(3, 1, "", "1e300 -1e-300 5e-324"), None);
+        assert_eq!(
+            values(&out.datasets[0]),
+            [Some(1e300), Some(-1e-300), Some(5e-324)]
+        );
+    }
+
+    #[test]
+    fn a_grid_that_is_too_big_is_refused_before_anything_is_allocated() {
+        for (columns, rows) in [(20_000, 20_000), (u32::MAX, u32::MAX)] {
+            let out = read_asc(&grid_file(columns, rows, "", "1 2 3"), None);
+            assert!(out.datasets.is_empty());
+            assert_eq!(
+                codes(&out.findings),
+                ["dataset.too_large"],
+                "{columns} x {rows}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_header_problem_gives_no_dataset_and_no_value_findings() {
+        let out = read_asc("ncols 2\nnrows 2\n1 2\n3 4\n", None);
+        assert!(out.datasets.is_empty());
+        assert_eq!(codes(&out.findings), ["asc.header.missing"]);
+    }
+
+    #[test]
+    fn reading_twice_gives_the_same_result() {
+        let text = fixtures::text("grid.asc");
+        assert_eq!(
+            read_asc(&text, Some("g.asc")),
+            read_asc(&text, Some("g.asc"))
+        );
     }
 }

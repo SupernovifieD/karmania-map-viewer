@@ -549,3 +549,20 @@ was chosen, why.
   value is not also reported as missing. `ncols` and `nrows` must be whole numbers
   of at least 1 and `cellsize` must be above 0. Without `NODATA_value` there is no
   nodata value; -9999 is not assumed. The codes use the new area `asc`.
+- Step 3.17: `read_asc` makes a grid dataset with one `value` column in lattice
+  order. The file lists the northernmost row first, so the rows are reversed to
+  the south-first order of the lattice; the lattice origin is the outer corner of
+  the lower-left cell (a centre position was already moved to it by the header
+  step), `z` spacing is 1 and the elevation is flat at 0, since only the user
+  knows whether the values are elevations. The coordinate system is left unset (a
+  `.prj` sidecar, step 3.19, or the wizard provides it), so validation reports
+  `crs.missing` until then. Values are read as a stream of tokens, whatever the
+  line breaks. The count must be exactly ncols x nrows, else `asc.values.count`
+  with both numbers and no dataset; a grid over the element limit is refused
+  before any memory is allocated. A cell equal to the header's nodata value, or a
+  word such as `NaN`, `NA` or `-`, is null and counted in `asc.values.nodata`; a
+  token that is not a number is null and counted apart in `asc.values.unreadable`.
+  A nodata value that is huge (beyond 1e30, like -3.4028234663852886e+38 from a
+  single precision grid) also matches values written with fewer digits, within
+  one part in a million, since writers disagree on how many digits to print. With
+  no `NODATA_value` line no number is treated as nodata.

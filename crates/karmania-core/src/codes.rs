@@ -122,6 +122,12 @@ finding_codes! {
     AscHeaderInvalid => "asc.header.invalid", Error, Some(WizardStep::File);
     /// The header of an ASCII grid lacks something that is needed.
     AscHeaderMissing => "asc.header.missing", Error, Some(WizardStep::File);
+    /// The number of values in an ASCII grid is not what the header says.
+    AscValuesCount => "asc.values.count", Error, Some(WizardStep::File);
+    /// Some cells of an ASCII grid have no data and were left empty.
+    AscValuesNodata => "asc.values.nodata", Warning, Some(WizardStep::Nodata);
+    /// Some cells of an ASCII grid are not numbers and were left empty.
+    AscValuesUnreadable => "asc.values.unreadable", Warning, Some(WizardStep::File);
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.
