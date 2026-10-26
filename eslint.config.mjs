@@ -8,6 +8,7 @@ export default defineConfig(
     '**/dist/',
     '**/target/',
     '**/pkg/',
+    'packages/engine/wasm/',
     '**/playwright-report/',
     '**/test-results/',
     'fixtures/',

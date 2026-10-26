@@ -8,10 +8,22 @@
 
 import {
   CHECK_GROUPS,
+  COLUMN_TYPES,
+  CRS_SOURCES,
+  DELIMITERS,
+  FORMATS,
+  KINDS,
+  ROLES,
   SEVERITIES,
   WIZARD_STEPS,
+  type CrsRef,
+  type DetectedCrs,
   type Finding,
   type Location,
+  type NodataSuggestions,
+  type Preview,
+  type RoleSuggestion,
+  type TablePreview,
   type ValidationReport,
 } from './types.js';
 
@@ -126,4 +138,129 @@ export function checkedValidationReport(value: unknown, path = 'report'): Valida
     });
   });
   return o as unknown as ValidationReport;
+}
+
+/** A string that is one of `allowed`. */
+export function checkedOneOf(value: unknown, path: string, allowed: readonly string[]): string {
+  if (typeof value !== 'string' || !allowed.includes(value)) {
+    throw new ContractError(path, `expected one of ${allowed.join(', ')}`);
+  }
+  return value;
+}
+
+/** A finite number. */
+export function checkedNumber(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new ContractError(path, 'expected a finite number');
+  }
+  return value;
+}
+
+export function checkedCrs(value: unknown, path: string): CrsRef {
+  const kind = checkedObject(value, path, ['kind'], ['code', 'units'])['kind'];
+  if (kind === 'epsg') {
+    const o = checkedObject(value, path, ['kind', 'code']);
+    if (checkedCount(o['code'], `${path}.code`) < 1) throw new ContractError(path, 'code below 1');
+    return o as unknown as CrsRef;
+  }
+  if (kind === 'local') {
+    const o = checkedObject(value, path, ['kind', 'units']);
+    checkedOneOf(o['units'], `${path}.units`, ['m', 'ft', 'us_ft']);
+    return o as unknown as CrsRef;
+  }
+  throw new ContractError(`${path}.kind`, 'expected epsg or local');
+}
+
+export function checkedDetectedCrs(value: unknown, path: string): DetectedCrs {
+  const o = checkedObject(value, path, ['crs', 'source']);
+  checkedCrs(o['crs'], `${path}.crs`);
+  checkedOneOf(o['source'], `${path}.source`, CRS_SOURCES);
+  return o as unknown as DetectedCrs;
+}
+
+function checkedRoleSuggestion(value: unknown, path: string): RoleSuggestion {
+  const o = checkedObject(value, path, ['role', 'confidence']);
+  checkedOneOf(o['role'], `${path}.role`, ROLES);
+  const confidence = checkedNumber(o['confidence'], `${path}.confidence`);
+  if (confidence < 0 || confidence > 1) throw new ContractError(path, 'confidence outside 0 to 1');
+  return o as unknown as RoleSuggestion;
+}
+
+function checkedNodata(value: unknown, path: string): NodataSuggestions {
+  const o = checkedObject(value, path, ['tokens', 'numbers']);
+  checkedArray(o['tokens'], `${path}.tokens`).forEach((t, i) => {
+    const entry = checkedObject(t, `${path}.tokens[${String(i)}]`, ['token', 'count']);
+    checkedString(entry['token'], `${path}.tokens[${String(i)}].token`);
+    checkedCount(entry['count'], `${path}.tokens[${String(i)}].count`);
+  });
+  checkedArray(o['numbers'], `${path}.numbers`).forEach((n, i) => {
+    const entry = checkedObject(n, `${path}.numbers[${String(i)}]`, ['value', 'count']);
+    checkedNumber(entry['value'], `${path}.numbers[${String(i)}].value`);
+    checkedCount(entry['count'], `${path}.numbers[${String(i)}].count`);
+  });
+  return o as unknown as NodataSuggestions;
+}
+
+export function checkedTablePreview(value: unknown, path: string): TablePreview {
+  const o = checkedObject(value, path, [
+    'delimiter',
+    'hasHeader',
+    'header',
+    'rows',
+    'estimatedRows',
+    'decimalSeparator',
+    'columnTypes',
+    'roles',
+    'nodata',
+  ]);
+  checkedOneOf(o['delimiter'], `${path}.delimiter`, DELIMITERS);
+  if (typeof o['hasHeader'] !== 'boolean')
+    throw new ContractError(`${path}.hasHeader`, 'expected a boolean');
+  const header = checkedArray(o['header'], `${path}.header`);
+  header.forEach((h, i) => checkedString(h, `${path}.header[${String(i)}]`));
+  checkedArray(o['rows'], `${path}.rows`).forEach((row, i) => {
+    checkedArray(row, `${path}.rows[${String(i)}]`).forEach((cell, j) => {
+      checkedString(cell, `${path}.rows[${String(i)}][${String(j)}]`);
+    });
+  });
+  checkedCount(o['estimatedRows'], `${path}.estimatedRows`);
+  checkedOneOf(o['decimalSeparator'], `${path}.decimalSeparator`, ['.', ',']);
+  const types = checkedArray(o['columnTypes'], `${path}.columnTypes`);
+  types.forEach((t, i) => checkedOneOf(t, `${path}.columnTypes[${String(i)}]`, COLUMN_TYPES));
+  const roles = checkedArray(o['roles'], `${path}.roles`);
+  roles.forEach((r, i) => checkedRoleSuggestion(r, `${path}.roles[${String(i)}]`));
+  if (types.length !== header.length || roles.length !== header.length) {
+    throw new ContractError(path, 'types and roles must have one entry per column');
+  }
+  checkedNodata(o['nodata'], `${path}.nodata`);
+  return o as unknown as TablePreview;
+}
+
+export function checkedPreview(value: unknown, path = 'preview'): Preview {
+  const o = checkedObject(
+    value,
+    path,
+    ['fileName', 'findings'],
+    ['format', 'suggestedKind', 'encoding', 'table', 'crs'],
+  );
+  checkedString(o['fileName'], `${path}.fileName`);
+  if ('format' in o) checkedOneOf(o['format'], `${path}.format`, FORMATS);
+  if ('suggestedKind' in o) checkedOneOf(o['suggestedKind'], `${path}.suggestedKind`, KINDS);
+  if ('encoding' in o) {
+    checkedOneOf(o['encoding'], `${path}.encoding`, [
+      'UTF-8',
+      'UTF-16 LE',
+      'UTF-16 BE',
+      'Windows-1252',
+    ]);
+  }
+  if ('table' in o) checkedTablePreview(o['table'], `${path}.table`);
+  if ('crs' in o) checkedDetectedCrs(o['crs'], `${path}.crs`);
+  checkedArray(o['findings'], `${path}.findings`).forEach((f, i) => {
+    checkedFinding(f, `${path}.findings[${String(i)}]`);
+  });
+  if (!('format' in o) && !(o['findings'] as readonly unknown[]).length) {
+    throw new ContractError(path, 'no format and no finding to say why');
+  }
+  return o as unknown as Preview;
 }

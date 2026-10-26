@@ -227,9 +227,9 @@ Definitions and reprojection can be added later, with the features that need the
   build-wasm script; output gitignored; root `pnpm build:wasm`.
 - [x] 4.2 Serialize findings, report and preview to JS with serde-wasm-bindgen;
   matching TS types in `packages/engine`.
-- [ ] 4.3 Export `preview(bytes, filename, sidecars)`.
+- [x] 4.3 Export `preview(bytes, filename, sidecars)`.
   - [x] 4.3a The preview itself, in `karmania-io` (plain Rust, tested natively).
-  - [ ] 4.3b The WebAssembly export, the `serde-wasm-bindgen` conversion and the
+  - [x] 4.3b The WebAssembly export, the `serde-wasm-bindgen` conversion and the
     TypeScript `Preview` type, tested against the real module in Node.
 - [ ] 4.4 Export a dataset store inside the WASM instance (handles) plus
   ImportJob creation and `step()`.

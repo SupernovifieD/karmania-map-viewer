@@ -756,3 +756,20 @@ was chosen, why.
   of the import mapping, so the import will detect them again from the same bytes,
   which gives the same answer. Previewing a 46 MB, 1,000,000-row CSV takes 54 ms
   (target: under 1 s); the preview is also part of the malformed-input suite.
+- Step 4.3b: `preview` is exported to JavaScript as `preview(fileName, bytes,
+  sidecars)`, where `sidecars` is an array of `{ name, bytes }` (or absent). The
+  bindings crate does no work of its own: it reads the arguments, calls the Rust
+  preview and turns the result into plain JavaScript values with `serde-wasm-bindgen`,
+  configured so maps become objects and absent fields are absent, never `undefined`. A
+  file that cannot be read gives a preview with no format and a finding; only misuse
+  (sidecars that are not `{ name, bytes }` objects) throws. The build now writes into
+  `packages/engine/wasm` (git-ignored, with `--no-pack`) so the engine owns its
+  artifacts and imports them locally. The generated types call every result `any`;
+  the tests wrap the module in a small typed facade that returns `unknown`, and
+  check each result with a strict runtime check for `Preview` that rejects unknown
+  fields, as for findings. Because the engine's type checks and tests now import the
+  built module, `pnpm check` and CI build it first (CI installs a prebuilt `wasm-pack`
+  with a pinned action). The tests run the real module in Node on every sample file
+  and cover the sidecar path, files that cannot be read and misuse. I broke the
+  sidecar handling in the glue to see the tests fail, and they did. The release
+  module is 219 KB.

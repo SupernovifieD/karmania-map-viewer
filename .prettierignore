@@ -3,6 +3,7 @@ node_modules/
 dist/
 target/
 pkg/
+packages/engine/wasm/
 playwright-report/
 test-results/
 pnpm-lock.yaml
