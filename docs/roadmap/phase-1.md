@@ -32,7 +32,7 @@ brief says to stop.
 - [x] 0.9 CI workflow (GitHub Actions, or the platform the remote uses) for
   Rust fmt, clippy and test, and TS lint, typecheck and test. Done when: CI is
   green on the pushed commit.
-- [ ] 0.10 Root `pnpm check` script as defined in section 5.
+- [x] 0.10 Root `pnpm check` script as defined in section 5.
 
 ## M1: Core data model (karmania-core)
 

@@ -76,3 +76,11 @@ was chosen, why.
 - Step 0.9: CI also runs `pnpm format:check`, which the brief's `pnpm check`
   (step 0.10) does not list. Left for the owner to decide whether `pnpm check`
   should include it so local and CI runs match.
+- Step 0.10: `pnpm check` is the exact sequence from section 5, as one
+  `package.json` script that stops at the first failure. It runs whichever
+  `cargo` is first on PATH. On the development machine a Homebrew Rust in
+  `/usr/local/bin` can shadow the rustup one in interactive login shells (macOS
+  reorders PATH after `~/.zshenv`). The Rust checks pass either way, but the
+  pinned toolchain and the wasm32 target (needed from step 4.1) only apply when
+  `~/.cargo/bin` comes first. Fix is a PATH line in `~/.zshrc`, left to the
+  owner.
