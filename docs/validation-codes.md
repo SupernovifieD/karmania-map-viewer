@@ -9,6 +9,14 @@ severity or step disagrees with the registry, or if this file lists a code that
 is not registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
+## `dataset.coordinates.incomplete`
+
+- Severity: error
+- Step: none
+- Message: The coordinate list ends with an incomplete position: it has {count} values, which is not a multiple of 3.
+- Hint: Give X, Y and Z for every position.
+- Example: The coordinate list ends with an incomplete position: it has 4 values, which is not a multiple of 3.
+
 ## `dataset.coordinates.length_mismatch`
 
 - Severity: error
@@ -16,6 +24,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: The coordinate lists have different lengths: X has {nx} values, Y has {ny}[, Z has {nz}].
 - Hint: Give X, Y and Z (if used) the same number of values.
 - Example: The coordinate lists have different lengths: X has 1,204 values, Y has 5.
+
+## `dataset.empty`
+
+- Severity: error
+- Step: file
+- Message: The dataset has no {things}.
+- Hint: Check that the file has data rows and that you chose the right file.
+- Example: The dataset has no points.
 
 ## `dataset.too_large`
 

@@ -52,8 +52,12 @@ macro_rules! finding_codes {
 }
 
 finding_codes! {
+    /// The coordinate list ends with an incomplete x, y, z position.
+    DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
+    /// The dataset has no elements at all.
+    DatasetEmpty => "dataset.empty", Error, Some(WizardStep::File);
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
     /// A table column has a different number of rows from the first column.

@@ -7,6 +7,8 @@
 
 mod crs_checks;
 mod structure;
+#[cfg(test)]
+mod testutil;
 mod values;
 
 use serde::Serialize;
