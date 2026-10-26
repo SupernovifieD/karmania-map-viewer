@@ -11,10 +11,12 @@ use crate::polygons::Polygons;
 use crate::positions::Positions;
 use crate::table::Table;
 
-/// `n` positions along the diagonal, without Z.
+/// `n` positions on a parabola `(i, i * i)`, without Z. No three of them are in
+/// a straight line, so any three distinct ones make a real triangle.
 pub(crate) fn positions(n: usize) -> Positions {
-    let coords: Vec<f64> = (0..n).map(|i| i as f64).collect();
-    Positions::from_xyz(&coords, &coords, None, &mut Findings::new()).unwrap()
+    let x: Vec<f64> = (0..n).map(|i| i as f64).collect();
+    let y: Vec<f64> = (0..n).map(|i| (i * i) as f64).collect();
+    Positions::from_xyz(&x, &y, None, &mut Findings::new()).unwrap()
 }
 
 /// A dataset with no CRS and no attributes.

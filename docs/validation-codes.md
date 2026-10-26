@@ -97,6 +97,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Vertex numbers start at 0 and must be lower than the number of vertices.
 - Example: Some triangles use vertex numbers that do not exist: the mesh has 3 vertices.
 
+## `mesh.triangle.degenerate`
+
+- Severity: warning
+- Step: none
+- Message: Some triangles have no area: two corners are the same point, or all three are in a straight line.
+- Hint: Remove those triangles; they cannot be shaded.
+- Example: Some triangles have no area: two corners are the same point, or all three are in a straight line.
+
+## `mesh.vertices.unused`
+
+- Severity: info
+- Step: none
+- Message: Some vertices are not used by any triangle.
+- Hint: none
+- Example: Some vertices are not used by any triangle.
+
 ## `polygons.polygon.no_rings`
 
 - Severity: error

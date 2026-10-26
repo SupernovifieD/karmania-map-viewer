@@ -66,6 +66,10 @@ finding_codes! {
     MeshIndicesIncomplete => "mesh.indices.incomplete", Error, None;
     /// Some triangles use vertex numbers that do not exist.
     MeshIndicesOutOfRange => "mesh.indices.out_of_range", Error, None;
+    /// Some triangles have no area.
+    MeshTriangleDegenerate => "mesh.triangle.degenerate", Warning, None;
+    /// Some vertices are not used by any triangle.
+    MeshVerticesUnused => "mesh.vertices.unused", Info, None;
     /// The offsets list of a line set ends at the wrong vertex.
     LinesOffsetsBadEnd => "lines.offsets.bad_end", Error, None;
     /// The offsets list of a line set does not start at 0.
