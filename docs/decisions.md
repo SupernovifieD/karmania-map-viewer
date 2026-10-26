@@ -943,3 +943,20 @@ was chosen, why.
   repeats sorts instead of using one bit per cell; a dense model too big to hold is
   refused by the size guard before any block is made. The bounding box of a model is
   its whole lattice, sparse or not. This completes the builders (steps 4.5 to 4.10).
+- Step 4.11a: `Dataset::page(start, count)` gives a window of rows: the geometry
+  columns first, then the attribute columns, as the brief lists them (points `X Y Z`;
+  lines `line #` and `vertex count`; polygons `polygon #`, `ring count` and `vertex
+  count`; mesh `triangle #` and `v1 v2 v3`; grid `i j`, `k` and `cell centre X Y`; blocks
+  `i j k` and `centre X Y Z`). Choices made where the brief was silent: a 2D point set
+  has no `Z` column and a one-layer grid no `k`; a sparse block model reads its cell from
+  its triplets and a dense one from the row number; rotated lattices give rotated
+  centres. Indices are shown as stored, counting from 0, following the convention that
+  only source-file line numbers are 1-based; the data table's own row-number column
+  (step 9.4) is separate and 1-based. This is easy to change if 1-based reads better
+  to geoscientists. Values come as `Float64` (decimals, and whole numbers, which lose
+  digits beyond 2^53), `Int32` (counts and indices), `Bool` as 0/1 bytes and text; a
+  category shows its text. A null has a placeholder value and a 1 in `nulls`, and so
+  does a category whose code is outside its dictionary (validation rejects those before
+  a dataset loads). A start past the end gives an empty page that still names its
+  columns; a count past the end or past 100,000 rows is cut short and the page says how
+  many rows it holds.
