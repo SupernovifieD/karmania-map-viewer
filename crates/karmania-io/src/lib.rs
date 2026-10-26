@@ -15,4 +15,5 @@ pub mod delimited;
 mod fixtures;
 pub mod infer;
 pub mod numbers;
+pub mod roles;
 pub mod text;
