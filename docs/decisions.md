@@ -702,3 +702,10 @@ was chosen, why.
   about thirty lines. The resolved dependency graph fell from 36 crates to 15 and
   the core's WebAssembly build no longer carries about 4.8 MB of definitions, which
   settles the question of the size of the EPSG data.
+- Step 3.25c: the plan for later milestones follows the owner's decision that the
+  core does not know what an EPSG code means. Steps 4.12 (`search_crs`) and 5.10
+  (`searchCrs()`) are dropped and kept in the list, marked, so step numbers do not
+  move. The wizard's CRS step (8.8) takes an EPSG code typed as a number and shows
+  where the file's own CRS came from, with no name, kind or units shown; the
+  dataset summary (9.3) shows the code, or Local with its units. When definitions
+  are added later, those are the places to extend.

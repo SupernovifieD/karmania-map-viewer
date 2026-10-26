@@ -219,7 +219,7 @@ Definitions and reprojection can be added later, with the features that need the
   the `proj4rs` dependency.
 - [x] 3.25b Remove the EPSG lookup, the unknown-code check, the geographic range
   and swapped-axes checks, and the `crs-definitions` dependency.
-- [ ] 3.25c Update the plan for the later milestones that expected a CRS search.
+- [x] 3.25c Update the plan for the later milestones that expected a CRS search.
 
 ## M4: WebAssembly bridge (karmania-wasm)
 
@@ -238,7 +238,8 @@ Definitions and reprojection can be added later, with the features that need the
 - [ ] 4.10 Builders: blocks.
 - [ ] 4.11 Export `summary(handle)`, `rows(handle, start, count)` with
   geometry-derived columns, and `remove(handle)`.
-- [ ] 4.12 Export `search_crs(query, limit)`.
+- [x] 4.12 *Dropped (owner decision, 3.25):* export `search_crs(query, limit)`. The
+  core has no EPSG definitions, so there is nothing to search.
 - [ ] 4.13 Node smoke test: load the built WASM and round-trip one fixture per
   format.
 
@@ -259,7 +260,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
   "blocked" result, never a throw.
 - [ ] 5.9 `rows()`: paging with a small LRU cache (pages of 256 rows).
-- [ ] 5.10 `searchCrs()`.
+- [x] 5.10 *Dropped (owner decision, 3.25):* `searchCrs()`.
 - [ ] 5.11 Browser integration test (Playwright, test page): import every
   fixture, check summaries and findings.
 
@@ -317,8 +318,10 @@ Definitions and reprojection can be added later, with the features that need the
 - [ ] 8.6 Step "Mapping", part 3: per-column type override and rename.
 - [ ] 8.7 Step "Nodata": suggested tokens and numbers as checkboxes with counts;
   custom value input; empty-coordinate policy.
-- [ ] 8.8 Step "CRS", part 1: the detected CRS with its source; EPSG search
-  (code or name, top 20) with name, kind and units shown.
+- [ ] 8.8 Step "CRS", part 1: the detected CRS with its source (the file's own
+  `crs` member, a `.prj` file, or the GeoJSON default); typing an EPSG code as a
+  number. The code is shown as given: there is no name, kind or units lookup,
+  because the core has no definitions (owner decision, 3.25).
 - [ ] 8.9 Step "CRS", part 2: the Local grid option with units; the chosen CRS
   summary.
 - [ ] 8.10 Step "Review": runs the import job with a progress bar and cancel;
@@ -340,7 +343,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [ ] 9.1 Data tab empty state ("No data loaded" plus an Import button).
 - [ ] 9.2 Dataset list: kind icon, truncated name, tabular count, warning badge,
   remove with confirmation; selection.
-- [ ] 9.3 Dataset summary: kind, count, CRS (code, name, units or Local),
+- [ ] 9.3 Dataset summary: kind, count, CRS (EPSG code, or Local with its units),
   has_z, formatted bbox, columns; an expandable list of warnings and info.
 - [ ] 9.4 Virtualized table, part 1: fixed rows, sticky header, row-number
   column, windowed rendering.
