@@ -35,3 +35,18 @@ was chosen, why.
 - Step 0.5: `tsconfig.base.json` sets `noEmit`; packages type-check only and
   Vite builds the output. Library `.d.ts` emission is decided when the engine
   package is built (M5).
+- Step 0.6: ESLint uses `strictTypeChecked` (type-aware) so `any`, unsafe
+  `unknown` handling and floating promises are caught. Default exports are
+  banned with ESLint's built-in `no-restricted-exports` rather than
+  `eslint-plugin-import`, because that plugin is not on the approved dependency
+  list; tool config files (`*.config.*`) are exempt. `eslint-config-prettier`
+  is not needed: ESLint 10 core and typescript-eslint `strict` carry no
+  formatting rules.
+- Step 0.6: Prettier skips `*.md` (hand-written, not reflowed) and `fixtures/`
+  (sample files must stay byte-exact). Rust is formatted by rustfmt.
+- Step 0.6: the root `lint` script runs `eslint .` over the whole repo using the
+  single root config. Package `lint` scripts (step 0.7 onward) call the same
+  command, and `pnpm check` (step 0.10) decides how to avoid linting twice.
+- Step 0.6: `minimatch` (BlueOak-1.0.0, permissive, dev-only transitive of
+  ESLint) is outside the allowed license list but unavoidable with ESLint;
+  recorded in `docs/dependencies.md` for owner approval.

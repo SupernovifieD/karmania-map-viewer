@@ -24,7 +24,7 @@ brief says to stop.
   `unsafe_code` in core.
 - [x] 0.5 pnpm workspace root, `.nvmrc`, base tsconfig (strict options from
   section 6).
-- [ ] 0.6 ESLint (typescript-eslint, strict) and Prettier configs, with root
+- [x] 0.6 ESLint (typescript-eslint, strict) and Prettier configs, with root
   lint and format scripts.
 - [ ] 0.7 `packages/engine` skeleton with Vitest and one passing test.
 - [ ] 0.8 `docs/conventions.md` (naming, commit rules, finding code style) and
