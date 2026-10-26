@@ -36,3 +36,27 @@ export function loadKernel(): TestKernel {
 export function fixtureBytes(name: string): Uint8Array {
   return new Uint8Array(readFileSync(new URL(`../../../../fixtures/${name}`, import.meta.url)));
 }
+
+/** One kernel object, as the tests see it: results are `unknown` and must be checked. */
+export interface TestKernelInstance {
+  readonly startImport: (fileName: string, bytes: Uint8Array, mapping: unknown) => number;
+  readonly stepImport: (importId: number, budgetRows: number) => unknown;
+  readonly cancelImport: (importId: number) => boolean;
+  readonly datasets: () => unknown;
+  readonly free: () => void;
+}
+
+/** A new kernel with nothing loaded. Each one is independent of the others. */
+export function createKernel(): TestKernelInstance {
+  loadKernel();
+  const kernel = new generated.Kernel();
+  return {
+    startImport: (fileName, bytes, mapping) => kernel.startImport(fileName, bytes, mapping),
+    stepImport: (importId, budgetRows) => kernel.stepImport(importId, budgetRows) as unknown,
+    cancelImport: (importId) => kernel.cancelImport(importId),
+    datasets: () => kernel.datasets() as unknown,
+    free: () => {
+      kernel.free();
+    },
+  };
+}
