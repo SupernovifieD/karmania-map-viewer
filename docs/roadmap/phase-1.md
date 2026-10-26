@@ -53,7 +53,7 @@ M0; each is its own commit):
   - [x] 1.1b Findings collector that aggregates repeats.
 - [x] 1.2 FindingCode: a registry of stable codes with `as_str()`, plus
   `docs/validation-codes.md` with its "every code documented" test.
-- [ ] 1.3 CrsRef (Epsg, Local) and Units, with serde.
+- [x] 1.3 CrsRef (Epsg, Local) and Units, with serde.
 - [ ] 1.4 Column and ColumnData (five types) with a validity bitmap: length,
   null count, get as optional.
 - [ ] 1.5 Table: ordered columns; construction reports duplicate or empty names
