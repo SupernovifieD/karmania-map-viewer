@@ -7,7 +7,6 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-crs-definitions.workspace = true
 libm.workspace = true
 serde.workspace = true
 

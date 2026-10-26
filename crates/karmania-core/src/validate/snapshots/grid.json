@@ -29,10 +29,10 @@
       "name": "crs",
       "findings": [
         {
-          "code": "crs.epsg.unknown",
+          "code": "crs.missing",
           "severity": "error",
-          "message": "The EPSG code 99999 is not in the list of coordinate systems this tool knows.",
-          "hint": "Check the code. For example, 4326 is WGS 84 and 32640 is WGS 84 / UTM zone 40N.",
+          "message": "The coordinate reference system is missing, so the positions have no meaning on the Earth.",
+          "hint": "Choose an EPSG code, or choose a local grid and its units.",
           "count": 1,
           "examples": [],
           "step": "crs"

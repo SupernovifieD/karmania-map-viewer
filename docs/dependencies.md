@@ -11,9 +11,6 @@ The project license is Apache-2.0 (see `LICENSE`). Allowed for dependencies:
 - BlueOak-1.0.0, a permissive license, accepted at step 0.12.
 - Unicode-3.0, a permissive license for Unicode data and code, accepted at
   step 1.19 (it covers `unicode-ident`, which `serde_derive` needs).
-- CC0-1.0, a public-domain dedication, accepted at step 2.16 for
-  `crs-definitions`. The owner chose to use the EPSG definitions whatever their
-  terms; see the note under the Rust crates table.
 - MPL-2.0, accepted at step 0.12 for dev-only build tools that are never shipped
   as part of Karmania. It is compatible with Apache-2.0: MPL's copyleft applies
   per file to MPL-licensed code, so using an unmodified MPL tool at build time
@@ -51,23 +48,23 @@ BSD-3-Clause or ISC, except:
 | --- | --- | --- | --- | --- |
 | serde (with `derive`) | 1.0.229 | MIT OR Apache-2.0 | Serialization of the wire contracts (findings, CRS, import mapping) in `karmania-core`. | step 1.1a |
 | serde_json (dev, `karmania-core`) | 1.0.154 | MIT OR Apache-2.0 | Tests that pin the exact JSON shape of serialized types. | step 1.1a |
-| crs-definitions | 0.6.0 | CC0-1.0 | EPSG code to definition lookup (name, kind and units are read from the WKT; the PROJ string feeds the plausibility check). `no_std`, no dependencies of its own. Its definition tables are 4.8 MB of source text, so expect a noticeably larger WebAssembly file (not yet measured). | step 2.16 |
 | serde_json (`karmania-io`) | 1.0.154 | MIT OR Apache-2.0 | Parses GeoJSON. Already in use in tests; now also part of the reader, so its `itoa` (MIT OR Apache-2.0), `memchr` (Unlicense OR MIT, used under MIT) and `zmij` (MIT) dependencies are in the engine build too. | step 3.12a |
 | csv (dev, `karmania-io`) | 1.4.0 | Unlicense/MIT | Cross-checks the hand-written delimited-text reader in tests only; not part of any build of the engine. Brings `csv-core` and `ryu` (`Apache-2.0 OR BSL-1.0`, used under Apache-2.0), plus crates already listed. | step 3.3 |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
 
-Where the EPSG data comes from: `crs-definitions` is licensed CC0-1.0, but its
-definitions are generated from the `spatial_ref_sys` table of PostGIS, which in
-turn derives from the EPSG registry maintained by IOGP, whose own terms of use
-apply to that data. The owner decided to use it regardless of those terms
-(step 2.16). Check the EPSG terms before redistributing the definitions on their
-own, outside this engine.
-
-Rust transitive tree at step 2.19 (33 crates in the resolved graph, checked with
-`cargo metadata`, same for host and `wasm32-unknown-unknown`): all MIT,
-Apache-2.0, `Unlicense OR MIT` (memchr), CC0-1.0 (`crs-definitions`, above), or
-Unicode-3.0 with MIT or Apache-2.0 (`unicode-ident`):
+Rust transitive tree at step 3.25b (15 crates in the resolved graph, checked with
+`cargo metadata`, the same for host and `wasm32-unknown-unknown`): all MIT,
+Apache-2.0, `Unlicense OR MIT` (memchr), `Apache-2.0 OR BSL-1.0` (ryu, used only
+by the dev dependency `csv`), or Unicode-3.0 with MIT or Apache-2.0
+(`unicode-ident`):
 
 - `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Required by
   `syn`, which `serde_derive` cannot do without. Approved by the
   owner (step 1.19).
+
+Removed at step 3.25a and 3.25b, by the owner's decision that this repository is
+the core and does not interpret coordinate systems: `proj4rs` (MIT OR Apache-2.0,
+reprojection, with the crates it brought along) and `crs-definitions` (CC0-1.0,
+the EPSG definitions, 4.8 MB of source text). If definitions are added again later,
+note that they derive from the EPSG registry maintained by IOGP, whose own terms of
+use apply; check them before redistributing the definitions on their own.

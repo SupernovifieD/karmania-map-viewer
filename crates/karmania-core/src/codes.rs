@@ -164,12 +164,6 @@ finding_codes! {
     MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
     /// The mapping names a column that is not in the file.
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
-    /// The EPSG code is not in the list of known coordinate systems.
-    CrsEpsgUnknown => "crs.epsg.unknown", Error, Some(WizardStep::Crs);
-    /// X and Y fit latitude and longitude only if they are swapped.
-    CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
-    /// Some coordinates are outside the range of longitude and latitude.
-    CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.
