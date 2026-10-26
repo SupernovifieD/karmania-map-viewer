@@ -21,6 +21,7 @@ pub mod geojson;
 mod geojson_crs;
 mod geojson_properties;
 mod geojson_shapes;
+pub mod import_job;
 pub mod infer;
 pub mod mapping;
 pub mod nodata;

@@ -197,11 +197,11 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   DetectedFormat and the suggested kind.
 - [x] 3.21 Reader robustness tests: the malformed-input list from section 6 for
   every reader.
-- [ ] 3.22 Incremental ImportJob with `step(budget_rows) -> Progress | Done` for
+- [x] 3.22 Incremental ImportJob with `step(budget_rows) -> Progress | Done` for
   CSV; the other readers run as one step for now.
   - [x] 3.22a Let a CSV import own its text and mapping, so it can be held
     between calls.
-  - [ ] 3.22b The `ImportJob` that steps a CSV import and runs the other readers
+  - [x] 3.22b The `ImportJob` that steps a CSV import and runs the other readers
     as one step.
 
 ## M4: WebAssembly bridge (karmania-wasm)

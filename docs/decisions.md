@@ -645,3 +645,16 @@ was chosen, why.
   the reader borrows the text while the row handler needs the rest of the import.
   No unsafe code is involved. Output is unchanged: all earlier tests pass, and
   every kind of CSV import read one row at a time equals one read in one go.
+- Step 3.22b: an `ImportJob` runs one import in bounded steps. `step(budget_rows)`
+  returns `Step::Progress` (rows read, and an estimated total from counting lines
+  up front, never less than the real number) or `Step::Done` with the result. A
+  CSV job reads the budgeted rows each step; GeoJSON, ASCII grid and OBJ jobs parse
+  the whole file in their first step, since those formats cannot be split cheaply
+  (a JSON document has to be parsed whole, and a grid or mesh is checked as a
+  whole). A budget of 0 counts as 1, so a caller looping until done cannot stall.
+  The job owns its text and mapping, so it can be held between calls, and dropping
+  it cancels. `Done` is returned once; asking a spent job again gives `Done` with
+  no datasets and no findings, and `is_finished` says so, so misuse cannot panic.
+  A problem found at the start (a bad mapping, an empty file) ends the job in its
+  first step. Reading a 20,000 row file 1,000 rows at a time gives exactly the
+  result of reading it at once.
