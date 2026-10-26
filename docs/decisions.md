@@ -658,3 +658,12 @@ was chosen, why.
   A problem found at the start (a bad mapping, an empty file) ends the job in its
   first step. Reading a 20,000 row file 1,000 rows at a time gives exactly the
   result of reading it at once.
+- Step 3.23: `pnpm check` and CI now run clippy and the tests with `--locked`, so a
+  `Cargo.lock` that does not match the manifests fails instead of being quietly
+  rewritten. Checking milestone M3 from a fresh clone showed the lockfile was out
+  of date for seven commits in a row (3.7a, when `karmania-io` got `serde` and
+  `serde_json`, up to 3.11b), fixed forward in 0524ab0. Nothing caught it because
+  clippy runs before the tests and rewrites a stale lock without complaint, and
+  the step helper only committed the files it was given. I checked the new flag
+  against a deliberately stale lockfile and it fails with "cannot update the lock
+  file". The step helper now also stages a changed `Cargo.lock`.

@@ -203,6 +203,11 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
     between calls.
   - [x] 3.22b The `ImportJob` that steps a CSV import and runs the other readers
     as one step.
+- [x] 3.23 Added at the end of M3: build and test with `--locked` in `pnpm check`
+  and CI, so a stale `Cargo.lock` fails the commit. It was stale from 3.7a to
+  3.11b without anything noticing.
+- [ ] 3.24 Added at the end of M3: timings for the readers on large generated
+  files (ignored tests), recorded in `docs/perf.md`.
 
 ## M4: WebAssembly bridge (karmania-wasm)
 
