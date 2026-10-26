@@ -225,3 +225,12 @@ was chosen, why.
   shared function giving up to four codes (`empty`, `bad_start`, `bad_end`,
   `decreasing`). Backwards steps are one finding with a count and the first 20
   examples, so a bad file does not produce thousands of findings.
+- Step 2.8: lattice checks cover dimensions, cell size, origin, rotation and the
+  size limit. The origin and rotation checks go beyond the brief's "dims and
+  spacing" because a non-finite origin or rotation makes the bounding box and
+  every cell centre meaningless. For a sparse block model the size limit applies
+  to the number of blocks, not lattice cells (a sparse model can sit on a huge
+  lattice). Whether the attribute row count equals the cell count is checked
+  once, for every kind, in step 2.10. Numbers in these messages use Rust's
+  shortest round-trip format (`10`, `0.5`, `NaN`, `inf`), which is identical on
+  every platform.

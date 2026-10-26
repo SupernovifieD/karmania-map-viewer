@@ -7,6 +7,7 @@ use crate::blocks::Blocks;
 use crate::column::Column;
 use crate::crs::CrsRef;
 use crate::grid::{Grid, GridZ};
+use crate::lattice::Lattice;
 use crate::lines::Lines;
 use crate::mesh::Mesh;
 use crate::polygons::Polygons;
@@ -123,6 +124,16 @@ impl Geometry {
             Geometry::Polygons(polygons) => Some(&polygons.positions),
             Geometry::Mesh(mesh) => Some(&mesh.positions),
             Geometry::Grid(_) | Geometry::Blocks(_) => None,
+        }
+    }
+
+    /// The lattice, for grids and block models. `None` for the other shapes.
+    #[must_use]
+    pub fn lattice(&self) -> Option<&Lattice> {
+        match self {
+            Geometry::Grid(grid) => Some(&grid.lattice),
+            Geometry::Blocks(blocks) => Some(&blocks.lattice),
+            _ => None,
         }
     }
 

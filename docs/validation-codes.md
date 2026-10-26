@@ -41,6 +41,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Use fewer {things}, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
 
+## `lattice.dims.zero`
+
+- Severity: error
+- Step: none
+- Message: The {grid or block model} has no cells along at least one axis ({nx} x {ny} x {nz}); every dimension must be at least 1.
+- Hint: Check the number of cells along each axis.
+- Example: The grid has no cells along at least one axis (4 x 0 x 1); every dimension must be at least 1.
+
+## `lattice.origin.not_finite`
+
+- Severity: error
+- Step: none
+- Message: The position of the {grid or block model} must be made of numbers, but its corner is {x}, {y}, {z}.
+- Hint: Give the X, Y and Z of the grid's lower corner.
+- Example: The position of the grid must be made of numbers, but its corner is 0, NaN, 0.
+
+## `lattice.rotation.not_finite`
+
+- Severity: error
+- Step: none
+- Message: The rotation of the {grid or block model} must be a number of degrees, but it is {value}.
+- Hint: Use 0 for a grid aligned with north.
+- Example: The rotation of the grid must be a number of degrees, but it is inf.
+
+## `lattice.spacing.invalid`
+
+- Severity: error
+- Step: none
+- Message: The cell size of the {grid or block model} must be greater than 0 on every axis, but it is {dx} x {dy} x {dz}.
+- Hint: Use a positive cell size, such as 10 for 10-metre cells.
+- Example: The cell size of the grid must be greater than 0 on every axis, but it is 10 x 0 x 1.
+
 ## `lines.line.too_short`
 
 - Severity: warning
