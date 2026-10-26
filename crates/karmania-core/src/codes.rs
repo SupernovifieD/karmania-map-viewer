@@ -67,7 +67,7 @@ finding_codes! {
     /// X and Y fit latitude and longitude only if they are swapped.
     CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
     /// Some coordinates are outside the range of longitude and latitude.
-    CrsGeographicOutOfRange => "crs.geographic.out_of_range", Error, Some(WizardStep::Crs);
+    CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
     /// Some coordinates do not convert to valid longitudes and latitudes.
     CrsProjectedImplausible => "crs.projected.implausible", Warning, Some(WizardStep::Crs);
     /// Some coordinates are far outside the UTM zone the dataset names.

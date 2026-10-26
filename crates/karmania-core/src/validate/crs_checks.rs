@@ -29,7 +29,8 @@ fn is_latitude(y: f64) -> bool {
 }
 
 /// In a geographic system X is longitude and Y is latitude, so the values must
-/// fit those ranges. If they only fit with the axes swapped, say so instead.
+/// fit those ranges. A warning, so the data still loads. If the values only fit
+/// with the axes swapped, say so instead.
 fn check_geographic_range(dataset: &Dataset, findings: &mut Findings) {
     let Some(CrsRef::Epsg { code }) = dataset.crs else {
         return;
@@ -196,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn a_latitude_beyond_ninety_is_an_error_counted_per_position() {
+    fn a_latitude_beyond_ninety_is_a_warning_counted_per_position() {
         let f = run(
             check,
             &geographic(&[(10.0, 10.0), (20.0, 95.0), (30.0, -100.0), (400.0, 0.0)]),
@@ -205,7 +206,7 @@ mod tests {
         let one = &f.as_slice()[0];
         assert_eq!(
             (one.count, one.severity),
-            (3, crate::findings::Severity::Error)
+            (3, crate::findings::Severity::Warning)
         );
         assert_eq!(one.step, Some(crate::findings::WizardStep::Crs));
         let at: Vec<_> = one.examples.iter().map(|l| l.element).collect();
@@ -217,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn projected_looking_numbers_in_a_geographic_system_are_an_error() {
+    fn projected_looking_numbers_in_a_geographic_system_are_a_warning() {
         let f = run(
             check,
             &geographic(&[(500_000.0, 2_800_000.0), (510_000.0, 2_810_000.0)]),
@@ -227,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn swapped_axes_are_a_warning_instead_of_a_range_error() {
+    fn swapped_axes_get_their_own_warning_instead_of_the_range_warning() {
         // Latitudes in X, longitudes (some above 90) in Y.
         let f = run(check, &geographic(&[(25.2, 121.5), (-33.9, 151.2)]));
         assert_eq!(codes(&f), ["crs.geographic.axes_swapped"]);

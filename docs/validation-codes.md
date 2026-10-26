@@ -51,7 +51,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 ## `crs.geographic.out_of_range`
 
-- Severity: error
+- Severity: warning
 - Step: crs
 - Message: Some coordinates are not valid longitudes and latitudes: X runs from {min_x} to {max_x} and Y from {min_y} to {max_y}, but longitude must be between -180 and 360 and latitude between -90 and 90.
 - Hint: Check the coordinate system. Values this large usually belong to a projected system such as UTM.
