@@ -412,3 +412,20 @@ was chosen, why.
   including case) and a coordinate typed as text, bool or category are reported
   too. It does not look at the data, so numbers that fail to parse are reported by
   the readers (step 3.8).
+- Step 3.8: `CsvImport` reads a file in steps (`step(n)` then `finish()`), so the
+  incremental job of step 3.22 is a thin wrapper around it; `read_csv` runs it to
+  the end. Value rules (also in the module docs): an empty cell is null in every
+  column; the mapping's no-data words and numbers apply only to float and int
+  columns, because `NA` or `-` can be real text elsewhere; a value that does not
+  read as its column's type is null and counted in one `csv.value.unreadable`
+  warning per column; a coordinate that is empty, no-data or unreadable follows
+  `emptyCoordinates`: `error` gives one `csv.coordinate.missing` error per
+  coordinate column (and no dataset), `skip` drops the row and gives one
+  `csv.rows.skipped` warning with the count and example lines. Rows with a
+  different number of fields from the header give `csv.rows.ragged` (missing cells
+  are empty, extra ones ignored). Attribute types the mapping leaves open are
+  guessed from the first 200 rows. Text is kept exactly as written (not trimmed).
+  Dataset ids are 0 until whoever holds the datasets assigns them. The new code
+  area `csv` is in `docs/conventions.md`. For now a mapping whose kind is not
+  points gets an error; steps 3.9 to 3.11 add lines and blocks and remove that
+  guard.

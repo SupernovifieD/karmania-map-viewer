@@ -157,7 +157,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   Split to stay under the commit size guideline:
   - [x] 3.7a The ImportMapping types with serde.
   - [x] 3.7b Mapping validation.
-- [ ] 3.8 CSV -> points: full parse with mapping; bad numbers become null with a
+- [x] 3.8 CSV -> points: full parse with mapping; bad numbers become null with a
   warning; empty-coordinate policy (error or skip with a warning count).
 - [ ] 3.9 CSV -> lines: group by line ID in order of first appearance; vertices
   in row order; info finding if IDs are not contiguous.

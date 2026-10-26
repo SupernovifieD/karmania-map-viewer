@@ -68,6 +68,14 @@ finding_codes! {
     FileEncodingFallback => "file.encoding.fallback", Warning, Some(WizardStep::File);
     /// Some UTF-16 characters could not be read.
     FileEncodingInvalidUtf16 => "file.encoding.invalid_utf16", Warning, Some(WizardStep::File);
+    /// Rows have an empty or unreadable coordinate and the mapping says to stop.
+    CsvCoordinateMissing => "csv.coordinate.missing", Error, Some(WizardStep::Nodata);
+    /// Rows have a different number of values from the header.
+    CsvRowsRagged => "csv.rows.ragged", Warning, Some(WizardStep::File);
+    /// Rows were left out because a coordinate was empty or unreadable.
+    CsvRowsSkipped => "csv.rows.skipped", Warning, Some(WizardStep::Nodata);
+    /// Some values could not be read as the column's type and were left empty.
+    CsvValueUnreadable => "csv.value.unreadable", Warning, Some(WizardStep::Mapping);
     /// The block size of a block model is missing.
     MappingBlockSizeMissing => "mapping.block_size.missing", Error, Some(WizardStep::Mapping);
     /// The block size is not greater than 0 in all directions.

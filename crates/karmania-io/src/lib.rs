@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod csv_import;
 pub mod delimited;
 #[cfg(test)]
 mod fixtures;
