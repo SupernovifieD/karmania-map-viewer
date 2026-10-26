@@ -172,7 +172,8 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 - [ ] 3.12 GeoJSON: FeatureCollection with Point and MultiPoint gives points;
   properties become attributes with type inference across features.
   - [x] 3.12a Attribute columns from feature properties, typed across features.
-  - [ ] 3.12b Read a GeoJSON file: points and MultiPoints, plus the checks every
+  - [x] 3.12b Share `ReadOutput` and the row counter between the readers.
+  - [ ] 3.12c Read a GeoJSON file: points and MultiPoints, plus the checks every
     GeoJSON reader needs.
 - [ ] 3.13 GeoJSON: LineString and MultiLineString give lines; each part is a
   line and copies the feature's attributes plus a `feature_id` column.

@@ -20,5 +20,8 @@ pub mod infer;
 pub mod mapping;
 pub mod nodata;
 pub mod numbers;
+mod output;
 pub mod roles;
 pub mod text;
+
+pub use output::ReadOutput;

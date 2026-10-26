@@ -30,6 +30,7 @@ use crate::delimited::{Delimiter, PREVIEW_ROWS, Record, RecordReader};
 use crate::infer::infer_types;
 use crate::mapping::{EmptyCoordinates, ImportMapping, validate_mapping};
 use crate::numbers::{DecimalSeparator, parse_int, parse_number};
+use crate::output::{ReadOutput, Tally};
 use crate::roles::Role;
 
 /// How the text of a CSV file is laid out.
@@ -40,37 +41,6 @@ pub struct CsvOptions {
     /// Whether the first row holds column names. Without a header the columns
     /// are called `Column 1`, `Column 2`, ...
     pub has_header: bool,
-}
-
-/// What a reader produced: the datasets (none if there were errors) and every
-/// finding along the way.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ReadOutput {
-    /// The datasets. Their ids are all zero; whoever holds the datasets assigns
-    /// real ones.
-    pub datasets: Vec<Dataset>,
-    /// What was found.
-    pub findings: Findings,
-}
-
-/// One finding being counted as rows go by.
-struct Tally(Finding);
-
-impl Tally {
-    fn new(finding: Finding) -> Self {
-        let mut finding = finding;
-        finding.count = 0;
-        Self(finding)
-    }
-
-    fn hit(&mut self, at: Location) {
-        self.0.count += 1;
-        self.0.add_example(at);
-    }
-
-    fn into_finding(self) -> Option<Finding> {
-        (self.0.count > 0).then_some(self.0)
-    }
 }
 
 /// The result of reading one cell as a value of some type.
