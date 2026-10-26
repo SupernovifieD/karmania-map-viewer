@@ -43,7 +43,7 @@ impl Role {
 /// A coordinate or line suggestion comes from the column's name; a column with
 /// no recognised name is suggested as an ordinary attribute with confidence 0.5,
 /// which means "no idea".
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct RoleSuggestion {
     /// The suggested role.
     pub role: Role,

@@ -75,6 +75,10 @@ memory and the dataset made from it.
 
 Reading in steps costs nothing measurable over reading at once.
 
+The preview (step 4.3) of the same 46.0 MB, 1,000,000-row CSV takes 54 ms, against
+the brief's target of under 1 s: it decodes the text without copying it, reads only
+the first rows and counts lines.
+
 Things to know:
 
 - GeoJSON is the memory-hungry format: about 20 times the size of the file, because

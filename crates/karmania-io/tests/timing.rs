@@ -18,6 +18,7 @@ use karmania_io::import_job::{ImportJob, Step};
 use karmania_io::mapping::{ColumnMapping, EmptyCoordinates, ImportMapping, Nodata};
 use karmania_io::numbers::DecimalSeparator;
 use karmania_io::obj::read_obj;
+use karmania_io::preview::preview;
 use karmania_io::roles::Role;
 
 const COMMA: CsvOptions = CsvOptions {
@@ -147,6 +148,23 @@ fn csv_one_million_points_import_and_validation() {
         read + checked < LIMIT_SECONDS,
         "the brief asks for under 5 s"
     );
+}
+
+#[test]
+#[ignore = "timing; run in a release build with --ignored"]
+fn preview_of_a_one_million_row_csv() {
+    let text = points_csv(1_000_000);
+    let start = Instant::now();
+    let p = preview("big.csv", text.as_bytes(), &[]);
+    let seconds = start.elapsed().as_secs_f64();
+    println!(
+        "preview of a {:.1} MB CSV with 1,000,000 rows: {:.0} ms",
+        megabytes(&text),
+        seconds * 1000.0
+    );
+    assert_eq!(p.table.as_ref().map(|t| t.estimated_rows), Some(1_000_000));
+    // The brief asks for under 1 s.
+    assert!(seconds < 1.0, "the preview took {seconds:.2} s");
 }
 
 #[test]

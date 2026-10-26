@@ -218,16 +218,7 @@ fn apply_crs(root: &Value, datasets: &mut [Dataset], findings: &mut Findings) {
         }
         FileCrs::Epsg(code) => Some(CrsRef::Epsg { code }),
         FileCrs::Unrecognized(name) => {
-            let message = match name {
-                Some(name) => format!(
-                    "The file names the coordinate system \"{name}\", which could not be recognized, so none was set."
-                ),
-                None => "The file says its coordinate system is unknown, or gives it in a form that could not be read, so none was set.".to_string(),
-            };
-            findings.add(
-                Finding::new(FindingCode::GeojsonCrsUnrecognized, message)
-                    .with_hint("Choose the coordinate system yourself."),
-            );
+            findings.add(crs_unrecognized(name));
             None
         }
     };
@@ -236,8 +227,21 @@ fn apply_crs(root: &Value, datasets: &mut [Dataset], findings: &mut Findings) {
     }
 }
 
+/// The warning for a `crs` member that names no system we can use. `name` is the
+/// name the file gave, if it gave one.
+pub(crate) fn crs_unrecognized(name: Option<String>) -> Finding {
+    let message = match name {
+        Some(name) => format!(
+            "The file names the coordinate system \"{name}\", which could not be recognized, so none was set."
+        ),
+        None => "The file says its coordinate system is unknown, or gives it in a form that could not be read, so none was set.".to_string(),
+    };
+    Finding::new(FindingCode::GeojsonCrsUnrecognized, message)
+        .with_hint("Choose the coordinate system yourself.")
+}
+
 /// Parses the text, adding an error if it is empty or not JSON.
-fn parse(text: &str, findings: &mut Findings) -> Option<Value> {
+pub(crate) fn parse(text: &str, findings: &mut Findings) -> Option<Value> {
     let text = text.trim_start_matches('\u{feff}');
     if text.trim().is_empty() {
         findings.add(
