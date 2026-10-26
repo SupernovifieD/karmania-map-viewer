@@ -39,3 +39,17 @@ BSD-3-Clause or ISC, except:
   shipped. Approved by the owner (step 0.12).
 - `lightningcss` 1.33.0 and its platform binary package, MPL-2.0. Dev-only CSS
   build tool pulled in by Vite 8; covered by the MPL-2.0 rule in the policy above.
+
+## Rust crates
+
+| Crate | Version | License | Purpose | Added |
+| --- | --- | --- | --- | --- |
+| serde (with `derive`) | 1.0.229 | MIT OR Apache-2.0 | Serialization of the wire contracts (findings, CRS, import mapping) in `karmania-core`. | step 1.1a |
+| serde_json (dev, `karmania-core`) | 1.0.154 | MIT OR Apache-2.0 | Tests that pin the exact JSON shape of serialized types. | step 1.1a |
+
+Rust transitive tree at step 1.1a (12 crates, checked with `cargo metadata`):
+all MIT, Apache-2.0 or `Unlicense OR MIT`, except:
+
+- `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Unicode-3.0 is
+  a permissive license but is not named in the policy above. It is required by
+  `syn`, which `serde_derive` cannot do without. Pending the owner's approval.
