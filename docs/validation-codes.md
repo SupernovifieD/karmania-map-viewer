@@ -21,8 +21,8 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: This dataset would have about {count} {things}, which is more than the limit of {limit}.
-- Hint: Use fewer {things}, a larger cell size, or split the data into several datasets.
+- Message: This dataset would have about {count} {things}, which is more than the limit of {limit}. (When the count is too large to calculate: This dataset would have far more {things} than the limit of {limit}.)
+- Hint: Use fewer {things}, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
 
 ## `table.column.length_mismatch`
