@@ -375,3 +375,15 @@ was chosen, why.
   whitespace files, since European data uses them with decimal commas too; a comma
   file always uses a decimal point. Thousands separators are not understood.
   Number parsing lives in `numbers.rs` so the readers share one definition.
+- Step 3.5: role suggestions use the listed X, Y and Z names plus a few obvious
+  spellings (`centre`/`center`, `coordinate`, plural eastings/northings) and,
+  beyond the brief, line-identifier names (`Line`, `LineID`, `LineNo`, ...) so the
+  wizard can pre-fill the CSV-to-lines mapping. Names are compared after dropping
+  a trailing unit in brackets and everything but letters and digits. Confidence is
+  fixed by how specific the name is (0.95 descriptive, 0.9 single letters and `RL`,
+  0.8 `Long`, 0.5 `Depth`, because depth grows downwards and Z upwards). A
+  coordinate name on a non-numeric column is not suggested. Each role goes to one
+  column only, the best match then the leftmost; a column with no match is an
+  attribute at 0.5, meaning "no idea". Suggestions use the header and the inferred
+  types, not the values, so a column named `Lat` holding projected numbers is still
+  suggested; the CRS checks catch that later.

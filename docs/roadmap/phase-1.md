@@ -144,7 +144,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   whitespace), header detection, first 200 rows, estimated row count.
 - [x] 3.4 Column type inference from a sample (float, int, bool, text,
   category). Decimal comma detection when the delimiter is a semicolon.
-- [ ] 3.5 Coordinate role suggestions from header names, with confidence scores.
+- [x] 3.5 Coordinate role suggestions from header names, with confidence scores.
   Recognize at least: x: X, EAST, EASTING, XC, XCOORD, XCENTRE, LON, LONG,
   LONGITUDE; y: Y, NORTH, NORTHING, YC, YCOORD, YCENTRE, LAT, LATITUDE; z: Z,
   RL, ELEV, ELEVATION, ZC, ZCOORD, ZCENTRE, DEPTH. Matching is case-insensitive.
