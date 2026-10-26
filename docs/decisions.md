@@ -140,3 +140,17 @@ was chosen, why.
   rather than an empty list, so the docs test has something to check. Later
   steps add codes with the step that uses them. `dataset` was added to the list
   of code areas in `docs/conventions.md` for the size limit.
+- Step 1.4: `ColumnType::as_str` returns the import-mapping vocabulary (`float`,
+  `int`, `bool`, `text`, `category`) so the dataset summary and the wizard show
+  the same words. A categorical code outside its dictionary is allowed in a
+  column and reported by validation (step 2.14), not rejected at construction.
+  The only construction error is a data/validity length mismatch, a plain
+  `std::error::Error` type rather than `thiserror`, which would add a
+  dependency for one type.
+- Step 1.5: beyond the brief, a `Table` also requires all columns to have the
+  same length, reported as `table.column.length_mismatch`. Without it a table
+  has no single row count. Validation (step 2.10) then only compares the table's
+  row count with the element count. Blank names (whitespace only) count as
+  empty. Constructors that can meet bad user data return `Option<T>` and add
+  findings to a `Findings`; this is the pattern for later steps. A thousands
+  separator helper (`text::format_count`) was added for messages like `1,204`.

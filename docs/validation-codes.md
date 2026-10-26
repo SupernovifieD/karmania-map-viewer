@@ -17,6 +17,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Use fewer {things}, a larger cell size, or split the data into several datasets.
 - Example: This dataset would have about 200,000,000 cells, which is more than the limit of 134,217,728.
 
+## `table.column.length_mismatch`
+
+- Severity: error
+- Step: none
+- Message: Column "{name}" has {count} values, but the first column "{first}" has {expected}.
+- Hint: Make every column the same length.
+- Example: Column "grade" has 1,204 values, but the first column "x" has 5.
+
 ## `table.column.name_duplicate`
 
 - Severity: error

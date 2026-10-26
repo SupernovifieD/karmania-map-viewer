@@ -54,6 +54,8 @@ macro_rules! finding_codes {
 finding_codes! {
     /// The dataset has more elements than the size limit allows.
     DatasetTooLarge => "dataset.too_large", Error, None;
+    /// A table column has a different number of rows from the first column.
+    TableColumnLengthMismatch => "table.column.length_mismatch", Error, None;
     /// A table column has no name.
     TableColumnNameEmpty => "table.column.name_empty", Error, Some(WizardStep::Mapping);
     /// Two or more table columns share a name.
