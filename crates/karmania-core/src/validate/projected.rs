@@ -264,9 +264,11 @@ mod tests {
         let f = run(check, &d);
         assert_eq!(codes(&f), ["crs.projected.outside_zone"]);
         let one = &f.as_slice()[0];
+        // 4 failing samples: the 2 far corners of the bounding box, plus
+        // positions 1 and 2.
         assert_eq!(
             (one.severity, one.count),
-            (crate::findings::Severity::Warning, 2)
+            (crate::findings::Severity::Warning, 4)
         );
         assert_eq!(one.step, Some(crate::findings::WizardStep::Crs));
         assert!(one.message.contains(
