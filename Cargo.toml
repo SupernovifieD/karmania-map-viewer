@@ -10,11 +10,14 @@ publish = false
 
 [workspace.dependencies]
 karmania-core = { path = "crates/karmania-core" }
+karmania-io = { path = "crates/karmania-io" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 libm = "0.2.16"
 csv = "1.4.0"
 wasm-bindgen = "0.2.129"
+serde-wasm-bindgen = "0.6.5"
+js-sys = "0.3.106"
 
 # `unsafe_code` is forbidden per crate (`#![forbid(unsafe_code)]` in karmania-core
 # and karmania-io), not here, because wasm-bindgen generates unsafe code.

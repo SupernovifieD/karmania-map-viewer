@@ -61,3 +61,101 @@ export interface CheckGroup {
 export interface ValidationReport {
   readonly groups: readonly CheckGroup[];
 }
+
+/** Every shape of dataset. */
+export const KINDS = ['points', 'lines', 'polygons', 'mesh', 'grid', 'blocks'] as const;
+
+/** The shape of a dataset. */
+export type Kind = (typeof KINDS)[number];
+
+/** Every file format the kernel can read. */
+export const FORMATS = ['csv', 'geojson', 'ascii_grid', 'obj', 'prj'] as const;
+
+/** A file format the kernel can read. */
+export type Format = (typeof FORMATS)[number];
+
+/** Every delimiter a text file can be split by. */
+export const DELIMITERS = ['comma', 'semicolon', 'tab', 'whitespace'] as const;
+
+/** What separates the fields of a row in a delimited text file. */
+export type Delimiter = (typeof DELIMITERS)[number];
+
+/** How decimal numbers are written. */
+export type DecimalSeparator = '.' | ',';
+
+/** Every column type. */
+export const COLUMN_TYPES = ['float', 'int', 'bool', 'text', 'category'] as const;
+
+/** The type of the values in a column. */
+export type ColumnType = (typeof COLUMN_TYPES)[number];
+
+/** Every role a column can have in an import. */
+export const ROLES = ['x', 'y', 'z', 'line_id', 'attribute', 'ignore'] as const;
+
+/** What a column is used for in an import. */
+export type Role = (typeof ROLES)[number];
+
+/** The unit of a local grid: metres, international feet or US survey feet. */
+export type Units = 'm' | 'ft' | 'us_ft';
+
+/** A coordinate reference system: an EPSG code, or a local grid with its unit. */
+export type CrsRef =
+  | { readonly kind: 'epsg'; readonly code: number }
+  | { readonly kind: 'local'; readonly units: Units };
+
+/** Every place a detected coordinate system can come from. */
+export const CRS_SOURCES = ['prj_file', 'geojson_default', 'geojson_crs_member'] as const;
+
+/** Where a detected coordinate system came from. */
+export type CrsSource = (typeof CRS_SOURCES)[number];
+
+/** A coordinate system found in or beside a file, and where it came from. */
+export interface DetectedCrs {
+  readonly crs: CrsRef;
+  readonly source: CrsSource;
+}
+
+/** A suggested role for a column, and how sure the guess is, from 0 to 1. */
+export interface RoleSuggestion {
+  readonly role: Role;
+  readonly confidence: number;
+}
+
+/** Values that look like "no data" and how often each appears in the sample. */
+export interface NodataSuggestions {
+  readonly tokens: readonly { readonly token: string; readonly count: number }[];
+  readonly numbers: readonly { readonly value: number; readonly count: number }[];
+}
+
+/** What a delimited text file looks like. */
+export interface TablePreview {
+  readonly delimiter: Delimiter;
+  readonly hasHeader: boolean;
+  /** Column names; `Column 1`, `Column 2`, ... when the file has no header row. */
+  readonly header: readonly string[];
+  /** The first 200 data rows, as written in the file. */
+  readonly rows: readonly (readonly string[])[];
+  /** About how many data rows there are, counted by lines. */
+  readonly estimatedRows: number;
+  readonly decimalSeparator: DecimalSeparator;
+  /** One suggested type per column. */
+  readonly columnTypes: readonly ColumnType[];
+  /** One suggested role per column. */
+  readonly roles: readonly RoleSuggestion[];
+  readonly nodata: NodataSuggestions;
+}
+
+/** What a file is and how to import it, found without importing it. */
+export interface Preview {
+  readonly fileName: string;
+  /** Absent if the file cannot be read; a finding says why. */
+  readonly format?: Format;
+  /** The kind of dataset the file probably holds, where that can be told. */
+  readonly suggestedKind?: Kind;
+  /** `UTF-8`, `UTF-16 LE`, `UTF-16 BE` or `Windows-1252`. */
+  readonly encoding?: string;
+  /** Present for delimited text only. */
+  readonly table?: TablePreview;
+  readonly crs?: DetectedCrs;
+  readonly findings: readonly Finding[];
+}

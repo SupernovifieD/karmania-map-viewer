@@ -1,8 +1,9 @@
 # Rust build output
 /target/
 
-# Generated WebAssembly output (wasm-pack)
+# Generated WebAssembly output (wasm-pack): scripts/build-wasm writes it into the engine
 pkg/
+/packages/engine/wasm/
 
 # JavaScript build output and dependencies
 node_modules/

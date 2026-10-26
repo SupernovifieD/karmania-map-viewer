@@ -28,12 +28,13 @@ Anything else needs the owner's approval first. That includes strong copyleft
 | typescript-eslint (dev) | ^8.72.0 | MIT | Parser and the `strictTypeChecked` rule set (bans `any`, unsafe `unknown` use, floating promises, non-null assertions). | step 0.6 |
 | prettier (dev) | ^3.9.10 | MIT | Code formatting for TypeScript, JavaScript, JSON, YAML, CSS and HTML. | step 0.6 |
 | vitest (dev, `@karmania/engine`) | ^5.0.5 | MIT | TypeScript unit tests. | step 0.7 |
+| @types/node (dev, `@karmania/engine`) | ^24.19.2 | MIT | Node type declarations for the tests that load the built WebAssembly module in Node (pulls in `undici-types`, MIT). Referenced only from the test support file. | step 4.3b |
 | vite (dev, `@karmania/engine`) | ^8.3.5 | MIT | Required peer of vitest, and the app dev server and library builds later. Was 7.x from step 0.7 until step 0.13 (Vite 8 pulls in lightningcss, MPL-2.0, now accepted for dev-only tools). | step 0.7 |
 
 ## Transitive licenses
 
 Checked at step 0.13 by reading the `license` field of every installed package
-(129 packages, none unknown). `pnpm licenses list` is not used: under pnpm 12 it
+(129 packages, none unknown); at step 4.3b there are 131, still none unknown. `pnpm licenses list` is not used: under pnpm 12 it
 omits packages it listed under pnpm 10. All are MIT, Apache-2.0, BSD-2-Clause,
 BSD-3-Clause or ISC, except:
 
@@ -51,9 +52,11 @@ BSD-3-Clause or ISC, except:
 | serde_json (`karmania-io`) | 1.0.154 | MIT OR Apache-2.0 | Parses GeoJSON. Already in use in tests; now also part of the reader, so its `itoa` (MIT OR Apache-2.0), `memchr` (Unlicense OR MIT, used under MIT) and `zmij` (MIT) dependencies are in the engine build too. | step 3.12a |
 | csv (dev, `karmania-io`) | 1.4.0 | Unlicense/MIT | Cross-checks the hand-written delimited-text reader in tests only; not part of any build of the engine. Brings `csv-core` and `ryu` (`Apache-2.0 OR BSL-1.0`, used under Apache-2.0), plus crates already listed. | step 3.3 |
 | wasm-bindgen (`karmania-wasm`) | 0.2.129 | MIT OR Apache-2.0 | Generates the JavaScript glue and types for the WebAssembly module. Brings `wasm-bindgen-macro`, `-macro-support` and `-shared`, `bumpalo`, `cfg-if`, `once_cell` and `rustversion`, all MIT OR Apache-2.0, and `quote`, `proc-macro2`, `syn` and `unicode-ident`, listed below. | step 4.1 |
+| serde-wasm-bindgen (`karmania-wasm`) | 0.6.5 | MIT | Turns Rust values into plain JavaScript values at the WebAssembly boundary. Brings `js-sys` (MIT OR Apache-2.0) and, through it, `futures-util` and its small dependencies (`futures-core`, `futures-task`, `pin-project-lite`, `slab`; all MIT OR Apache-2.0 or MIT). | step 4.3b |
+| js-sys (`karmania-wasm`) | 0.3.106 | MIT OR Apache-2.0 | Reads JavaScript arrays and typed arrays passed to the module. | step 4.3b |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
 
-Rust transitive tree at step 4.1 (23 crates in the resolved graph, checked with
+Rust transitive tree at step 4.3b (30 crates in the resolved graph, checked with
 `cargo metadata`, the same for host and `wasm32-unknown-unknown`): all MIT,
 Apache-2.0, `Unlicense OR MIT` (memchr), `Apache-2.0 OR BSL-1.0` (ryu, used only
 by the dev dependency `csv`), or Unicode-3.0 with MIT or Apache-2.0
@@ -75,4 +78,4 @@ developer's machine and in CI):
 
 | Tool | Version | License | Purpose | Added |
 | --- | --- | --- | --- | --- |
-| wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |
+| wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue into `packages/engine/wasm` (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. In CI it is installed by `taiki-e/install-action` (MIT OR Apache-2.0, pinned to a commit), which downloads a prebuilt binary. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |

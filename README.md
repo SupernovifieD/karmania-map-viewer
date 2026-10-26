@@ -8,6 +8,6 @@ Rust (stable, pinned in `rust-toolchain.toml`) and Node (pinned in `.nvmrc`) wit
 
 ```
 pnpm install
-pnpm build:wasm   # writes crates/karmania-wasm/pkg, which is not committed
+pnpm build:wasm   # writes packages/engine/wasm, which is not committed
 pnpm check        # formatting, lints and every test
 ```

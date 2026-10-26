@@ -11,6 +11,11 @@ publish.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+karmania-core.workspace = true
+karmania-io.workspace = true
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
+js-sys.workspace = true
 wasm-bindgen.workspace = true
 
 [lints]

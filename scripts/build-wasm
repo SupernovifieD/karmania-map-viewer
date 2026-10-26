@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the WebAssembly kernel into crates/karmania-wasm/pkg (not committed).
+# Builds the WebAssembly kernel into packages/engine/wasm (not committed), where the
+# engine imports it from.
 #
 # Needs wasm-pack (cargo install wasm-pack) and the wasm32-unknown-unknown target,
 # which rust-toolchain.toml installs. Pass --dev for a faster, unoptimised build.
@@ -18,4 +19,7 @@ fi
 
 cd "$root"
 # --target web gives an ES module that a module Web Worker can load.
-wasm-pack build crates/karmania-wasm --target web "$profile" --out-dir pkg --out-name karmania_wasm
+# The output directory is relative to the crate. --no-pack skips the package.json that
+# wasm-pack would write: the engine package is the one that owns these files.
+wasm-pack build crates/karmania-wasm --target web "$profile" --no-pack \
+  --out-dir ../../packages/engine/wasm --out-name karmania_wasm
