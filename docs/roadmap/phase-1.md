@@ -72,6 +72,9 @@ M0; each is its own commit):
 - [x] 1.13 `Geometry::Blocks` (dense or sparse ijk).
 - [x] 1.14 `element_count()` and expected attribute rows for each kind.
 - [ ] 1.15 Bounding box for each kind (lattice bbox accounts for rotation).
+  Split to stay under the commit size guideline:
+  - [x] 1.15a BBox type and the rotated lattice bounding box.
+  - [ ] 1.15b Dataset bounding box for each kind.
 - [ ] 1.16 MAX_ELEMENTS guard: a size estimate before allocation that returns
   an error finding.
 

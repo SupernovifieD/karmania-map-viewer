@@ -1,5 +1,7 @@
 //! The lattice: the regular 3D index space shared by grids and block models.
 
+use crate::bbox::BBox;
+
 /// A regular lattice of cells.
 ///
 /// Conventions, shared by every importer and by the rest of the engine:
@@ -95,6 +97,28 @@ impl Lattice {
             self.origin[1] + (x * sin + y * cos),
             self.origin[2] + z,
         ]
+    }
+
+    /// The smallest axis-aligned box containing the whole lattice after
+    /// rotation: the eight corners of the lattice box, rotated about `origin`.
+    /// `None` if any corner is not finite, which happens when the origin,
+    /// spacing or rotation is not finite; a partial box would be misleading.
+    #[must_use]
+    pub fn bbox(&self) -> Option<BBox> {
+        let [nx, ny, nz] = self.dims.map(f64::from);
+        let [dx, dy, dz] = self.spacing;
+        let (sx, sy, sz) = (nx * dx, ny * dy, nz * dz);
+        let corners: Vec<[f64; 3]> = [0.0, sx]
+            .into_iter()
+            .flat_map(|x| {
+                [0.0, sy]
+                    .into_iter()
+                    .flat_map(move |y| [0.0, sz].into_iter().map(move |z| [x, y, z]))
+            })
+            .map(|local| self.local_to_world(local))
+            .collect();
+        let all_finite = corners.iter().all(|c| c.iter().all(|v| v.is_finite()));
+        all_finite.then(|| BBox::from_points(corners)).flatten()
     }
 
     /// The world coordinates of the centre of cell `(i, j, k)`:
@@ -247,6 +271,81 @@ mod tests {
         let (sin, cos) = (0.5, 3.0_f64.sqrt() / 2.0);
         let expected = [2.5 * cos - 0.5 * sin, 2.5 * sin + 0.5 * cos, 0.5];
         assert!(close(l.cell_centre(2, 0, 0).unwrap(), expected));
+    }
+
+    #[test]
+    fn an_unrotated_lattice_box_runs_from_the_origin_by_its_size() {
+        let l = Lattice {
+            dims: [3, 2, 1],
+            ..lattice([1, 1, 1], 0.0)
+        };
+        let b = l.bbox().unwrap();
+        assert_eq!((b.min, b.max), ([10.0, 20.0, 30.0], [16.0, 24.0, 32.0]));
+    }
+
+    #[test]
+    fn a_quarter_turn_swaps_the_extents_around_the_origin_corner() {
+        // Local box is 6 wide (x) and 4 deep (y); turned 90 degrees CCW about the
+        // origin it spans x from -4 to 0 and y from 0 to 6, relative to the origin.
+        let l = Lattice {
+            dims: [3, 2, 1],
+            ..lattice([1, 1, 1], 90.0)
+        };
+        let b = l.bbox().unwrap();
+        assert_eq!((b.min, b.max), ([6.0, 20.0, 30.0], [10.0, 26.0, 32.0]));
+    }
+
+    #[test]
+    fn a_rotated_box_contains_every_cell_centre_and_touches_all_corners() {
+        let l = Lattice {
+            dims: [4, 3, 2],
+            ..lattice([1, 1, 1], 30.0)
+        };
+        let b = l.bbox().unwrap();
+        for k in 0..2 {
+            for j in 0..3 {
+                for i in 0..4 {
+                    let c = l.cell_centre(i, j, k).unwrap();
+                    assert!((0..3).all(|a| b.min[a] <= c[a] && c[a] <= b.max[a]));
+                }
+            }
+        }
+        // For a 30 degree turn the x extent comes from corners (0,sy) and (sx,0).
+        let (sx, sy) = (8.0, 6.0);
+        let (sin, cos) = (0.5, 3.0_f64.sqrt() / 2.0);
+        assert!((b.min[0] - (10.0 - sy * sin)).abs() < 1e-12);
+        assert!((b.max[0] - (10.0 + sx * cos)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn negative_spacing_and_empty_lattices_still_give_an_ordered_box() {
+        let flipped = Lattice {
+            spacing: [-2.0, 2.0, 2.0],
+            dims: [3, 1, 1],
+            ..lattice([1, 1, 1], 0.0)
+        };
+        let b = flipped.bbox().unwrap();
+        assert_eq!((b.min[0], b.max[0]), (4.0, 10.0));
+        let empty = lattice([0, 0, 0], 0.0).bbox().unwrap();
+        assert_eq!(
+            (empty.min, empty.max),
+            ([10.0, 20.0, 30.0], [10.0, 20.0, 30.0])
+        );
+    }
+
+    #[test]
+    fn a_lattice_with_non_finite_values_has_no_box() {
+        let bad_spacing = Lattice {
+            spacing: [f64::NAN, 1.0, 1.0],
+            ..lattice([2, 2, 2], 0.0)
+        };
+        assert_eq!(bad_spacing.bbox(), None);
+        assert_eq!(lattice([2, 2, 2], f64::NAN).bbox(), None);
+        let bad_origin = Lattice {
+            origin: [f64::INFINITY, 0.0, 0.0],
+            ..lattice([2, 2, 2], 0.0)
+        };
+        assert_eq!(bad_origin.bbox(), None);
     }
 
     #[test]
