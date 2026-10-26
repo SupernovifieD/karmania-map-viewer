@@ -8,14 +8,17 @@
 //!
 //! A job owns its text and mapping, so it can be kept between calls.
 
-use karmania_core::Findings;
+use karmania_core::{Finding, FindingCode, Findings};
 
 use crate::asc::read_asc;
 use crate::csv_import::{CsvImport, CsvOptions};
+use crate::delimited::sniff;
+use crate::detect::{DetectedFormat, detect_format};
 use crate::geojson::read_geojson;
 use crate::mapping::ImportMapping;
 use crate::obj::read_obj;
 use crate::output::ReadOutput;
+use crate::text::decode;
 
 /// How far a job has got.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -56,6 +59,9 @@ enum Work {
 /// it returns [`Step::Done`], and drop it to cancel.
 pub struct ImportJob {
     work: Work,
+    /// Findings from before the reader ran (the format and the encoding), which
+    /// come first in the result.
+    before: Findings,
 }
 
 impl ImportJob {
@@ -71,7 +77,61 @@ impl ImportJob {
             work: Work::Csv(Some(Box::new(CsvImport::owned(
                 text, options, mapping, file_name,
             )))),
+            before: Findings::new(),
         }
+    }
+
+    /// An import of a file given as bytes. The format, the encoding and, for a
+    /// delimited file, the delimiter and header are detected the same way as in
+    /// [`crate::preview::preview`], so the `mapping` made from a preview fits. The
+    /// mapping is used by CSV only; other formats ignore it.
+    ///
+    /// A file that cannot be imported gives a job that finishes in its first step
+    /// with an error finding that says why.
+    #[must_use]
+    pub fn file(file_name: &str, bytes: &[u8], mapping: ImportMapping) -> Self {
+        let detection = detect_format(Some(file_name), bytes);
+        let mut before = detection.findings;
+        let Some(format) = detection.format else {
+            return Self::failed(before);
+        };
+        let text = decode(bytes, &mut before).text.into_owned();
+        let name = Some(file_name);
+        let mut job = match format {
+            DetectedFormat::Csv => {
+                let Some(sniffed) = sniff(&text, &mut before) else {
+                    return Self::failed(before);
+                };
+                let options = CsvOptions {
+                    delimiter: sniffed.delimiter,
+                    has_header: sniffed.has_header,
+                };
+                Self::csv(text, options, mapping, name)
+            }
+            DetectedFormat::GeoJson => Self::geojson(text, name),
+            DetectedFormat::AsciiGrid => Self::ascii_grid(text, name),
+            DetectedFormat::Obj => Self::obj(text, name),
+            DetectedFormat::Prj => {
+                before.add(
+                    Finding::new(
+                        FindingCode::FileFormatUnrecognized,
+                        "A .prj file only names a coordinate system, so it holds no data to import.",
+                    )
+                    .with_hint("Choose it together with the data file it belongs to."),
+                );
+                return Self::failed(before);
+            }
+        };
+        job.before = before;
+        job
+    }
+
+    /// A job that ends at once with these findings and no datasets.
+    fn failed(findings: Findings) -> Self {
+        Self::once(move || ReadOutput {
+            datasets: Vec::new(),
+            findings,
+        })
     }
 
     /// A GeoJSON import, done in one step.
@@ -98,6 +158,7 @@ impl ImportJob {
     fn once(run: impl FnOnce() -> ReadOutput + 'static) -> Self {
         Self {
             work: Work::Once(Some(Box::new(run))),
+            before: Findings::new(),
         }
     }
 
@@ -108,13 +169,15 @@ impl ImportJob {
     /// After [`Step::Done`] has been returned the job is spent: further calls
     /// return `Done` with no datasets and no findings.
     pub fn step(&mut self, budget_rows: usize) -> Step {
+        let before = &mut self.before;
         match &mut self.work {
             Work::Csv(slot) => {
                 let Some(import) = slot.as_mut() else {
                     return Step::Done(spent());
                 };
                 if import.step(budget_rows.max(1)) {
-                    Step::Done(slot.take().map_or_else(spent, |import| import.finish()))
+                    let output = slot.take().map_or_else(spent, |import| import.finish());
+                    Step::Done(with_before(std::mem::take(before), output))
                 } else {
                     Step::Progress(Progress {
                         rows_read: import.rows_read(),
@@ -122,7 +185,10 @@ impl ImportJob {
                     })
                 }
             }
-            Work::Once(slot) => Step::Done(slot.take().map_or_else(spent, |run| run())),
+            Work::Once(slot) => {
+                let output = slot.take().map_or_else(spent, |run| run());
+                Step::Done(with_before(std::mem::take(before), output))
+            }
         }
     }
 
@@ -143,6 +209,18 @@ impl ImportJob {
                 return output;
             }
         }
+    }
+}
+
+/// `output` with the findings from before the reader ran put first.
+fn with_before(before: Findings, output: ReadOutput) -> ReadOutput {
+    let mut findings = before;
+    for finding in output.findings.iter() {
+        findings.add(finding.clone());
+    }
+    ReadOutput {
+        datasets: output.datasets,
+        findings,
     }
 }
 
@@ -359,5 +437,161 @@ mod tests {
         assert_eq!(steps, 20);
         assert_eq!(output, whole);
         assert_eq!(output.datasets[0].element_count(), Some(20_000));
+    }
+
+    fn run_file(name: &str, bytes: &[u8], mapping: ImportMapping) -> ReadOutput {
+        ImportJob::file(name, bytes, mapping).run()
+    }
+
+    fn codes(output: &ReadOutput) -> Vec<&'static str> {
+        output.findings.iter().map(|f| f.code.as_str()).collect()
+    }
+
+    fn xy_mapping() -> ImportMapping {
+        let mut m = collars();
+        m.columns = vec![
+            ColumnMapping {
+                source: "X".into(),
+                role: Role::X,
+                column_type: None,
+                rename: None,
+            },
+            ColumnMapping {
+                source: "Y".into(),
+                role: Role::Y,
+                column_type: None,
+                rename: None,
+            },
+        ];
+        m
+    }
+
+    #[test]
+    fn a_file_job_gives_what_the_reader_for_its_format_gives() {
+        let points = fixtures::bytes("points.csv");
+        let direct = read_csv(
+            &fixtures::text("points.csv"),
+            COMMA,
+            &collars(),
+            Some("points.csv"),
+        );
+        assert_eq!(run_file("points.csv", &points, collars()), direct);
+        for (name, direct) in [
+            (
+                "mixed.geojson",
+                read_geojson(&fixtures::text("mixed.geojson"), Some("mixed.geojson")),
+            ),
+            (
+                "grid.asc",
+                read_asc(&fixtures::text("grid.asc"), Some("grid.asc")),
+            ),
+            (
+                "mesh.obj",
+                read_obj(&fixtures::text("mesh.obj"), Some("mesh.obj")),
+            ),
+        ] {
+            let output = run_file(name, &fixtures::bytes(name), collars());
+            assert_eq!(output, direct, "{name}");
+            assert!(!output.datasets.is_empty());
+        }
+    }
+
+    #[test]
+    fn a_file_job_steps_a_csv_in_chunks_and_finishes_in_one_step_for_other_formats() {
+        let mut job = ImportJob::file("points.csv", &fixtures::bytes("points.csv"), collars());
+        assert!(matches!(job.step(3), Step::Progress(p) if p.rows_read == 3));
+        while let Step::Progress(_) = job.step(3) {}
+        assert!(job.is_finished());
+        let mut job = ImportJob::file("grid.asc", &fixtures::bytes("grid.asc"), collars());
+        assert!(matches!(job.step(1), Step::Done(_)));
+    }
+
+    #[test]
+    fn the_encoding_is_detected_and_a_fallback_is_reported_before_the_readers_findings() {
+        let bytes = b"X,Y,Name\n1,2,Caf\xE9\n3,4,Zo\xEB\n";
+        let mut m = xy_mapping();
+        m.columns.push(ColumnMapping {
+            source: "Name".into(),
+            role: Role::Attribute,
+            column_type: None,
+            rename: None,
+        });
+        let output = run_file("a.csv", bytes, m);
+        assert_eq!(codes(&output), ["file.encoding.fallback"]);
+        let d = &output.datasets[0];
+        assert_eq!(
+            d.attributes.column("Name").unwrap().get(0),
+            Some(karmania_core::Value::Utf8("Café"))
+        );
+
+        let mut utf16 = vec![0xFF, 0xFE];
+        for unit in "X,Y\n1,2\n".encode_utf16() {
+            utf16.extend(unit.to_le_bytes());
+        }
+        let output = run_file("u.csv", &utf16, xy_mapping());
+        assert!(output.findings.is_empty(), "{:?}", codes(&output));
+        assert_eq!(output.datasets[0].element_count(), Some(1));
+    }
+
+    #[test]
+    fn the_delimiter_and_the_header_are_detected_from_the_bytes() {
+        // Semicolons and decimal commas.
+        let mut m = xy_mapping();
+        m.decimal_separator = DecimalSeparator::Comma;
+        let output = run_file("a.csv", b"X;Y\n1,5;2,5\n3,5;4,5\n", m);
+        assert!(output.findings.is_empty(), "{:?}", codes(&output));
+        let karmania_core::Geometry::Points(p) = &output.datasets[0].geometry else {
+            panic!("not points")
+        };
+        assert_eq!(p.get(1), Some([3.5, 4.5, 0.0]));
+
+        // No header row: the columns are called Column 1, Column 2.
+        let mut m = xy_mapping();
+        for (column, name) in m.columns.iter_mut().zip(["Column 1", "Column 2"]) {
+            column.source = name.into();
+        }
+        let output = run_file("a.csv", b"1,2\n3,4\n5,6\n", m);
+        assert!(output.findings.is_empty(), "{:?}", codes(&output));
+        assert_eq!(output.datasets[0].element_count(), Some(3));
+    }
+
+    #[test]
+    fn the_content_decides_the_format_and_a_mismatch_comes_first() {
+        let output = run_file("survey.csv", &fixtures::bytes("grid.asc"), collars());
+        assert_eq!(codes(&output)[0], "file.format.mismatch");
+        assert_eq!(output.datasets[0].kind(), karmania_core::Kind::Grid);
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_imported_ends_at_once_with_an_error_and_no_dataset() {
+        let cases: [(&str, &[u8], &str); 4] = [
+            (
+                "points.prj",
+                b"PROJCS[\"x\",AUTHORITY[\"EPSG\",\"32640\"]]",
+                "file.format.unrecognized",
+            ),
+            ("wells.shp", &[0, 0, 1], "file.format.unrecognized"),
+            ("empty.csv", b"", "file.empty"),
+            (
+                "letter",
+                b"Hello, this is a letter.\nNothing here.\n",
+                "file.format.unrecognized",
+            ),
+        ];
+        for (name, bytes, code) in cases {
+            let mut job = ImportJob::file(name, bytes, collars());
+            let Step::Done(output) = job.step(1) else {
+                panic!("expected Done for {name}")
+            };
+            assert!(output.datasets.is_empty(), "{name}");
+            assert_eq!(codes(&output), [code], "{name}");
+            assert!(output.findings.has_errors());
+        }
+        let prj = run_file("points.prj", &fixtures::bytes("points.prj"), collars());
+        assert!(
+            prj.findings.as_slice()[0]
+                .message
+                .starts_with("A .prj file only names")
+        );
     }
 }
