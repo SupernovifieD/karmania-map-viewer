@@ -62,6 +62,8 @@ finding_codes! {
     DatasetAttributesRowsMismatch => "dataset.attributes.rows_mismatch", Error, None;
     /// The coordinate list ends with an incomplete x, y, z position.
     DatasetCoordinatesIncomplete => "dataset.coordinates.incomplete", Error, None;
+    /// The dataset has no coordinate reference system.
+    CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The per-vertex table does not have one row per vertex.
