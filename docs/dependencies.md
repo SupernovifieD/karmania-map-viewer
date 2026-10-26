@@ -52,7 +52,6 @@ BSD-3-Clause or ISC, except:
 | serde (with `derive`) | 1.0.229 | MIT OR Apache-2.0 | Serialization of the wire contracts (findings, CRS, import mapping) in `karmania-core`. | step 1.1a |
 | serde_json (dev, `karmania-core`) | 1.0.154 | MIT OR Apache-2.0 | Tests that pin the exact JSON shape of serialized types. | step 1.1a |
 | crs-definitions | 0.6.0 | CC0-1.0 | EPSG code to definition lookup (name, kind and units are read from the WKT; the PROJ string feeds the plausibility check). `no_std`, no dependencies of its own. Its definition tables are 4.8 MB of source text, so expect a noticeably larger WebAssembly file (not yet measured). | step 2.16 |
-| proj4rs | 0.2.1 | MIT OR Apache-2.0 | Pure-Rust PROJ port, used to inverse-project coordinates to longitude and latitude for the plausibility check (step 2.20). Default features are off: `aeqd` compiles a C file, which a pure-Rust wasm32 build cannot do, so the azimuthal equidistant projection is unavailable. Brings `thiserror`; on `wasm32-unknown-unknown` it also unconditionally brings `wasm-bindgen`, `js-sys`, `web-sys` and `console_log`. | step 2.19 |
 | serde_json (`karmania-io`) | 1.0.154 | MIT OR Apache-2.0 | Parses GeoJSON. Already in use in tests; now also part of the reader, so its `itoa` (MIT OR Apache-2.0), `memchr` (Unlicense OR MIT, used under MIT) and `zmij` (MIT) dependencies are in the engine build too. | step 3.12a |
 | csv (dev, `karmania-io`) | 1.4.0 | Unlicense/MIT | Cross-checks the hand-written delimited-text reader in tests only; not part of any build of the engine. Brings `csv-core` and `ryu` (`Apache-2.0 OR BSL-1.0`, used under Apache-2.0), plus crates already listed. | step 3.3 |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
@@ -70,5 +69,5 @@ Apache-2.0, `Unlicense OR MIT` (memchr), CC0-1.0 (`crs-definitions`, above), or
 Unicode-3.0 with MIT or Apache-2.0 (`unicode-ident`):
 
 - `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Required by
-  `syn`, which `serde_derive` and `thiserror` cannot do without. Approved by the
+  `syn`, which `serde_derive` cannot do without. Approved by the
   owner (step 1.19).

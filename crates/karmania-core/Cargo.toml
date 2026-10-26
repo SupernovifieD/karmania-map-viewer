@@ -9,7 +9,6 @@ publish.workspace = true
 [dependencies]
 crs-definitions.workspace = true
 libm.workspace = true
-proj4rs.workspace = true
 serde.workspace = true
 
 [dev-dependencies]

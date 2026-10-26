@@ -170,12 +170,6 @@ finding_codes! {
     CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
     /// Some coordinates are outside the range of longitude and latitude.
     CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
-    /// Some coordinates do not convert to valid longitudes and latitudes.
-    CrsProjectedImplausible => "crs.projected.implausible", Warning, Some(WizardStep::Crs);
-    /// Some coordinates are far outside the UTM zone the dataset names.
-    CrsProjectedOutsideZone => "crs.projected.outside_zone", Warning, Some(WizardStep::Crs);
-    /// The coordinates could not be checked because the projection is unsupported.
-    CrsProjectedUnchecked => "crs.projected.unchecked", Info, None;
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.

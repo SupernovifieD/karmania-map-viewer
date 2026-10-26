@@ -1,6 +1,5 @@
 //! CRS checks: is the coordinate reference system present and plausible?
 
-use super::projected;
 use crate::codes::FindingCode;
 use crate::crs::CrsRef;
 use crate::dataset::{Dataset, Kind};
@@ -12,7 +11,6 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_present(dataset, findings);
     check_epsg_code_known(dataset, findings);
     check_geographic_range(dataset, findings);
-    projected::check(dataset, findings);
 }
 
 /// Longitude may be written from -180 or from 0 (so up to 360); latitude is

@@ -675,3 +675,15 @@ was chosen, why.
   features one at a time is a bigger change that only matters for files over
   roughly 100 MB, and it needs the owner's view on whether such files are
   expected.
+- Step 3.25a (owner decision after the M3 report): the repository is the core, so
+  it carries a CRS identifier and does not interpret it. Projection and the EPSG
+  definitions can be added later, together with features that need them. This step
+  removes the projected plausibility check (inverse-projecting sample points to
+  longitude and latitude), the UTM zone rule, the three `crs.projected.*` finding
+  codes and the `proj4rs` dependency, with `thiserror` and the browser helper
+  crates it brought along on wasm32. The snapshot for polygons now shows
+  `crs.missing`, since its fixture had a CRS only to trip the removed check. The
+  one-million-point validation time is unchanged in practice (about 300 ms; the
+  `crs` group fell from 6 to 0.1 ms). Step 3.25b removes the rest of what needs the
+  definitions. The earlier decision entries for steps 2.16 to 2.24 describe how
+  these checks worked and are kept as history.

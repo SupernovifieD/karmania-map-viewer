@@ -119,10 +119,11 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   - [x] 2.17b Unknown EPSG code finding.
 - [x] 2.18 CRS: geographic range check; swapped-axes heuristic (warning "X and
   Y may be swapped").
-- [x] 2.19 Add the proj4rs dependency (dependency-only commit).
+- [x] 2.19 Add the proj4rs dependency (dependency-only commit). *Removed again in
+  3.25a, by the owner's decision.*
 - [x] 2.20 CRS: projected plausibility. Inverse-project the bbox corners plus up
   to 1,000 evenly spaced sample points to longitude and latitude. Non-finite or
-  out-of-range results give a warning.
+  out-of-range results give a warning. *Removed in 3.25a.*
 - [x] 2.21 Report snapshot tests: one full report per kind, fixed and
   deterministic.
 - [x] 2.22 Ignored-by-default timing test: validate 1M points; record the result
@@ -131,7 +132,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
 Follow-ups requested by the owner after the M2 report (each its own commit):
 
 - [x] 2.23 UTM zone rule: coordinates far from the middle of a UTM zone are a
-  warning.
+  warning. *Removed in 3.25a.*
 - [x] 2.24 The geographic range check is a warning, not an error.
 
 ## M3: Readers (karmania-io)
@@ -208,6 +209,16 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   3.11b without anything noticing.
 - [x] 3.24 Added at the end of M3: timings for the readers on large generated
   files (ignored tests), recorded in `docs/perf.md`.
+
+Follow-ups decided by the owner after the M3 report: the core only carries a CRS
+identifier (an EPSG code or a local grid) and does not know what a code means.
+Definitions and reprojection can be added later, with the features that need them.
+
+- [x] 3.25a Remove the projected plausibility check and the UTM zone rule, and
+  the `proj4rs` dependency.
+- [ ] 3.25b Remove the EPSG lookup, the unknown-code check, the geographic range
+  and swapped-axes checks, and the `crs-definitions` dependency.
+- [ ] 3.25c Update the plan for the later milestones that expected a CRS search.
 
 ## M4: WebAssembly bridge (karmania-wasm)
 
