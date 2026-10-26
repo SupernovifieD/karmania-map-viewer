@@ -331,3 +331,11 @@ was chosen, why.
   step 2.18; the swapped-axes warning and the 0 to 360 longitude allowance are
   unchanged. Anything that later draws such a dataset must cope with positions
   outside longitude -180 to 360 or latitude -90 to 90.
+- Step 3.1: M3 dependency choices. The CSV reader uses the `csv` crate, as the
+  brief suggests. `encoding_rs` is not used: the only fallback needed is
+  Windows-1252, a 32-entry table that is simpler and cheaper than a dependency
+  (step 3.2). The `geojson` crate is not used either: `serde_json`, already
+  approved, parses GeoJSON, and `geojson` would add `geo-types` and its
+  dependencies for no gain. Fixtures are small hand-written files in `fixtures/`
+  (one per format, plus a second `.prj` without an EPSG code, the common ESRI
+  style); a test keeps each under 50 KB and the directory in step with its list.

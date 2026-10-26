@@ -1,0 +1,13 @@
+[package]
+name = "karmania-io"
+description = "Karmania file readers: CSV, GeoJSON, ESRI ASCII grid, OBJ and .prj. No WebAssembly-specific code."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+karmania-core.workspace = true
+
+[lints]
+workspace = true

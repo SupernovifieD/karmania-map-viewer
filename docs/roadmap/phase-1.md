@@ -136,7 +136,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 
 ## M3: Readers (karmania-io)
 
-- [ ] 3.1 Create `crates/karmania-io` and `fixtures/` with tiny sample files for
+- [x] 3.1 Create `crates/karmania-io` and `fixtures/` with tiny sample files for
   every format.
 - [ ] 3.2 Text decoding: UTF-8 with BOM strip; Windows-1252 fallback with a
   warning finding.

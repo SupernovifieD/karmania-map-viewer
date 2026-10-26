@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "Well A", "depth": 120.5 },
+      "geometry": { "type": "Point", "coordinates": [55.3, 25.2] } },
+    { "type": "Feature", "properties": { "name": "Well B", "depth": 98.0 },
+      "geometry": { "type": "Point", "coordinates": [55.4, 25.3, 10.0] } },
+    { "type": "Feature", "properties": { "name": "Road", "lanes": 2 },
+      "geometry": { "type": "LineString", "coordinates": [[55.3, 25.2], [55.35, 25.25], [55.4, 25.3]] } },
+    { "type": "Feature", "properties": { "name": "Lease", "area_ha": 40.0 },
+      "geometry": { "type": "Polygon", "coordinates": [
+        [[55.30, 25.20], [55.40, 25.20], [55.40, 25.30], [55.30, 25.30], [55.30, 25.20]],
+        [[55.33, 25.23], [55.37, 25.23], [55.37, 25.27], [55.33, 25.27], [55.33, 25.23]]
+      ] } }
+  ]
+}
