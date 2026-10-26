@@ -8,7 +8,7 @@
 
 use js_sys::{Array, BigInt64Array, Float64Array, Reflect, Symbol, Uint8Array, Uint32Array};
 use karmania_core::CrsRef;
-use karmania_io::build::{ColumnInput, ColumnValues, LinesInput, PointsInput};
+use karmania_io::build::{ColumnInput, ColumnValues, LinesInput, PointsInput, PolygonsInput};
 use wasm_bindgen::{JsCast, JsError, JsValue};
 
 /// A dataset description, read.
@@ -17,6 +17,8 @@ pub(crate) enum DatasetInput {
     Points(PointsInput),
     /// Lines.
     Lines(LinesInput),
+    /// Polygons.
+    Polygons(PolygonsInput),
 }
 
 /// Reads a description of a dataset.
@@ -41,6 +43,16 @@ pub(crate) fn read_dataset(value: &JsValue) -> Result<DatasetInput, JsError> {
             offsets: object.unsigned("offsets")?,
             columns: object.columns("columns")?,
             vertex_columns: object.columns("vertexColumns")?,
+        })),
+        "polygons" => Ok(DatasetInput::Polygons(PolygonsInput {
+            name: object.string("name")?,
+            crs: object.crs()?,
+            x: object.floats("x")?,
+            y: object.floats("y")?,
+            z: object.optional_floats("z")?,
+            ring_offsets: object.unsigned("ringOffsets")?,
+            polygon_offsets: object.unsigned("polygonOffsets")?,
+            columns: object.columns("columns")?,
         })),
         other => Err(JsError::new(&format!(
             "the dataset has an unknown kind: \"{other}\""

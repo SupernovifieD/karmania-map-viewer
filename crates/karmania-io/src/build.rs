@@ -10,7 +10,7 @@
 use karmania_core::text::format_count;
 use karmania_core::{
     Column, ColumnData, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings, Geometry, Kind,
-    Lines, Positions, Table, Validity,
+    Lines, Polygons, Positions, Table, Validity,
 };
 
 /// The values of one column.
@@ -195,6 +195,49 @@ pub fn build_lines(input: LinesInput, findings: &mut Findings) -> Option<Dataset
     );
     dataset.vertex_attributes = vertex_attributes?;
     Some(dataset)
+}
+
+/// Polygons to load: positions in ring order, where each ring starts, where each
+/// polygon's rings start, and attributes per polygon.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PolygonsInput {
+    /// The dataset's name; blank means `polygons`.
+    pub name: String,
+    /// The coordinate system; `None` is reported by validation.
+    pub crs: Option<CrsRef>,
+    /// Easting or longitude of each vertex. Rings are open: the closing vertex that
+    /// repeats the first is not given.
+    pub x: Vec<f64>,
+    /// Northing or latitude of each vertex.
+    pub y: Vec<f64>,
+    /// Elevation of each vertex, or `None` for 2D polygons.
+    pub z: Option<Vec<f64>>,
+    /// Where each ring starts in the vertex list, plus the end.
+    pub ring_offsets: Vec<u32>,
+    /// Where each polygon's rings start in the ring list, plus the end. The first
+    /// ring of a polygon is its exterior and the rest are holes.
+    pub polygon_offsets: Vec<u32>,
+    /// The attribute columns, one value per polygon.
+    pub columns: Vec<ColumnInput>,
+}
+
+/// Makes a polygons dataset. `None`, with a finding, if the coordinate lists differ in
+/// length or the columns cannot be made into a table. Offsets that do not fit are left
+/// to validation.
+pub fn build_polygons(input: PolygonsInput, findings: &mut Findings) -> Option<Dataset> {
+    let positions = Positions::from_xyz(&input.x, &input.y, input.z.as_deref(), findings);
+    let attributes = table_from_columns(input.columns, findings);
+    Some(Dataset::new(
+        DatasetId(0),
+        name_or_kind(input.name, Kind::Polygons),
+        input.crs,
+        Geometry::Polygons(Polygons {
+            positions: positions?,
+            ring_offsets: input.ring_offsets,
+            polygon_offsets: input.polygon_offsets,
+        }),
+        attributes?,
+    ))
 }
 
 #[cfg(test)]
@@ -479,5 +522,123 @@ mod tests {
         let mut findings = Findings::new();
         assert!(build_lines(bad, &mut findings).is_none());
         assert!(findings.has_errors());
+    }
+
+    /// A square with a square hole, then a triangle: two polygons, three rings.
+    fn polygons() -> PolygonsInput {
+        PolygonsInput {
+            name: "Leases".into(),
+            crs: metres(),
+            x: vec![0.0, 10.0, 10.0, 0.0, 2.0, 2.0, 4.0, 4.0, 20.0, 30.0, 25.0],
+            y: vec![0.0, 0.0, 10.0, 10.0, 2.0, 4.0, 4.0, 2.0, 0.0, 0.0, 9.0],
+            z: None,
+            ring_offsets: vec![0, 4, 8, 11],
+            polygon_offsets: vec![0, 2, 3],
+            columns: vec![column(
+                "name",
+                ColumnValues::Text(vec!["A".into(), "B".into()]),
+            )],
+        }
+    }
+
+    #[test]
+    fn polygons_with_holes_become_a_dataset() {
+        let mut findings = Findings::new();
+        let d = build_polygons(polygons(), &mut findings).unwrap();
+        assert!(findings.is_empty());
+        assert_eq!(
+            (
+                d.kind(),
+                d.element_count(),
+                d.geometry.vertex_count(),
+                d.name.as_str()
+            ),
+            (Kind::Polygons, Some(2), Some(11), "Leases")
+        );
+        assert!(karmania_core::validate(&d).is_loadable());
+        let mut unnamed = polygons();
+        unnamed.name = " ".into();
+        assert_eq!(
+            build_polygons(unnamed, &mut Findings::new()).unwrap().name,
+            "polygons"
+        );
+    }
+
+    #[test]
+    fn polygon_offsets_that_do_not_fit_are_left_to_validation_which_names_the_problem() {
+        let cases: [(Vec<u32>, Vec<u32>, &str); 6] = [
+            (
+                vec![0, 8, 4, 11],
+                vec![0, 2, 3],
+                "polygons.ring_offsets.decreasing",
+            ),
+            (
+                vec![1, 4, 8, 11],
+                vec![0, 2, 3],
+                "polygons.ring_offsets.bad_start",
+            ),
+            (
+                vec![0, 4, 8, 10],
+                vec![0, 2, 3],
+                "polygons.ring_offsets.bad_end",
+            ),
+            (
+                vec![0, 4, 8, 11],
+                vec![0, 3, 2],
+                "polygons.polygon_offsets.decreasing",
+            ),
+            (
+                vec![0, 4, 8, 11],
+                vec![0, 2, 4],
+                "polygons.polygon_offsets.bad_end",
+            ),
+            (
+                vec![0, 4, 8, 11],
+                vec![0, 2, 2],
+                "polygons.polygon_offsets.bad_end",
+            ),
+        ];
+        for (rings, polygons_at, code) in cases {
+            let mut input = polygons();
+            input.ring_offsets = rings;
+            input.polygon_offsets = polygons_at;
+            let d = build_polygons(input, &mut Findings::new()).unwrap();
+            let report = karmania_core::validate(&d);
+            assert!(report.findings().any(|f| f.code.as_str() == code), "{code}");
+            assert!(!report.is_loadable(), "{code}");
+        }
+    }
+
+    #[test]
+    fn a_ring_of_two_vertices_and_a_polygon_without_rings_are_errors() {
+        let mut thin = polygons();
+        thin.ring_offsets = vec![0, 2, 8, 11];
+        let d = build_polygons(thin, &mut Findings::new()).unwrap();
+        assert!(
+            karmania_core::validate(&d)
+                .findings()
+                .any(|f| f.code.as_str() == "polygons.ring.too_short")
+        );
+        let mut empty = polygons();
+        empty.polygon_offsets = vec![0, 2, 2, 3];
+        empty.columns = vec![column(
+            "name",
+            ColumnValues::Text(vec!["A".into(), "B".into(), "C".into()]),
+        )];
+        let d = build_polygons(empty, &mut Findings::new()).unwrap();
+        assert!(
+            karmania_core::validate(&d)
+                .findings()
+                .any(|f| f.code.as_str() == "polygons.polygon.no_rings")
+        );
+    }
+
+    #[test]
+    fn polygons_with_mismatched_coordinates_make_no_dataset() {
+        let mut input = polygons();
+        input.x.pop();
+        let mut findings = Findings::new();
+        assert!(build_polygons(input, &mut findings).is_none());
+        assert_eq!(codes(&findings), ["dataset.coordinates.length_mismatch"]);
     }
 }

@@ -896,3 +896,11 @@ was chosen, why.
   than there are lines), attribute columns per line and optional `vertexColumns` per
   vertex. Offsets that do not fit the vertices are left to validation, which names the
   problem; a one-vertex line loads with a warning.
+- Step 4.7: polygons are loaded with `kind: "polygons"`, `x`, `y`, `z?`, `ringOffsets`
+  and `polygonOffsets` (both `Uint32Array`s with one more entry than there are rings and
+  polygons) and one attribute value per polygon. Rings are open, as in the data model:
+  the closing vertex that repeats the first is not given (the GeoJSON reader already
+  drops it). Ring or polygon offsets that do not fit, a ring of fewer than three
+  vertices and a polygon without rings are left to validation, which names each; the
+  tests check every one of them through the real module. As for lines, coordinate lists
+  of different lengths make no dataset at all.
