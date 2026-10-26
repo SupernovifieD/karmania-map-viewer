@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crs::CrsRef;
 use crate::lines::Lines;
+use crate::mesh::Mesh;
 use crate::polygons::Polygons;
 use crate::positions::Positions;
 use crate::table::Table;
@@ -57,6 +58,8 @@ pub enum Geometry {
     Lines(Lines),
     /// Polygons with optional holes, one attribute row per polygon.
     Polygons(Polygons),
+    /// A triangle mesh, one attribute row per triangle.
+    Mesh(Mesh),
 }
 
 impl Geometry {
@@ -67,6 +70,7 @@ impl Geometry {
             Geometry::Points(_) => Kind::Points,
             Geometry::Lines(_) => Kind::Lines,
             Geometry::Polygons(_) => Kind::Polygons,
+            Geometry::Mesh(_) => Kind::Mesh,
         }
     }
 
@@ -78,6 +82,7 @@ impl Geometry {
             Geometry::Points(positions) => positions.has_z(),
             Geometry::Lines(lines) => lines.positions.has_z(),
             Geometry::Polygons(polygons) => polygons.positions.has_z(),
+            Geometry::Mesh(mesh) => mesh.positions.has_z(),
         }
     }
 }
@@ -229,6 +234,25 @@ mod tests {
         let geometry = Geometry::Polygons(polygons);
         let d = Dataset::new(DatasetId(2), "lots", None, geometry, Table::empty());
         assert_eq!((d.kind(), d.has_z()), (Kind::Polygons, false));
+    }
+
+    #[test]
+    fn a_mesh_dataset_reports_the_mesh_kind_and_its_z_flag() {
+        let mut findings = Findings::new();
+        let xs = [0.0, 1.0, 0.0];
+        let positions = Positions::from_xyz(&xs, &xs, Some(&xs), &mut findings).unwrap();
+        let mesh = Mesh {
+            positions,
+            indices: vec![0, 1, 2],
+        };
+        let d = Dataset::new(
+            DatasetId(3),
+            "surface",
+            None,
+            Geometry::Mesh(mesh),
+            Table::empty(),
+        );
+        assert_eq!((d.kind(), d.has_z()), (Kind::Mesh, true));
     }
 
     #[test]
