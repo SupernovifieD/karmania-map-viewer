@@ -89,6 +89,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: none
 - Example: The coordinates could not be checked against EPSG:3993 (NAD83(NSRS2007) / Guam Dateline) because this tool cannot calculate that projection.
 
+## `csv.blocks.lattice_too_large`
+
+- Severity: error
+- Step: mapping
+- Message: The block centres span {nx} x {ny} x {nz} blocks, more than a block model can hold along one axis.
+- Hint: Check the block size and the units of the coordinates.
+- Example: The block centres span 1,000,000,000,001 x 1 x 1 blocks, more than a block model can hold along one axis.
+
 ## `csv.coordinate.missing`
 
 - Severity: error

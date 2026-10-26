@@ -70,6 +70,8 @@ finding_codes! {
     FileEncodingInvalidUtf16 => "file.encoding.invalid_utf16", Warning, Some(WizardStep::File);
     /// Rows have an empty or unreadable coordinate and the mapping says to stop.
     CsvCoordinateMissing => "csv.coordinate.missing", Error, Some(WizardStep::Nodata);
+    /// The block centres span too many blocks along one axis.
+    CsvBlocksLatticeTooLarge => "csv.blocks.lattice_too_large", Error, Some(WizardStep::Mapping);
     /// Rows were left out because they have no line identifier.
     CsvLineIdMissing => "csv.line_id.missing", Warning, Some(WizardStep::Mapping);
     /// The rows of some lines are not next to each other in the file.
