@@ -84,6 +84,7 @@ Follow-ups requested by the owner after the M1 report (each its own commit):
   boxes, per axis.
 - [x] 1.18 Use the `libm` crate for rotation sine and cosine, so results are
   bit-identical on every platform.
+- [x] 1.19 Accept Unicode-3.0 in the license policy (`unicode-ident`).
 
 ## M2: Validation (karmania-core)
 

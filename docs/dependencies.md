@@ -9,6 +9,8 @@ The project license is Apache-2.0 (see `LICENSE`). Allowed for dependencies:
 
 - MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Zlib, and OFL (fonts only).
 - BlueOak-1.0.0, a permissive license, accepted at step 0.12.
+- Unicode-3.0, a permissive license for Unicode data and code, accepted at
+  step 1.19 (it covers `unicode-ident`, which `serde_derive` needs).
 - MPL-2.0, accepted at step 0.12 for dev-only build tools that are never shipped
   as part of Karmania. It is compatible with Apache-2.0: MPL's copyleft applies
   per file to MPL-licensed code, so using an unmodified MPL tool at build time
@@ -51,6 +53,6 @@ BSD-3-Clause or ISC, except:
 Rust transitive tree at step 1.1a (12 crates, checked with `cargo metadata`):
 all MIT, Apache-2.0 or `Unlicense OR MIT`, except:
 
-- `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Unicode-3.0 is
-  a permissive license but is not named in the policy above. It is required by
-  `syn`, which `serde_derive` cannot do without. Pending the owner's approval.
+- `unicode-ident` 1.0.27, `(MIT OR Apache-2.0) AND Unicode-3.0`. Required by
+  `syn`, which `serde_derive` cannot do without. Approved by the owner
+  (step 1.19).

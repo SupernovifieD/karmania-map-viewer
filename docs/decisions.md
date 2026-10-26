@@ -215,3 +215,5 @@ was chosen, why.
   `libm::sincos`, and a test pins the exact bits of eight results, so a platform
   difference would fail on CI. `f64::to_radians` and `rem_euclid` are plain IEEE
   arithmetic, so they already agree everywhere.
+- Step 1.19: the owner approved `unicode-ident` (Unicode-3.0), so Unicode-3.0 is
+  now in the license policy in `docs/dependencies.md`.
