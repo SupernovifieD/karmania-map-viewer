@@ -154,6 +154,9 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 - [ ] 3.7 ImportMapping type with serde, plus a mapping validation that returns
   findings tagged with step "mapping" (missing X or Y, line ID missing for
   lines, block size missing for blocks).
+  Split to stay under the commit size guideline:
+  - [x] 3.7a The ImportMapping types with serde.
+  - [ ] 3.7b Mapping validation.
 - [ ] 3.8 CSV -> points: full parse with mapping; bad numbers become null with a
   warning; empty-coordinate policy (error or skip with a warning count).
 - [ ] 3.9 CSV -> lines: group by line ID in order of first appearance; vertices

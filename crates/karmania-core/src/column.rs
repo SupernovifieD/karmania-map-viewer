@@ -6,20 +6,28 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 use crate::validity::Validity;
 
-/// The storage type of a column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// The storage type of a column. In JSON it uses the import mapping's names:
+/// `float`, `int`, `bool`, `text` and `category`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ColumnType {
     /// 64-bit floating point numbers.
+    #[serde(rename = "float")]
     Float64,
     /// 64-bit signed integers.
+    #[serde(rename = "int")]
     Int64,
     /// True or false.
+    #[serde(rename = "bool")]
     Bool,
     /// UTF-8 text.
+    #[serde(rename = "text")]
     Utf8,
     /// Codes into a dictionary of distinct strings.
+    #[serde(rename = "category")]
     Categorical,
 }
 
@@ -278,6 +286,22 @@ mod tests {
         for (t, name) in names {
             assert_eq!(t.as_str(), name);
         }
+    }
+
+    #[test]
+    fn type_names_in_json_are_the_same_words_as_as_str() {
+        for t in [
+            ColumnType::Float64,
+            ColumnType::Int64,
+            ColumnType::Bool,
+            ColumnType::Utf8,
+            ColumnType::Categorical,
+        ] {
+            let json = serde_json::to_string(&t).unwrap();
+            assert_eq!(json, format!("\"{}\"", t.as_str()));
+            assert_eq!(serde_json::from_str::<ColumnType>(&json).unwrap(), t);
+        }
+        assert!(serde_json::from_str::<ColumnType>("\"Float64\"").is_err());
     }
 
     #[test]

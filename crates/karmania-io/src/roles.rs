@@ -1,9 +1,12 @@
 //! Suggesting what each column of a table is for, from its header name.
 
 use karmania_core::ColumnType;
+use serde::{Deserialize, Serialize};
 
-/// What a column is used for in an import.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// What a column is used for in an import. In JSON: `x`, `y`, `z`, `line_id`,
+/// `attribute` or `ignore`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Role {
     /// The X coordinate (easting or longitude).
     X,

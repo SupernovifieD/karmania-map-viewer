@@ -1,11 +1,16 @@
 //! Reading numbers from text, the same way everywhere in the readers.
 
-/// Which character separates the whole part of a number from its fraction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+
+/// Which character separates the whole part of a number from its fraction. In
+/// JSON it is the character itself: `"."` or `","`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DecimalSeparator {
     /// A point: `12.5`.
+    #[serde(rename = ".")]
     Point,
     /// A comma: `12,5`.
+    #[serde(rename = ",")]
     Comma,
 }
 

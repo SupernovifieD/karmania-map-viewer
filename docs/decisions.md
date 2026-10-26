@@ -394,3 +394,12 @@ was chosen, why.
   which must match; the empty word matches empty or blank cells but not a missing
   cell in a short row. Numbers are matched exactly after parsing, so `-999`,
   `-999.0` and `-9.99e2` all count, and `-998` or `-999.5` do not.
+- Step 3.7a: `ImportMapping` is in `karmania-io` and follows section 8.3 field for
+  field (camelCase JSON). Unknown fields anywhere in it are rejected, so a typo in
+  a client is an error, not a silently ignored setting; `blockSize` must have three
+  numbers. The contract's words are the serde names of the types themselves:
+  `ColumnType` (in core) serializes as `float`, `int`, `bool`, `text`, `category`,
+  `Role` as `x`, `y`, `z`, `line_id`, `attribute`, `ignore`, and `DecimalSeparator`
+  as `.` or `,`; a test pins each. One leniency: `crs` may be absent as well as
+  `null`, and both mean "not chosen yet". Everything else listed as required is
+  required.
