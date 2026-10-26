@@ -60,3 +60,8 @@ was chosen, why.
   `src/index.ts`) for workspace use only; the build and publish setup is decided
   in M5. Its tsconfig uses the `DOM` lib; typing for the worker entry (the
   `WebWorker` lib) is decided in step 5.2.
+- Step 0.8: `docs/conventions.md` accepts the `build` commit type from
+  `AGENTS.md` in addition to the types listed in the brief; both come from the
+  owner. It also fixes the finding-code style (`<area>.<subject>[.<problem>]`,
+  lowercase ASCII, stable once released), which the brief only described as
+  "stable, dotted lowercase".

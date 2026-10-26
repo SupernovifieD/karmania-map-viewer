@@ -1,0 +1,93 @@
+# Conventions
+
+Rules for anyone changing this repository. The step plan is in
+`docs/roadmap/phase-1.md`; decisions made along the way are in
+`docs/decisions.md`; dependencies are in `docs/dependencies.md`. Working rules
+for AI assistants are in `AGENTS.md`.
+
+## Naming
+
+Rust:
+
+- Crates are `karmania-core`, `karmania-io` and `karmania-wasm`. Modules,
+  functions and variables use `snake_case`; types and enum variants use
+  `UpperCamelCase`; constants use `SCREAMING_SNAKE_CASE`.
+- Units and conventions go in the doc comment of every public item (for
+  example "metres", "degrees counter-clockwise", "i fastest").
+
+TypeScript:
+
+- Packages are `@karmania/engine`, `@karmania/ui` and `@karmania/app`. Files use
+  `kebab-case.ts`; tests sit next to the code as `name.test.ts`.
+- Variables and functions use `camelCase`; types, interfaces and classes use
+  `PascalCase`. Named exports only; no default exports except tool config files
+  that require them (enforced by ESLint).
+- No `any`: use `unknown` and narrow it. No non-null assertions on data.
+- Custom elements are prefixed `karmania-` (`<karmania-app>`); CSS custom
+  properties are prefixed `--k-`.
+
+Data in files and messages:
+
+- Internal indices are 0-based. Anything shown to a user that refers to a line
+  in a source file is 1-based, and the header counts as line 1.
+- User-facing text is plain language: say what is wrong and where, with no
+  internal names or jargon.
+
+## Finding codes
+
+A finding code names one kind of problem, for example `crs.missing` or
+`lines.offsets.decreasing`.
+
+- Lowercase, dot-separated: `<area>.<subject>[.<problem>]`. Each segment is
+  lowercase ASCII letters, digits or underscores. The area is a shape (`points`,
+  `lines`, `polygons`, `mesh`, `grid`, `blocks`), `table`, `values`, `crs`,
+  `file` or `mapping`.
+- Codes are stable. Once a code is released, do not rename it or change its
+  meaning; add a new code instead. Never reuse a retired code.
+- One code has one severity (`error`, `warning` or `info`), one message
+  template and, where the user can act, one hint.
+- Every code used in the source is listed in `docs/validation-codes.md` with
+  its severity, message template, hint and an example. A test fails if one is
+  missing.
+- Data problems are findings. They are never panics in Rust or exceptions in
+  TypeScript. Nothing is fixed silently: every conversion, skip or default
+  produces a finding with a count.
+- Output is deterministic: same input, same findings, same order, same text.
+  Never build output by iterating a `HashMap`; sort or use ordered maps.
+
+## Commits
+
+- One roadmap step is one commit, and the commit leaves the repository building
+  with all checks passing. Keep a commit under about 150 changed lines;
+  lockfiles, generated snapshots, fixtures and screenshots do not count. If a
+  step is bigger, split it into sub-steps (for example 4.5a, 4.5b) in the
+  roadmap.
+- Tick the step in `docs/roadmap/phase-1.md` in the same commit that completes
+  it.
+- Format: `type(scope): description` (Conventional Commits), imperative mood,
+  then a body that names the step and says what was verified.
+- Types: `feat`, `fix`, `test`, `docs`, `chore`, `ci`, `refactor`, `style`,
+  `perf`, and `build` for build-system changes.
+- Scopes: `core`, `io`, `wasm`, `engine`, `ui`, `app`, `repo`, `ci`, `docs`.
+- No unrelated changes in a commit. If you notice something else worth fixing,
+  add it as a new step at the end of the current milestone in the roadmap.
+- Never commit secrets, credentials, personal data, generated output (`pkg/`,
+  `dist/`, `target/`, Playwright reports) or files over 1 MB (the font and the
+  screenshot baselines are the only exceptions).
+- Push after every commit. Never force-push, and never amend or rewrite pushed
+  commits.
+
+## Checks
+
+Before every commit, run what the step touches; from step 0.10 on that is
+`pnpm check`. A change is not done if a test, lint rule or type check was
+disabled, skipped or weakened to make it pass. If a rule is wrong, say so and
+record the decision in `docs/decisions.md`.
+
+## Dependencies
+
+Allowed licenses: MIT, Apache-2.0, BSD, ISC, Zlib, and OFL for fonts. No
+copyleft until the project license is decided. Add a dependency in the step that
+first needs it, record it in `docs/dependencies.md` in the same commit, use the
+latest stable version unless a documented constraint forbids it, and commit the
+lockfile.
