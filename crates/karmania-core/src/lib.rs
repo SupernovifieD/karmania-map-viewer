@@ -9,10 +9,12 @@
 pub mod codes;
 pub mod crs;
 pub mod findings;
+pub mod validity;
 
 pub use codes::FindingCode;
 pub use crs::{CrsRef, Units};
 pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
+pub use validity::Validity;
 
 #[cfg(test)]
 mod tests {

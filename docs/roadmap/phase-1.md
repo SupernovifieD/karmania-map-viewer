@@ -55,7 +55,9 @@ M0; each is its own commit):
   `docs/validation-codes.md` with its "every code documented" test.
 - [x] 1.3 CrsRef (Epsg, Local) and Units, with serde.
 - [ ] 1.4 Column and ColumnData (five types) with a validity bitmap: length,
-  null count, get as optional.
+  null count, get as optional. Split to stay under the commit size guideline:
+  - [x] 1.4a Validity bitmap.
+  - [ ] 1.4b ColumnData, Column and Value.
 - [ ] 1.5 Table: ordered columns; construction reports duplicate or empty names
   as findings.
 - [ ] 1.6 Positions newtype (interleaved xyz, has_z) with constructors from x,
