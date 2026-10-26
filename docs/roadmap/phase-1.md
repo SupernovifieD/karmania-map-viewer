@@ -231,7 +231,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 4.3a The preview itself, in `karmania-io` (plain Rust, tested natively).
   - [x] 4.3b The WebAssembly export, the `serde-wasm-bindgen` conversion and the
     TypeScript `Preview` type, tested against the real module in Node.
-- [ ] 4.4 Export a dataset store inside the WASM instance (handles) plus
+- [x] 4.4 Export a dataset store inside the WASM instance (handles) plus
   ImportJob creation and `step()`.
   - [x] 4.4a The dataset summary, in `karmania-core` (moved up from 4.11, since a
     load result carries summaries).
@@ -242,7 +242,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 4.4d The staged run: parsing, then validating, with progress for each.
   - [x] 4.4e The kernel state in `karmania-io`: the registry and the imports in
     progress, as plain Rust.
-  - [ ] 4.4f The `Kernel` object exported to JavaScript, with the TypeScript types
+  - [x] 4.4f The `Kernel` object exported to JavaScript, with the TypeScript types
     and Node tests.
 - [ ] 4.5 Export builders from typed arrays: points.
 - [ ] 4.6 Builders: lines.

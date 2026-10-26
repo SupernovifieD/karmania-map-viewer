@@ -159,3 +159,79 @@ export interface Preview {
   readonly crs?: DetectedCrs;
   readonly findings: readonly Finding[];
 }
+
+/** A box around a dataset, in its coordinate system's units, Z up. */
+export interface BBox {
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+}
+
+/** An attribute column, described without its values. */
+export interface ColumnSummary {
+  readonly name: string;
+  readonly type: ColumnType;
+  readonly nullCount: number;
+}
+
+/** What a loaded dataset is, without its data. */
+export interface Summary {
+  readonly id: number;
+  readonly name: string;
+  readonly kind: Kind;
+  /** Points, lines, polygons, triangles, cells or blocks: one attribute row each. */
+  readonly elementCount: number;
+  /** For lines, polygons and meshes. */
+  readonly vertexCount?: number;
+  readonly crs?: CrsRef;
+  readonly hasZ: boolean;
+  readonly bbox?: BBox;
+  readonly columns: readonly ColumnSummary[];
+  /** Warnings and info about the dataset; errors would have stopped it loading. */
+  readonly findings: readonly Finding[];
+}
+
+/** What loading datasets came to: they are all loaded, or none is. */
+export type LoadResult =
+  | { readonly status: 'loaded'; readonly summaries: readonly Summary[] }
+  | { readonly status: 'blocked'; readonly findings: readonly Finding[] };
+
+/** The stages of an import the kernel works through. */
+export const PHASES = ['parsing', 'validating'] as const;
+
+/** A stage of an import. Reading the file from disk comes before these and is the caller's. */
+export type Phase = (typeof PHASES)[number];
+
+/** What one step of an import did. */
+export type ImportStatus =
+  | { readonly status: 'progress'; readonly phase: Phase; readonly fraction: number }
+  | { readonly status: 'done'; readonly result: LoadResult };
+
+/** How one column of a file is imported. */
+export interface ColumnMapping {
+  /** The column's name in the file. */
+  readonly source: string;
+  readonly role: Role;
+  /** Overrides the guessed type. */
+  readonly type?: ColumnType;
+  /** The name the column gets in the dataset. */
+  readonly rename?: string;
+}
+
+/** Everything the kernel needs to know about how to import a file. */
+export interface ImportMapping {
+  readonly datasetName: string;
+  readonly kind: Kind;
+  readonly columns: readonly ColumnMapping[];
+  /** Which values mean "no data". */
+  readonly nodata: {
+    readonly tokens: readonly string[];
+    readonly numbers: readonly number[];
+  };
+  /** What to do with rows that have an empty coordinate. */
+  readonly emptyCoordinates: 'error' | 'skip';
+  /** The size of a block along X, Y and Z, for block models. */
+  readonly blockSize?: readonly [number, number, number];
+  readonly decimalSeparator: DecimalSeparator;
+  /** The coordinate system, or `null` if none has been chosen. */
+  readonly crs: CrsRef | null;
+}

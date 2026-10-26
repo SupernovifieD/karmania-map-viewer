@@ -831,3 +831,22 @@ was chosen, why.
   `done` with the load result, and `None` for an identifier that never existed,
   finished or was cancelled; `cancel_import` drops the import. Imports can run side
   by side and be stepped alternately, and two kernels share nothing (no globals).
+- Step 4.4f: the kernel is exported as a `Kernel` class (`new Kernel()`, `free()` to
+  release it) with `startImport(fileName, bytes, mapping)`, `stepImport(id,
+  budgetRows)`, `cancelImport(id)` and `datasets()`, named in camelCase for JavaScript.
+  It is a thin wrapper over the Rust kernel of step 4.4e. Results are plain objects:
+  a step gives `{ status: "progress", phase, fraction }` or `{ status: "done", result
+  }`, where `result` is `{ status: "loaded", summaries }` or `{ status: "blocked",
+  findings }`. Only misuse throws: an import id that does not exist, or a mapping
+  missing a required field. The TypeScript types (`Summary`, `LoadResult`,
+  `ImportStatus`, `ImportMapping`, ...) are checked by strict runtime checks against
+  every result in tests that run the real module in Node: they import the sample
+  files, check progress through both stages, a blocked file, a GeoJSON file that makes
+  three datasets, a grid and a mesh with a chosen coordinate system, cancelling, kernels
+  that share nothing, and a budget of zero. One thing found: `serde-wasm-bindgen`
+  ignores a field the Rust type does not know even though `ImportMapping` says
+  `deny_unknown_fields` (which `serde_json` does enforce), so a misspelled optional
+  field would pass the boundary unnoticed. The TypeScript `ImportMapping` type, which
+  the engine will use, is what guards against that, so the check was left there. The
+  stage names are `parsing` and `validating`; the brief's `reading` stage, reading the
+  file from disk, belongs to the engine that calls the kernel.

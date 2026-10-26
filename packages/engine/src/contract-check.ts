@@ -13,16 +13,22 @@ import {
   DELIMITERS,
   FORMATS,
   KINDS,
+  PHASES,
   ROLES,
   SEVERITIES,
   WIZARD_STEPS,
+  type BBox,
+  type ColumnSummary,
   type CrsRef,
   type DetectedCrs,
   type Finding,
+  type ImportStatus,
+  type LoadResult,
   type Location,
   type NodataSuggestions,
   type Preview,
   type RoleSuggestion,
+  type Summary,
   type TablePreview,
   type ValidationReport,
 } from './types.js';
@@ -263,4 +269,92 @@ export function checkedPreview(value: unknown, path = 'preview'): Preview {
     throw new ContractError(path, 'no format and no finding to say why');
   }
   return o as unknown as Preview;
+}
+
+function checkedFindings(value: unknown, path: string): readonly Finding[] {
+  return checkedArray(value, path).map((f, i) => checkedFinding(f, `${path}[${String(i)}]`));
+}
+
+function checkedBBox(value: unknown, path: string): BBox {
+  const o = checkedObject(value, path, ['min', 'max']);
+  for (const key of ['min', 'max']) {
+    const corner = checkedArray(o[key], `${path}.${key}`);
+    if (corner.length !== 3) throw new ContractError(`${path}.${key}`, 'expected [x, y, z]');
+    corner.forEach((n, i) => checkedNumber(n, `${path}.${key}[${String(i)}]`));
+  }
+  const [min, max] = [o['min'], o['max']] as [number[], number[]];
+  if (min.some((v, i) => v > (max[i] ?? Number.NEGATIVE_INFINITY))) {
+    throw new ContractError(path, 'min is above max');
+  }
+  return o as unknown as BBox;
+}
+
+function checkedColumnSummary(value: unknown, path: string): ColumnSummary {
+  const o = checkedObject(value, path, ['name', 'type', 'nullCount']);
+  if (checkedString(o['name'], `${path}.name`) === '') throw new ContractError(path, 'empty name');
+  checkedOneOf(o['type'], `${path}.type`, COLUMN_TYPES);
+  checkedCount(o['nullCount'], `${path}.nullCount`);
+  return o as unknown as ColumnSummary;
+}
+
+export function checkedSummary(value: unknown, path = 'summary'): Summary {
+  const o = checkedObject(
+    value,
+    path,
+    ['id', 'name', 'kind', 'elementCount', 'hasZ', 'columns', 'findings'],
+    ['vertexCount', 'crs', 'bbox'],
+  );
+  if (checkedCount(o['id'], `${path}.id`) < 1) throw new ContractError(`${path}.id`, 'below 1');
+  checkedString(o['name'], `${path}.name`);
+  checkedOneOf(o['kind'], `${path}.kind`, KINDS);
+  checkedCount(o['elementCount'], `${path}.elementCount`);
+  if ('vertexCount' in o) checkedCount(o['vertexCount'], `${path}.vertexCount`);
+  if ('crs' in o) checkedCrs(o['crs'], `${path}.crs`);
+  if (typeof o['hasZ'] !== 'boolean') throw new ContractError(`${path}.hasZ`, 'expected a boolean');
+  if ('bbox' in o) checkedBBox(o['bbox'], `${path}.bbox`);
+  checkedArray(o['columns'], `${path}.columns`).forEach((c, i) => {
+    checkedColumnSummary(c, `${path}.columns[${String(i)}]`);
+  });
+  const findings = checkedFindings(o['findings'], `${path}.findings`);
+  if (findings.some((f) => f.severity === 'error')) {
+    throw new ContractError(`${path}.findings`, 'a loaded dataset cannot have an error');
+  }
+  return o as unknown as Summary;
+}
+
+export function checkedLoadResult(value: unknown, path = 'result'): LoadResult {
+  const status = checkedObject(value, path, ['status'], ['summaries', 'findings'])['status'];
+  if (status === 'loaded') {
+    const o = checkedObject(value, path, ['status', 'summaries']);
+    checkedArray(o['summaries'], `${path}.summaries`).forEach((s, i) => {
+      checkedSummary(s, `${path}.summaries[${String(i)}]`);
+    });
+    return o as unknown as LoadResult;
+  }
+  if (status === 'blocked') {
+    const o = checkedObject(value, path, ['status', 'findings']);
+    const findings = checkedFindings(o['findings'], `${path}.findings`);
+    if (!findings.some((f) => f.severity === 'error')) {
+      throw new ContractError(`${path}.findings`, 'blocked without an error');
+    }
+    return o as unknown as LoadResult;
+  }
+  throw new ContractError(`${path}.status`, 'expected loaded or blocked');
+}
+
+export function checkedImportStatus(value: unknown, path = 'status'): ImportStatus {
+  const status = checkedObject(value, path, ['status'], ['phase', 'fraction', 'result'])['status'];
+  if (status === 'progress') {
+    const o = checkedObject(value, path, ['status', 'phase', 'fraction']);
+    checkedOneOf(o['phase'], `${path}.phase`, PHASES);
+    const fraction = checkedNumber(o['fraction'], `${path}.fraction`);
+    if (fraction < 0 || fraction > 1) throw new ContractError(`${path}.fraction`, 'outside 0 to 1');
+    return o as unknown as ImportStatus;
+  }
+  if (status === 'done') {
+    const o = checkedObject(value, path, ['status', 'result']);
+    checkedLoadResult(o['result'], `${path}.result`);
+    return o as unknown as ImportStatus;
+  }
+  throw new ContractError(`${path}.status`, 'expected progress or done');
 }
