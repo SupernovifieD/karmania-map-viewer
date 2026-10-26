@@ -171,6 +171,9 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
   - [x] 3.11c Use it in the CSV importer for block models.
 - [ ] 3.12 GeoJSON: FeatureCollection with Point and MultiPoint gives points;
   properties become attributes with type inference across features.
+  - [x] 3.12a Attribute columns from feature properties, typed across features.
+  - [ ] 3.12b Read a GeoJSON file: points and MultiPoints, plus the checks every
+    GeoJSON reader needs.
 - [ ] 3.13 GeoJSON: LineString and MultiLineString give lines; each part is a
   line and copies the feature's attributes plus a `feature_id` column.
 - [ ] 3.14 GeoJSON: Polygon and MultiPolygon give polygons; drop closing

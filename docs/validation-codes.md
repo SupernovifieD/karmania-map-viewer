@@ -249,6 +249,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Save the file as UTF-8 and import it again.
 - Example: Some UTF-16 characters could not be read and were replaced with a question-mark symbol.
 
+## `geojson.property.as_text`
+
+- Severity: warning
+- Step: mapping
+- Message: The property "{name}" was read as text because {reason}.
+- Hint: Use the same kind of value for a property in every feature.
+- Example: The property "depth" was read as text because its values are of different kinds (true/false, numbers and text).
+
+## `geojson.property.unnamed`
+
+- Severity: warning
+- Step: mapping
+- Message: Some features have a property with no name; it was left out.
+- Hint: Give every property a name.
+- Example: Some features have a property with no name; it was left out.
+
 ## `lattice.dims.zero`
 
 - Severity: error

@@ -66,6 +66,13 @@ pub fn infer_types(
         .collect()
 }
 
+/// Whether a text column with `distinct` different values among `total` values
+/// should be a category: few different values, each appearing at least twice on
+/// average.
+pub(crate) fn is_category(distinct: usize, total: usize) -> bool {
+    distinct <= MAX_CATEGORIES && distinct * 2 <= total
+}
+
 fn infer_column(values: &[&str], decimal: DecimalSeparator) -> ColumnType {
     if values.is_empty() {
         return ColumnType::Utf8;
@@ -92,7 +99,7 @@ fn infer_column(values: &[&str], decimal: DecimalSeparator) -> ColumnType {
         };
     }
     let distinct: BTreeSet<&str> = values.iter().map(|v| v.trim()).collect();
-    if distinct.len() <= MAX_CATEGORIES && distinct.len() * 2 <= values.len() {
+    if is_category(distinct.len(), values.len()) {
         ColumnType::Categorical
     } else {
         ColumnType::Utf8

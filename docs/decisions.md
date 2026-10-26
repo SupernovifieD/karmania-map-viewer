@@ -471,3 +471,16 @@ was chosen, why.
   with `emptyCoordinates=skip` leave gaps, so the model becomes sparse. The
   reader keeps the three centre columns and the line of every kept row until the
   end, like points, plus 12 bytes per row for the cells.
+- Step 3.12a: GeoJSON properties become attribute columns, one per property name,
+  in alphabetical order (JSON objects are unordered, and the `serde_json`
+  `preserve_order` feature would bring in `hashbrown` and its Zlib-licensed
+  `foldhash`, which is not on the license list). A column's type comes from all
+  its values: true/false is `Bool`; numbers are `Int64` when every one is a whole
+  number that fits, else `Float64`; text is a category under the same rule as CSV
+  (`infer::is_category`) and plain text otherwise. A property with different
+  kinds of value, or with lists or objects, is read as text (lists and objects as
+  compact JSON) with the warning `geojson.property.as_text`, which counts the
+  values that were converted. A missing property and a `null` are both null. A
+  property with a blank name is left out with `geojson.property.unnamed`, because
+  a table cannot hold a column without a name and one odd key should not block
+  the whole file.
