@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bbox;
 pub mod blocks;
 pub mod codes;
 pub mod column;
@@ -23,6 +24,7 @@ pub mod table;
 pub mod text;
 pub mod validity;
 
+pub use bbox::BBox;
 pub use blocks::Blocks;
 pub use codes::FindingCode;
 pub use column::{Column, ColumnData, ColumnType, LengthMismatch, Value};
