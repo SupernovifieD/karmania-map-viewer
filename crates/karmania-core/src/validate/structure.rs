@@ -14,6 +14,49 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_short_lines(dataset, findings);
     check_polygon_offsets(dataset, findings);
     check_polygon_rings(dataset, findings);
+    check_mesh_indices(dataset, findings);
+}
+
+/// Triangle indices come in threes and must point at existing vertices.
+fn check_mesh_indices(dataset: &Dataset, findings: &mut Findings) {
+    let Geometry::Mesh(mesh) = &dataset.geometry else {
+        return;
+    };
+    let count = mesh.indices.len();
+    if !count.is_multiple_of(3) {
+        findings.add(
+            Finding::new(
+                FindingCode::MeshIndicesIncomplete,
+                format!(
+                    "The triangle list ends with an incomplete triangle: it has {} vertex numbers, which is not a multiple of 3.",
+                    format_count(count as u64)
+                ),
+            )
+            .with_hint("Give three vertex numbers for every triangle."),
+        );
+    }
+    let vertices = mesh.vertex_count();
+    let mut outside = Finding::new(
+        FindingCode::MeshIndicesOutOfRange,
+        format!(
+            "Some triangles use vertex numbers that do not exist: the mesh has {} vertices.",
+            format_count(vertices as u64)
+        ),
+    )
+    .with_hint("Vertex numbers start at 0 and must be lower than the number of vertices.");
+    outside.count = 0;
+    for (i, &index) in mesh.indices.iter().enumerate() {
+        if usize::try_from(index).is_ok_and(|v| v < vertices) {
+            continue;
+        }
+        outside.count += 1;
+        outside = outside.at(Location::default()
+            .with_element((i / 3) as u64)
+            .with_vertex(u64::from(index)));
+    }
+    if outside.count > 0 {
+        findings.add(outside);
+    }
 }
 
 /// The two offsets lists of a polygon set: vertices into rings, rings into
@@ -375,6 +418,48 @@ mod tests {
         assert!(!found.is_empty());
         let found = run(check, &polygons(3, &[0, u32::MAX], &[u32::MAX, 0]));
         assert!(found.has_errors());
+    }
+
+    #[test]
+    fn valid_mesh_indices_pass() {
+        assert!(check_all(&mesh(4, &[0, 1, 2, 2, 1, 3])).is_empty());
+    }
+
+    #[test]
+    fn an_incomplete_last_triangle_is_reported_with_the_count() {
+        let found = run(check, &mesh(4, &[0, 1, 2, 3, 1]));
+        assert_eq!(codes(&found), ["mesh.indices.incomplete"]);
+        assert_eq!(
+            found.as_slice()[0].message,
+            "The triangle list ends with an incomplete triangle: it has 5 vertex numbers, which is not a multiple of 3."
+        );
+    }
+
+    #[test]
+    fn vertex_numbers_that_do_not_exist_are_counted_with_where_they_are() {
+        let found = run(check, &mesh(3, &[0, 1, 2, 2, 3, 9, u32::MAX, 0, 1]));
+        assert_eq!(codes(&found), ["mesh.indices.out_of_range"]);
+        let f = &found.as_slice()[0];
+        assert_eq!(
+            f.message,
+            "Some triangles use vertex numbers that do not exist: the mesh has 3 vertices."
+        );
+        assert_eq!(f.count, 3);
+        let at: Vec<_> = f.examples.iter().map(|l| (l.element, l.vertex)).collect();
+        assert_eq!(
+            at,
+            [
+                (Some(1), Some(3)),
+                (Some(1), Some(9)),
+                (Some(2), Some(u64::from(u32::MAX)))
+            ]
+        );
+    }
+
+    #[test]
+    fn every_index_is_out_of_range_when_there_are_no_vertices() {
+        let found = run(check, &mesh(0, &[0, 0, 0]));
+        assert!(codes(&found).contains(&"mesh.indices.out_of_range"));
     }
 
     #[test]
