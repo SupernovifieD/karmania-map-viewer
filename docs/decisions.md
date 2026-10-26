@@ -207,3 +207,11 @@ was chosen, why.
   dropped because it made no sense for points. The guard only reports; readers
   and builders (milestones M3 and M4) must call it before allocating, which is
   tracked there.
+- Step 1.17: the lattice bounding-box bug (a NaN spacing on one axis gave a
+  partial box) now has per-axis regression tests; three of them fail against the
+  original code.
+- Step 1.18: the owner approved `libm` (MIT), resolving the flag in the step 1.11
+  entry. Rotation by an angle that is not a multiple of 90 degrees uses
+  `libm::sincos`, and a test pins the exact bits of eight results, so a platform
+  difference would fail on CI. `f64::to_radians` and `rem_euclid` are plain IEEE
+  arithmetic, so they already agree everywhere.

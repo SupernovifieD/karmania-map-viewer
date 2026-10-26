@@ -31,15 +31,19 @@ pub struct Lattice {
     pub rotation: f64,
 }
 
-/// Sine and cosine of an angle in degrees, exact for multiples of 90 degrees so
-/// that common rotations give exact coordinates.
+/// Sine and cosine of an angle in degrees.
+///
+/// Exact for multiples of 90 degrees, so common rotations give exact
+/// coordinates. Other angles use the pure-Rust `libm` instead of the platform's
+/// math library, so the result is bit-identical on every platform, including
+/// WebAssembly.
 fn rotation_sin_cos(degrees: f64) -> (f64, f64) {
     match degrees.rem_euclid(360.0) {
         0.0 => (0.0, 1.0),
         90.0 => (1.0, 0.0),
         180.0 => (0.0, -1.0),
         270.0 => (-1.0, 0.0),
-        other => other.to_radians().sin_cos(),
+        other => libm::sincos(other.to_radians()),
     }
 }
 
@@ -257,6 +261,28 @@ mod tests {
         let unrotated = lattice([3, 3, 3], 0.0).cell_centre(2, 1, 0);
         assert_eq!(lattice([3, 3, 3], 360.0).cell_centre(2, 1, 0), unrotated);
         assert_eq!(lattice([3, 3, 3], -360.0).cell_centre(2, 1, 0), unrotated);
+    }
+
+    /// The exact bits of sine and cosine for some angles. They come from the
+    /// pure-Rust `libm`, so they are the same on every platform; if a platform's
+    /// own math library ever crept back in, this would fail there.
+    #[test]
+    fn rotation_sine_and_cosine_are_bit_identical_on_every_platform() {
+        let pinned: [(f64, u64, u64); 8] = [
+            (30.0, 0x3fdf_ffff_ffff_ffff, 0x3feb_b67a_e858_4cab),
+            (45.0, 0x3fe6_a09e_667f_3bcc, 0x3fe6_a09e_667f_3bcd),
+            (60.0, 0x3feb_b67a_e858_4caa, 0x3fe0_0000_0000_0001),
+            (123.456, 0x3fea_b2a9_b25a_9ab8, 0xbfe1_a438_70d3_71fa),
+            (-17.25, 0xbfd2_fa89_839b_2988, 0x3fee_8f85_fc8f_1553),
+            (0.001, 0x3ef2_4d15_2115_36db, 0x3fef_ffff_ffeb_111d),
+            (359.999, 0xbef2_4d15_2115_1cc9, 0x3fef_ffff_ffeb_111d),
+            (720.5, 0x3f81_df37_c495_4c21, 0x3fef_ffb0_2599_c9cd),
+        ];
+        for (degrees, sin_bits, cos_bits) in pinned {
+            let (sin, cos) = rotation_sin_cos(degrees);
+            assert_eq!(sin.to_bits(), sin_bits, "sin({degrees})");
+            assert_eq!(cos.to_bits(), cos_bits, "cos({degrees})");
+        }
     }
 
     #[test]
