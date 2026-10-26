@@ -333,19 +333,81 @@ mod tests {
         );
     }
 
+    const NON_FINITE: [f64; 3] = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+
+    /// Regression: a NaN spacing on one axis used to give a partial box,
+    /// because the corners at local 0 on that axis stayed finite. The whole
+    /// box must be rejected instead.
     #[test]
-    fn a_lattice_with_non_finite_values_has_no_box() {
-        let bad_spacing = Lattice {
-            spacing: [f64::NAN, 1.0, 1.0],
-            ..lattice([2, 2, 2], 0.0)
+    fn a_nan_spacing_on_one_axis_does_not_give_a_partial_box() {
+        let l = Lattice {
+            spacing: [f64::NAN, 2.0, 2.0],
+            ..lattice([3, 2, 1], 0.0)
         };
-        assert_eq!(bad_spacing.bbox(), None);
-        assert_eq!(lattice([2, 2, 2], f64::NAN).bbox(), None);
-        let bad_origin = Lattice {
-            origin: [f64::INFINITY, 0.0, 0.0],
-            ..lattice([2, 2, 2], 0.0)
+        assert_eq!(l.bbox(), None);
+    }
+
+    #[test]
+    fn a_non_finite_spacing_on_any_axis_has_no_box() {
+        for axis in 0..3 {
+            for bad in NON_FINITE {
+                let mut spacing = [2.0; 3];
+                spacing[axis] = bad;
+                let l = Lattice {
+                    spacing,
+                    ..lattice([3, 2, 1], 0.0)
+                };
+                assert_eq!(l.bbox(), None, "spacing axis {axis} = {bad}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_non_finite_origin_on_any_axis_has_no_box() {
+        for axis in 0..3 {
+            for bad in NON_FINITE {
+                let mut origin = [10.0; 3];
+                origin[axis] = bad;
+                let l = Lattice {
+                    origin,
+                    ..lattice([3, 2, 1], 0.0)
+                };
+                assert_eq!(l.bbox(), None, "origin axis {axis} = {bad}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_non_finite_rotation_has_no_box() {
+        for bad in NON_FINITE {
+            assert_eq!(lattice([3, 2, 1], bad).bbox(), None, "rotation {bad}");
+        }
+    }
+
+    #[test]
+    fn finite_inputs_whose_box_overflows_have_no_box() {
+        let too_big = Lattice {
+            spacing: [1e308, 1.0, 1.0],
+            ..lattice([3, 1, 1], 0.0)
         };
-        assert_eq!(bad_origin.bbox(), None);
+        assert_eq!(too_big.bbox(), None);
+        let far = Lattice {
+            origin: [f64::MAX, 0.0, 0.0],
+            spacing: [f64::MAX, 1.0, 1.0],
+            ..lattice([2, 1, 1], 0.0)
+        };
+        assert_eq!(far.bbox(), None);
+    }
+
+    #[test]
+    fn large_but_finite_lattices_still_have_a_box() {
+        let l = Lattice {
+            origin: [-1e300, 0.0, 0.0],
+            spacing: [1e300, 1.0, 1.0],
+            ..lattice([2, 1, 1], 0.0)
+        };
+        let b = l.bbox().unwrap();
+        assert_eq!((b.min[0], b.max[0]), (-1e300, 1e300));
     }
 
     #[test]

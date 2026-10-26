@@ -78,6 +78,13 @@ M0; each is its own commit):
 - [x] 1.16 MAX_ELEMENTS guard: a size estimate before allocation that returns
   an error finding.
 
+Follow-ups requested by the owner after the M1 report (each its own commit):
+
+- [x] 1.17 Regression tests for non-finite and overflowing lattice bounding
+  boxes, per axis.
+- [ ] 1.18 Use the `libm` crate for rotation sine and cosine, so results are
+  bit-identical on every platform.
+
 ## M2: Validation (karmania-core)
 
 - [ ] 2.1 `validate(&Dataset) -> ValidationReport`: an ordered list of check
