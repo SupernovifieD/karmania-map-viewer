@@ -1,6 +1,7 @@
 //! Block model geometry: blocks on a lattice, dense or sparse.
 
 use crate::lattice::Lattice;
+use crate::limits::MAX_ELEMENTS;
 
 /// A block model.
 ///
@@ -51,6 +52,58 @@ impl Blocks {
             Some(ijk) => ijk.as_chunks::<3>().0.get(index).copied(),
         }
     }
+}
+
+/// The indices of blocks that repeat an earlier block, in ascending order.
+/// `inside` lists the indices of the blocks that are within the lattice; the
+/// others are ignored.
+///
+/// When the lattice is small enough, one bit per cell finds repeats in a single
+/// pass. A sparse model on a huge lattice falls back to sorting the blocks.
+#[must_use]
+pub fn repeated_blocks(triplets: &[[u32; 3]], inside: &[usize], lattice: &Lattice) -> Vec<usize> {
+    match lattice.cell_count() {
+        Some(cells) if cells <= MAX_ELEMENTS => by_bitmap(triplets, inside, lattice, cells),
+        _ => by_sorting(triplets, inside),
+    }
+}
+
+fn by_bitmap(triplets: &[[u32; 3]], inside: &[usize], lattice: &Lattice, cells: u64) -> Vec<usize> {
+    let words = usize::try_from(cells.div_ceil(64)).unwrap_or(0);
+    let mut seen = vec![0u64; words];
+    let mut repeats = Vec::new();
+    for &index in inside {
+        let Some(&[i, j, k]) = triplets.get(index) else {
+            continue;
+        };
+        let Some(cell) = lattice.index(i, j, k).and_then(|c| usize::try_from(c).ok()) else {
+            continue;
+        };
+        let Some(word) = seen.get_mut(cell / 64) else {
+            continue;
+        };
+        let bit = 1u64 << (cell % 64);
+        if *word & bit != 0 {
+            repeats.push(index);
+        }
+        *word |= bit;
+    }
+    repeats
+}
+
+fn by_sorting(triplets: &[[u32; 3]], inside: &[usize]) -> Vec<usize> {
+    let mut order: Vec<usize> = inside.to_vec();
+    order.sort_unstable_by_key(|&index| (triplets.get(index).copied(), index));
+    let mut repeats = Vec::new();
+    for pair in order.windows(2) {
+        if let [first, second] = *pair
+            && triplets.get(first) == triplets.get(second)
+        {
+            repeats.push(second);
+        }
+    }
+    repeats.sort_unstable();
+    repeats
 }
 
 #[cfg(test)]
@@ -111,5 +164,41 @@ mod tests {
         let huge = blocks([u32::MAX, u32::MAX, 2], None);
         assert_eq!((huge.block_count(), huge.block_ijk(0)), (None, None));
         assert_eq!(blocks([2, 2, 2], None).block_ijk(usize::MAX), None);
+    }
+
+    #[test]
+    fn both_duplicate_paths_agree_on_a_pseudo_random_list() {
+        let mut ijk = Vec::new();
+        let mut state = 12345u32;
+        for _ in 0..3000 {
+            for _ in 0..3 {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                ijk.push((state >> 16) % 7);
+            }
+        }
+        let triplets = ijk.as_chunks::<3>().0;
+        let inside: Vec<usize> = (0..triplets.len()).collect();
+        let lattice = Lattice {
+            origin: [0.0; 3],
+            spacing: [1.0; 3],
+            dims: [7, 7, 7],
+            rotation: 0.0,
+        };
+        let cells = lattice.cell_count().unwrap();
+        let a = by_bitmap(triplets, &inside, &lattice, cells);
+        let b = by_sorting(triplets, &inside);
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 3000 - 343);
+    }
+
+    #[test]
+    fn only_the_blocks_listed_as_inside_can_repeat() {
+        let lattice = blocks([4, 4, 4], None).lattice;
+        let triplets = [[1, 1, 1], [1, 1, 1], [9, 9, 9], [9, 9, 9], [1, 1, 1]];
+        assert_eq!(repeated_blocks(&triplets, &[0, 1, 4], &lattice), [1, 4]);
+        assert_eq!(repeated_blocks(&triplets, &[1, 4], &lattice), [4]);
+        assert!(repeated_blocks(&triplets, &[], &lattice).is_empty());
+        // An index past the end of the list is ignored on both paths.
+        assert!(repeated_blocks(&triplets, &[17], &lattice).is_empty());
     }
 }
