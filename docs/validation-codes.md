@@ -9,6 +9,22 @@ severity or step disagrees with the registry, or if this file lists a code that
 is not registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
+## `asc.header.invalid`
+
+- Severity: error
+- Step: file
+- Message: The grid header {what is wrong}.
+- Hint: Each header line is a name and a number, for example "ncols 4".
+- Example: The grid header gives cellsize as 0; it should be greater than 0.
+
+## `asc.header.missing`
+
+- Severity: error
+- Step: file
+- Message: The grid header is missing {names}.
+- Hint: A grid file starts with ncols, nrows, xllcorner (or xllcenter), yllcorner (or yllcenter) and cellsize.
+- Example: The grid header is missing ncols and nrows.
+
 ## `blocks.ijk.duplicate`
 
 - Severity: error

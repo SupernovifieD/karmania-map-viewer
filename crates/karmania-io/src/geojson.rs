@@ -25,11 +25,11 @@ use serde_json::error::Category;
 use serde_json::{Map, Value};
 
 use crate::geojson_crs::{FileCrs, file_crs};
-use crate::geojson_properties::{Properties, join_and};
+use crate::geojson_properties::Properties;
 use crate::geojson_shapes::{
     GEOMETRY_TYPES, LinesAcc, Parsed, PointsAcc, PolygonsAcc, WGS84, parse_geometry,
 };
-use crate::output::{ReadOutput, Tally};
+use crate::output::{ReadOutput, Tally, join_and};
 
 /// One feature (or a bare geometry): where it is in the file, its geometry and
 /// its properties.

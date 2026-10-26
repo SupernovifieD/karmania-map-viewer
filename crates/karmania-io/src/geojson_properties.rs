@@ -21,6 +21,7 @@ use karmania_core::{Column, ColumnData, Finding, FindingCode, Findings, Location
 use serde_json::{Map, Value};
 
 use crate::infer::is_category;
+use crate::output::join_and;
 
 /// The properties of one feature, and where the feature is in the file.
 #[derive(Debug, Clone, Copy)]
@@ -170,15 +171,6 @@ fn shape_of(
             findings.add(finding);
             Shape::ConvertedText
         }
-    }
-}
-
-/// "a", "a and b", "a, b and c".
-pub(crate) fn join_and(words: &[&str]) -> String {
-    match words {
-        [] => String::new(),
-        [only] => (*only).to_string(),
-        [init @ .., last] => format!("{} and {last}", init.join(", ")),
     }
 }
 

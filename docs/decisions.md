@@ -538,3 +538,14 @@ was chosen, why.
   unknown name, sets no CRS and gives the warning `geojson.crs.unrecognized`, so
   the wizard asks for one; the data is still imported. A code is not looked up in
   the EPSG database here: validation reports an unknown code.
+- Step 3.16: the header of an ESRI ASCII grid is a run of `name value` lines that
+  ends at the first line starting with a number; names are not case sensitive and
+  blank lines are allowed. The position can be `xllcorner`/`yllcorner` (the outer
+  corner of the lower-left cell) or `xllcenter`/`yllcenter` (the middle of that
+  cell, moved by half a cell), and the cell size `cellsize` or `dx` and `dy`. All
+  problems are reported together: lines that are not understood, unusable
+  numbers, a name given twice, two ways of giving the same thing, and what is
+  missing (one message listing it all). A name that is present with an unusable
+  value is not also reported as missing. `ncols` and `nrows` must be whole numbers
+  of at least 1 and `cellsize` must be above 0. Without `NODATA_value` there is no
+  nodata value; -9999 is not assumed. The codes use the new area `asc`.

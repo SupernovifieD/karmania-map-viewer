@@ -184,7 +184,7 @@ Follow-ups requested by the owner after the M2 report (each its own commit):
 - [x] 3.15 GeoJSON: mixed geometry types give one dataset per kind (info); CRS
   defaults to EPSG:4326 (RFC 7946); the legacy "crs" member is honored when it
   names an EPSG code.
-- [ ] 3.16 ESRI ASCII grid header: ncols, nrows, xllcorner or xllcenter,
+- [x] 3.16 ESRI ASCII grid header: ncols, nrows, xllcorner or xllcenter,
   yllcorner or yllcenter, cellsize or dx/dy, NODATA_value.
 - [ ] 3.17 ESRI ASCII grid values: flip rows to south-first; normalize centre
   registration to corner; check value count; nodata to null with a warning
