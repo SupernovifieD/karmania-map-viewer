@@ -104,3 +104,11 @@ was chosen, why.
   postinstall is denied (`allowBuilds` in `pnpm-workspace.yaml`) because esbuild
   runs without it; the entry becomes unnecessary once Vite 8 replaces Vite 7
   (step 0.13). The lockfile now begins with a document that pins pnpm itself.
+- Step 0.12: license policy, owner decision. Apache-2.0 (the `LICENSE` from the
+  initial commit, which the owner said not to touch) is treated as the project
+  license, so the brief's "no copyleft until the license is decided" no longer
+  blocks anything. `minimatch` (BlueOak-1.0.0) is accepted. MPL-2.0 is accepted
+  for dev-only build tools, which covers `lightningcss` in Vite 8. This is a
+  narrow reading of "go with copyleft": GPL, LGPL and AGPL, and any license not
+  listed in `docs/dependencies.md`, still need approval. If the owner wants a
+  broader rule, change it there.

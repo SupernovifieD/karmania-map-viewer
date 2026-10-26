@@ -86,8 +86,8 @@ record the decision in `docs/decisions.md`.
 
 ## Dependencies
 
-Allowed licenses: MIT, Apache-2.0, BSD, ISC, Zlib, and OFL for fonts. No
-copyleft until the project license is decided. Add a dependency in the step that
-first needs it, record it in `docs/dependencies.md` in the same commit, use the
-latest stable version unless a documented constraint forbids it, and commit the
-lockfile.
+The allowed licenses are listed in the license policy in
+`docs/dependencies.md`; anything not listed needs the owner's approval. Add a
+dependency in the step that first needs it, record it in `docs/dependencies.md`
+in the same commit, use the latest stable version unless a documented constraint
+forbids it, and commit the lockfile.

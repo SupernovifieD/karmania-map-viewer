@@ -38,7 +38,7 @@ Follow-ups requested by the owner after the M0 report (added as sub-steps of
 M0; each is its own commit):
 
 - [x] 0.11 Update pnpm to 12.15.0 (global install and `packageManager`).
-- [ ] 0.12 License policy: accept BlueOak-1.0.0 and, for dev-only build tools,
+- [x] 0.12 License policy: accept BlueOak-1.0.0 and, for dev-only build tools,
   MPL-2.0 (weak copyleft); update `docs/dependencies.md` and
   `docs/conventions.md`.
 - [ ] 0.13 Move Vite from 7 to 8 now that MPL-2.0 build tools are accepted.
