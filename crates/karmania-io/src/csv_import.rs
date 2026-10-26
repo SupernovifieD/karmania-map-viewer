@@ -373,6 +373,7 @@ pub struct CsvImport<'a> {
     findings: Findings,
     done: bool,
     rows: u64,
+    estimated_rows: u64,
 }
 
 impl<'a> CsvImport<'a> {
@@ -551,6 +552,7 @@ impl<'a> CsvImport<'a> {
             findings,
             done,
             rows: 0,
+            estimated_rows: data_rows,
             text,
             mapping,
         }
@@ -585,6 +587,14 @@ impl CsvImport<'_> {
     #[must_use]
     pub fn rows_read(&self) -> u64 {
         self.rows
+    }
+
+    /// About how many data rows the file has, counted by lines before any row is
+    /// read. A quoted field with a line break in it counts as several, so this can
+    /// be more than the real number, never less.
+    #[must_use]
+    pub fn estimated_rows(&self) -> u64 {
+        self.estimated_rows
     }
 
     fn row(&mut self, record: &Record) {
