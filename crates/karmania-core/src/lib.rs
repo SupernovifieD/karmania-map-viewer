@@ -6,8 +6,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod codes;
 pub mod findings;
 
+pub use codes::FindingCode;
 pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
 
 #[cfg(test)]
