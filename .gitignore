@@ -20,5 +20,9 @@ blob-report/
 # Claude Code project files
 .claude/
 
+# Editor swap files
+*.swp
+*.swo
+
 # macOS
 .DS_Store
