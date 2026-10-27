@@ -86,7 +86,12 @@ export interface Engine {
   /** The loaded datasets, in the order they were loaded. */
   datasets(): readonly Summary[];
 
-  /** Rows `start` to `start + count` of a dataset; fewer at the end of the data. */
+  /**
+   * Rows `start` to `start + count` of a dataset, counting from 0: fewer at the end of the
+   * data, none past it, and never more than 100,000. Small windows are read through a
+   * cache, so asking again for rows just read costs nothing. A window that is not a whole
+   * number of rows, or starts before row 0, is misuse.
+   */
   rows(id: number, start: number, count: number): Promise<Page>;
 
   /** Unloads a dataset. */

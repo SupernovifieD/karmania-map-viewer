@@ -6,7 +6,7 @@ import { createEngine } from './engine.js';
 import { EngineDisposedError, EngineError } from './errors.js';
 import type { DatasetInput } from './inputs.js';
 import { bigPointsCsv, pointsMapping } from './test-support/data.js';
-import { fixtureFile } from './test-support/kernel.js';
+import { fixtureFile, testKernelModule, wrapKernel } from './test-support/kernel.js';
 import { mappingFrom } from './test-support/mapping.js';
 import { engineOverChannel } from './test-support/ports.js';
 import type { ImportMapping } from './types.js';
@@ -205,6 +205,106 @@ describe('loading a dataset', () => {
       'grid',
       'blocks',
     ]);
+  });
+});
+
+describe('reading rows', () => {
+  /** An engine whose kernel counts the requests for rows that reach it. */
+  function countingEngine(): { engine: Engine; asked: () => number } {
+    let asked = 0;
+    const real = testKernelModule();
+    const engine = start(() =>
+      Promise.resolve({
+        ...real,
+        createKernel: () => {
+          const kernel = real.createKernel();
+          return {
+            ...wrapKernel(kernel),
+            rows: (dataset, first, many) => {
+              asked += 1;
+              return kernel.rows(dataset, first, many);
+            },
+          };
+        },
+      }),
+    );
+    return { engine, asked: () => asked };
+  }
+
+  const numbered = (rows: number) =>
+    points({
+      name: 'numbered',
+      x: Array.from({ length: rows }, (_, i) => 500_000 + i),
+      y: Array.from({ length: rows }, (_, i) => 2_700_000 + 2 * i),
+      crs: UTM40,
+    });
+
+  it('gives the rows asked for, across the pages they are fetched in', async () => {
+    const { engine, asked } = countingEngine();
+    await engine.load(numbered(1000));
+    const id = engine.datasets()[0]?.id ?? -1;
+    const page = await engine.rows(id, 250, 20);
+    expect([page.start, page.count]).toEqual([250, 20]);
+    const x = page.columns.find((c) => c.name === 'X')?.values;
+    expect(x).toEqual(Float64Array.from({ length: 20 }, (_, i) => 500_250 + i));
+    // Rows 250 to 269 are in the first two pages of 256 rows.
+    expect(asked()).toBe(2);
+  });
+
+  it('asks the worker once for rows that are asked for again', async () => {
+    const { engine, asked } = countingEngine();
+    await engine.load(numbered(1000));
+    const id = engine.datasets()[0]?.id ?? -1;
+    await engine.rows(id, 0, 50);
+    await engine.rows(id, 10, 50);
+    await engine.rows(id, 0, 50);
+    expect(asked()).toBe(1);
+  });
+
+  it('cuts a window short at the end of the data', async () => {
+    const { engine } = countingEngine();
+    await engine.load(numbered(300));
+    const id = engine.datasets()[0]?.id ?? -1;
+    const page = await engine.rows(id, 290, 50);
+    expect([page.start, page.count]).toEqual([290, 10]);
+    expect((await engine.rows(id, 5000, 10)).count).toBe(0);
+  });
+
+  it('reads a very large window straight from the worker, and does not keep it', async () => {
+    const { engine, asked } = countingEngine();
+    await engine.load(numbered(5000));
+    const id = engine.datasets()[0]?.id ?? -1;
+    expect((await engine.rows(id, 0, 5000)).count).toBe(5000);
+    await engine.rows(id, 0, 5000);
+    expect(asked()).toBe(2);
+  });
+
+  it('forgets the rows of a dataset that is removed', async () => {
+    const { engine, asked } = countingEngine();
+    await engine.load(numbered(100));
+    const id = engine.datasets()[0]?.id ?? -1;
+    await engine.rows(id, 0, 10);
+    await engine.remove(id);
+    await expect(engine.rows(id, 0, 10)).rejects.toThrow(/no dataset/);
+    await engine.load(numbered(100));
+    const next = engine.datasets()[0]?.id ?? -1;
+    expect(next).not.toBe(id);
+    await engine.rows(next, 0, 10);
+    expect(asked()).toBe(3);
+  });
+
+  it('refuses a window that cannot be, as misuse, without asking the worker', async () => {
+    const { engine, asked } = countingEngine();
+    await engine.load(numbered(10));
+    const id = engine.datasets()[0]?.id ?? -1;
+    await expect(engine.rows(id, -1, 5)).rejects.toBeInstanceOf(TypeError);
+    await expect(engine.rows(id, 0, 1.5)).rejects.toBeInstanceOf(TypeError);
+    expect(asked()).toBe(0);
+  });
+
+  it('says there is no such dataset for a dataset that was never loaded', async () => {
+    const { engine } = countingEngine();
+    await expect(engine.rows(99, 0, 10)).rejects.toBeInstanceOf(EngineError);
   });
 });
 
