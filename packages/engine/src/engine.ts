@@ -16,6 +16,7 @@ import type { ClientPort } from './client.js';
 import { groupFiles } from './grouping.js';
 import type { DatasetInput } from './inputs.js';
 import { EngineDisposedError } from './errors.js';
+import { createPageCache } from './page-cache.js';
 import { createRegistry } from './registry.js';
 import { transferablesOf } from './transfer.js';
 import type { ImportMapping, LoadResult } from './types.js';
@@ -54,6 +55,9 @@ export function createEngineOnPort(
 ): Engine {
   const client = createKernelClient(port);
   const registry = createRegistry();
+  const pages = createPageCache((dataset, start, count) =>
+    client.request('rows', { dataset, start, count }),
+  );
   // The dataset inputs whose arrays have gone to the worker.
   const consumed = new WeakSet<DatasetInput>();
   let disposed = false;
@@ -144,13 +148,15 @@ export function createEngineOnPort(
     rows: async (id, start, count) => {
       assertUsable();
       await started;
-      return client.request('rows', { dataset: id, start, count });
+      return pages.window(id, start, count);
     },
 
     remove: async (id) => {
       assertUsable();
       await started;
-      if (await client.request('remove', { dataset: id })) {
+      const removed = await client.request('remove', { dataset: id });
+      pages.forget(id);
+      if (removed) {
         registry.remove(id);
       }
     },
@@ -167,6 +173,7 @@ export function createEngineOnPort(
       }
       disposed = true;
       registry.clear();
+      pages.clear();
       client.dispose();
     },
   };

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { DatasetInput } from './inputs.js';
-import type { KernelApi, KernelModule, LoadKernelModule } from './kernel-module.js';
+import type { KernelModule, LoadKernelModule } from './kernel-module.js';
 import type { HandlerHarness, Posted } from './test-support/handler.js';
 import { resultOf, startHandler } from './test-support/handler.js';
-import { fixtureFile, testKernelModule } from './test-support/kernel.js';
+import { fixtureFile, testKernelModule, wrapKernel } from './test-support/kernel.js';
 import { bigPointsCsv, pointsMapping, UTM40 } from './test-support/data.js';
 import { mappingFrom } from './test-support/mapping.js';
 import type { ImportMapping, Kind, LoadResult } from './types.js';
@@ -328,7 +328,10 @@ describe('loading datasets made from arrays', () => {
     const real = testKernelModule();
     const lying: KernelModule = {
       ...real,
-      createKernel: () => ({ ...wrap(real.createKernel()), load: () => ({ status: 'maybe' }) }),
+      createKernel: () => ({
+        ...wrapKernel(real.createKernel()),
+        load: () => ({ status: 'maybe' }),
+      }),
     };
     const harness = await ready(() => Promise.resolve(lying));
     const reply = await harness.settle({
@@ -339,21 +342,6 @@ describe('loading datasets made from arrays', () => {
     expect(errorOf(reply).message).toMatch(/status/);
   });
 });
-
-/** The methods of a kernel as plain properties, so a test can replace some of them. */
-function wrap(kernel: KernelApi): { -readonly [K in keyof KernelApi]: KernelApi[K] } {
-  return {
-    startImport: (fileName, bytes, mapping) => kernel.startImport(fileName, bytes, mapping),
-    stepImport: (importId, budget) => kernel.stepImport(importId, budget),
-    cancelImport: (importId) => kernel.cancelImport(importId),
-    load: (input) => kernel.load(input),
-    rows: (dataset, start, count) => kernel.rows(dataset, start, count),
-    remove: (dataset) => kernel.remove(dataset),
-    free: () => {
-      kernel.free();
-    },
-  };
-}
 
 describe('stopping a request', () => {
   it('stops one that has not started', async () => {
@@ -378,7 +366,7 @@ describe('stopping a request', () => {
       createKernel: () => {
         const kernel = real.createKernel();
         return {
-          ...wrap(kernel),
+          ...wrapKernel(kernel),
           stepImport: (importId, budget) => {
             const status = kernel.stepImport(importId, budget);
             steps += 1;

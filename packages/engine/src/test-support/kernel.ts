@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import * as generated from '../../wasm/karmania_wasm.js';
 import { kernelModuleOf } from '../kernel-module.js';
-import type { KernelModule } from '../kernel-module.js';
+import type { KernelApi, KernelModule } from '../kernel-module.js';
 
 /**
  * The kernel as the tests see it. The generated types call every result `any`;
@@ -96,5 +96,20 @@ export function foreignArrays(): {
   ) as {
     floats: Float64Array;
     unsigned: Uint32Array;
+  };
+}
+
+/** The methods of a kernel as plain properties, so a test can replace some of them. */
+export function wrapKernel(kernel: KernelApi): { -readonly [K in keyof KernelApi]: KernelApi[K] } {
+  return {
+    startImport: (fileName, bytes, mapping) => kernel.startImport(fileName, bytes, mapping),
+    stepImport: (importId, budget) => kernel.stepImport(importId, budget),
+    cancelImport: (importId) => kernel.cancelImport(importId),
+    load: (input) => kernel.load(input),
+    rows: (dataset, start, count) => kernel.rows(dataset, start, count),
+    remove: (dataset) => kernel.remove(dataset),
+    free: () => {
+      kernel.free();
+    },
   };
 }
