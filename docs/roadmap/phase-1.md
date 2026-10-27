@@ -283,14 +283,14 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.1a The inputs of the builder functions (`DatasetInput`) and type tests
     for the unions that already exist.
   - [x] 5.1b The engine API types (engine, options, progress, events).
-- [ ] 5.2 Worker entry: loads the WASM; typed request and response protocol with
+- [x] 5.2 Worker entry: loads the WASM; typed request and response protocol with
   IDs; serializes errors.
   - [x] 5.2a The protocol: request and response unions, serialized errors.
   - [x] 5.2b The worker handler: initialising, preview, rows, remove, load, and
     the import loop with cancellation.
   - [x] 5.2c The worker handler: reading a file in chunks, and progress replies
     for the three phases of an import.
-  - [ ] 5.2d The worker entry that binds the handler to the worker's scope.
+  - [x] 5.2d The worker entry that binds the handler to the worker's scope.
 - [ ] 5.3 KernelClient on the main thread: promises, transferables, AbortSignal
   to cancel messages; tested with a fake worker.
   - [ ] 5.3a Requests, replies and errors.
