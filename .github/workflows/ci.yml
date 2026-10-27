@@ -50,4 +50,8 @@ jobs:
       - run: pnpm -r lint
       - run: pnpm -r typecheck
       - run: pnpm -r test
+      # The browser tests run the engine's real worker in Chromium.
+      - name: Install the browser for the end-to-end tests
+        run: pnpm --filter @karmania/engine exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
       - run: pnpm format:check
