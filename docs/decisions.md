@@ -1045,3 +1045,16 @@ was chosen, why.
   engine: `preview` takes each file alone, `importFiles` takes one file, `load` copies
   its arrays and `rows` asks the worker each time. Steps 5.5 to 5.9 each replace one of
   these with the full behaviour and its tests.
+- Step 5.8a: the builders give each attribute column the type a CSV import would give
+  the same values: whole numbers that a 64-bit integer holds exactly are `int` and other
+  numbers `float`; true and false are `bool`; text with at most 50 different values, each
+  appearing twice or more on average, is a `category` (numbered in order of first
+  appearance), and other text is `text`; `null` is a missing value of any type, and a
+  column that is all `null` or empty is `float`. A `Float64Array` is taken as it is, as a
+  `float` column, and the other typed arrays are read as numbers. Coordinates and offsets
+  that are already typed arrays are not copied (loading transfers them, see 5.8b). Mixed
+  kinds, a value that is none of the kinds, and a position that is not a whole number from
+  0 to 4,294,967,295 make the builder throw a `TypeError` that names the column or list
+  and the place counting from 1: they cannot be put in a dataset (a wrapped-around offset
+  would change the data silently), and everything else, such as lengths that do not match,
+  is left to the kernel to report as a finding.

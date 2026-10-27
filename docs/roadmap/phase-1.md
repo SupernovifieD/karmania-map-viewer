@@ -305,7 +305,7 @@ Definitions and reprojection can be added later, with the features that need the
   cancellation.
 - [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
   "blocked" result, never a throw.
-  - [ ] 5.8a The builder functions.
+  - [x] 5.8a The builder functions.
   - [ ] 5.8b `engine.load`.
 - [ ] 5.9 `rows()`: paging with a small LRU cache (pages of 256 rows).
   - [ ] 5.9a The page cache: windows made from cached pages.
