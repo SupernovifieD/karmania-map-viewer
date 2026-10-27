@@ -86,16 +86,24 @@ export function createEngineOnPort(
 
     importFiles: async (files, mapping: ImportMapping, importOptions: ImportOptions = {}) => {
       assertUsable();
-      const [file, ...others] = files;
-      if (file === undefined || others.length > 0) {
-        throw new Error('importFiles imports one file at a time.');
+      // One mapping describes the columns of one file, so there is one data file to import.
+      // Its sidecars come along but are not read: the coordinate system is in the mapping.
+      const [group, ...others] = groupFiles(files);
+      if (group === undefined) {
+        throw new TypeError('importFiles needs a data file to import.');
+      }
+      if (others.length > 0) {
+        const names = [group, ...others].map((g) => `"${g.file.name}"`).join(', ');
+        throw new TypeError(
+          `importFiles imports one data file at a time, but was given ${names}. Call it once for each file.`,
+        );
       }
       await started;
       const { signal, onProgress } = importOptions;
       return loaded(
         await client.request(
           'import',
-          { file, mapping },
+          { file: group.file, mapping },
           {
             ...(signal === undefined ? {} : { signal }),
             ...(onProgress === undefined ? {} : { onProgress }),

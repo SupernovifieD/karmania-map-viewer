@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Engine } from './api.js';
+import { IMPORT_PHASES } from './api.js';
+import type { Engine, ImportProgress } from './api.js';
 import { createEngine } from './engine.js';
 import { EngineDisposedError, EngineError } from './errors.js';
 import type { DatasetInput } from './inputs.js';
+import { bigPointsCsv, pointsMapping } from './test-support/data.js';
 import { fixtureFile } from './test-support/kernel.js';
 import { mappingFrom } from './test-support/mapping.js';
 import { engineOverChannel } from './test-support/ports.js';
+import type { ImportMapping } from './types.js';
 
 const UTM40 = { kind: 'epsg', code: 32640 } as const;
 
@@ -183,5 +186,120 @@ describe('starting', () => {
 
   it('says that it needs a browser when there are no workers', () => {
     expect(() => createEngine()).toThrow(/Web Workers are not available/);
+  });
+});
+
+describe('importing files', () => {
+  it('imports one data file, and leaves its sidecar alone', async () => {
+    const engine = start();
+    const csv = fixtureFile('points.csv');
+    const prj = fixtureFile('points.prj');
+    const [preview] = await engine.preview([csv, prj]);
+    if (preview === undefined) {
+      throw new Error('no preview');
+    }
+    const result = await engine.importFiles([prj, csv], mappingFrom(preview, 'points', UTM40));
+    expect(result.status).toBe('loaded');
+    expect(engine.datasets().map((d) => [d.name, d.elementCount])).toEqual([['points.csv', 8]]);
+  });
+
+  it('tells listeners of the new dataset once', async () => {
+    const engine = start();
+    const heard: number[] = [];
+    engine.on('datasets', (list) => heard.push(list.length));
+    await engine.importFiles([bigPointsCsv(10)], pointsMapping('ten'));
+    expect(heard).toEqual([1]);
+  });
+
+  it('reports what blocks an import and loads nothing', async () => {
+    const engine = start();
+    const result = await engine.importFiles([bigPointsCsv(10)], {
+      ...pointsMapping('x'),
+      crs: null,
+    });
+    expect(result.status === 'blocked' && result.findings.map((f) => f.code)).toEqual([
+      'crs.missing',
+    ]);
+    expect(engine.datasets()).toEqual([]);
+  });
+
+  it('refuses to import no file, or several data files, as misuse', async () => {
+    const engine = start();
+    const mapping = pointsMapping('x');
+    await expect(engine.importFiles([], mapping)).rejects.toThrow(/needs a data file/);
+    await expect(
+      engine.importFiles([fixtureFile('points.csv'), fixtureFile('lines.csv')], mapping),
+    ).rejects.toThrow(/one data file at a time.*"points.csv", "lines.csv"/);
+    await expect(
+      engine.importFiles([fixtureFile('points.csv'), fixtureFile('lines.csv')], mapping),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(engine.datasets()).toEqual([]);
+  });
+
+  it('refuses a mapping that is not a mapping, as misuse', async () => {
+    const engine = start();
+    const notAMapping = {} as unknown as ImportMapping;
+    await expect(engine.importFiles([bigPointsCsv(2)], notAMapping)).rejects.toBeInstanceOf(
+      EngineError,
+    );
+  });
+});
+
+describe('progress and stopping an import', () => {
+  it('reports reading, parsing and validating, each from the start, before it resolves', async () => {
+    const engine = start();
+    const seen: ImportProgress[] = [];
+    let resolved = false;
+    const importing = engine
+      .importFiles([bigPointsCsv(150_000)], pointsMapping('big'), {
+        onProgress: (progress) => {
+          expect(resolved).toBe(false);
+          seen.push(progress);
+        },
+      })
+      .then((result) => {
+        resolved = true;
+        return result;
+      });
+    expect((await importing).status).toBe('loaded');
+    expect(seen[0]).toEqual({ phase: 'reading', fraction: 0 });
+    expect([...new Set(seen.map((p) => p.phase))]).toEqual(['reading', 'parsing', 'validating']);
+    for (const phase of IMPORT_PHASES) {
+      const fractions = seen.filter((p) => p.phase === phase).map((p) => p.fraction);
+      expect(fractions).toEqual([...fractions].sort((a, b) => a - b));
+    }
+    expect(engine.datasets()[0]?.elementCount).toBe(150_000);
+  });
+
+  it('stops when aborted, drops what it had read, and can import again', async () => {
+    const engine = start();
+    let announced = 0;
+    engine.on('datasets', () => {
+      announced += 1;
+    });
+    const controller = new AbortController();
+    const importing = engine.importFiles([bigPointsCsv(150_000)], pointsMapping('big'), {
+      signal: controller.signal,
+      onProgress: ({ phase }) => {
+        if (phase === 'parsing') {
+          controller.abort();
+        }
+      },
+    });
+    await expect(importing).rejects.toMatchObject({ name: 'AbortError' });
+    expect(engine.datasets()).toEqual([]);
+    expect(announced).toBe(0);
+    const again = await engine.importFiles([bigPointsCsv(5)], pointsMapping('small'));
+    expect(again.status).toBe('loaded');
+    expect(engine.datasets().map((d) => d.elementCount)).toEqual([5]);
+  });
+
+  it('does not start when the signal is already aborted', async () => {
+    const engine = start();
+    const importing = engine.importFiles([bigPointsCsv(5)], pointsMapping('small'), {
+      signal: AbortSignal.abort(),
+    });
+    await expect(importing).rejects.toMatchObject({ name: 'AbortError' });
+    expect(engine.datasets()).toEqual([]);
   });
 });
