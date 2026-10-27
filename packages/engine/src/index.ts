@@ -14,6 +14,20 @@ export {
   WIZARD_STEPS,
 } from './types.js';
 export type {
+  AttributeColumn,
+  AttributeValue,
+  Attributes,
+  BlocksData,
+  DatasetInput,
+  GridData,
+  IndexList,
+  LinesData,
+  MeshData,
+  NumberList,
+  PointsData,
+  PolygonsData,
+} from './inputs.js';
+export type {
   BBox,
   CheckGroup,
   ColumnMapping,
