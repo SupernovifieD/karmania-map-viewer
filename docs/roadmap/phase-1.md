@@ -297,10 +297,10 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.3b Progress, cancellation, transfer lists and a worker that fails.
 - [x] 5.4 createEngine and dispose; multiple instances; no globals.
 - [x] 5.5 Registry and events: `datasets()`, `on("datasets")`, `remove()`.
-- [ ] 5.6 `preview(files)`: sidecar grouping by basename; reads File bytes
+- [x] 5.6 `preview(files)`: sidecar grouping by basename; reads File bytes
   inside the worker.
   - [x] 5.6a Grouping data files with their `.prj` sidecars.
-  - [ ] 5.6b `engine.preview`.
+  - [x] 5.6b `engine.preview`.
 - [ ] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
   cancellation.
 - [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
