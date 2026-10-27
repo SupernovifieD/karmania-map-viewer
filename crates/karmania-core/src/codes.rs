@@ -166,6 +166,10 @@ finding_codes! {
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
+    /// In EPSG:4326, X fits latitude and Y does not, so the two look swapped.
+    CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
+    /// In EPSG:4326, some coordinates are not valid longitudes and latitudes.
+    CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The per-vertex table does not have one row per vertex.

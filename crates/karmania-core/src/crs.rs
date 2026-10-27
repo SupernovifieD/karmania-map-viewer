@@ -2,7 +2,9 @@
 //!
 //! A dataset names its CRS either by EPSG code or as a local (mine) grid with an
 //! explicit length unit. A missing CRS is an error, reported by validation.
-//! Looking up what an EPSG code means is a separate step, not done here.
+//! Looking up what an EPSG code means is a separate step, not done here; the one
+//! exception is that validation recognises EPSG:4326 by its code (see
+//! `validate::crs_checks`).
 
 use serde::{Deserialize, Serialize};
 

@@ -706,6 +706,21 @@ mod tests {
     }
 
     #[test]
+    fn projected_coordinates_in_a_file_with_no_crs_are_caught_by_validation() {
+        // No crs member means EPSG:4326, so numbers like these cannot be right.
+        let out = read(&collection(vec![point(
+            json!([500_000.0, 2_765_000.0]),
+            json!({}),
+        )]));
+        let report = karmania_core::validate(only(&out));
+        assert!(
+            report
+                .findings()
+                .any(|f| f.code.as_str() == "crs.geographic.out_of_range")
+        );
+    }
+
+    #[test]
     fn reading_twice_gives_the_same_result() {
         let text = fixtures::text("mixed.geojson");
         assert_eq!(
