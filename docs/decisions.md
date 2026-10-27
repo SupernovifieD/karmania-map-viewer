@@ -1058,3 +1058,13 @@ was chosen, why.
   and the place counting from 1: they cannot be put in a dataset (a wrapped-around offset
   would change the data silently), and everything else, such as lengths that do not match,
   is left to the kernel to report as a finding.
+- Step 6.1: `@karmania/ui` is the component library and `@karmania/app` hosts
+  `gallery.html`, which shows the components in isolation (step 7.1 adds the real app to
+  it). Components are written without decorators: reactive properties are declared in
+  `static properties` and typed with `declare` fields, which behaves the same under every
+  TypeScript setting. Custom elements are named with a `k-` prefix, like the `--k-`
+  tokens (the app's root is `<karmania-app>`, as the brief says). Vite 8 is built on
+  Rolldown, so the build options are `rolldownOptions` (the old name is deprecated and
+  lint rejects it); the UI library is built as an ES module with Lit left external.
+  `pnpm check` and CI now also run every package's `build`, so a broken build is caught
+  at once. The gallery's browser tests use port 4174, the engine's use 4173.

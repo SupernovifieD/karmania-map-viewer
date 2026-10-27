@@ -318,7 +318,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 ## M6: UI foundations (packages/ui)
 
-- [ ] 6.1 Package setup with Lit and Vite library mode; `gallery.html` in
+- [x] 6.1 Package setup with Lit and Vite library mode; `gallery.html` in
   `packages/app` shows components in isolation.
 - [ ] 6.2 `tokens.css` (section 7.1) plus `docs/design-tokens.md`.
 - [ ] 6.3 Base styles: Inter self-hosted, box-sizing, focus-visible, reduced
