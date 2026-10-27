@@ -15,6 +15,7 @@ import { assertNever } from './exhaustive.js';
 import type { KernelApi, KernelModule, LoadKernelModule } from './kernel-module.js';
 import { parseToWorker } from './protocol.js';
 import type { FromWorker, RequestMessage, Requests } from './protocol.js';
+import type { ImportPhase } from './api.js';
 import type { LoadResult, Page, Preview } from './types.js';
 
 /** What the handler needs from its surroundings. */
@@ -44,6 +45,41 @@ function yieldToEventLoop(): Promise<void> {
 
 async function readBytes(file: Blob): Promise<Uint8Array> {
   return new Uint8Array(await file.arrayBuffer());
+}
+
+/**
+ * Reads a file chunk by chunk into one buffer of the file's size, so that a large file
+ * is held once, and tells `afterChunk` how much is read (0 to 1). If `afterChunk`
+ * throws, the reading stops and the error goes on.
+ */
+async function readBytesInChunks(
+  file: File,
+  afterChunk: (fraction: number) => void,
+): Promise<Uint8Array> {
+  const bytes = new Uint8Array(file.size);
+  const reader = file.stream().getReader();
+  let offset = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (offset + value.byteLength > bytes.byteLength) {
+        throw new Error(`The file "${file.name}" changed while it was being read.`);
+      }
+      bytes.set(value, offset);
+      offset += value.byteLength;
+      afterChunk(bytes.byteLength === 0 ? 1 : offset / bytes.byteLength);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+  if (offset !== bytes.byteLength) {
+    throw new Error(`The file "${file.name}" changed while it was being read.`);
+  }
+  return bytes;
 }
 
 /** The buffers of a page that can be handed over instead of copied. */
@@ -119,10 +155,29 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
     return previews;
   }
 
+  /** Posts progress, at most once for each whole percent of each phase. */
+  function progressReporter(id: number): (phase: ImportPhase, fraction: number) => void {
+    let lastPhase: ImportPhase | undefined;
+    let lastPercent = -1;
+    return (phase, fraction) => {
+      const percent = Math.floor(Math.min(Math.max(fraction, 0), 1) * 100);
+      if (phase !== lastPhase || percent !== lastPercent) {
+        lastPhase = phase;
+        lastPercent = percent;
+        post({ type: 'progress', id, progress: { phase, fraction: percent / 100 } }, []);
+      }
+    };
+  }
+
   async function runImport(id: number, params: Requests['import']['params']): Promise<LoadResult> {
     const { kernel } = await ready();
     throwIfStopped(id);
-    const bytes = await readBytes(params.file);
+    const report = progressReporter(id);
+    report('reading', 0);
+    const bytes = await readBytesInChunks(params.file, (fraction) => {
+      throwIfStopped(id);
+      report('reading', fraction);
+    });
     throwIfStopped(id);
     const importId = kernel.startImport(params.file.name, bytes, params.mapping);
     try {
@@ -132,6 +187,7 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         if (status.status === 'done') {
           return status.result;
         }
+        report(status.phase, status.fraction);
         await yieldToEventLoop();
       }
     } catch (error) {

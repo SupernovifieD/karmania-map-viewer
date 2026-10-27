@@ -204,8 +204,111 @@ describe('importing, reading and removing', () => {
     });
     const removed = await harness.settle({ type: 'remove', id: id(), params: { dataset: 99 } });
     expect(resultOf(removed, 'remove')).toBe(false);
-    expect(harness.posted.map((p) => p.message.type)).toEqual(['result', 'result']);
+    expect(
+      harness.posted.filter((p) => p.message.type === 'result' && p.message.request === 'import'),
+    ).toEqual([]);
     expect(loadedSummaries(resultOf(await importing, 'import'))[0]?.elementCount).toBe(150_000);
+  });
+});
+
+describe('progress of an import', () => {
+  /** A file whose bytes arrive in small pieces, as a large file's do. */
+  class PiecemealFile extends File {
+    override stream(): ReadableStream<Uint8Array<ArrayBuffer>> {
+      const content = this.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+      const piece = 1000;
+      let offset = 0;
+      return new ReadableStream({
+        async pull(controller) {
+          const bytes = await content;
+          if (offset >= bytes.byteLength) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(bytes.slice(offset, offset + piece));
+          offset += piece;
+        },
+      });
+    }
+  }
+
+  const progressOf = (harness: HandlerHarness, request: number) =>
+    harness.posted.flatMap(({ message }) =>
+      message.type === 'progress' && message.id === request ? [message.progress] : [],
+    );
+
+  it('goes through reading, parsing and validating, each from 0 to 1 and never back', async () => {
+    const harness = await ready();
+    const request = id();
+    const reply = await harness.settle({
+      type: 'import',
+      id: request,
+      params: { file: bigPointsCsv(150_000), mapping: pointsMapping('big') },
+    });
+    expect(reply.message.type).toBe('result');
+    const progress = progressOf(harness, request);
+    const phases = [...new Set(progress.map((p) => p.phase))];
+    expect(phases).toEqual(['reading', 'parsing', 'validating']);
+    for (const phase of phases) {
+      const fractions = progress.filter((p) => p.phase === phase).map((p) => p.fraction);
+      expect(Math.min(...fractions)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...fractions)).toBeLessThanOrEqual(1);
+      expect(fractions).toEqual([...fractions].sort((a, b) => a - b));
+    }
+    expect(progress[0]).toEqual({ phase: 'reading', fraction: 0 });
+    expect(progress.filter((p) => p.phase === 'reading').at(-1)?.fraction).toBe(1);
+    // Progress is not a message for every row: at most one for each whole percent.
+    expect(progress.length).toBeLessThanOrEqual(3 * 101);
+  });
+
+  it('reads a file that arrives in pieces, and says how far it has got', async () => {
+    const harness = await ready();
+    const request = id();
+    const source = bigPointsCsv(2_000);
+    const file = new PiecemealFile([await source.arrayBuffer()], 'pieces.csv');
+    const reply = await harness.settle({
+      type: 'import',
+      id: request,
+      params: { file, mapping: pointsMapping('pieces') },
+    });
+    expect(loadedSummaries(resultOf(reply, 'import'))[0]?.elementCount).toBe(2_000);
+    const reading = progressOf(harness, request).filter((p) => p.phase === 'reading');
+    expect(reading.length).toBeGreaterThan(10);
+    expect(reading.at(-1)?.fraction).toBe(1);
+  });
+
+  it('stops reading a large file when asked to', async () => {
+    const harness = await ready();
+    const request = id();
+    const file = new PiecemealFile([await bigPointsCsv(5_000).arrayBuffer()], 'pieces.csv');
+    const reply = harness.settle({
+      type: 'import',
+      id: request,
+      params: { file, mapping: pointsMapping('pieces') },
+    });
+    harness.send({ type: 'cancel', target: request });
+    expect((await reply).message).toEqual({ type: 'cancelled', id: request });
+  });
+
+  it('says so when the file is not the size it was when the import began', async () => {
+    class GrowingFile extends File {
+      override stream(): ReadableStream<Uint8Array<ArrayBuffer>> {
+        const size = this.size;
+        return new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(size + 10));
+            controller.close();
+          },
+        });
+      }
+    }
+    const harness = await ready();
+    const reply = await harness.settle({
+      type: 'import',
+      id: id(),
+      params: { file: new GrowingFile(['X,Y\n'], 'grew.csv'), mapping: pointsMapping('g') },
+    });
+    expect(errorOf(reply).message).toMatch(/changed while it was being read/);
   });
 });
 
