@@ -11,31 +11,10 @@ import {
   checkedSummary,
 } from './contract-check.js';
 import { createKernel, fixtureBytes, loadKernel } from './test-support/kernel.js';
-import type { CrsRef, ImportMapping, Kind, Preview, Summary } from './types.js';
+import { mappingFrom } from './test-support/mapping.js';
+import type { CrsRef, ImportMapping, Kind, Summary } from './types.js';
 
 const UTM40: CrsRef = { kind: 'epsg', code: 32640 };
-
-/** What the wizard does with a preview: take its suggestions as they are. */
-function mappingFrom(preview: Preview, kind: Kind, crs: CrsRef | null): ImportMapping {
-  const table = preview.table;
-  return {
-    datasetName: preview.fileName,
-    kind,
-    columns:
-      table?.header.map((source, index) => ({
-        source,
-        role: table.roles[index]?.role ?? 'attribute',
-      })) ?? [],
-    nodata: {
-      tokens: table?.nodata.tokens.map((t) => t.token) ?? [],
-      numbers: table?.nodata.numbers.map((n) => n.value) ?? [],
-    },
-    emptyCoordinates: 'error',
-    ...(kind === 'blocks' ? { blockSize: [10, 10, 10] as const } : {}),
-    decimalSeparator: table?.decimalSeparator ?? '.',
-    crs: crs ?? preview.crs?.crs ?? null,
-  };
-}
 
 /** Imports a file and returns what loaded, or the codes of what blocked it. */
 function importFile(
