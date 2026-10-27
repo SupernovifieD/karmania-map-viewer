@@ -1007,3 +1007,26 @@ was chosen, why.
   every projected code, as before. A GeoJSON file with no `crs` member is EPSG:4326, so
   it is checked again. When EPSG definitions return, replace the constant with a lookup
   of the system's kind; the checks, codes and tests stay.
+- Plan for M5 (the engine), with the choices the brief left open:
+  - The worker is a small shell around a *handler* that takes the kernel and a
+    `post` function, so it can be tested in Node. The tests connect the client and
+    the handler through a real `MessageChannel` (real structured cloning and
+    transfer) with the real WebAssembly kernel; only the browser test (5.11) runs
+    the real `Worker`.
+  - `importFiles(files, mapping)` imports one data file; the other files may only be
+    sidecars (a `.prj`), because one mapping describes the columns of one file and
+    the coordinate system is already in the mapping. Two data files are misuse and
+    throw. The sidecars are not read at import time.
+  - An abort settles the promise with what really happened: an import is stopped
+    between steps and rejects with the signal's reason; a call that already finished
+    in the worker resolves with its result, as `fetch` does. A `load` cannot be
+    interrupted, so aborting it only helps before it starts.
+  - `load` transfers the typed arrays in a dataset input to the worker (the brief asks
+    for transferables, and a large dataset must not be copied on the main thread). The
+    arrays become empty in the caller's code, so an input can be loaded once; loading
+    it twice is misuse and throws. Pages come back to the main thread the same way.
+  - A column of mixed types in a builder (numbers and strings, say) is a mistake in
+    the code that builds the data, so the builder throws a `TypeError` naming the
+    column and the first value that does not fit; it is not a finding.
+  - Progress has three phases: `reading` (the worker reading the file, with a real
+    fraction), then the kernel's `parsing` and `validating`.

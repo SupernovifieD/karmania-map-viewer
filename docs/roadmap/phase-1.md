@@ -280,22 +280,40 @@ Definitions and reprojection can be added later, with the features that need the
 
 - [ ] 5.1 Public TS types for every contract in section 8, with exhaustive
   unions and type tests.
+  - [ ] 5.1a The engine API types (engine, options, progress, events) and type
+    tests for the unions that already exist.
+  - [ ] 5.1b The inputs of the builder functions (`DatasetInput`).
 - [ ] 5.2 Worker entry: loads the WASM; typed request and response protocol with
   IDs; serializes errors.
+  - [ ] 5.2a The protocol: request and response unions, serialized errors.
+  - [ ] 5.2b The worker handler: initialising, preview, datasets, rows, remove.
+  - [ ] 5.2c The worker handler: load, and the import loop with progress and
+    cancellation.
+  - [ ] 5.2d The worker entry that binds the handler to the worker's scope.
 - [ ] 5.3 KernelClient on the main thread: promises, transferables, AbortSignal
   to cancel messages; tested with a fake worker.
+  - [ ] 5.3a Requests, replies and errors.
+  - [ ] 5.3b Progress, cancellation, transfer lists and a worker that fails.
 - [ ] 5.4 createEngine and dispose; multiple instances; no globals.
 - [ ] 5.5 Registry and events: `datasets()`, `on("datasets")`, `remove()`.
 - [ ] 5.6 `preview(files)`: sidecar grouping by basename; reads File bytes
   inside the worker.
+  - [ ] 5.6a Grouping data files with their `.prj` sidecars.
+  - [ ] 5.6b `engine.preview`.
 - [ ] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
   cancellation.
 - [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
   "blocked" result, never a throw.
+  - [ ] 5.8a The builder functions.
+  - [ ] 5.8b `engine.load`.
 - [ ] 5.9 `rows()`: paging with a small LRU cache (pages of 256 rows).
+  - [ ] 5.9a The page cache: windows made from cached pages.
+  - [ ] 5.9b `engine.rows`.
 - [x] 5.10 *Dropped (owner decision, 3.25):* `searchCrs()`.
 - [ ] 5.11 Browser integration test (Playwright, test page): import every
   fixture, check summaries and findings.
+  - [ ] 5.11a Playwright, a test page and the real worker starting up.
+  - [ ] 5.11b Every fixture through the real worker.
 
 ## M6: UI foundations (packages/ui)
 
