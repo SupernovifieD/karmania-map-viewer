@@ -15,7 +15,8 @@ import { createKernelClient, workerPort } from './client.js';
 import type { ClientPort } from './client.js';
 import type { DatasetInput } from './inputs.js';
 import { EngineDisposedError } from './errors.js';
-import type { ImportMapping, LoadResult, Summary } from './types.js';
+import { createRegistry } from './registry.js';
+import type { ImportMapping, LoadResult } from './types.js';
 
 /** Makes the worker, at `workerUrl` or at the one that ships with the engine. */
 function spawnWorker(workerUrl: string | URL | undefined): Worker {
@@ -50,8 +51,7 @@ export function createEngineOnPort(
   init: { readonly wasmUrl?: string } = {},
 ): Engine {
   const client = createKernelClient(port);
-  const listeners = new Set<(payload: readonly Summary[]) => void>();
-  let summaries: readonly Summary[] = [];
+  const registry = createRegistry();
   let disposed = false;
 
   // The worker answers requests that arrive before it is ready once it is, but if it
@@ -65,16 +65,9 @@ export function createEngineOnPort(
     }
   }
 
-  function announce(): void {
-    for (const listener of [...listeners]) {
-      listener(summaries);
-    }
-  }
-
   function loaded(result: LoadResult): LoadResult {
     if (result.status === 'loaded') {
-      summaries = [...summaries, ...result.summaries];
-      announce();
+      registry.add(result.summaries);
     }
     return result;
   }
@@ -117,7 +110,7 @@ export function createEngineOnPort(
 
     datasets: () => {
       assertUsable();
-      return summaries;
+      return registry.summaries();
     },
 
     rows: async (id, start, count) => {
@@ -130,18 +123,14 @@ export function createEngineOnPort(
       assertUsable();
       await started;
       if (await client.request('remove', { dataset: id })) {
-        summaries = summaries.filter((summary) => summary.id !== id);
-        announce();
+        registry.remove(id);
       }
     },
 
     on: <E extends EngineEvent>(event: E, listener: (payload: EngineEvents[E]) => void) => {
       assertUsable();
       // `datasets` is the only event there is.
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
+      return registry.subscribe(listener);
     },
 
     dispose: () => {
@@ -149,8 +138,7 @@ export function createEngineOnPort(
         return;
       }
       disposed = true;
-      listeners.clear();
-      summaries = [];
+      registry.clear();
       client.dispose();
     },
   };
