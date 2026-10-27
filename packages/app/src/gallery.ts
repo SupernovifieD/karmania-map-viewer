@@ -2,6 +2,7 @@
  * The gallery: every component of `@karmania/ui` on a page of its own, in every state, so
  * that it can be looked at, tested and photographed without the rest of the app.
  */
+import '@karmania/ui/tokens.css';
 import { PACKAGE_NAME } from '@karmania/ui';
 import { html, LitElement } from 'lit';
 
