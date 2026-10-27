@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import * as generated from '../../wasm/karmania_wasm.js';
+import { kernelModuleOf } from '../kernel-module.js';
+import type { KernelModule } from '../kernel-module.js';
 
 /**
  * The kernel as the tests see it. The generated types call every result `any`;
@@ -31,6 +33,17 @@ export function loadKernel(): TestKernel {
     };
   }
   return loaded;
+}
+
+/** The kernel module as the worker handler takes it, initialised. */
+export function testKernelModule(): KernelModule {
+  loadKernel();
+  return kernelModuleOf(generated);
+}
+
+/** One of the sample files in the repository's `fixtures/` directory, as a `File`. */
+export function fixtureFile(name: string): File {
+  return new File([fixtureBytes(name).slice()], name);
 }
 
 /** The bytes of one of the sample files in the repository's `fixtures/` directory. */
