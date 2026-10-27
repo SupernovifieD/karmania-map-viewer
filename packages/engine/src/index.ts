@@ -2,6 +2,7 @@
 export const PACKAGE_NAME = '@karmania/engine';
 
 export { IMPORT_PHASES } from './api.js';
+export { createEngine } from './engine.js';
 export { EngineDisposedError, EngineError } from './errors.js';
 export type {
   Engine,

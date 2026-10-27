@@ -1030,3 +1030,18 @@ was chosen, why.
     column and the first value that does not fit; it is not a finding.
   - Progress has three phases: `reading` (the worker reading the file, with a real
     fraction), then the kernel's `parsing` and `validating`.
+- Step 5.4: `createEngine({ workerUrl?, wasmUrl? })` starts a module worker (the
+  `new Worker(new URL(...), { type: "module" })` form that bundlers turn into a worker
+  script) and wraps it in a port; `createEngineOnPort` takes any port and is what the
+  tests use, so the public options stay exactly the brief's. A `wasmUrl` is made
+  absolute against the page before it is sent, since the worker would otherwise resolve
+  it against its own address. The `init` request is sent at once; calls that arrive
+  before the worker is ready wait for it, and if it cannot start, the first call
+  rejects with the reason. Without `Worker` (in Node, say) `createEngine` throws a
+  message saying it needs a browser. After `dispose` the synchronous calls
+  (`datasets`, `on`) throw an `EngineDisposedError` and the asynchronous ones reject
+  with it; calls under way reject, and no listener hears anything more.
+  This step gives every method a first, working form, so that every commit has a whole
+  engine: `preview` takes each file alone, `importFiles` takes one file, `load` copies
+  its arrays and `rows` asks the worker each time. Steps 5.5 to 5.9 each replace one of
+  these with the full behaviour and its tests.
