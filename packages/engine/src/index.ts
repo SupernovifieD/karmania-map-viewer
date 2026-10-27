@@ -2,6 +2,7 @@
 export const PACKAGE_NAME = '@karmania/engine';
 
 export { IMPORT_PHASES } from './api.js';
+export { blocks, grid, lines, mesh, points, polygons } from './builders.js';
 export { createEngine } from './engine.js';
 export { EngineDisposedError, EngineError } from './errors.js';
 export type {
