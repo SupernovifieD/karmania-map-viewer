@@ -311,10 +311,10 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.9a The page cache: windows made from cached pages.
   - [x] 5.9b `engine.rows`.
 - [x] 5.10 *Dropped (owner decision, 3.25):* `searchCrs()`.
-- [ ] 5.11 Browser integration test (Playwright, test page): import every
+- [x] 5.11 Browser integration test (Playwright, test page): import every
   fixture, check summaries and findings.
   - [x] 5.11a Playwright, a test page and the real worker starting up.
-  - [ ] 5.11b Every fixture through the real worker.
+  - [x] 5.11b Every fixture through the real worker.
 
 ## M6: UI foundations (packages/ui)
 
