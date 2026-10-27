@@ -1,6 +1,17 @@
 /** Public name of this package. */
 export const PACKAGE_NAME = '@karmania/engine';
 
+export { IMPORT_PHASES } from './api.js';
+export type {
+  Engine,
+  EngineEvent,
+  EngineEvents,
+  EngineOptions,
+  ImportOptions,
+  ImportPhase,
+  ImportProgress,
+  LoadOptions,
+} from './api.js';
 export {
   CHECK_GROUPS,
   COLUMN_TYPES,
