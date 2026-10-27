@@ -308,7 +308,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.8a The builder functions.
   - [x] 5.8b `engine.load`.
 - [ ] 5.9 `rows()`: paging with a small LRU cache (pages of 256 rows).
-  - [ ] 5.9a The page cache: windows made from cached pages.
+  - [x] 5.9a The page cache: windows made from cached pages.
   - [ ] 5.9b `engine.rows`.
 - [x] 5.10 *Dropped (owner decision, 3.25):* `searchCrs()`.
 - [ ] 5.11 Browser integration test (Playwright, test page): import every
