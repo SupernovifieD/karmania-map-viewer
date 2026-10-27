@@ -993,3 +993,17 @@ was chosen, why.
   still an offset to ask for, the mesh builder still takes vertex indices from 0, and the
   `element`, `row` and `vertex` of a finding's location are still 0-based, so whoever shows
   a location adds 1 (only `line` was ever 1-based). `docs/conventions.md` says so.
+- Step 4.16 (owner decision after the M4 review, qualifying 3.25b): a range check for
+  EPSG:4326 alone is back, as the owner allowed provided it stays minimal and the
+  assumption is written down. `crs.geographic.out_of_range` and
+  `crs.geographic.axes_swapped` are warnings again, with the same wording, thresholds
+  and examples as before 3.25b: longitude from -180 to 360, latitude within 90, a
+  per-position count with the first examples located, and the swapped-axes warning
+  instead when the values only fit the other way round. A grid or a block model is
+  judged by its extent. **The assumption:** the core treats the code 4326 and no other
+  as a longitude and latitude system (`GEOGRAPHIC_EPSG_CODE` in
+  `validate/crs_checks.rs`), because it has no definitions to ask. Other geographic
+  codes (NAD83 4269, ETRS89 4258, ...) are accepted without a range check, and so is
+  every projected code, as before. A GeoJSON file with no `crs` member is EPSG:4326, so
+  it is checked again. When EPSG definitions return, replace the constant with a lookup
+  of the system's kind; the checks, codes and tests stay.

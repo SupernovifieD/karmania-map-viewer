@@ -271,6 +271,10 @@ Definitions and reprojection can be added later, with the features that need the
   inside WebAssembly (an opt-in test), recorded in `docs/perf.md`.
 - [x] 4.15 Added after the M4 review (owner decision): the numbers of rows, lines,
   polygons, triangles, cells and vertices in a page count from 1.
+- [x] 4.16 Added after the M4 review (owner decision): a range check for EPSG:4326
+  alone (`crs.geographic.out_of_range` and `crs.geographic.axes_swapped`, both
+  warnings). The code is hard-coded as the one known longitude and latitude system
+  until EPSG definitions return.
 
 ## M5: Engine (packages/engine)
 
