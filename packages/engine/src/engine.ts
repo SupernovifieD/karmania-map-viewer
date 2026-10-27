@@ -17,6 +17,7 @@ import { groupFiles } from './grouping.js';
 import type { DatasetInput } from './inputs.js';
 import { EngineDisposedError } from './errors.js';
 import { createRegistry } from './registry.js';
+import { transferablesOf } from './transfer.js';
 import type { ImportMapping, LoadResult } from './types.js';
 
 /** Makes the worker, at `workerUrl` or at the one that ships with the engine. */
@@ -53,6 +54,8 @@ export function createEngineOnPort(
 ): Engine {
   const client = createKernelClient(port);
   const registry = createRegistry();
+  // The dataset inputs whose arrays have gone to the worker.
+  const consumed = new WeakSet<DatasetInput>();
   let disposed = false;
 
   // The worker answers requests that arrive before it is ready once it is, but if it
@@ -114,11 +117,23 @@ export function createEngineOnPort(
 
     load: async (input: DatasetInput, loadOptions: LoadOptions = {}) => {
       assertUsable();
+      if (consumed.has(input)) {
+        throw new TypeError(
+          'This dataset input has already been loaded. Loading hands its arrays to the worker, so they are empty now; build the dataset again to load it again.',
+        );
+      }
       await started;
       const { signal } = loadOptions;
-      return loaded(
-        await client.request('load', { input }, signal === undefined ? {} : { signal }),
+      const sending = client.request(
+        'load',
+        { input },
+        { transfer: transferablesOf(input), ...(signal === undefined ? {} : { signal }) },
       );
+      // Unless the signal was already aborted, the arrays were sent in the line above.
+      if (signal?.aborted !== true) {
+        consumed.add(input);
+      }
+      return loaded(await sending);
     },
 
     datasets: () => {

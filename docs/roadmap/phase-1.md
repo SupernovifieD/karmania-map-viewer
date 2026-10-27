@@ -303,10 +303,10 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.6b `engine.preview`.
 - [x] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
   cancellation.
-- [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
+- [x] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
   "blocked" result, never a throw.
   - [x] 5.8a The builder functions.
-  - [ ] 5.8b `engine.load`.
+  - [x] 5.8b `engine.load`.
 - [ ] 5.9 `rows()`: paging with a small LRU cache (pages of 256 rows).
   - [ ] 5.9a The page cache: windows made from cached pages.
   - [ ] 5.9b `engine.rows`.
