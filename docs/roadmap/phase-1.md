@@ -293,7 +293,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.2d The worker entry that binds the handler to the worker's scope.
 - [ ] 5.3 KernelClient on the main thread: promises, transferables, AbortSignal
   to cancel messages; tested with a fake worker.
-  - [ ] 5.3a Requests, replies and errors.
+  - [x] 5.3a Requests, replies and errors.
   - [ ] 5.3b Progress, cancellation, transfer lists and a worker that fails.
 - [ ] 5.4 createEngine and dispose; multiple instances; no globals.
 - [ ] 5.5 Registry and events: `datasets()`, `on("datasets")`, `remove()`.
