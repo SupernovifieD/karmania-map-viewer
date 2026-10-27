@@ -285,7 +285,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 5.1b The engine API types (engine, options, progress, events).
 - [ ] 5.2 Worker entry: loads the WASM; typed request and response protocol with
   IDs; serializes errors.
-  - [ ] 5.2a The protocol: request and response unions, serialized errors.
+  - [x] 5.2a The protocol: request and response unions, serialized errors.
   - [ ] 5.2b The worker handler: initialising, preview, datasets, rows, remove.
   - [ ] 5.2c The worker handler: load, and the import loop with progress and
     cancellation.
