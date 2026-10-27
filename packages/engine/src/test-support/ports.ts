@@ -1,6 +1,9 @@
 /** Ways to stand in for a worker when testing the client. */
+import type { Engine } from '../api.js';
 import { createKernelClient } from '../client.js';
 import type { ClientPort, KernelClient } from '../client.js';
+import { createEngineOnPort } from '../engine.js';
+import type { LoadKernelModule } from '../kernel-module.js';
 import { startWorker } from '../worker.js';
 import { testKernelModule } from './kernel.js';
 
@@ -85,4 +88,22 @@ export function clientOverChannel(): { client: KernelClient; port: ClientPort } 
       },
     },
   };
+}
+
+/** An engine on a real worker handler over a message channel, as the page would have it. */
+export function engineOverChannel(
+  loadModule: LoadKernelModule = () => Promise.resolve(testKernelModule()),
+): Engine {
+  const channel = new MessageChannel();
+  startWorker(channel.port2, loadModule);
+  channel.port2.start();
+  const port = messagePort(channel.port1);
+  const close = port.close;
+  return createEngineOnPort({
+    ...port,
+    close: () => {
+      close();
+      channel.port2.close();
+    },
+  });
 }
