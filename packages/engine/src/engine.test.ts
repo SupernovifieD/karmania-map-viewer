@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { IMPORT_PHASES } from './api.js';
 import type { Engine, ImportProgress } from './api.js';
+import { blocks, grid, lines, mesh, points, polygons } from './builders.js';
 import { createEngine } from './engine.js';
 import { EngineDisposedError, EngineError } from './errors.js';
 import type { DatasetInput } from './inputs.js';
@@ -12,13 +13,13 @@ import type { ImportMapping } from './types.js';
 
 const UTM40 = { kind: 'epsg', code: 32640 } as const;
 
-const points = (name: string, crs: DatasetInput['crs'] = UTM40): DatasetInput => ({
-  kind: 'points',
-  name,
-  crs,
-  x: new Float64Array([500_000, 500_010, 500_020]),
-  y: new Float64Array([2_700_000, 2_700_010, 2_700_020]),
-});
+const somePoints = (name: string, crs: DatasetInput['crs'] = UTM40): DatasetInput =>
+  points({
+    name,
+    x: [500_000, 500_010, 500_020],
+    y: [2_700_000, 2_700_010, 2_700_020],
+    crs,
+  });
 
 const engines: Engine[] = [];
 function start(...args: Parameters<typeof engineOverChannel>): Engine {
@@ -37,7 +38,7 @@ describe('an engine', () => {
   it('starts with no datasets, and has them once they are loaded', async () => {
     const engine = start();
     expect(engine.datasets()).toEqual([]);
-    const result = await engine.load(points('first'));
+    const result = await engine.load(somePoints('first'));
     expect(result.status).toBe('loaded');
     expect(engine.datasets().map((d) => [d.name, d.kind, d.elementCount])).toEqual([
       ['first', 'points', 3],
@@ -59,7 +60,7 @@ describe('an engine', () => {
 
   it('reads rows of a dataset and unloads it', async () => {
     const engine = start();
-    await engine.load(points('p'));
+    await engine.load(somePoints('p'));
     const id = engine.datasets()[0]?.id ?? -1;
     const page = await engine.rows(id, 1, 2);
     expect([page.start, page.count]).toEqual([1, 2]);
@@ -74,11 +75,11 @@ describe('an engine', () => {
     const stop = engine.on('datasets', (list) => {
       heard.push(list.map((d) => d.name));
     });
-    await engine.load(points('a'));
-    await engine.load(points('b'));
+    await engine.load(somePoints('a'));
+    await engine.load(somePoints('b'));
     await engine.remove(engine.datasets()[0]?.id ?? -1);
     stop();
-    await engine.load(points('c'));
+    await engine.load(somePoints('c'));
     expect(heard).toEqual([['a'], ['a', 'b'], ['b']]);
   });
 
@@ -88,12 +89,122 @@ describe('an engine', () => {
     engine.on('datasets', () => {
       announced += 1;
     });
-    const result = await engine.load(points('p', null));
+    const result = await engine.load(somePoints('p', null));
     expect(result.status === 'blocked' && result.findings.map((f) => f.code)).toEqual([
       'crs.missing',
     ]);
     expect(engine.datasets()).toEqual([]);
     expect(announced).toBe(0);
+  });
+});
+
+describe('loading a dataset', () => {
+  it('hands its arrays to the worker, so they are empty afterwards', async () => {
+    const engine = start();
+    const made = points({
+      name: 'p',
+      x: [500_000, 500_010],
+      y: [2_700_000, 2_700_010],
+      attributes: { rock: ['a', 'a'], grade: [1.5, null] },
+      crs: UTM40,
+    });
+    const x = made.x;
+    expect((await engine.load(made)).status).toBe('loaded');
+    expect(x.byteLength).toBe(0);
+    expect(engine.datasets()[0]?.columns.map((c) => [c.name, c.type, c.nullCount])).toEqual([
+      ['rock', 'category', 0],
+      ['grade', 'float', 1],
+    ]);
+  });
+
+  it('refuses to load the same input twice, as misuse, and says why', async () => {
+    const engine = start();
+    const made = points({ name: 'p', x: [1], y: [1], crs: UTM40 });
+    await engine.load(made);
+    const again = engine.load(made);
+    await expect(again).rejects.toBeInstanceOf(TypeError);
+    await expect(again).rejects.toThrow(/already been loaded.*build the dataset again/);
+    expect(engine.datasets()).toHaveLength(1);
+  });
+
+  it('also uses up an input that was blocked', async () => {
+    const engine = start();
+    const made = points({ name: 'p', x: [1], y: [1], crs: null });
+    expect((await engine.load(made)).status).toBe('blocked');
+    expect(made.x.byteLength).toBe(0);
+    await expect(engine.load(made)).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it('keeps an input whose load was stopped before it was sent', async () => {
+    const engine = start();
+    const made = points({ name: 'p', x: [1, 2], y: [1, 2], crs: UTM40 });
+    await expect(engine.load(made, { signal: AbortSignal.abort() })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(made.x.byteLength).toBe(16);
+    expect((await engine.load(made)).status).toBe('loaded');
+  });
+
+  it('can load arrays that are views of one buffer', async () => {
+    const engine = start();
+    const shared = new Float64Array([500_000, 500_010, 2_700_000, 2_700_010]);
+    const result = await engine.load(
+      points({ name: 'p', x: shared.subarray(0, 2), y: shared.subarray(2, 4), crs: UTM40 }),
+    );
+    expect(result.status).toBe('loaded');
+    expect(shared.byteLength).toBe(0);
+  });
+
+  it('loads each shape through the worker', async () => {
+    const engine = start();
+    const lattice = {
+      origin: [500_000, 2_700_000, 0],
+      spacing: [10, 10, 10],
+      dims: [2, 2, 1],
+      crs: UTM40,
+    } as const;
+    const results = [
+      await engine.load(
+        lines({
+          name: 'l',
+          x: [0, 1, 2, 3],
+          y: [0, 1, 2, 3],
+          offsets: [0, 2, 4],
+          attributes: { a: [1, 2] },
+          crs: UTM40,
+        }),
+      ),
+      await engine.load(
+        polygons({
+          name: 'pg',
+          x: [0, 10, 10],
+          y: [0, 0, 10],
+          ringOffsets: [0, 3],
+          polygonOffsets: [0, 1],
+          crs: UTM40,
+        }),
+      ),
+      await engine.load(
+        mesh({
+          name: 'm',
+          x: [0, 1, 0],
+          y: [0, 0, 1],
+          z: [0, 0, 0],
+          indices: [0, 1, 2],
+          crs: UTM40,
+        }),
+      ),
+      await engine.load(grid({ name: 'g', ...lattice, values: { v: [1.5, 2.5, 3.5, 4.5] } })),
+      await engine.load(blocks({ name: 'b', ...lattice, values: { v: [1.5, 2.5, 3.5, 4.5] } })),
+    ];
+    expect(results.map((r) => r.status)).toEqual(Array<string>(5).fill('loaded'));
+    expect(engine.datasets().map((d) => d.kind)).toEqual([
+      'lines',
+      'polygons',
+      'mesh',
+      'grid',
+      'blocks',
+    ]);
   });
 });
 
@@ -136,9 +247,9 @@ describe('previewing files', () => {
 describe('several engines', () => {
   it('share nothing', async () => {
     const [one, two] = [start(), start()];
-    await one.load(points('only in one'));
+    await one.load(somePoints('only in one'));
     expect(two.datasets()).toEqual([]);
-    await two.load(points('only in two'));
+    await two.load(somePoints('only in two'));
     const names = (engine: Engine): readonly string[] => engine.datasets().map((d) => d.name);
     expect([names(one), names(two)]).toEqual([['only in one'], ['only in two']]);
     // Both have a dataset with the same number, which means different things in each.
@@ -152,13 +263,13 @@ describe('several engines', () => {
 describe('disposing an engine', () => {
   it('makes every later call a misuse, and says so', async () => {
     const engine = start();
-    await engine.load(points('p'));
+    await engine.load(somePoints('p'));
     engine.dispose();
     expect(() => engine.datasets()).toThrow(EngineDisposedError);
     expect(() => engine.on('datasets', () => undefined)).toThrow(/disposed/);
     const file = fixtureFile('points.csv');
     await expect(engine.preview([file])).rejects.toBeInstanceOf(EngineDisposedError);
-    await expect(engine.load(points('q'))).rejects.toBeInstanceOf(EngineDisposedError);
+    await expect(engine.load(somePoints('q'))).rejects.toBeInstanceOf(EngineDisposedError);
     await expect(engine.rows(1, 0, 1)).rejects.toBeInstanceOf(EngineDisposedError);
     await expect(engine.remove(1)).rejects.toBeInstanceOf(EngineDisposedError);
     engine.dispose();
@@ -170,7 +281,7 @@ describe('disposing an engine', () => {
     engine.on('datasets', () => {
       announced += 1;
     });
-    const loading = engine.load(points('p'));
+    const loading = engine.load(somePoints('p'));
     engine.dispose();
     await expect(loading).rejects.toBeInstanceOf(EngineDisposedError);
     expect(announced).toBe(0);
@@ -180,7 +291,7 @@ describe('disposing an engine', () => {
 describe('starting', () => {
   it('says why when the kernel cannot be loaded, at the first call', async () => {
     const engine = start(() => Promise.reject(new Error('the .wasm file is missing')));
-    await expect(engine.load(points('p'))).rejects.toThrow('the .wasm file is missing');
+    await expect(engine.load(somePoints('p'))).rejects.toThrow('the .wasm file is missing');
     await expect(engine.rows(1, 0, 1)).rejects.toThrow('the .wasm file is missing');
   });
 
