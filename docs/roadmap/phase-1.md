@@ -278,11 +278,11 @@ Definitions and reprojection can be added later, with the features that need the
 
 ## M5: Engine (packages/engine)
 
-- [ ] 5.1 Public TS types for every contract in section 8, with exhaustive
+- [x] 5.1 Public TS types for every contract in section 8, with exhaustive
   unions and type tests.
   - [x] 5.1a The inputs of the builder functions (`DatasetInput`) and type tests
     for the unions that already exist.
-  - [ ] 5.1b The engine API types (engine, options, progress, events).
+  - [x] 5.1b The engine API types (engine, options, progress, events).
 - [ ] 5.2 Worker entry: loads the WASM; typed request and response protocol with
   IDs; serializes errors.
   - [ ] 5.2a The protocol: request and response unions, serialized errors.
