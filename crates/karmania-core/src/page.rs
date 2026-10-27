@@ -1,7 +1,8 @@
 //! A window of rows of a dataset, for showing in a table.
 //!
 //! A page starts with columns derived from the geometry, which say what each row is,
-//! followed by the attribute columns. Indices are shown as stored, counting from 0.
+//! followed by the attribute columns. Numbers that name a row, a cell or a vertex are
+//! shown counting from 1, as a person counts; inside the kernel they count from 0.
 //!
 //! | Shape | Geometry columns |
 //! | --- | --- |
@@ -26,7 +27,8 @@ pub enum PageValues {
     /// Decimal numbers: coordinates, cell centres, decimal and whole-number
     /// attributes. (A whole number beyond 2^53 loses its last digits here.)
     Float64(Vec<f64>),
-    /// Whole numbers that fit 32 bits: counts, indices.
+    /// Whole numbers that fit 32 bits: counts, and the numbers of rows, cells and
+    /// vertices, which count from 1.
     Int32(Vec<i32>),
     /// True (1) or false (0).
     Bool(Vec<u8>),
@@ -68,7 +70,8 @@ pub struct PageColumn {
 /// A window of rows.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
-    /// The first row, counting from 0. At most the number of rows.
+    /// The first row, counting from 0 (an offset, not a number shown to anyone). At
+    /// most the number of rows.
     pub start: u64,
     /// How many rows the page holds: as many as were asked for, fewer at the end of
     /// the dataset and never more than [`MAX_PAGE_ROWS`].
@@ -79,6 +82,11 @@ pub struct Page {
 
 fn int32(value: usize) -> i32 {
     i32::try_from(value).unwrap_or(i32::MAX)
+}
+
+/// A 0-based position as it is shown to people: counting from 1.
+fn one_based(zero_based: usize) -> i32 {
+    int32(zero_based.saturating_add(1))
 }
 
 fn derived_ints(name: &str, values: Vec<i32>) -> PageColumn {
@@ -130,7 +138,7 @@ fn geometry_columns(dataset: &Dataset, rows: std::ops::Range<usize>) -> Vec<Page
             columns
         }
         Geometry::Lines(lines) => vec![
-            derived_ints("line #", rows.clone().map(int32).collect()),
+            derived_ints("line #", rows.clone().map(one_based).collect()),
             derived_ints(
                 "vertex count",
                 rows.map(|row| int32(line_size(lines, row))).collect(),
@@ -142,7 +150,7 @@ fn geometry_columns(dataset: &Dataset, rows: std::ops::Range<usize>) -> Vec<Page
                 .map(|row| polygon_sizes(polygons, row))
                 .collect();
             vec![
-                derived_ints("polygon #", rows.map(int32).collect()),
+                derived_ints("polygon #", rows.map(one_based).collect()),
                 derived_ints("ring count", sizes.iter().map(|s| int32(s.0)).collect()),
                 derived_ints("vertex count", sizes.iter().map(|s| int32(s.1)).collect()),
             ]
@@ -152,9 +160,9 @@ fn geometry_columns(dataset: &Dataset, rows: std::ops::Range<usize>) -> Vec<Page
                 .clone()
                 .map(|row| mesh.triangle(row).unwrap_or([0; 3]))
                 .collect();
-            let corner = |n: usize| triangles.iter().map(|t| int32(t[n] as usize)).collect();
+            let corner = |n: usize| triangles.iter().map(|t| one_based(t[n] as usize)).collect();
             vec![
-                derived_ints("triangle #", rows.map(int32).collect()),
+                derived_ints("triangle #", rows.map(one_based).collect()),
                 derived_ints("v1", corner(0)),
                 derived_ints("v2", corner(1)),
                 derived_ints("v3", corner(2)),
@@ -165,13 +173,19 @@ fn geometry_columns(dataset: &Dataset, rows: std::ops::Range<usize>) -> Vec<Page
                 .map(|row| cell(&grid.lattice, row as u64, None))
                 .collect();
             let mut columns = vec![
-                derived_ints("i", cells.iter().map(|c| int32(c.0[0] as usize)).collect()),
-                derived_ints("j", cells.iter().map(|c| int32(c.0[1] as usize)).collect()),
+                derived_ints(
+                    "i",
+                    cells.iter().map(|c| one_based(c.0[0] as usize)).collect(),
+                ),
+                derived_ints(
+                    "j",
+                    cells.iter().map(|c| one_based(c.0[1] as usize)).collect(),
+                ),
             ];
             if grid.lattice.dims[2] > 1 {
                 columns.push(derived_ints(
                     "k",
-                    cells.iter().map(|c| int32(c.0[2] as usize)).collect(),
+                    cells.iter().map(|c| one_based(c.0[2] as usize)).collect(),
                 ));
             }
             columns.push(derived_floats(
@@ -192,9 +206,18 @@ fn geometry_columns(dataset: &Dataset, rows: std::ops::Range<usize>) -> Vec<Page
                 })
                 .collect();
             vec![
-                derived_ints("i", cells.iter().map(|c| int32(c.0[0] as usize)).collect()),
-                derived_ints("j", cells.iter().map(|c| int32(c.0[1] as usize)).collect()),
-                derived_ints("k", cells.iter().map(|c| int32(c.0[2] as usize)).collect()),
+                derived_ints(
+                    "i",
+                    cells.iter().map(|c| one_based(c.0[0] as usize)).collect(),
+                ),
+                derived_ints(
+                    "j",
+                    cells.iter().map(|c| one_based(c.0[1] as usize)).collect(),
+                ),
+                derived_ints(
+                    "k",
+                    cells.iter().map(|c| one_based(c.0[2] as usize)).collect(),
+                ),
                 derived_floats("centre X", cells.iter().map(|c| c.1[0]).collect()),
                 derived_floats("centre Y", cells.iter().map(|c| c.1[1]).collect()),
                 derived_floats("centre Z", cells.iter().map(|c| c.1[2]).collect()),
@@ -483,7 +506,7 @@ mod tests {
         };
         let page = dataset(Geometry::Lines(lines), vec![]).page(0, 5);
         assert_eq!(names(&page), ["line #", "vertex count"]);
-        assert_eq!(ints(&page, "line #"), [0, 1]);
+        assert_eq!(ints(&page, "line #"), [1, 2]);
         assert_eq!(ints(&page, "vertex count"), [3, 2]);
     }
 
@@ -496,7 +519,7 @@ mod tests {
         };
         let page = dataset(Geometry::Polygons(polygons), vec![]).page(0, 5);
         assert_eq!(names(&page), ["polygon #", "ring count", "vertex count"]);
-        assert_eq!(ints(&page, "polygon #"), [0, 1]);
+        assert_eq!(ints(&page, "polygon #"), [1, 2]);
         assert_eq!(ints(&page, "ring count"), [2, 1]);
         assert_eq!(ints(&page, "vertex count"), [8, 3]);
     }
@@ -510,8 +533,9 @@ mod tests {
         let page = dataset(Geometry::Mesh(mesh), vec![]).page(1, 5);
         assert_eq!(names(&page), ["triangle #", "v1", "v2", "v3"]);
         assert_eq!((page.start, page.count), (1, 1));
-        assert_eq!(ints(&page, "triangle #"), [1]);
-        assert_eq!((ints(&page, "v1"), ints(&page, "v3")), (vec![1], vec![3]));
+        assert_eq!(ints(&page, "triangle #"), [2]);
+        // The second triangle is 1, 2, 3 (counting from 0), shown as 2, 3, 4.
+        assert_eq!((ints(&page, "v1"), ints(&page, "v3")), (vec![2], vec![4]));
     }
 
     fn lattice(dims: [u32; 3], rotation: f64) -> Lattice {
@@ -538,8 +562,8 @@ mod tests {
             names(&page),
             ["i", "j", "cell centre X", "cell centre Y", "v"]
         );
-        assert_eq!(ints(&page, "i"), [0, 1, 0, 1, 0, 1]);
-        assert_eq!(ints(&page, "j"), [0, 0, 1, 1, 2, 2]);
+        assert_eq!(ints(&page, "i"), [1, 2, 1, 2, 1, 2]);
+        assert_eq!(ints(&page, "j"), [1, 1, 2, 2, 3, 3]);
         assert_eq!(floats(&page, "cell centre X")[..2], [105.0, 115.0]);
         assert_eq!(floats(&page, "cell centre Y")[..3], [205.0, 205.0, 215.0]);
 
@@ -548,7 +572,7 @@ mod tests {
             names(&layered),
             ["i", "j", "k", "cell centre X", "cell centre Y"]
         );
-        assert_eq!(ints(&layered, "k"), [0, 0, 1, 1]);
+        assert_eq!(ints(&layered, "k"), [1, 1, 2, 2]);
     }
 
     #[test]
@@ -574,9 +598,9 @@ mod tests {
             names(&page),
             ["i", "j", "k", "centre X", "centre Y", "centre Z"]
         );
-        assert_eq!(ints(&page, "i"), [1, 0]);
-        assert_eq!(ints(&page, "j"), [0, 1]);
-        assert_eq!(ints(&page, "k"), [1, 1]);
+        assert_eq!(ints(&page, "i"), [2, 1]);
+        assert_eq!(ints(&page, "j"), [1, 2]);
+        assert_eq!(ints(&page, "k"), [2, 2]);
         assert_eq!(floats(&page, "centre Z"), [7.5, 7.5]);
 
         let sparse = Blocks {
@@ -584,8 +608,8 @@ mod tests {
             ijk: Some(vec![1, 1, 0, 0, 0, 1]),
         };
         let page = dataset(Geometry::Blocks(sparse), vec![]).page(0, 2);
-        assert_eq!(ints(&page, "i"), [1, 0]);
-        assert_eq!(ints(&page, "k"), [0, 1]);
+        assert_eq!(ints(&page, "i"), [2, 1]);
+        assert_eq!(ints(&page, "k"), [1, 2]);
         assert_eq!(floats(&page, "centre X"), [115.0, 105.0]);
     }
 

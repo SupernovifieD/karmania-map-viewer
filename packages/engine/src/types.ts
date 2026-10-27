@@ -387,9 +387,10 @@ export interface PageColumn {
   readonly name: string;
   /**
    * `Float64Array` for decimals and for whole-number attributes (digits beyond 2^53 are
-   * lost), `Int32Array` for counts and indices (counting from 0), `Uint8Array` for
-   * true and false (1 and 0), and an array of strings for text and categories. A null
-   * has a placeholder here and a 1 in `nulls`.
+   * lost), `Int32Array` for counts and for the numbers of rows, cells and vertices (which
+   * count from 1, as a person counts), `Uint8Array` for true and false (1 and 0), and an
+   * array of strings for text and categories. A null has a placeholder here and a 1 in
+   * `nulls`.
    */
   readonly values: PageValues;
   /** A byte for each row: 1 for a null, 0 otherwise. */
@@ -404,7 +405,7 @@ export interface PageColumn {
  * `k` and `centre X`, `Y` and `Z`), then the attribute columns.
  */
 export interface Page {
-  /** The first row, counting from 0. */
+  /** The first row, counting from 0: an offset to ask for, not a number shown to anyone. */
   readonly start: number;
   /** How many rows came back: fewer than asked for at the end, and at most 100,000. */
   readonly count: number;
