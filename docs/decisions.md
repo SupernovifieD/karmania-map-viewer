@@ -986,3 +986,10 @@ was chosen, why.
   validation 1.7 s (target under 5 s), so both targets hold with room to spare inside
   WebAssembly on this laptop. It is not run by default for the same reason as the Rust
   timing tests. The final measurement in a browser is step 10.3.
+- Step 4.15 (owner decision after the M4 review, superseding the "counting from 0" in
+  4.11a): the numbers a page shows count from 1, as a person counts. That covers `line #`,
+  `polygon #`, `triangle #`, the vertex numbers `v1` to `v3`, and the cell numbers `i`, `j`
+  and `k` of grids and blocks. Everything inside the kernel stays 0-based: `Page.start` is
+  still an offset to ask for, the mesh builder still takes vertex indices from 0, and the
+  `element`, `row` and `vertex` of a finding's location are still 0-based, so whoever shows
+  a location adds 1 (only `line` was ever 1-based). `docs/conventions.md` says so.

@@ -269,6 +269,8 @@ Definitions and reprojection can be added later, with the features that need the
   format.
 - [x] 4.14 Added at the end of M4: timings of the preview and a million-row import
   inside WebAssembly (an opt-in test), recorded in `docs/perf.md`.
+- [x] 4.15 Added after the M4 review (owner decision): the numbers of rows, lines,
+  polygons, triangles, cells and vertices in a page count from 1.
 
 ## M5: Engine (packages/engine)
 

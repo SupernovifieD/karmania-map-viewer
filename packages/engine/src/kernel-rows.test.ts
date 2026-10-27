@@ -180,7 +180,9 @@ describe('reading rows back through the kernel object', () => {
     );
     const blocksPage = checkedPage(kernel.rows(blocksId, 0, 2));
     expect(column(blocksPage, 'centre Z').values).toEqual(new Float64Array([2.5, 7.5]));
-    expect(column(blocksPage, 'i').values).toEqual(new Int32Array([1, 0]));
+    // The sparse blocks are in cells (1, 1, 0) and (0, 0, 1), shown counting from 1.
+    expect(column(blocksPage, 'i').values).toEqual(new Int32Array([2, 1]));
+    expect(column(blocksPage, 'k').values).toEqual(new Int32Array([1, 2]));
     expect(checkedPage(kernel.rows(meshId, 0, 1)).columns.map((c) => c.name)).toEqual([
       'triangle #',
       'v1',

@@ -28,8 +28,11 @@ TypeScript:
 
 Data in files and messages:
 
-- Internal indices are 0-based. Anything shown to a user that refers to a line
-  in a source file is 1-based, and the header counts as line 1.
+- Internal indices are 0-based. Anything shown to a user that numbers things is
+  1-based: lines of a source file (the header counts as line 1), and the numbers of
+  rows, lines, polygons, triangles, cells and vertices in the data table. The
+  `element`, `row` and `vertex` of a finding's location are internal and 0-based;
+  whoever shows them adds 1.
 - User-facing text is plain language: say what is wrong and where, with no
   internal names or jargon.
 
