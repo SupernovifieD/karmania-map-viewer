@@ -13,6 +13,7 @@ import type {
 } from './api.js';
 import { createKernelClient, workerPort } from './client.js';
 import type { ClientPort } from './client.js';
+import { groupFiles } from './grouping.js';
 import type { DatasetInput } from './inputs.js';
 import { EngineDisposedError } from './errors.js';
 import { createRegistry } from './registry.js';
@@ -75,8 +76,12 @@ export function createEngineOnPort(
   return {
     preview: async (files) => {
       assertUsable();
+      const groups = groupFiles(files);
+      if (groups.length === 0) {
+        return [];
+      }
       await started;
-      return client.request('preview', { groups: files.map((file) => ({ file, sidecars: [] })) });
+      return client.request('preview', { groups });
     },
 
     importFiles: async (files, mapping: ImportMapping, importOptions: ImportOptions = {}) => {

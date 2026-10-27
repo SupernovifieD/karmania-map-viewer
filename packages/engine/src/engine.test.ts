@@ -94,6 +94,42 @@ describe('an engine', () => {
   });
 });
 
+describe('previewing files', () => {
+  it('looks at a data file together with its .prj, and gives one preview for the pair', async () => {
+    const engine = start();
+    const previews = await engine.preview([fixtureFile('points.prj'), fixtureFile('points.csv')]);
+    expect(previews.map((p) => p.fileName)).toEqual(['points.csv']);
+    expect(previews[0]?.crs?.source).toBe('prj_file');
+  });
+
+  it('gives a preview for each file that is not a sidecar, in the order given', async () => {
+    const engine = start();
+    const previews = await engine.preview([
+      fixtureFile('grid.asc'),
+      fixtureFile('esri.prj'),
+      fixtureFile('mesh.obj'),
+      fixtureFile('points.csv'),
+      fixtureFile('points.prj'),
+    ]);
+    expect(previews.map((p) => [p.fileName, p.format])).toEqual([
+      ['grid.asc', 'ascii_grid'],
+      ['esri.prj', 'prj'],
+      ['mesh.obj', 'obj'],
+      ['points.csv', 'csv'],
+    ]);
+  });
+
+  it('gives nothing for no files', async () => {
+    expect(await start().preview([])).toEqual([]);
+  });
+
+  it('still refuses once disposed, even with nothing to look at', async () => {
+    const engine = start();
+    engine.dispose();
+    await expect(engine.preview([])).rejects.toBeInstanceOf(EngineDisposedError);
+  });
+});
+
 describe('several engines', () => {
   it('share nothing', async () => {
     const [one, two] = [start(), start()];
