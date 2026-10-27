@@ -299,7 +299,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 5.5 Registry and events: `datasets()`, `on("datasets")`, `remove()`.
 - [ ] 5.6 `preview(files)`: sidecar grouping by basename; reads File bytes
   inside the worker.
-  - [ ] 5.6a Grouping data files with their `.prj` sidecars.
+  - [x] 5.6a Grouping data files with their `.prj` sidecars.
   - [ ] 5.6b `engine.preview`.
 - [ ] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
   cancellation.
