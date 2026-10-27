@@ -301,7 +301,7 @@ Definitions and reprojection can be added later, with the features that need the
   inside the worker.
   - [x] 5.6a Grouping data files with their `.prj` sidecars.
   - [x] 5.6b `engine.preview`.
-- [ ] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
+- [x] 5.7 `importFiles(files, mapping)`: the incremental job loop, progress and
   cancellation.
 - [ ] 5.8 `load(input)`: builder functions in TS; data problems resolve as a
   "blocked" result, never a throw.

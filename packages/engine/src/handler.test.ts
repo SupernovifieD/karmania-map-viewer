@@ -4,10 +4,9 @@ import type { KernelApi, KernelModule, LoadKernelModule } from './kernel-module.
 import type { HandlerHarness, Posted } from './test-support/handler.js';
 import { resultOf, startHandler } from './test-support/handler.js';
 import { fixtureFile, testKernelModule } from './test-support/kernel.js';
+import { bigPointsCsv, pointsMapping, UTM40 } from './test-support/data.js';
 import { mappingFrom } from './test-support/mapping.js';
 import type { ImportMapping, Kind, LoadResult } from './types.js';
-
-const UTM40 = { kind: 'epsg', code: 32640 } as const;
 
 let nextId = 100;
 const id = (): number => nextId++;
@@ -32,29 +31,6 @@ function loadedSummaries(result: LoadResult) {
   }
   return result.summaries;
 }
-
-/** A points CSV with a million-less but still many rows, so an import takes several steps. */
-function bigPointsCsv(rows: number): File {
-  const lines = ['X,Y,Z'];
-  for (let row = 0; row < rows; row += 1) {
-    lines.push(`${String(500_000 + row)},${String(2_700_000 + row)},${String(row % 100)}`);
-  }
-  return new File([lines.join('\n')], 'big.csv');
-}
-
-const pointsMapping = (name: string): ImportMapping => ({
-  datasetName: name,
-  kind: 'points',
-  columns: [
-    { source: 'X', role: 'x' },
-    { source: 'Y', role: 'y' },
-    { source: 'Z', role: 'z' },
-  ],
-  nodata: { tokens: [], numbers: [] },
-  emptyCoordinates: 'error',
-  decimalSeparator: '.',
-  crs: UTM40,
-});
 
 describe('starting up', () => {
   it('refuses a request before it has been initialised', async () => {
