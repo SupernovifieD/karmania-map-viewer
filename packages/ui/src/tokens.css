@@ -1,0 +1,123 @@
+/*
+ * Karmania design tokens. Every margin, padding, gap, size, radius, color, duration and
+ * layer in the UI comes from here; component CSS has no magic numbers. Documented in
+ * docs/design-tokens.md, and checked by tokens.test.ts (scales, light and dark in step,
+ * and the contrast of every text and boundary color).
+ */
+
+:root {
+  /* Which color schemes the page supports. A data-theme attribute on the root forces one. */
+  color-scheme: light dark;
+
+  /* Spacing scale. Every margin, padding and gap is one of these. */
+  --k-space-2: 2px;
+  --k-space-4: 4px;
+  --k-space-8: 8px;
+  --k-space-12: 12px;
+  --k-space-16: 16px;
+  --k-space-24: 24px;
+  --k-space-32: 32px;
+  --k-space-48: 48px;
+
+  /* Type: Inter, then the system font. Sizes and line heights come in pairs. */
+  --k-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --k-font-size-caption: 12px;
+  --k-line-height-caption: 16px;
+  --k-font-size-secondary: 13px; /* table and secondary text */
+  --k-line-height-secondary: 20px;
+  --k-font-size-body: 14px;
+  --k-line-height-body: 20px;
+  --k-font-size-section-title: 16px;
+  --k-line-height-section-title: 24px;
+  --k-font-size-dialog-title: 20px;
+  --k-line-height-dialog-title: 28px;
+  --k-weight-regular: 400;
+  --k-weight-medium: 500;
+
+  /* Corner radius: small controls, buttons and inputs, cards and dialogs. */
+  --k-radius-sm: 4px;
+  --k-radius-md: 6px;
+  --k-radius-lg: 8px;
+
+  /* Control heights: compact (inside tables) and default. An icon button is at least
+     as big as the hit target. */
+  --k-control-height-compact: 28px;
+  --k-control-height: 32px;
+  --k-hit-target: 32px;
+
+  /* Focus ring, drawn on :focus-visible. */
+  --k-focus-width: 2px;
+  --k-focus-offset: 2px;
+
+  /* Motion. Zero when the user asks for less of it (below). */
+  --k-motion-duration: 150ms;
+  --k-motion-easing: ease-out;
+
+  /* Layers, lowest first. */
+  --k-z-base: 0;
+  --k-z-sticky: 10;
+  --k-z-overlay: 100;
+  --k-z-dialog: 200;
+  --k-z-tooltip: 300;
+
+  /* Colors, light. Text is at least 4.5:1 on every surface; --k-border-strong, which draws
+     the boundary of a control, is at least 3:1; --k-border is a decorative divider. */
+  --k-surface: #ffffff;
+  --k-surface-raised: #f4f5f7;
+  --k-surface-map: #e9ecf0;
+  --k-text: #1a1d21;
+  --k-text-muted: #555e6b;
+  --k-border: #dfe3e8;
+  --k-border-strong: #7d8794;
+  --k-accent: #1a56c4;
+  --k-on-accent: #ffffff;
+  --k-danger: #b42318;
+  --k-warning: #8a5300;
+  --k-info: #0b6580;
+}
+
+/* Colors, dark: when the system prefers it, unless the page forces light... */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --k-surface: #14171c;
+    --k-surface-raised: #1c2027;
+    --k-surface-map: #0e1013;
+    --k-text: #e6e9ee;
+    --k-text-muted: #9ba5b3;
+    --k-border: #2d333c;
+    --k-border-strong: #6f7a89;
+    --k-accent: #7aa7ff;
+    --k-on-accent: #0a1020;
+    --k-danger: #ff8b82;
+    --k-warning: #f0b94a;
+    --k-info: #63c9e8;
+  }
+}
+
+/* ...and whenever the page forces dark. The values are the same as above; CSS has no way
+   to say "either of these conditions" for a block of declarations. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --k-surface: #14171c;
+  --k-surface-raised: #1c2027;
+  --k-surface-map: #0e1013;
+  --k-text: #e6e9ee;
+  --k-text-muted: #9ba5b3;
+  --k-border: #2d333c;
+  --k-border-strong: #6f7a89;
+  --k-accent: #7aa7ff;
+  --k-on-accent: #0a1020;
+  --k-danger: #ff8b82;
+  --k-warning: #f0b94a;
+  --k-info: #63c9e8;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --k-motion-duration: 0ms;
+  }
+}

@@ -320,7 +320,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 - [x] 6.1 Package setup with Lit and Vite library mode; `gallery.html` in
   `packages/app` shows components in isolation.
-- [ ] 6.2 `tokens.css` (section 7.1) plus `docs/design-tokens.md`.
+- [x] 6.2 `tokens.css` (section 7.1) plus `docs/design-tokens.md`.
 - [ ] 6.3 Base styles: Inter self-hosted, box-sizing, focus-visible, reduced
   motion, scrollbar styling.
 - [ ] 6.4 Icon component (Lucide static SVG; 16 and 20; aria-hidden unless
