@@ -165,6 +165,7 @@ export class KTabs extends LitElement {
             <button
               type="button"
               class="tab"
+              data-truncate
               role="tab"
               id=${`tab-${tab.id}`}
               data-id=${tab.id}

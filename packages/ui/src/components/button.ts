@@ -65,19 +65,12 @@ export class KButton extends LitElement {
           border-color var(--k-motion-duration) var(--k-motion-easing);
       }
 
-      /* An icon alone makes a square. */
+      /* An icon alone makes a square, at least as big as a hit target: a compact icon button is
+         as high as a default one rather than smaller than a finger can be expected to hit. */
       button.icon-only {
+        height: max(var(--_height), var(--k-hit-target));
         padding: 0;
-        width: var(--_height);
-      }
-
-      /* The pointer target of a compact icon-only button reaches the size of a hit target
-         without making the button, which lines up with its neighbours, any bigger. The inset
-         is measured from inside the border, so the border's width is taken off it. */
-      button.icon-only::after {
-        content: '';
-        inset: calc((var(--_height) - var(--k-hit-target)) / 2 - var(--k-border-width));
-        position: absolute;
+        width: max(var(--_height), var(--k-hit-target));
       }
 
       .text {
