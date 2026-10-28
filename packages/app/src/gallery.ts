@@ -10,6 +10,7 @@ import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { buttonsSection } from './sections/buttons.js';
 import { iconsSection } from './sections/icons.js';
+import { tabsSection } from './sections/tabs.js';
 
 const theme = new URLSearchParams(location.search).get('theme');
 if (theme === 'light' || theme === 'dark') {
@@ -65,6 +66,20 @@ export class KarmaniaGallery extends LitElement {
         margin-bottom: var(--k-space-8);
       }
 
+      .tabs-demo {
+        border: var(--k-border-width) solid var(--k-border);
+        border-radius: var(--k-radius-lg);
+        max-width: calc(var(--k-space-48) * 8);
+      }
+
+      .narrow-tabs {
+        width: calc(var(--k-space-48) * 4);
+      }
+
+      .tab-content {
+        padding: var(--k-space-16);
+      }
+
       .row-label {
         flex: none;
         width: calc(var(--k-space-48) + var(--k-space-24));
@@ -93,7 +108,7 @@ export class KarmaniaGallery extends LitElement {
     return html`
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
-      ${iconsSection()} ${buttonsSection()}
+      ${iconsSection()} ${buttonsSection()} ${tabsSection()}
     `;
   }
 }

@@ -9,3 +9,5 @@ export type { IconName } from './components/icons.js';
 export { defineOnce } from './define.js';
 export { KButton, kButton } from './components/button.js';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './components/button.js';
+export { KTabs, TAB_CHANGE } from './components/tabs.js';
+export type { TabChange, TabDefinition } from './components/tabs.js';
