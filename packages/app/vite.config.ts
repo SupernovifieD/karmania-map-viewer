@@ -8,5 +8,6 @@ export default defineConfig({
       input: { gallery: new URL('./gallery.html', import.meta.url).pathname },
     },
   },
-  preview: { port: 4174, strictPort: true },
+  // The screenshot tests' browser runs in Docker and reaches this server by that name.
+  preview: { port: 4174, strictPort: true, allowedHosts: ['host.docker.internal'] },
 });

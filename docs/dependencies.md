@@ -83,4 +83,8 @@ developer's machine and in CI):
 
 | Tool | Version | License | Purpose | Added |
 | --- | --- | --- | --- | --- |
+| Playwright Docker image (`mcr.microsoft.com/playwright`) | v1.64.1-noble | Playwright: Apache-2.0; the image is Ubuntu 24.04 with the browsers and their system libraries, which carry their own licenses (some GPL or LGPL) | The browser the screenshot tests use, so that pictures are the same on every machine and in CI (`scripts/visual-tests`, `pnpm test:visual`). It is pulled from Microsoft's registry (about 2.5 GB), runs only while the tests do, and is never part of a build or shipped. Recorded for the owner's attention, as the Playwright `ffmpeg` is, since the policy names GPL and LGPL: nothing in it is linked into or distributed with Karmania. | step 6.10 |
+
+| Tool | Version | License | Purpose | Added |
+| --- | --- | --- | --- | --- |
 | wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue into `packages/engine/wasm` (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. In CI it is installed by `taiki-e/install-action` (MIT OR Apache-2.0, pinned to a commit), which downloads a prebuilt binary. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |

@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:e2e": "pnpm -r --if-present run test:e2e"
+    "test:e2e": "pnpm -r --if-present run test:e2e",
+    "test:visual": "scripts/visual-tests",
+    "test:visual:update": "scripts/visual-tests --update"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

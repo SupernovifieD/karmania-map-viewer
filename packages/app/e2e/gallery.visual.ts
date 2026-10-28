@@ -1,0 +1,163 @@
+/**
+ * A photograph of every state of every component in the gallery, at three window sizes in
+ * both themes. Run with `pnpm test:visual` (it needs Docker); `pnpm test:visual:update` takes
+ * them again, and the new pictures have to be looked at before they are committed.
+ */
+import { test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { photograph, reveal } from './support/screenshots.js';
+import type { Shot } from './support/screenshots.js';
+
+test.use({ reducedMotion: 'reduce' });
+
+const gallery = (page: Page, selector: string): Locator => page.locator(selector);
+const section = (page: Page, name: string): Locator =>
+  gallery(page, `karmania-gallery [data-section="${name}"]`);
+
+/** The 32 pixel button of a variant with an icon and words. */
+const button = (page: Page, variant: string, kind = 'icon-text', size = '32'): Locator =>
+  gallery(
+    page,
+    `div[data-variant="${variant}"][data-size="${size}"][data-kind="${kind}"] k-button`,
+  );
+
+/** Shows the whole section. */
+const wholeSection = (name: string) => async (page: Page) => {
+  const target = section(page, name);
+  await reveal(target);
+  return [target];
+};
+
+/** Focuses with the keyboard, which is what makes the focus ring show. */
+async function focusByKeyboard(page: Page, target: Locator): Promise<void> {
+  await page.keyboard.press('Shift');
+  await target.focus();
+}
+
+const buttonStates = (variant: string): Shot[] => [
+  {
+    name: `button-${variant}-hover`,
+    show: async (page) => {
+      const target = button(page, variant);
+      await reveal(target);
+      await target.hover();
+      return [target];
+    },
+  },
+  {
+    name: `button-${variant}-pressed`,
+    show: async (page) => {
+      const target = button(page, variant);
+      await reveal(target);
+      await target.hover();
+      await page.mouse.down();
+      return [target];
+    },
+  },
+  {
+    name: `button-${variant}-focus`,
+    show: async (page) => {
+      const target = button(page, variant);
+      await reveal(target);
+      await focusByKeyboard(page, target.locator('button'));
+      return [target];
+    },
+  },
+];
+
+/** A tooltip showing, with the control it belongs to. */
+const tooltipShot = (name: string, id: string, how: 'hover' | 'focus'): Shot => ({
+  name,
+  padding: 12,
+  show: async (page) => {
+    const host = gallery(page, `karmania-gallery #${id}`);
+    await reveal(host);
+    if (how === 'hover') {
+      await host.hover();
+    } else {
+      await focusByKeyboard(page, host.locator('button'));
+    }
+    return [host.locator('k-button'), host.locator('.tip')];
+  },
+});
+
+const tab = (page: Page, id: string): Locator =>
+  gallery(page, `karmania-gallery #panel-tabs [role="tab"][data-id="${id}"]`);
+
+const SHOTS: Shot[] = [
+  { name: 'icons', show: wholeSection('icons') },
+  { name: 'buttons', show: wholeSection('buttons') },
+  ...['primary', 'secondary', 'ghost'].flatMap(buttonStates),
+  {
+    name: 'button-icon-only-focus',
+    show: async (page) => {
+      const target = button(page, 'secondary', 'icon-only', '28');
+      await reveal(target);
+      await focusByKeyboard(page, target.locator('button'));
+      return [target];
+    },
+  },
+  {
+    name: 'tabs-panel',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #panel-tabs');
+      await reveal(target);
+      return [target];
+    },
+  },
+  {
+    name: 'tabs-panel-data',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #panel-tabs');
+      await reveal(target);
+      await tab(page, 'data').click();
+      await page.mouse.move(0, 0);
+      return [target];
+    },
+  },
+  {
+    name: 'tabs-focus',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #panel-tabs');
+      await reveal(target);
+      await focusByKeyboard(page, tab(page, 'legend'));
+      return [target];
+    },
+  },
+  {
+    name: 'tabs-hover',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #panel-tabs');
+      await reveal(target);
+      await tab(page, 'data').hover();
+      return [target];
+    },
+  },
+  {
+    name: 'tabs-crowded',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #crowded-tabs');
+      await reveal(target);
+      return [target];
+    },
+  },
+  tooltipShot('tooltip-icon', 'tip-icon', 'hover'),
+  tooltipShot('tooltip-describes', 'tip-describes', 'focus'),
+  tooltipShot('tooltip-long', 'tip-long', 'hover'),
+  tooltipShot('tooltip-below', 'tip-below', 'hover'),
+  tooltipShot('tooltip-clipped', 'tip-clipped', 'hover'),
+  ...['full', 'message', 'small'].map((variant): Shot => ({
+    name: `empty-${variant}`,
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #empty-${variant}`);
+      await reveal(target);
+      return [target];
+    },
+  })),
+];
+
+for (const shot of SHOTS) {
+  test(`the state "${shot.name}", at every window size in both themes`, async ({ page }) => {
+    await photograph(page, '/gallery.html', shot);
+  });
+}

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Runs the screenshot tests with a browser in the official Playwright Docker image, so the same
+# pixels come out on every machine and in CI. Only the browser is in the container: it runs
+# Playwright's server, and the tests run here and drive it over a websocket. The pages are
+# served from this machine (the container reaches it as host.docker.internal).
+#
+#   scripts/visual-tests                 compare the screenshots with the ones in the repository
+#   scripts/visual-tests --update        take them again (review the images before committing)
+#   scripts/visual-tests -g "tabs"       any other arguments go to `playwright test`
+#
+# Needs Docker running. The first run pulls the image (about 2 GB).
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+name="karmania-playwright"
+port="${PW_VISUAL_PORT:-3000}"
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  echo "Docker is not installed or not running; the screenshot tests need it." >&2
+  exit 1
+fi
+
+cd "$root"
+# The image has to match the Playwright the tests use, or the browser would not understand it.
+version="$(pnpm --silent --filter @karmania/app exec playwright --version | awk '{print $2}')"
+image="mcr.microsoft.com/playwright:v${version}-noble"
+
+docker rm -f "$name" >/dev/null 2>&1 || true
+docker run -d --rm --init --ipc=host --name "$name" \
+  --add-host=host.docker.internal:host-gateway \
+  -p "127.0.0.1:${port}:3000" "$image" \
+  /bin/sh -c "npx -y playwright@${version} run-server --port 3000 --host 0.0.0.0" >/dev/null
+trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+
+for _ in $(seq 1 90); do
+  if docker logs "$name" 2>&1 | grep -q "Listening on"; then
+    break
+  fi
+  sleep 1
+done
+if ! docker logs "$name" 2>&1 | grep -q "Listening on"; then
+  echo "The Playwright server in Docker did not start:" >&2
+  docker logs "$name" >&2
+  exit 1
+fi
+
+args=()
+if [[ "${1:-}" == "--update" ]]; then
+  args+=(--update-snapshots)
+  shift
+fi
+
+export PW_VISUAL_WS="ws://127.0.0.1:${port}/"
+pnpm --filter @karmania/app exec playwright test --project visual ${args[@]+"${args[@]}"} "$@"

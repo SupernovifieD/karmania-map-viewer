@@ -1167,3 +1167,19 @@ was chosen, why.
   with an auto margin rather than `justify-content: center`, because the latter leaves the
   top of overflowing content unreachable. The 32 px icon needed an icon size, so
   `--k-icon-size-lg` is new and `k-icon` accepts size 32.
+- Step 6.10 (screenshots): Docker is available here, so the baselines come from the official
+  Playwright image, as the brief asks. Only the browser is in the container: it runs
+  Playwright's server and the tests, on the host, drive it over a websocket, so the macOS
+  `node_modules` need not work in Linux and CI uses the very same script. The container
+  reaches the host's preview server as `host.docker.internal`, which Vite's host check would
+  otherwise refuse, so the preview allows that name (it is a throwaway test server). Because the
+  browser is always the one in the image, there is one set of baselines whatever the platform of
+  the machine running the tests, so the snapshot path has no platform suffix. The comparison is
+  tight (a pixel may differ by 5% in colour, and none beyond that); a one-pixel change in a gap
+  was seen to fail it. The `visual` project only exists when `PW_VISUAL_WS` names a browser, so a
+  plain `playwright test` runs the ordinary tests and never compares pictures taken by another
+  browser. 25 states are photographed at 6 layouts: 150 pictures, 1.1 MB. Reviewing them as the
+  brief requires turned up one thing to fix: the browser's own text box, used in the tabs demo,
+  had a faint boundary in the dark theme, so it is now drawn with the tokens. In this review
+  nothing else bled, clipped, overflowed or overlapped, rows and baselines lined up, focus rings
+  were whole, and nothing moved between states of one control.

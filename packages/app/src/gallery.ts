@@ -105,6 +105,17 @@ export class KarmaniaGallery extends LitElement {
         padding: var(--k-space-16);
       }
 
+      /* A text box for the demo, drawn with the tokens: the browser's own has a faint
+         boundary in the dark theme, and a control's boundary must be easy to see. */
+      input {
+        background: var(--k-surface);
+        border: var(--k-border-width) solid var(--k-border-strong);
+        border-radius: var(--k-radius-md);
+        color: var(--k-text);
+        height: var(--k-control-height);
+        padding: 0 var(--k-space-8);
+      }
+
       .row-label {
         flex: none;
         width: calc(var(--k-space-48) + var(--k-space-24));

@@ -115,3 +115,15 @@ app's own pages from step 7.1. The helpers are in `packages/app/e2e/support`:
 
 A helper that cannot fail proves nothing, so each one is tested against layouts that are
 deliberately wrong as well as ones that are right.
+
+### Screenshots
+
+`pnpm test:visual` photographs every state of every component in the gallery (`e2e/gallery.visual.ts`)
+at 1024x640, 1440x900 and 1920x1080, in both themes, and compares each picture with the one in
+`packages/app/e2e/screenshots`. It needs Docker: the browser runs in the official Playwright image,
+so that the same pixels come out on every machine and in CI. A difference is a failure, however
+small; if the change is meant, `pnpm test:visual:update` takes the pictures again, and **the new
+pictures must be looked at before they are committed**, with the checklist of section 7.5 of the
+brief (nothing bleeds, clips, overflows or overlaps; edges and baselines line up; the composition
+is balanced; truncated text has an ellipsis; focus rings show and are not clipped; dark mode is
+readable; nothing shifts between states). A new state is a new entry in `SHOTS`.
