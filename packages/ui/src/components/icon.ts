@@ -6,8 +6,8 @@ import { sharedStyles } from '../shared-styles.js';
 import { iconShapes, isIconName } from './icons.js';
 import type { IconName } from './icons.js';
 
-/** The sizes an icon is drawn at, in the tokens' pixels: beside text, and in buttons. */
-export type IconSize = 16 | 20;
+/** The sizes an icon is drawn at, in the tokens' pixels: beside text, in buttons, in empty states. */
+export type IconSize = 16 | 20 | 32;
 
 /** How Lucide draws its icons, in its 24-unit square. */
 const DRAWING = { viewBox: '0 0 24 24', strokeWidth: '2' } as const;
@@ -39,6 +39,11 @@ export class KIcon extends LitElement {
         width: var(--k-icon-size-md);
       }
 
+      :host([size='32']) {
+        height: var(--k-icon-size-lg);
+        width: var(--k-icon-size-lg);
+      }
+
       svg {
         display: block;
         height: 100%;
@@ -49,7 +54,7 @@ export class KIcon extends LitElement {
 
   /** The icon to draw. An unknown name draws nothing. */
   declare name: IconName;
-  /** 16 (the default) or 20. */
+  /** 16 (the default), 20 or 32. */
   declare size: IconSize;
   /** What the icon means, if it carries meaning of its own; otherwise it is hidden from assistive technology. */
   declare label: string | undefined;

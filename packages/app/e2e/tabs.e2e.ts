@@ -65,12 +65,12 @@ test.describe('the tabs', () => {
   });
 
   test('show only the chosen panel, and keep the others in the page', async ({ page }) => {
-    await expect(page.getByText('Layers will appear here')).toBeVisible();
+    await expect(page.locator('#panel-tabs').getByText('Layers will appear here')).toBeVisible();
     await expect(page.getByText('No datasets yet.')).toBeHidden();
     await expect(page.getByText('No datasets yet.')).toHaveCount(1);
     await tab(page, 'data').click();
     await expect(page.getByText('No datasets yet.')).toBeVisible();
-    await expect(page.getByText('Layers will appear here')).toBeHidden();
+    await expect(page.locator('#panel-tabs').getByText('Layers will appear here')).toBeHidden();
   });
 
   test('keep what is in a hidden panel as it was', async ({ page }) => {

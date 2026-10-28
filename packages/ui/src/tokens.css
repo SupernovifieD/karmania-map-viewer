@@ -50,9 +50,10 @@
      transparent), so they are all the same size. */
   --k-border-width: 1px;
 
-  /* Icon sizes: beside text, and alone in a button. */
+  /* Icon sizes: beside text, alone in a button, and in an empty state. */
   --k-icon-size-sm: 16px;
   --k-icon-size-md: 20px;
+  --k-icon-size-lg: 32px;
 
   /* Focus ring, drawn on :focus-visible. */
   --k-focus-width: 2px;

@@ -333,7 +333,7 @@ Definitions and reprojection can be added later, with the features that need the
   never clipped).
 - [x] 6.8 Layout test helpers from section 7.4, with their own tests on the
   gallery page.
-- [ ] 6.9 Empty-state component.
+- [x] 6.9 Empty-state component.
 - [ ] 6.10 Gallery screenshots for every component state, reviewed with the
   section 7.5 checklist.
 

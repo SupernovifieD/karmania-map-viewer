@@ -1156,3 +1156,14 @@ was chosen, why.
   it holds through slots. Native text boxes are exempt from the overflow check, since scrolling
   their own text is what they are for, and so are the document and body, whose scrolling is the
   window check's business.
+- Step 6.9 (empty state): every part (icon, heading, line, action) is optional, so the same
+  component serves the map area ("No data yet"), the Legend tab (a line alone) and later
+  panels. The heading is a styled paragraph, not a heading element, so that placing the
+  component does not disturb the page's heading order. The spacing is the brief's: 8 between
+  parts, 16 before the action (the flex gap plus 8 more), and the tests measure it. The text
+  sits in a column no wider than 288 px so a line does not stretch across a wide window.
+  Content that is still too tall once wrapped, which only long text in little room produces,
+  scrolls rather than overflowing: the element is a scroll region, and centres its content
+  with an auto margin rather than `justify-content: center`, because the latter leaves the
+  top of overflowing content unreachable. The 32 px icon needed an icon size, so
+  `--k-icon-size-lg` is new and `k-icon` accepts size 32.

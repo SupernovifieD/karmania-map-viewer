@@ -9,6 +9,7 @@ import '@karmania/ui/base.css';
 import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { buttonsSection } from './sections/buttons.js';
+import { emptyStateSection } from './sections/empty-state.js';
 import { iconsSection } from './sections/icons.js';
 import { tabsSection } from './sections/tabs.js';
 import { tooltipsSection } from './sections/tooltips.js';
@@ -78,6 +79,18 @@ export class KarmaniaGallery extends LitElement {
         transform: translateZ(0);
       }
 
+      .empty-demo {
+        background: var(--k-surface-map);
+        border-radius: var(--k-radius-lg);
+        height: calc(var(--k-space-48) * 5);
+        width: calc(var(--k-space-48) * 7.5);
+      }
+
+      .empty-demo.small {
+        height: calc(var(--k-space-48) * 3);
+        width: calc(var(--k-space-48) * 4);
+      }
+
       .tabs-demo {
         border: var(--k-border-width) solid var(--k-border);
         border-radius: var(--k-radius-lg);
@@ -138,6 +151,7 @@ export class KarmaniaGallery extends LitElement {
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
       ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
+      ${emptyStateSection()}
     `;
   }
 }
