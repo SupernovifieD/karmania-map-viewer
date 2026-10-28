@@ -8,6 +8,7 @@ import '@karmania/ui/tokens.css';
 import '@karmania/ui/base.css';
 import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
+import { buttonsSection } from './sections/buttons.js';
 import { iconsSection } from './sections/icons.js';
 
 const theme = new URLSearchParams(location.search).get('theme');
@@ -48,6 +49,35 @@ export class KarmaniaGallery extends LitElement {
         line-height: var(--k-line-height-caption);
       }
 
+      h3 {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-secondary);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-secondary);
+        margin: var(--k-space-16) 0 var(--k-space-8);
+      }
+
+      .row {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--k-space-16);
+        margin-bottom: var(--k-space-8);
+      }
+
+      .row-label {
+        flex: none;
+        width: calc(var(--k-space-48) + var(--k-space-24));
+      }
+
+      .cell {
+        display: inline-flex;
+      }
+
+      .narrow {
+        width: calc(var(--k-space-48) * 4);
+      }
+
       .grid {
         display: grid;
         gap: var(--k-space-16) var(--k-space-24);
@@ -63,7 +93,7 @@ export class KarmaniaGallery extends LitElement {
     return html`
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
-      ${iconsSection()}
+      ${iconsSection()} ${buttonsSection()}
     `;
   }
 }
