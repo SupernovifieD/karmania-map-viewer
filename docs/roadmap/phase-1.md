@@ -329,7 +329,7 @@ Definitions and reprojection can be added later, with the features that need the
   requires an aria-label (type-enforced); sizes 28 and 32.
 - [x] 6.6 Tabs component: ARIA tablist, arrow and Home/End keys, roving
   tabindex.
-- [ ] 6.7 Tooltip component (hover and focus, positioned inside the viewport,
+- [x] 6.7 Tooltip component (hover and focus, positioned inside the viewport,
   never clipped).
 - [ ] 6.8 Layout test helpers from section 7.4, with their own tests on the
   gallery page.

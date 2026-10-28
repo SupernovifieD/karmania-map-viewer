@@ -1127,3 +1127,18 @@ was chosen, why.
   is also the height of the panel header. Like the button, tabs throw on a mistake in the
   page: two tabs with the same id, or a row with no label. A panel is not made focusable
   itself; when the app's panels hold scroll regions, axe will say whether they need that.
+- Step 6.7 (tooltip): the bubble is a `popover="manual"` element, which the browser draws in
+  its top layer, so no ancestor's `overflow: hidden`, transform or stacking context can clip
+  it; the test puts a trigger inside a box that does all three and checks, with a probe that
+  was seen to detect an ordinary element being clipped, that the bubble sticks out of it. Where
+  it goes is a pure function (`placeTooltip`: above if it fits, else below, then slid into the
+  window a margin from the edges) tested in Node on its own, and in the browser at the corners
+  and edges of two window sizes. The behaviour follows WCAG 1.4.13 for content that appears on
+  hover: it is dismissible (Escape), hoverable (the pointer can move onto it) and persistent
+  until the pointer or focus leaves. Keyboard focus shows it but the focus a click leaves
+  behind does not (`:focus-visible` on the element that took focus). It appears at once: a
+  delay would be a number outside the tokens. An ARIA reference cannot cross into the tooltip's
+  shadow root, so the bubble is `aria-hidden` and the control is given the text as
+  `aria-description` only when it differs from the control's own name, which for an icon button
+  it usually does not, so nothing is read twice. A control near the edge gets a tooltip that is
+  slid in rather than centred on it, which the tests check on purpose.

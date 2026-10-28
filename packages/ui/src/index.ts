@@ -11,3 +11,6 @@ export { KButton, kButton } from './components/button.js';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './components/button.js';
 export { KTabs, TAB_CHANGE } from './components/tabs.js';
 export type { TabChange, TabDefinition } from './components/tabs.js';
+export { KTooltip } from './components/tooltip.js';
+export { placeTooltip } from './components/tooltip-position.js';
+export type { Box, Placement, Position } from './components/tooltip-position.js';
