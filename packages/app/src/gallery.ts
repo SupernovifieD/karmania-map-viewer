@@ -11,6 +11,7 @@ import { css, html, LitElement } from 'lit';
 import { buttonsSection } from './sections/buttons.js';
 import { iconsSection } from './sections/icons.js';
 import { tabsSection } from './sections/tabs.js';
+import { tooltipsSection } from './sections/tooltips.js';
 
 const theme = new URLSearchParams(location.search).get('theme');
 if (theme === 'light' || theme === 'dark') {
@@ -66,6 +67,17 @@ export class KarmaniaGallery extends LitElement {
         margin-bottom: var(--k-space-8);
       }
 
+      /* A box that clips its content and has a transform, which would cut off an ordinary
+         tooltip and also makes it the containing block of fixed-position children. */
+      .clipping-box {
+        border: var(--k-border-width) solid var(--k-border);
+        border-radius: var(--k-radius-md);
+        display: inline-flex;
+        overflow: hidden;
+        padding: var(--k-space-4);
+        transform: translateZ(0);
+      }
+
       .tabs-demo {
         border: var(--k-border-width) solid var(--k-border);
         border-radius: var(--k-radius-lg);
@@ -108,7 +120,7 @@ export class KarmaniaGallery extends LitElement {
     return html`
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
-      ${iconsSection()} ${buttonsSection()} ${tabsSection()}
+      ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
     `;
   }
 }
