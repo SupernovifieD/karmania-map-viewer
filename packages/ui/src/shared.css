@@ -1,0 +1,26 @@
+/*
+ * The rules every piece of the UI needs, in the page and inside every component. The page
+ * gets them from base.css; a component adopts them as its first style sheet
+ * (`sharedStyles`), because the page's rules do not reach into a shadow root.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The focus ring: drawn for keyboard focus, never clipped (it sits outside the control). */
+:focus-visible {
+  outline: var(--k-focus-width) solid var(--k-accent);
+  outline-offset: var(--k-focus-offset);
+}
+
+/* Native controls start in the system font and colors; make them follow the page. */
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}

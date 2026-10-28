@@ -1068,3 +1068,20 @@ was chosen, why.
   lint rejects it); the UI library is built as an ES module with Lit left external.
   `pnpm check` and CI now also run every package's `build`, so a broken build is caught
   at once. The gallery's browser tests use port 4174, the engine's use 4173.
+- Step 6.2 (tokens): colors were chosen by measuring WCAG contrast, not by eye, and
+  `tokens.test.ts` re-measures them from the CSS: text, the muted text and the state
+  colors are at least 4.5:1 on all three surfaces in both themes, the boundary of a
+  control at least 3:1. The dark values are written twice in `tokens.css` (once for the
+  system preference, once for a forced `data-theme="dark"`) because CSS cannot share a
+  block between two conditions; the test requires the two copies to be identical.
+- Step 6.3 (base styles): the page and the components need different things. The page
+  gets `base.css` (font faces, typography, scrollbars); a component adopts `sharedStyles`
+  (box sizing, the focus ring, native controls that follow the font), because a page's
+  rules do not cross into a shadow root and `@font-face` is ignored inside one. Both are
+  built from the same `shared.css`. Inter is a variable font, so 400 and 500 come from
+  one file; `font-display: block` makes text wait a moment for the font rather than show
+  in another font and then shift. Tabular numerals are on for the whole page. Reduced
+  motion needs no extra rule: every transition uses `--k-motion-duration`, which is 0
+  under `prefers-reduced-motion`, and a test fails any `transition` or `animation` that
+  does not. Scrollbars use the standard `scrollbar-width` and `scrollbar-color`, which
+  inherit into shadow roots; the `::-webkit-scrollbar` pseudo-elements do not.

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 /** Builds the components as an ES module library. Lit is a dependency, not bundled. */
 export default defineConfig({
@@ -8,4 +8,6 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
   },
+  // Tests read the style sheets that components import, so they are processed, not emptied.
+  test: { css: { include: /.+/ } },
 });

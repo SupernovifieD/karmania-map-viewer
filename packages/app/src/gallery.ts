@@ -3,10 +3,21 @@
  * that it can be looked at, tested and photographed without the rest of the app.
  */
 import '@karmania/ui/tokens.css';
-import { PACKAGE_NAME } from '@karmania/ui';
-import { html, LitElement } from 'lit';
+import '@karmania/ui/base.css';
+import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
+import { css, html, LitElement } from 'lit';
 
 export class KarmaniaGallery extends LitElement {
+  static override styles = [
+    sharedStyles,
+    css`
+      :host {
+        display: block;
+        padding: var(--k-space-24);
+      }
+    `,
+  ];
+
   override render() {
     return html`
       <h1>Karmania components</h1>
