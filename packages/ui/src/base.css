@@ -1,0 +1,30 @@
+/*
+ * The base of every page: the font, the page's colors, numbers that line up, thin
+ * scrollbars in the theme's colors. Import it after tokens.css (it uses them), once, in the
+ * page:  import '@karmania/ui/base.css';
+ */
+
+@import './fonts.css';
+@import './shared.css';
+
+:root {
+  /* Inherited, so scroll regions inside components get them too. */
+  scrollbar-color: var(--k-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+html {
+  background: var(--k-surface);
+  color: var(--k-text);
+  font-family: var(--k-font-sans);
+  font-size: var(--k-font-size-body);
+  font-weight: var(--k-weight-regular);
+  /* Digits are the same width everywhere, so columns of numbers line up. */
+  font-variant-numeric: tabular-nums;
+  line-height: var(--k-line-height-body);
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+}
