@@ -1114,3 +1114,16 @@ was chosen, why.
   the tests probe. A label that does not fit is cut with an ellipsis; the accessible name
   stays whole. Icon size: 16 beside words and in compact buttons, 20 for an icon alone in a
   default button.
+- Step 6.6 (tabs): the tab buttons and the panels are in one shadow root, because an ARIA
+  reference (`aria-controls`, `aria-labelledby`) cannot point across a shadow boundary; the
+  page's content reaches a panel through a slot named after the tab's id. Inactive panels
+  are hidden, not removed, so a table's scroll position or a text box's contents survive
+  switching tabs. Tabs choose as they take focus (automatic activation, as the pattern allows
+  when a panel is cheap to show), wrap round at the ends, and only the chosen tab is in the
+  Tab order. The chosen tab is underlined as well as darker, and the underline is inside the
+  tab and the weight never changes, so choosing a tab shifts nothing (the tests measure
+  positions from the row, since a click may scroll the page). The focus ring is drawn inside
+  the tab, where an `overflow` ancestor cannot clip it. Tab height, 40, is a token because it
+  is also the height of the panel header. Like the button, tabs throw on a mistake in the
+  page: two tabs with the same id, or a row with no label. A panel is not made focusable
+  itself; when the app's panels hold scroll regions, axe will say whether they need that.

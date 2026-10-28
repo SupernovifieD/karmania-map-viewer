@@ -327,7 +327,7 @@ Definitions and reprojection can be added later, with the features that need the
   labelled).
 - [x] 6.5 Button component: primary, secondary and ghost variants; icon-only
   requires an aria-label (type-enforced); sizes 28 and 32.
-- [ ] 6.6 Tabs component: ARIA tablist, arrow and Home/End keys, roving
+- [x] 6.6 Tabs component: ARIA tablist, arrow and Home/End keys, roving
   tabindex.
 - [ ] 6.7 Tooltip component (hover and focus, positioned inside the viewport,
   never clipped).

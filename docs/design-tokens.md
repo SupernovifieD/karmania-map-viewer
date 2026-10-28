@@ -60,6 +60,7 @@ and there are only two weights.
 | `--k-control-height-compact` | 28px  | Controls inside tables                  |
 | `--k-control-height`         | 32px  | Default controls                        |
 | `--k-hit-target`             | 32px  | Least focusable area of an icon button  |
+| `--k-tab-height`             | 40px  | A tab, and so the header of a tabbed panel |
 | `--k-icon-size-sm`           | 16px  | Icons beside text, kind icons in lists  |
 | `--k-icon-size-md`           | 20px  | Icons alone in a button                 |
 | `--k-border-width`           | 1px   | A control's border (may be transparent) |
