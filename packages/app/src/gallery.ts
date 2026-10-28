@@ -1,11 +1,19 @@
 /**
  * The gallery: every component of `@karmania/ui` on a page of its own, in every state, so
  * that it can be looked at, tested and photographed without the rest of the app.
+ *
+ * `?theme=light` or `?theme=dark` forces a theme, as the app's own setting will.
  */
 import '@karmania/ui/tokens.css';
 import '@karmania/ui/base.css';
 import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
+import { iconsSection } from './sections/icons.js';
+
+const theme = new URLSearchParams(location.search).get('theme');
+if (theme === 'light' || theme === 'dark') {
+  document.documentElement.dataset['theme'] = theme;
+}
 
 export class KarmaniaGallery extends LitElement {
   static override styles = [
@@ -15,6 +23,39 @@ export class KarmaniaGallery extends LitElement {
         display: block;
         padding: var(--k-space-24);
       }
+
+      h1 {
+        font-size: var(--k-font-size-dialog-title);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-dialog-title);
+        margin: 0 0 var(--k-space-8);
+      }
+
+      h2 {
+        font-size: var(--k-font-size-section-title);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-section-title);
+        margin: var(--k-space-24) 0 var(--k-space-8);
+      }
+
+      p {
+        margin: 0 0 var(--k-space-8);
+      }
+
+      code {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-caption);
+        line-height: var(--k-line-height-caption);
+      }
+
+      .grid {
+        display: grid;
+        gap: var(--k-space-16) var(--k-space-24);
+        grid-template-columns: repeat(auto-fill, minmax(var(--k-space-48), 1fr));
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
     `,
   ];
 
@@ -22,6 +63,7 @@ export class KarmaniaGallery extends LitElement {
     return html`
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
+      ${iconsSection()}
     `;
   }
 }

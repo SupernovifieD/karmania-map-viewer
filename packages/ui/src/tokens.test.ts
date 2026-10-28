@@ -133,6 +133,7 @@ describe('the scales', () => {
       value('--k-control-height'),
       value('--k-hit-target'),
     ]).toEqual(['28px', '32px', '32px']);
+    expect([value('--k-icon-size-sm'), value('--k-icon-size-md')]).toEqual(['16px', '20px']);
     expect([value('--k-focus-width'), value('--k-focus-offset')]).toEqual(['2px', '2px']);
     expect([value('--k-motion-duration'), value('--k-motion-easing')]).toEqual([
       '150ms',
