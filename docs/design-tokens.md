@@ -63,6 +63,7 @@ and there are only two weights.
 | `--k-tab-height`             | 40px  | A tab, and so the header of a tabbed panel |
 | `--k-icon-size-sm`           | 16px  | Icons beside text, kind icons in lists  |
 | `--k-icon-size-md`           | 20px  | Icons alone in a button                 |
+| `--k-icon-size-lg`           | 32px  | The icon of an empty state              |
 | `--k-border-width`           | 1px   | A control's border (may be transparent) |
 | `--k-focus-width`            | 2px   | Focus ring, drawn in `--k-accent`       |
 | `--k-focus-offset`           | 2px   | Gap between the control and its ring    |
