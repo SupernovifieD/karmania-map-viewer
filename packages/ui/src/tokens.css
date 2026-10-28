@@ -45,6 +45,10 @@
   --k-control-height: 32px;
   --k-hit-target: 32px;
 
+  /* Icon sizes: beside text, and in buttons. */
+  --k-icon-size-sm: 16px;
+  --k-icon-size-md: 20px;
+
   /* Focus ring, drawn on :focus-visible. */
   --k-focus-width: 2px;
   --k-focus-offset: 2px;

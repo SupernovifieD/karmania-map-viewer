@@ -1085,3 +1085,16 @@ was chosen, why.
   under `prefers-reduced-motion`, and a test fails any `transition` or `animation` that
   does not. Scrollbars use the standard `scrollbar-width` and `scrollbar-color`, which
   inherit into shadow roots; the `::-webkit-scrollbar` pseudo-elements do not.
+- Step 6.4 (icons): the registry in `components/icons.ts` lists each icon in three
+  places (the import, the name list and the table) and the compiler requires all three, so
+  an icon cannot be half added. Lucide's drawings are imported as text and only the shapes
+  inside their `<svg>` are used; the component draws its own `<svg>` so that the size comes
+  from the `--k-icon-size-*` tokens (new in this step: 16 and 20) and the color from the
+  text around it. An icon is `aria-hidden` unless it has a `label`, when it becomes an
+  image with that name; an unknown name draws nothing instead of throwing, since it may
+  arrive from an attribute. Elements register through `defineOnce`, which does nothing
+  without a page, so the package can be imported in Node tests. A unit test now scans every
+  style in the UI for raw colors and lengths, so the "no magic numbers" rule is checked, not
+  just stated. Accessibility is checked with axe through `e2e/support/axe.ts`, which looks
+  inside shadow roots when given a path of selectors; it was seen to fail on an image with
+  no alt text before it was trusted to pass.

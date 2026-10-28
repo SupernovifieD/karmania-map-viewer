@@ -323,7 +323,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 6.2 `tokens.css` (section 7.1) plus `docs/design-tokens.md`.
 - [x] 6.3 Base styles: Inter self-hosted, box-sizing, focus-visible, reduced
   motion, scrollbar styling.
-- [ ] 6.4 Icon component (Lucide static SVG; 16 and 20; aria-hidden unless
+- [x] 6.4 Icon component (Lucide static SVG; 16 and 20; aria-hidden unless
   labelled).
 - [ ] 6.5 Button component: primary, secondary and ghost variants; icon-only
   requires an aria-label (type-enforced); sizes 28 and 32.

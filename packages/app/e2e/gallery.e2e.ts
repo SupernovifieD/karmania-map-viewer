@@ -9,7 +9,7 @@ test('the gallery page loads the UI package and renders a Lit element', async ({
     }
   });
   await page.goto('/gallery.html');
-  await expect(page.locator('karmania-gallery h1')).toHaveText('Karmania components');
-  await expect(page.locator('karmania-gallery p')).toHaveText('From @karmania/ui.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Karmania components');
+  await expect(page.locator('karmania-gallery p').first()).toHaveText('From @karmania/ui.');
   expect(errors).toEqual([]);
 });
