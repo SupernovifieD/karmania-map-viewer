@@ -331,7 +331,7 @@ Definitions and reprojection can be added later, with the features that need the
   tabindex.
 - [x] 6.7 Tooltip component (hover and focus, positioned inside the viewport,
   never clipped).
-- [ ] 6.8 Layout test helpers from section 7.4, with their own tests on the
+- [x] 6.8 Layout test helpers from section 7.4, with their own tests on the
   gallery page.
 - [ ] 6.9 Empty-state component.
 - [ ] 6.10 Gallery screenshots for every component state, reviewed with the

@@ -35,16 +35,18 @@ test.describe('the button', () => {
     await page.goto('/gallery.html');
   });
 
-  test('is 32 or 28 pixels high in every variant and kind, and an icon alone is square', async ({
+  test('is 32 or 28 pixels high in every variant and kind, and an icon alone is square and at least 32', async ({
     page,
   }) => {
     for (const variant of VARIANTS) {
       for (const size of SIZES) {
         for (const kind of KINDS) {
           const box = await cell(page, variant, size, kind).boundingBox();
-          expect(box?.height, `${variant} ${size} ${kind}`).toBe(Number(size));
+          // An icon alone is never smaller than the 32 pixel hit target.
+          const expected = kind.startsWith('icon-only') ? Math.max(Number(size), 32) : Number(size);
+          expect(box?.height, `${variant} ${size} ${kind}`).toBe(expected);
           if (kind.startsWith('icon-only')) {
-            expect(box?.width, `${variant} ${size} ${kind}`).toBe(Number(size));
+            expect(box?.width, `${variant} ${size} ${kind}`).toBe(expected);
           }
         }
       }
@@ -235,7 +237,7 @@ test.describe('the button', () => {
     expect(outcome.labelled).toBe('fine');
   });
 
-  test('can be pressed 2 pixels outside a compact icon-only button, but not 4', async ({
+  test('can be pressed anywhere in its 32 by 32 pixels, even when it is the compact size', async ({
     page,
   }) => {
     const button = cell(page, 'ghost', '28', 'icon-only');
@@ -249,15 +251,23 @@ test.describe('the button', () => {
     if (box === null) {
       throw new Error('no box');
     }
-    const middle = box.y + box.height / 2;
+    expect([box.width, box.height]).toEqual([32, 32]);
     const presses = (): Promise<number> =>
       page.evaluate(() => (window as unknown as { presses: number }).presses);
-    await page.mouse.click(box.x - 1.5, middle);
-    expect(await presses()).toBe(1);
-    await page.mouse.click(box.x + box.width + 1.5, middle);
-    expect(await presses()).toBe(2);
-    await page.mouse.click(box.x - 4, middle);
-    expect(await presses()).toBe(2);
+    let expected = 0;
+    for (const [x, y] of [
+      [1, 1],
+      [box.width - 1, 1],
+      [1, box.height - 1],
+      [box.width - 1, box.height - 1],
+    ] as const) {
+      await page.mouse.click(box.x + x, box.y + y);
+      expected += 1;
+      expect(await presses()).toBe(expected);
+    }
+    // Just outside is not the button.
+    await page.mouse.click(box.x - 2, box.y + box.height / 2);
+    expect(await presses()).toBe(expected);
   });
 
   test('cuts a label that is too long with an ellipsis, and keeps the whole name', async ({

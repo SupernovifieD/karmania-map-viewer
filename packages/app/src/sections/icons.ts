@@ -10,8 +10,10 @@ export function iconsSection() {
         ${ICON_NAMES.map(
           (name) => html`
             <li data-icon=${name}>
-              <k-icon name=${name}></k-icon>
-              <k-icon name=${name} size="20"></k-icon>
+              <span class="icon-pair">
+                <k-icon name=${name}></k-icon>
+                <k-icon name=${name} size="20"></k-icon>
+              </span>
               <code>${name}</code>
             </li>
           `,

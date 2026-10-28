@@ -108,10 +108,27 @@ export class KarmaniaGallery extends LitElement {
       .grid {
         display: grid;
         gap: var(--k-space-16) var(--k-space-24);
-        grid-template-columns: repeat(auto-fill, minmax(var(--k-space-48), 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(calc(var(--k-space-48) * 2), 1fr));
         list-style: none;
-        margin: 0;
+        margin: 0 0 var(--k-space-16);
         padding: 0;
+      }
+
+      .grid li {
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-space-4);
+        min-width: 0;
+      }
+
+      .icon-pair {
+        align-items: center;
+        display: flex;
+        gap: var(--k-space-8);
+      }
+
+      .grid code {
+        overflow-wrap: anywhere;
       }
     `,
   ];

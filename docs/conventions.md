@@ -95,3 +95,23 @@ The allowed licenses are listed in the license policy in
 dependency in the step that first needs it, record it in `docs/dependencies.md`
 in the same commit, use the latest stable version unless a documented constraint
 forbids it, and commit the lockfile.
+
+## UI tests
+
+Every UI state is tested in a browser (`pnpm test:e2e`), on the gallery page now and the
+app's own pages from step 7.1. The helpers are in `packages/app/e2e/support`:
+
+- `assertNoOverflow(root, { window })` fails if anything inside `root` has content bigger than
+  its box, or sticks out of the window. An element marked `data-scroll-region` may scroll;
+  one marked `data-truncate` cuts its text with an ellipsis. Both exceptions are for the
+  element itself: what is inside a scroll region must still fit it. `window` is `both` for
+  a page that never scrolls, `horizontal` for one that scrolls down.
+- `assertNoOverlap(a, b)`, `assertAdjacent(first, second, axis)` and
+  `assertAligned(elements, edge)` (an edge, a centre, or the text baseline) for how elements sit.
+- `expectNoSeriousViolations(page, selector)` runs axe; give a path of selectors
+  (`['karmania-gallery', '[data-section="tabs"]']`) to look inside a shadow root.
+- `inEveryLayout(page, path, check)` runs a check at 1024x640, 1440x900 and 1920x1080, in
+  the light and the dark theme.
+
+A helper that cannot fail proves nothing, so each one is tested against layouts that are
+deliberately wrong as well as ones that are right.

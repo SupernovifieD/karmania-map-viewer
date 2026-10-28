@@ -1142,3 +1142,17 @@ was chosen, why.
   `aria-description` only when it differs from the control's own name, which for an icon button
   it usually does not, so nothing is read twice. A control near the edge gets a tooltip that is
   slid in rather than centred on it, which the tests check on purpose.
+- Step 6.8 (layout helpers): the overflow check found two real problems the first time it was
+  run on the gallery, which is the point of having it. The icon grid's cells were 48 px wide for
+  a name like `chevrons-right`, so they were widened and the names allowed to wrap. And the
+  pointer target I gave compact icon-only buttons in 6.5 (an invisible `::after` reaching 32 px)
+  counts as scrollable overflow, so a button at the edge of a scrolling panel would have made
+  it scroll by two pixels. That approach is superseded: an icon-only button is now never smaller
+  than the 32 px hit target, so a compact one is 32 x 32 rather than 28, and the pseudo-element
+  is gone. The cost is that a compact icon button is taller than the compact text buttons beside
+  it; rows are aligned on their centre line, and the row test says so. The checks work through
+  shadow roots, use a one-pixel tolerance for rounding in scroll sizes and half a pixel for
+  positions, and take a baseline from the first line of text's box and the font's descent, so
+  it holds through slots. Native text boxes are exempt from the overflow check, since scrolling
+  their own text is what they are for, and so are the document and body, whose scrolling is the
+  window check's business.
