@@ -1098,3 +1098,19 @@ was chosen, why.
   just stated. Accessibility is checked with axe through `e2e/support/axe.ts`, which looks
   inside shadow roots when given a path of selectors; it was seen to fail on an image with
   no alt text before it was trusted to pass.
+- Step 6.5 (button): `k-button` wraps a native `<button>` in its shadow root, so focus,
+  Enter and Space, `disabled` and the accessible role are the browser's own, and
+  `delegatesFocus` lets `element.focus()` reach it. "Icon-only needs an aria-label,
+  type-enforced" is done in two layers: the `kButton()` template helper takes a union in
+  which an icon alone must have a `label`, so the omission does not compile (checked with
+  `@ts-expect-error` cases in `button.test.ts`), and the element throws at runtime if it
+  ends up with neither text nor a label, since a page that is not written in TypeScript can
+  still make that mistake. Every variant has a border (transparent for ghost) so all are the
+  same size; hover and pressed colors of the primary button are mixed from the accent and
+  the text color (`color-mix`), so they follow the theme, and the tests measure that text
+  stays at 4.5:1 in every state. The brief asks both for compact 28 px controls and for a
+  32 x 32 focusable area on icon buttons; a compact icon-only button is 28 px (so it lines up
+  with its neighbours) and its pointer target is extended to 32 px with a pseudo-element, which
+  the tests probe. A label that does not fit is cut with an ellipsis; the accessible name
+  stays whole. Icon size: 16 beside words and in compact buttons, 20 for an icon alone in a
+  default button.

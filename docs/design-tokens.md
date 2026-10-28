@@ -61,7 +61,8 @@ and there are only two weights.
 | `--k-control-height`         | 32px  | Default controls                        |
 | `--k-hit-target`             | 32px  | Least focusable area of an icon button  |
 | `--k-icon-size-sm`           | 16px  | Icons beside text, kind icons in lists  |
-| `--k-icon-size-md`           | 20px  | Icons in buttons                        |
+| `--k-icon-size-md`           | 20px  | Icons alone in a button                 |
+| `--k-border-width`           | 1px   | A control's border (may be transparent) |
 | `--k-focus-width`            | 2px   | Focus ring, drawn in `--k-accent`       |
 | `--k-focus-offset`           | 2px   | Gap between the control and its ring    |
 

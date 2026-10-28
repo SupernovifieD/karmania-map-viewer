@@ -325,7 +325,7 @@ Definitions and reprojection can be added later, with the features that need the
   motion, scrollbar styling.
 - [x] 6.4 Icon component (Lucide static SVG; 16 and 20; aria-hidden unless
   labelled).
-- [ ] 6.5 Button component: primary, secondary and ghost variants; icon-only
+- [x] 6.5 Button component: primary, secondary and ghost variants; icon-only
   requires an aria-label (type-enforced); sizes 28 and 32.
 - [ ] 6.6 Tabs component: ARIA tablist, arrow and Home/End keys, roving
   tabindex.

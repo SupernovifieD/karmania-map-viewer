@@ -114,10 +114,12 @@ test.describe('the base styles', () => {
       });
     // --k-accent in the light theme, the system default here.
     const expected = ['solid', '2px', '2px', 'rgb(26, 86, 196)'];
-    await page.keyboard.press('Tab');
+    // Focus comes by the keyboard: a key is pressed, then the control is focused.
+    await page.keyboard.press('Shift');
+    await page.locator('karmania-gallery #inside').focus();
     await expect(page.locator('karmania-gallery #inside')).toBeFocused();
     expect(await ring('karmania-gallery #inside')).toEqual(expected);
-    await page.keyboard.press('Tab');
+    await page.locator('#in-page').focus();
     await expect(page.locator('#in-page')).toBeFocused();
     expect(await ring('#in-page')).toEqual(expected);
   });

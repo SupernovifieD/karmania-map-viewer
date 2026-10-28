@@ -45,7 +45,11 @@
   --k-control-height: 32px;
   --k-hit-target: 32px;
 
-  /* Icon sizes: beside text, and in buttons. */
+  /* The width of a control's border. Every variant of a control has one (it may be
+     transparent), so they are all the same size. */
+  --k-border-width: 1px;
+
+  /* Icon sizes: beside text, and alone in a button. */
   --k-icon-size-sm: 16px;
   --k-icon-size-md: 20px;
 
