@@ -222,7 +222,7 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
-  ...['few', 'many', 'clamped'].map((which): Shot => ({
+  ...['few', 'many', 'values', 'clamped'].map((which): Shot => ({
     name: `table-${which}`,
     show: async (page) => {
       const target = gallery(page, `karmania-gallery #table-${which}`);

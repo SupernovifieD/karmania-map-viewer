@@ -94,6 +94,82 @@ export function clampedRows(start: number, count: number): TableRows {
 export const fetchClamped: TableFetch = (start, count) =>
   Promise.resolve(clampedRows(start, count));
 
+/** A row of the kinds of value: a note on what is in it, and one value for each kind of column. */
+interface ValueRow {
+  readonly note: string;
+  readonly decimal: number | null;
+  readonly whole: number | null;
+  readonly flag: boolean | null;
+  readonly text: string | null;
+}
+
+/** What a table does with the values a person might meet. */
+const VALUE_ROWS: readonly ValueRow[] = [
+  { note: 'plain', decimal: 42, whole: -2000, flag: true, text: 'plain' },
+  {
+    note: 'a decimal',
+    decimal: 1_234_567.5,
+    whole: 2_147_483_647,
+    flag: false,
+    text: '  spaced  ',
+  },
+  { note: 'noise', decimal: 0.1 + 0.2, whole: 0, flag: true, text: 'Ünï "quoted" & <tagged>' },
+  { note: 'minus zero', decimal: -0, whole: -1, flag: false, text: '' },
+  { note: 'large', decimal: 1.5e25, whole: 1, flag: true, text: 'null' },
+  { note: 'small', decimal: 1.5e-7, whole: 10, flag: false, text: 'x' },
+  { note: 'not a number', decimal: Number.NaN, whole: 100, flag: true, text: 'x' },
+  { note: 'infinite', decimal: Number.POSITIVE_INFINITY, whole: 1000, flag: false, text: 'x' },
+  {
+    note: 'minus infinite',
+    decimal: Number.NEGATIVE_INFINITY,
+    whole: 10_000,
+    flag: true,
+    text: 'x',
+  },
+  { note: 'null', decimal: null, whole: null, flag: null, text: null },
+];
+
+/** Rows of the kinds of value: a column of decimals, of whole numbers, of flags and of text. */
+export function valueRows(start: number, count: number): TableRows {
+  const rows = VALUE_ROWS.slice(start, start + count);
+  const nulls = (pick: (row: ValueRow) => unknown): Uint8Array =>
+    Uint8Array.from(rows, (row) => (pick(row) === null ? 1 : 0));
+  return {
+    start,
+    count: rows.length,
+    columns: [
+      {
+        name: 'note',
+        values: rows.map((row) => row.note),
+        nulls: new Uint8Array(rows.length),
+      },
+      {
+        name: 'decimal',
+        values: Float64Array.from(rows, (row) => row.decimal ?? 0),
+        nulls: nulls((row) => row.decimal),
+      },
+      {
+        name: 'whole',
+        values: Int32Array.from(rows, (row) => row.whole ?? 0),
+        nulls: nulls((row) => row.whole),
+      },
+      {
+        name: 'flag',
+        values: Uint8Array.from(rows, (row) => (row.flag === true ? 1 : 0)),
+        nulls: nulls((row) => row.flag),
+      },
+      {
+        name: 'text',
+        values: rows.map((row) => row.text ?? ''),
+        nulls: nulls((row) => row.text),
+      },
+    ],
+  };
+}
+
+/** A source of the rows of each kind of value. */
+export const fetchValues: TableFetch = (start, count) => Promise.resolve(valueRows(start, count));
+
 /** A source of `rowCount` made-up rows. */
 export const fetchSynthetic: TableFetch = (start, count) =>
   Promise.resolve(syntheticRows(start, count));
@@ -108,6 +184,9 @@ export function tableSection() {
       </div>
       <div class="table-demo" id="table-many">
         <k-table label="Many rows" .rowCount=${100_000} .fetch=${fetchSynthetic}></k-table>
+      </div>
+      <div class="table-demo wide tall" id="table-values">
+        <k-table label="Kinds of value" .rowCount=${10} .fetch=${fetchValues}></k-table>
       </div>
       <div class="table-demo wide" id="table-clamped">
         <k-table

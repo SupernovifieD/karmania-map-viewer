@@ -1,10 +1,12 @@
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
+import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
 import { columnWidth, isCut, rowNumberWidth, SAMPLE_ROWS } from './table-columns.js';
+import { formatCell, isNull, isNumeric } from './table-format.js';
 import { createMeasurer, loadFonts } from './table-measure.js';
 import type { Measurer } from './table-measure.js';
 import { windowFor } from './table-window.js';
@@ -54,20 +56,6 @@ interface ColumnLayout {
 function tokenPixels(element: Element, name: string, fallback: number): number {
   const value = Number.parseFloat(getComputedStyle(element).getPropertyValue(name));
   return Number.isFinite(value) ? value : fallback;
-}
-
-/** Whether a column holds numbers, which are set on the right. */
-function isNumeric(values: TableValues): boolean {
-  return values instanceof Float64Array || values instanceof Int32Array;
-}
-
-/** The text of a cell: nothing, if it is null. */
-function cellText(column: TableColumn, row: number): string {
-  if (column.nulls[row] === 1) {
-    return '';
-  }
-  const value = column.values[row];
-  return value === undefined ? '' : String(value);
 }
 
 /**
@@ -169,6 +157,11 @@ export class KTable extends LitElement {
 
       .cell.numeric {
         text-align: right;
+      }
+
+      /* A null is not a value, and is told apart by its colour, not by slanting it. */
+      .cell.null {
+        color: var(--k-text-muted);
       }
 
       .head {
@@ -364,7 +357,7 @@ export class KTable extends LitElement {
     }
     const heavy = tokenPixels(this, '--k-weight-medium', 500);
     const sample = rows.columns.map((column) =>
-      Array.from({ length: Math.min(SAMPLE_ROWS, rows.count) }, (_, at) => cellText(column, at)),
+      Array.from({ length: Math.min(SAMPLE_ROWS, rows.count) }, (_, at) => formatCell(column, at)),
     );
     const letters = new Set(
       rows.columns.flatMap((column, index) => [column.name, ...(sample[index] ?? [])]).join(''),
@@ -397,11 +390,15 @@ export class KTable extends LitElement {
     this.columns = rows.columns;
   }
 
-  /** The text of a cell, or nothing if its page has not come. */
-  private text(row: number, column: number): string {
+  /** The words in a cell, and whether it is a null: nothing, and not, if its page has not come. */
+  private cell(row: number, column: number): { text: string; isNull: boolean } {
     const rows = this.pages.get(Math.floor(row / TABLE_PAGE_SIZE));
     const values = rows?.columns[column];
-    return rows === undefined || values === undefined ? '' : cellText(values, row - rows.start);
+    if (rows === undefined || values === undefined) {
+      return { text: '', isNull: false };
+    }
+    const at = row - rows.start;
+    return { text: formatCell(values, at), isNull: isNull(values, at) };
   }
 
   /** The words in full, for a cell that cuts them off, and nothing for one that does not. */
@@ -415,13 +412,13 @@ export class KTable extends LitElement {
       <div class="row" role="row" aria-rowindex=${row + 2}>
         <div class="cell number" role="rowheader">${row + 1}</div>
         ${this.columns.map((column, index) => {
-          const text = this.text(row, index);
+          const cell = this.cell(row, index);
           return html`<div
-            class="cell ${isNumeric(column.values) ? 'numeric' : ''}"
+            class=${classMap({ cell: true, numeric: isNumeric(column.values), null: cell.isNull })}
             role="gridcell"
             aria-colindex=${index + 2}
-            title=${ifDefined(this.fullText(text, widths[index] ?? 0, false))}
-            .textContent=${text}
+            title=${ifDefined(this.fullText(cell.text, widths[index] ?? 0, false))}
+            .textContent=${cell.text}
           ></div>`;
         })}
       </div>

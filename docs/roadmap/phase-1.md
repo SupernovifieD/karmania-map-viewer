@@ -408,7 +408,7 @@ Definitions and reprojection can be added later, with the features that need the
   column, windowed rendering.
 - [x] 9.5 Virtualized table, part 2: column width measurement and clamping;
   ellipsis plus full value; horizontal scroll inside the table.
-- [ ] 9.6 Virtualized table, part 3: cell formatting (numbers, null, categories,
+- [x] 9.6 Virtualized table, part 3: cell formatting (numbers, null, categories,
   booleans).
 - [ ] 9.7 Virtualized table, part 4: page fetching through `engine.rows()` with
   prefetch of the next page.

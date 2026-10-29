@@ -1783,3 +1783,13 @@ was chosen, why.
   Words that do not fit end in an ellipsis and are in the cell's `title` in full, which only those
   cells have; the whole text is in the page for a screen reader. The row-number column has room for the
   last row's number, and at least three digits.
+- Step 9.6 (the words in a cell). The brief fixes two things: numbers on the right with digits in line,
+  and a null as a muted "null", not slanted. The rest is this: a number is written as it is, with no
+  thousands separators (a coordinate or an id would then differ from the file it came from, and a
+  comma is also a decimal mark in some places), no zeros after the point, and 15 significant digits,
+  which takes the noise off a result such as 0.1 + 0.2 and keeps what a file had. Minus zero is 0, a
+  number beyond what JavaScript writes in full is written as it does (`1.5e+25`), and NaN and the
+  infinities are in words. A flag is `true` or `false`. Text is as it was, spaces and all, and set as
+  text: a value that looks like markup is not markup. The rows do not say a category from text, so
+  both are text. A cell whose page has not come is empty, not "null", so that waiting and a null
+  differ. The widths of step 9.5 are measured from these same words, so "null" and "-Infinity" fit.
