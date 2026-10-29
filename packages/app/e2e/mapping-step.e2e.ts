@@ -21,7 +21,11 @@ function parts(page: Page) {
     rows: step.locator('tbody tr'),
     viewport: step.locator('.viewport'),
     count: step.locator('.count'),
-    note: step.locator('.note'),
+    noColumns: step.locator('.note'),
+    problems: host.locator('karmania-mapping-step .problems li'),
+    note: host.locator('span[slot="footer-note"]'),
+    sizes: host.locator('karmania-mapping-step .block-size k-input'),
+    sizeInputs: host.locator('karmania-mapping-step .block-size input'),
     next: host.locator('k-button[slot="footer-end"]').nth(1),
     back: host.locator('k-button[slot="footer-end"]').nth(0),
     kind: host.locator('karmania-file-step k-select select'),
@@ -58,10 +62,12 @@ const textsOf = (locator: Locator): Promise<string[]> =>
   locator.evaluateAll((all) => all.map((element) => element.textContent.trim()));
 
 /** A CSV file with `columns` columns and `rows` rows: a text column, then numbers. */
-function bigCsv(columns: number, rows: number, firstName = 'Name'): Pick {
+function bigCsv(columns: number, rows: number, firstName = 'X'): Pick {
+  // The first two columns are named for the coordinates, so that the mapping has what it needs.
   const header = [
     firstName,
-    ...Array.from({ length: columns - 1 }, (_, c) => `Column ${String(c + 2)}`),
+    'Y',
+    ...Array.from({ length: columns - 2 }, (_, c) => `Column ${String(c + 3)}`),
   ];
   const lines = [header.join(',')];
   for (let row = 0; row < rows; row += 1) {
@@ -165,19 +171,30 @@ test.describe('the Mapping step', () => {
     ]);
   });
 
-  test('moves nothing when a role is changed and its mark goes', async ({ page }) => {
+  test('moves nothing when a role is changed and its mark goes, nor what is wrong appears', async ({
+    page,
+  }) => {
     const p = parts(page);
     await mappingOf(page, 'points.csv');
-    const boxes = async () => [
-      await rect(p.viewport),
-      ...(await Promise.all([0, 1, 2, 3].map((index) => rect(p.heads.nth(index))))),
-      await rect(p.selects.first()),
-      await rect(p.rows.first()),
-    ];
+    const boxes = async () => {
+      const viewport = await rect(p.viewport);
+      return [
+        // The table's bottom edge gives way to what is wrong, which is under it; nothing else does.
+        { x: viewport.x, y: viewport.y, width: viewport.width },
+        ...(await Promise.all([0, 1, 2, 3].map((index) => rect(p.heads.nth(index))))),
+        await rect(p.selects.first()),
+        await rect(p.rows.first()),
+      ];
+    };
     const before = await boxes();
     await p.selects.nth(0).selectOption('attribute');
     await expect(p.suggested).toHaveCount(2);
+    // A mark has gone, and something is wrong now: the table starts where it did.
+    await expect(p.problems).toHaveCount(1);
     expect(await boxes()).toEqual(before);
+    await p.selects.nth(0).selectOption('x');
+    await expect(p.problems).toHaveCount(0);
+    expect((await boxes()).slice(1)).toEqual(before.slice(1));
   });
 
   test('sets a column that is ignored apart in the table', async ({ page }) => {
@@ -305,10 +322,167 @@ test.describe('the Mapping step', () => {
     ] as const) {
       await page.goto('/');
       await mappingOf(page, file);
-      await expect(p.note, file).toContainText(text);
+      await expect(p.noColumns, file).toContainText(text);
       await expect(p.step.locator('table'), file).toHaveCount(0);
       await expect(p.next.locator('button'), file).toBeEnabled();
     }
+  });
+
+  test('says what each kind needs before anything is wrong', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await expect(p.step.locator('p').first()).toContainText(
+      'Points need a column for X and one for Y.',
+    );
+    await p.back.click();
+    await p.kind.selectOption('lines');
+    await p.next.click();
+    await expect(p.step.locator('p').first()).toContainText(
+      'Lines need a column for X, one for Y and a line identifier',
+    );
+    await p.back.click();
+    await p.kind.selectOption('blocks');
+    await p.next.click();
+    await expect(p.step.locator('p').first()).toContainText(
+      'A block model needs a column for X, Y and Z',
+    );
+  });
+
+  test('can be gone on from when the roles the kind needs are set', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await expect(p.problems).toHaveCount(0);
+    await expect(p.note).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeEnabled();
+  });
+
+  test('says which coordinate has no column, and cannot be gone on from until it has one', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.selects.nth(0).selectOption('attribute');
+    await expect(p.problems).toHaveCount(1);
+    await expect(p.problems.first()).toContainText('No column is set as X (easting or longitude).');
+    await expect(p.problems.first()).toContainText('Choose the column that holds this coordinate.');
+    await expect(p.problems.first()).toHaveAttribute('data-severity', 'error');
+    await expect(p.next.locator('button')).toBeDisabled();
+    // The reason is in the footer, where the button is.
+    await expect(p.note).toHaveText('No column is set as X (easting or longitude).');
+    await p.selects.nth(0).selectOption('x');
+    await expect(p.problems).toHaveCount(0);
+    await expect(p.note).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeEnabled();
+  });
+
+  test('says when two columns have the same role', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.selects.nth(1).selectOption('x');
+    await expect(p.problems.first()).toContainText(
+      'More than one column is set as X (easting or longitude).',
+    );
+    // And the Y that it took the place of has no column now.
+    await expect(p.problems.last()).toContainText('No column is set as Y (northing or latitude).');
+    await expect(p.next.locator('button')).toBeDisabled();
+    await expect(p.note).toHaveText('More than one column is set as X (easting or longitude).');
+  });
+
+  test('needs a line identifier for lines, and says so when there is none', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'lines.csv');
+    await expect(p.next.locator('button')).toBeEnabled();
+    const lineColumn = (await valuesOf(p.selects)).indexOf('line_id');
+    await p.selects.nth(lineColumn).selectOption('attribute');
+    await expect(p.problems).toHaveCount(1);
+    await expect(p.problems.first()).toContainText('No column is set as the line identifier');
+    await expect(p.next.locator('button')).toBeDisabled();
+  });
+
+  test('has no block size for points and lines', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await expect(p.sizes).toHaveCount(0);
+  });
+
+  test('asks for the size of a block in a block model, and cannot be gone on from without it', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'blocks.csv');
+    await expect(p.sizes).toHaveCount(3);
+    await expect(p.step.locator('legend')).toHaveText(
+      'Size of a block, in the units of the coordinates',
+    );
+    expect(await textsOf(p.sizes.locator('label'))).toEqual(['Along X', 'Along Y', 'Along Z']);
+    await expect(p.problems).toHaveCount(1);
+    await expect(p.problems.first()).toContainText('The block size is missing.');
+    await expect(p.next.locator('button')).toBeDisabled();
+    await expect(p.note).toHaveText('The block size is missing.');
+
+    await p.sizeInputs.nth(0).fill('10');
+    await p.sizeInputs.nth(1).fill('10,5');
+    await expect(p.problems.first()).toContainText('The block size must be greater than 0');
+    await expect(p.problems.first()).toContainText('but it is 10 x 10,5 x empty.');
+    await p.sizeInputs.nth(2).fill('5');
+    await expect(p.problems).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeEnabled();
+    expect(
+      await p.host.evaluate(
+        (element) => (element as unknown as { draft: { blockSize: unknown } }).draft.blockSize,
+      ),
+    ).toEqual({ x: '10', y: '10,5', z: '5' });
+  });
+
+  test('says what is wrong with a size as it is typed, and moves nothing to do it', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'blocks.csv');
+    const before = [
+      await rect(p.sizes.first()),
+      await rect(p.sizes.last()),
+      await rect(p.viewport),
+    ];
+    await p.sizeInputs.nth(0).fill('abc');
+    await expect(p.sizes.first().locator('.error')).toHaveText('Enter a number above 0.');
+    await expect(p.sizeInputs.nth(0)).toHaveAttribute('aria-invalid', 'true');
+    // An empty one is not "wrong" yet, only missing.
+    await expect(p.sizes.last().locator('.error')).toHaveCount(0);
+    expect([await rect(p.sizes.first()), await rect(p.sizes.last())]).toEqual([
+      before[0],
+      before[1],
+    ]);
+    await p.sizeInputs.nth(0).fill('0');
+    await expect(p.sizes.first().locator('.error')).toHaveCount(1);
+  });
+
+  test('keeps the size of a block when the step is left and come back to, and asks for none after a change of kind to points', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'blocks.csv');
+    await p.sizeInputs.nth(0).fill('10');
+    await p.back.click();
+    await p.next.click();
+    await expect(p.sizeInputs.nth(0)).toHaveValue('10');
+    await p.back.click();
+    await p.kind.selectOption('points');
+    await p.next.click();
+    await expect(p.sizes).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeEnabled();
+  });
+
+  test('fits the smallest window with a block model, with nothing overflowing', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await mappingOf(page, 'blocks.csv');
+    await p.sizeInputs.nth(0).fill('abc');
+    await assertNoOverflow(p.dialog);
+    // The table keeps enough room to see rows in; what is round it can make the body scroll instead.
+    expect((await rect(p.viewport)).height).toBeGreaterThanOrEqual(192);
   });
 
   test('has the keyboard go from one selector to the next, in the order of the columns', async ({

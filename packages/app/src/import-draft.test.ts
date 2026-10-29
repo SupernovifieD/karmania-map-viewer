@@ -24,6 +24,7 @@ describe('the draft for a file', () => {
       datasetName: 'lines',
       kind: 'lines',
       columns: [],
+      blockSize: { x: '', y: '', z: '' },
     });
   });
 

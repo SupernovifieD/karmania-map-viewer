@@ -1,12 +1,21 @@
 import { sharedStyles } from '@karmania/ui';
-import type { SelectChange, SelectOption } from '@karmania/ui';
+import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
 import type { ImportDraft } from './import-draft.js';
 import { formatCount, NO_COLUMNS_NOTE } from './import-files.js';
 import type { FileEntry } from './import-files.js';
-import { ROLE_NAMES, rolesFor, withRole } from './import-mapping.js';
+import {
+  mappingProblems,
+  parseSize,
+  REQUIREMENTS_NOTE,
+  ROLE_NAMES,
+  rolesFor,
+  withRole,
+} from './import-mapping.js';
+import type { BlockSizeDraft } from './import-mapping.js';
+import './findings.js';
 import { ROLES } from '@karmania/engine';
 import type { Role } from '@karmania/engine';
 
@@ -37,9 +46,9 @@ export class KarmaniaMappingStep extends LitElement {
     css`
       :host {
         display: flex;
+        flex: 1 1 auto;
         flex-direction: column;
         gap: var(--k-space-8);
-        height: 100%;
         min-height: 0;
         min-width: 0;
       }
@@ -60,6 +69,27 @@ export class KarmaniaMappingStep extends LitElement {
         margin-top: var(--k-space-2);
       }
 
+      fieldset {
+        border: none;
+        margin: 0;
+        min-width: 0;
+        padding: 0;
+      }
+
+      legend {
+        font-size: var(--k-font-size-secondary);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-secondary);
+        margin-bottom: var(--k-space-4);
+        padding: 0;
+      }
+
+      .sizes {
+        display: grid;
+        gap: var(--k-space-16);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
       .count {
         color: var(--k-text-muted);
         flex: none;
@@ -67,13 +97,20 @@ export class KarmaniaMappingStep extends LitElement {
         line-height: var(--k-line-height-secondary);
       }
 
-      /* The table has its own room, and scrolls in it. */
+      /* The table has its own room, and scrolls in it: what the step has left, and not less than
+         enough to see a few rows in, since what is above and below it can take a good deal. */
       .viewport {
         border: var(--k-border-width) solid var(--k-border);
         border-radius: var(--k-radius-md);
-        flex: 1 1 auto;
-        min-height: 0;
+        flex: 1 1 0;
+        min-height: calc(var(--k-space-48) * 4);
         overflow: auto;
+      }
+
+      /* What is wrong is under the table, so that it appearing or going moves neither the header
+         nor the rows. */
+      .problems {
+        flex: none;
       }
 
       table {
@@ -183,6 +220,38 @@ export class KarmaniaMappingStep extends LitElement {
     }
   }
 
+  private onSize(axis: keyof BlockSizeDraft, event: CustomEvent<InputChange>): void {
+    if (this.draft !== undefined) {
+      this.tell({ blockSize: { ...this.draft.blockSize, [axis]: event.detail.value } });
+    }
+  }
+
+  /** The size of a block along each axis, for a block model. */
+  private blockSize(size: BlockSizeDraft) {
+    return html`
+      <fieldset class="block-size">
+        <legend>Size of a block, in the units of the coordinates</legend>
+        <div class="sizes">
+          ${(['x', 'y', 'z'] as const).map((axis) => {
+            const text = size[axis];
+            return html`<k-input
+              label=${`Along ${axis.toUpperCase()}`}
+              inputmode="decimal"
+              reserve
+              .value=${text}
+              error=${
+                text.trim() !== '' && parseSize(text) === undefined ? 'Enter a number above 0.' : ''
+              }
+              @k-input-change=${(event: CustomEvent<InputChange>) => {
+                this.onSize(axis, event);
+              }}
+            ></k-input>`;
+          })}
+        </div>
+      </fieldset>
+    `;
+  }
+
   private head(
     source: string,
     role: Role,
@@ -224,11 +293,14 @@ export class KarmaniaMappingStep extends LitElement {
     const options = rolesFor(draft.kind).map((role) => ({ value: role, label: ROLE_NAMES[role] }));
     const rows = table.rows.slice(0, PREVIEW_ROWS);
     const total = table.estimatedRows;
+    const kind = draft.kind;
+    const problems = mappingProblems(kind, draft.columns, draft.blockSize);
     return html`
       <p>
-        Say what each column is for. The roles the kernel suggests are filled in, and marked
-        <span class="suggested">suggested</span> until you change them.
+        ${kind === undefined ? '' : REQUIREMENTS_NOTE[kind]} The roles the kernel suggests are
+        filled in, and marked <span class="suggested">suggested</span> until you change them.
       </p>
+      ${kind === 'blocks' ? this.blockSize(draft.blockSize) : nothing}
       <div class="viewport" data-scroll-region>
         <table style=${`--columns: ${String(draft.columns.length)}`}>
           <thead>
@@ -258,6 +330,11 @@ export class KarmaniaMappingStep extends LitElement {
           </tbody>
         </table>
       </div>
+      ${
+        problems.length === 0
+          ? nothing
+          : html`<karmania-findings class="problems" .findings=${problems}></karmania-findings>`
+      }
       <p class="count">
         ${
           rows.length >= total

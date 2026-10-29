@@ -1,7 +1,11 @@
 import type { Role, TablePreview } from '@karmania/engine';
 import { describe, expect, it } from 'vitest';
 import {
+  blockSizeOf,
   columnsFromPreview,
+  EMPTY_BLOCK_SIZE,
+  mappingProblems,
+  parseSize,
   ROLE_NAMES,
   ROLES_BY_KIND,
   rolesFor,
@@ -102,5 +106,110 @@ describe('changing what the file is imported as', () => {
     ]);
     expect(withKind(columns, 'blocks')[0]?.role).toBe('attribute');
     expect(withKind(columns, 'lines')).toEqual(columns);
+  });
+});
+
+describe('a block size as a person types it', () => {
+  it('is a number above 0, with a point or a comma for the decimals', () => {
+    expect(parseSize('10')).toBe(10);
+    expect(parseSize(' 2.5 ')).toBe(2.5);
+    expect(parseSize('2,5')).toBe(2.5);
+    expect(parseSize('.5')).toBe(0.5);
+    expect(parseSize('10.')).toBe(10);
+  });
+
+  it('is not nothing, zero, negative, or anything that is not a plain number', () => {
+    for (const text of [
+      '',
+      ' ',
+      '0',
+      '0.0',
+      '-5',
+      '1e3',
+      '10 m',
+      'ten',
+      '1,000.5',
+      '1.2.3',
+      'NaN',
+      'Infinity',
+    ]) {
+      expect(parseSize(text), text).toBeUndefined();
+    }
+  });
+
+  it('is all three sizes, or none', () => {
+    expect(blockSizeOf({ x: '10', y: '10', z: '5' })).toEqual([10, 10, 5]);
+    expect(blockSizeOf({ x: '10', y: '10', z: '' })).toBeUndefined();
+    expect(blockSizeOf(EMPTY_BLOCK_SIZE)).toBeUndefined();
+  });
+});
+
+const columnsOf = (...roles: Role[]) =>
+  roles.map((role, index) => ({ source: `C${String(index)}`, role, suggested: false }));
+
+const codes = (problems: readonly { code: string }[]): string[] => problems.map((p) => p.code);
+
+describe('what is wrong with a mapping', () => {
+  it('is nothing for points that have an X and a Y, whatever else they have', () => {
+    expect(
+      mappingProblems('points', columnsOf('x', 'y', 'attribute', 'ignore'), EMPTY_BLOCK_SIZE),
+    ).toEqual([]);
+    expect(mappingProblems('points', columnsOf('x', 'y', 'z'), EMPTY_BLOCK_SIZE)).toEqual([]);
+  });
+
+  it('says which coordinate no column is set as', () => {
+    const found = mappingProblems('points', columnsOf('attribute', 'y'), EMPTY_BLOCK_SIZE);
+    expect(codes(found)).toEqual(['mapping.coordinate.missing']);
+    expect(found[0]?.message).toBe('No column is set as X (easting or longitude).');
+    expect(
+      codes(mappingProblems('points', columnsOf('attribute', 'attribute'), EMPTY_BLOCK_SIZE)),
+    ).toEqual(['mapping.coordinate.missing', 'mapping.coordinate.missing']);
+  });
+
+  it('needs a line identifier for lines, and no Z', () => {
+    expect(codes(mappingProblems('lines', columnsOf('x', 'y'), EMPTY_BLOCK_SIZE))).toEqual([
+      'mapping.line_id.missing',
+    ]);
+    expect(mappingProblems('lines', columnsOf('x', 'y', 'line_id'), EMPTY_BLOCK_SIZE)).toEqual([]);
+  });
+
+  it('needs a Z for a block model, and a block size', () => {
+    expect(
+      codes(mappingProblems('blocks', columnsOf('x', 'y'), { x: '10', y: '10', z: '5' })),
+    ).toEqual(['mapping.coordinate.missing']);
+    expect(codes(mappingProblems('blocks', columnsOf('x', 'y', 'z'), EMPTY_BLOCK_SIZE))).toEqual([
+      'mapping.block_size.missing',
+    ]);
+    expect(
+      mappingProblems('blocks', columnsOf('x', 'y', 'z'), { x: '10', y: '10', z: '5' }),
+    ).toEqual([]);
+  });
+
+  it('says what is wrong with a block size that is given but cannot be used', () => {
+    const found = mappingProblems('blocks', columnsOf('x', 'y', 'z'), { x: '10', y: '0', z: '' });
+    expect(codes(found)).toEqual(['mapping.block_size.invalid']);
+    expect(found[0]?.message).toBe(
+      'The block size must be greater than 0 in all three directions, but it is 10 x 0 x empty.',
+    );
+  });
+
+  it('says when a role has more than one column', () => {
+    const found = mappingProblems('points', columnsOf('x', 'x', 'y'), EMPTY_BLOCK_SIZE);
+    expect(codes(found)).toEqual(['mapping.role.duplicate']);
+    expect(found[0]?.message).toBe('More than one column is set as X (easting or longitude).');
+  });
+
+  it('is all errors, for the mapping step, each with a hint', () => {
+    const found = mappingProblems('blocks', columnsOf('x', 'x'), EMPTY_BLOCK_SIZE);
+    expect(found.length).toBeGreaterThan(2);
+    for (const finding of found) {
+      expect([finding.severity, finding.step, finding.count]).toEqual(['error', 'mapping', 1]);
+      expect(finding.hint).not.toBe('');
+    }
+  });
+
+  it('is nothing when there is no choice of kind, or nothing to map', () => {
+    expect(mappingProblems(undefined, [], EMPTY_BLOCK_SIZE)).toEqual([]);
+    expect(mappingProblems('grid', [], EMPTY_BLOCK_SIZE)).toEqual([]);
   });
 });

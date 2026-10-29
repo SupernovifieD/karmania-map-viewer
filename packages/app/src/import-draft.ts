@@ -1,8 +1,8 @@
 import type { Kind } from '@karmania/engine';
 import { KINDS_BY_FORMAT } from './import-files.js';
 import type { FileEntry } from './import-files.js';
-import { columnsFromPreview, withKind } from './import-mapping.js';
-import type { ColumnDraft } from './import-mapping.js';
+import { columnsFromPreview, EMPTY_BLOCK_SIZE, withKind } from './import-mapping.js';
+import type { BlockSizeDraft, ColumnDraft } from './import-mapping.js';
 
 /**
  * What a person has decided about the file being imported, step by step. It starts as what the kernel
@@ -15,6 +15,8 @@ export interface ImportDraft {
   readonly kind: Kind | undefined;
   /** What each column of the file is for, in the file's order; none for a file without columns. */
   readonly columns: readonly ColumnDraft[];
+  /** The size of a block, for a block model; as typed. */
+  readonly blockSize: BlockSizeDraft;
 }
 
 /** A file's name without its extension: `collars.csv` is `collars`, `a.b.csv` is `a.b`. */
@@ -34,6 +36,7 @@ export function draftFor(entry: FileEntry): ImportDraft {
     datasetName: fileStem(entry.preview.fileName),
     kind,
     columns: table === undefined ? [] : columnsFromPreview(table, kind),
+    blockSize: EMPTY_BLOCK_SIZE,
   };
 }
 

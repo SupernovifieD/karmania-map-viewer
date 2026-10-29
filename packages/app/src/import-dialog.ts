@@ -8,6 +8,7 @@ import type { DraftChange } from './file-step.js';
 import { applyDraftChange, draftFor } from './import-draft.js';
 import type { ImportDraft } from './import-draft.js';
 import { entriesOf, isImportable } from './import-files.js';
+import { mappingProblems } from './import-mapping.js';
 import type { FileEntry } from './import-files.js';
 import './findings.js';
 import './mapping-step.js';
@@ -63,10 +64,10 @@ export class KarmaniaImportDialog extends LitElement {
         margin: 0;
       }
 
-      /* The Mapping step has a table that scrolls in the room the step has, so the step has all of it. */
+      /* The Mapping step has a table that scrolls in the room the step has, so the step has all of it,
+         and more if what is round the table needs more than the dialog has. */
       .step[data-step='mapping'] {
-        height: 100%;
-        min-height: 0;
+        min-height: 100%;
       }
 
       .reading {
@@ -194,6 +195,10 @@ export class KarmaniaImportDialog extends LitElement {
 
   /** Why a person cannot go on from this step yet, in words, or `undefined` if they can. */
   private get blocker(): string | undefined {
+    if (this.step === 'mapping' && this.draft !== undefined) {
+      // The first thing that is wrong with the mapping, in the kernel's words.
+      return mappingProblems(this.draft.kind, this.draft.columns, this.draft.blockSize)[0]?.message;
+    }
     if (this.step !== 'file') {
       return undefined;
     }
@@ -271,8 +276,10 @@ export class KarmaniaImportDialog extends LitElement {
           current=${this.step}
           .steps=${IMPORT_STEPS}
         ></k-steps>
-        ${this.body()}
+        <!-- First, not last: it is placed absolutely, where it would have been, and where the content
+             ends is out of sight when the body is scrolled. -->
         <span class="visually-hidden" role="status">${describeStep(this.step)}</span>
+        ${this.body()}
         <k-button slot="footer-start" variant="ghost" @click=${this.onCancel}>Cancel</k-button>
         ${
           blocker === undefined

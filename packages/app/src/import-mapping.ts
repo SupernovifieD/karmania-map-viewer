@@ -1,4 +1,4 @@
-import type { Kind, Role, TablePreview } from '@karmania/engine';
+import type { Finding, Kind, Role, TablePreview } from '@karmania/engine';
 
 /** What a person has decided about one column of the file. */
 export interface ColumnDraft {
@@ -80,4 +80,129 @@ export function withKind(
       ? column
       : { source: column.source, role: 'attribute', suggested: false },
   );
+}
+
+/** The size of a block along each axis, as a person typed it: text, since a number can be half typed. */
+export interface BlockSizeDraft {
+  readonly x: string;
+  readonly y: string;
+  readonly z: string;
+}
+
+/** No block size yet. */
+export const EMPTY_BLOCK_SIZE: BlockSizeDraft = { x: '', y: '', z: '' };
+
+/** What a block's size is, as a number above 0: `10`, `2.5` or `2,5`; anything else is not one. */
+export function parseSize(text: string): number | undefined {
+  const trimmed = text.trim().replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(trimmed)) {
+    return undefined;
+  }
+  const size = Number(trimmed);
+  return Number.isFinite(size) && size > 0 ? size : undefined;
+}
+
+/** The block size as numbers, if all three are given and usable. */
+export function blockSizeOf(size: BlockSizeDraft): readonly [number, number, number] | undefined {
+  const [x, y, z] = [parseSize(size.x), parseSize(size.y), parseSize(size.z)];
+  return x === undefined || y === undefined || z === undefined ? undefined : [x, y, z];
+}
+
+/** The roles a mapping needs, for what the file is imported as. */
+export const REQUIRED_ROLES: Readonly<Record<Kind, readonly Role[]>> = {
+  points: ['x', 'y'],
+  lines: ['x', 'y', 'line_id'],
+  blocks: ['x', 'y', 'z'],
+  polygons: [],
+  mesh: [],
+  grid: [],
+};
+
+/** What each role is called in a sentence. The words are the kernel's, so that both say the same. */
+export const ROLE_WORDS: Readonly<Record<Role, string>> = {
+  x: 'X (easting or longitude)',
+  y: 'Y (northing or latitude)',
+  z: 'Z (elevation)',
+  line_id: 'the line identifier',
+  attribute: 'an attribute',
+  ignore: 'ignored',
+};
+
+/** What the Mapping step tells a person a kind needs, before anything is wrong. */
+export const REQUIREMENTS_NOTE: Readonly<Record<Kind, string>> = {
+  points: 'Points need a column for X and one for Y.',
+  lines:
+    'Lines need a column for X, one for Y and a line identifier: the column that says which line a row belongs to.',
+  blocks:
+    'A block model needs a column for X, Y and Z, which give the centre of each block, and the size of a block.',
+  polygons: '',
+  mesh: '',
+  grid: '',
+};
+
+/** A problem with the mapping that stops it being used, worded as the kernel words it. */
+function problem(code: string, message: string, hint: string): Finding {
+  return { code, severity: 'error', message, hint, count: 1, examples: [], step: 'mapping' };
+}
+
+/**
+ * What is wrong with the mapping so far, in the kernel's words (`mapping.*` in
+ * docs/validation-codes.md; a test keeps the two the same): a role that is needed and no column has,
+ * a role several columns have, and a block size that is missing or cannot be used. The kernel checks
+ * the same when the file is imported; this tells a person before.
+ */
+export function mappingProblems(
+  kind: Kind | undefined,
+  columns: readonly ColumnDraft[],
+  blockSize: BlockSizeDraft,
+): readonly Finding[] {
+  if (kind === undefined) {
+    return [];
+  }
+  const found: Finding[] = [];
+  const needed = REQUIRED_ROLES[kind];
+  for (const role of ['x', 'y', 'z', 'line_id'] as const) {
+    const holders = columns.filter((column) => column.role === role).length;
+    if (holders > 1) {
+      found.push(
+        problem(
+          'mapping.role.duplicate',
+          `More than one column is set as ${ROLE_WORDS[role]}.`,
+          'Keep one column for this role and set the others to attribute or ignore.',
+        ),
+      );
+    }
+    if (holders === 0 && needed.includes(role)) {
+      found.push(
+        role === 'line_id'
+          ? problem(
+              'mapping.line_id.missing',
+              'No column is set as the line identifier, so rows cannot be grouped into lines.',
+              'Choose the column that says which line each row belongs to.',
+            )
+          : problem(
+              'mapping.coordinate.missing',
+              `No column is set as ${ROLE_WORDS[role]}.`,
+              'Choose the column that holds this coordinate.',
+            ),
+      );
+    }
+  }
+  if (kind === 'blocks' && blockSizeOf(blockSize) === undefined) {
+    const given = [blockSize.x, blockSize.y, blockSize.z].some((text) => text.trim() !== '');
+    found.push(
+      given
+        ? problem(
+            'mapping.block_size.invalid',
+            `The block size must be greater than 0 in all three directions, but it is ${[blockSize.x, blockSize.y, blockSize.z].map((text) => (text.trim() === '' ? 'empty' : text.trim())).join(' x ')}.`,
+            'Use positive numbers, such as 10 for 10-metre blocks.',
+          )
+        : problem(
+            'mapping.block_size.missing',
+            'The block size is missing.',
+            'Enter the size of a block along X, Y and Z.',
+          ),
+    );
+  }
+  return found;
 }

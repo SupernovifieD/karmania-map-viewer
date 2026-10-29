@@ -68,8 +68,11 @@ export class KarmaniaFindings extends LitElement {
         overflow-wrap: anywhere;
       }
 
+      /* Positioned, so that the severity said for those who cannot see (placed absolutely) stays
+         with the finding and is clipped with it when what scrolls it away does. */
       .message {
         font-weight: var(--k-weight-medium);
+        position: relative;
       }
 
       .hint,
