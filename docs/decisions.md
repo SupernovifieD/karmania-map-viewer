@@ -1812,15 +1812,22 @@ was chosen, why.
 - Step 9.8 (more rows than a browser can scroll). A browser cannot make a box taller than about 33
   million pixels (Chromium) or 17 million (Firefox): past that, rows are not where they are said to
   be and the end cannot be reached, which a test shows by taking the limit away (all eight fail at
-  2,000,000 rows). The box is never made taller than 10 million pixels, a limit under both, so up to
-  about 357,000 rows nothing changes. Past that the scroll bar is for all the rows, drawn smaller:
+  2,000,000 rows). The box is never made taller than 8 million pixels, a limit under both, so up to
+  about 285,000 rows nothing changes. It is 8 and not the 10 that was first tried because Chromium
+  scrolls to every whole pixel only below about 8.4 million (2 to the power of 23) and to every other
+  pixel above it, which was found by asking for 40 positions at each of several heights (all 40
+  honoured up to 8,388,000, 20 of 40 from 9,000,000), and a scroll bar that cannot stop at each pixel
+  cannot stop at each row. The box is also clipped to its own height: rows drawn past its foot, in the
+  last pixel or two before the end, would otherwise make it taller, and let the browser scroll past
+  where the sums stop, so that the rows at the end were drawn too high. Past that the scroll bar is for
+  all the rows, drawn smaller:
   how far it is scrolled, as a share of how far it can be, is how far down the rows are, and the rows
   drawn are put where they show at the top of the table (`layerTop`), not where they would be. At
-  2,000,000 rows a pixel of scrolling is 5.6 pixels of rows; while that is less than a row (up to
-  10,000,000 rows) every row can be reached with the scroll bar, which unit tests prove from the sums
+  2,000,000 rows a pixel of scrolling is 7 pixels of rows; while that is less than a row (up to
+  8,000,000 rows) every row can be reached with the scroll bar, which unit tests prove from the sums
   (the end is the last row, the rows drawn always cover the table, scrolling on never goes back or
   skips a row, any row is within one of where it is aimed at) and a browser test shows at 2,000,000
-  rows and with the real engine at 400,000. Past 10,000,000 rows a pixel is more than a row, and the
+  rows and with the real engine at 400,000. Past 8,000,000 rows a pixel is more than a row, and the
   scroll bar alone cannot stop at each; the keyboard of step 9.10 will. A wheel notch or an arrow key
   moves further through the rows the more rows there are. Checked in Chromium only: the project's
   browser tests run in it alone, so the limits of Firefox and Safari are taken from their documentation

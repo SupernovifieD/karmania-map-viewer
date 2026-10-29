@@ -6,10 +6,13 @@
 /**
  * The most that the box a table scrolls in is made tall, in pixels. A browser has a limit to how tall
  * an element can be, about 33 million in Chromium and 17 million in Firefox, and goes wrong past it:
- * rows would be where they are not, and the end could not be reached. Below this, the scroll bar is
- * for the rows as they are; past it, the scroll bar is for all of the rows, drawn smaller.
+ * rows would be where they are not, and the end could not be reached. Chromium also holds a scroll
+ * position to every other pixel once the box is taller than about 8.4 million, which is where its
+ * numbers for it run out of whole pixels (2 to the power of 23), so the box is kept under that, where
+ * every pixel of the scroll bar can be scrolled to. Below this, the scroll bar is for the rows as
+ * they are; past it, the scroll bar is for all of the rows, drawn smaller.
  */
-export const MAX_SCROLL_HEIGHT = 10_000_000;
+export const MAX_SCROLL_HEIGHT = 8_000_000;
 
 /** What a table knows when it asks which rows to draw. */
 export interface WindowInput {

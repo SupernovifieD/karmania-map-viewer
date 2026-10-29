@@ -208,7 +208,7 @@ test.describe('the table of the Data tab', () => {
     await expect(p.viewport).toHaveAttribute('aria-rowcount', '400001');
     await expect(p.rows.first()).toBeVisible();
     // 400,000 rows of 28 are 11.2 million pixels: the box is made as tall as is allowed, not that.
-    expect(await p.viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 10_000_000);
+    expect(await p.viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 8_000_000);
     expect((await drawn(p.rows))[0]).toEqual(shownCoordinates(0));
     for (const fraction of [0.3, 0.5, 0.9]) {
       await p.viewport.evaluate((element, f) => {

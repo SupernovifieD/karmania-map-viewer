@@ -145,8 +145,9 @@ describe('rows that are too many to scroll as they are', () => {
   });
 
   it('never go back when scrolled on, and never skip a row that was in view', () => {
-    // 10,000 rows in a box of 100,000 pixels: a pixel of scrolling is 2.8 pixels of rows.
-    const dense = { ...base, rowCount: 10_000, maxScrollHeight: 100_000 };
+    // 2,000 rows in a box of 20,000 pixels: a pixel of scrolling is 2.8 pixels of rows, as in the
+    // table above, and every pixel of it is tried.
+    const dense = { ...base, rowCount: 2_000, maxScrollHeight: 20_000 };
     let before = topOf(dense, 0);
     for (let scrollTop = 1; scrollTop <= maxScroll(dense); scrollTop += 1) {
       const row = topOf(dense, scrollTop);
@@ -155,7 +156,7 @@ describe('rows that are too many to scroll as they are', () => {
       expect(row - before).toBeLessThanOrEqual(1);
       before = row;
     }
-    expect(before).toBe(10_000 - 10);
+    expect(before).toBe(2_000 - 10);
   });
 
   it('can be scrolled to any row, to within one', () => {
@@ -176,7 +177,7 @@ describe('rows that are too many to scroll as they are', () => {
     expect(w.scrollHeight).toBe(MAX_SCROLL_HEIGHT);
     const end = windowFor({ ...huge, scrollTop: maxScroll(huge) });
     expect(end.endRow).toBe(2_000_000);
-    // A pixel of scrolling is 5.6 pixels of rows: less than a row, so no row is out of reach.
+    // A pixel of scrolling is 7 pixels of rows: less than a row, so no row is out of reach.
     expect(scrollRatio(huge)).toBeLessThan(28);
   });
 });
