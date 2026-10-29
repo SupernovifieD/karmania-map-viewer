@@ -178,4 +178,57 @@ test.describe('importing', () => {
     });
     expect(result.inEngine).toEqual([dataset?.id]);
   });
+
+  test('a GeoJSON file with three kinds of shape: a dataset for each, in the coordinate system it assumes', async ({
+    page,
+  }) => {
+    const w = wizard(page);
+    await startWizard(page, 'mixed.geojson');
+    // File: nothing to choose, since the shapes in the file decide.
+    await expect(w.host.locator('karmania-file-step .detail')).toHaveText('GeoJSON · UTF-8');
+    await expect(w.host.locator('karmania-file-step k-select select')).toBeDisabled();
+    await goTo(page, 'mapping');
+    await expect(w.host.locator('karmania-mapping-step .note')).toContainText(
+      'no columns to set up',
+    );
+    await goTo(page, 'nodata');
+    await expect(w.host.locator('karmania-nodata-step .note')).toContainText('a null is a null');
+    await goTo(page, 'crs');
+    // CRS: the default of GeoJSON, which the step says is assumed, and a person keeps.
+    await expect(w.host.locator('karmania-crs-step .found-text')).toHaveText(
+      'Found EPSG 4326, from the GeoJSON default, which is assumed because the file names none.',
+    );
+    await goTo(page, 'review');
+
+    // Review: three datasets, one of each kind of shape, and notes about how they were made.
+    const review = w.host.locator('karmania-review-step');
+    await expect(review.locator('.verdict')).toHaveText('Ready to load');
+    await expect(review.locator('.dataset')).toHaveCount(3);
+    await expect(review.locator('.group[data-severity="info"]')).toBeVisible();
+    await expect(review.locator('.group[data-severity="error"]')).toHaveCount(0);
+    await w.next.click();
+
+    await expect(w.dialog).toBeHidden();
+    await expect(w.map).toContainText('3 datasets loaded');
+    const result = await kept(page);
+    expect(result.datasets.map((dataset) => dataset.kind).sort()).toEqual([
+      'lines',
+      'points',
+      'polygons',
+    ]);
+    const byKind = (kind: string) => result.datasets.find((dataset) => dataset.kind === kind);
+    // One of the two points has a height and the other does not, so the dataset has none.
+    expect(byKind('points')).toMatchObject({ elementCount: 2, hasZ: false });
+    expect(byKind('lines')).toMatchObject({ elementCount: 1 });
+    expect(byKind('polygons')).toMatchObject({ elementCount: 1 });
+    for (const dataset of result.datasets) {
+      expect(dataset.crs).toEqual({ kind: 'epsg', code: 4326 });
+      expect(dataset.name).toContain('mixed');
+      // Each says that the coordinate system was assumed.
+      expect(dataset.findings).toContain('geojson.crs.assumed');
+    }
+    // The first one made is the one selected, and all three are in the engine.
+    expect(result.selected).toBe(result.datasets[0]?.id);
+    expect(result.inEngine).toEqual(result.datasets.map((dataset) => dataset.id));
+  });
 });

@@ -1657,3 +1657,8 @@ was chosen, why.
   import is stopped for the empty coordinate, the error links to the Nodata step, "skip" and "Check
   again" load three of the four rows with a warning, the NA is the grade's one null and the box is
   that of the rows that were kept.
+- 8.13c: the GeoJSON sample, which has points, a line and a polygon. The File step offers no choice of
+  kind, the Mapping and Nodata steps say there is nothing to set, the coordinate system step says
+  EPSG 4326 is the default and assumed, and the import makes one dataset of each kind, each saying it
+  assumed the coordinate system, the first of them selected. The two points are not three-dimensional
+  because only one of them has a height.
