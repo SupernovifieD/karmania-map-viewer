@@ -62,6 +62,8 @@ and there are only two weights.
 | `--k-hit-target`             | 32px  | Least focusable area of an icon button  |
 | `--k-tab-height`             | 40px  | A tab, and so the header of a tabbed panel |
 | `--k-list-row-height`    | 40px  | A row of a list, such as a dataset in the Data tab |
+| `--k-table-row-height`   | 28px  | A row of the data table                 |
+| `--k-table-header-height` | 32px | The header over the rows of the data table |
 | `--k-icon-size-sm`           | 16px  | Icons beside text, kind icons in lists  |
 | `--k-icon-size-md`           | 20px  | Icons alone in a button                 |
 | `--k-icon-size-lg`           | 32px  | The icon of an empty state              |

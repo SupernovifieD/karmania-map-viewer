@@ -15,6 +15,7 @@ import { fieldsSection } from './sections/fields.js';
 import { iconsSection } from './sections/icons.js';
 import { stepsSection } from './sections/steps.js';
 import { tabsSection } from './sections/tabs.js';
+import { tableSection } from './sections/table.js';
 import { tooltipsSection } from './sections/tooltips.js';
 import { forceThemeFromAddress } from './theme.js';
 
@@ -187,6 +188,14 @@ export class KarmaniaGallery extends LitElement {
         width: calc(var(--k-space-48) * 4);
       }
 
+      /* The room the Data tab gives its table: as wide as the panel, and a fixed height. */
+      .table-demo {
+        border: var(--k-border-width) solid var(--k-border);
+        height: calc(var(--k-space-48) * 6);
+        margin-bottom: var(--k-space-16);
+        width: var(--k-panel-width-default);
+      }
+
       .grid {
         display: grid;
         gap: var(--k-space-16) var(--k-space-24);
@@ -221,6 +230,7 @@ export class KarmaniaGallery extends LitElement {
       <p>From ${PACKAGE_NAME}.</p>
       ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
       ${emptyStateSection()} ${fieldsSection()} ${stepsSection()} ${dialogSection()}
+      ${tableSection()}
     `;
   }
 }
