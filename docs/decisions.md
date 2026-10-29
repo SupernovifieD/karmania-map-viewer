@@ -1270,3 +1270,8 @@ was chosen, why.
   `expanded` too. It is a property and not an attribute because unset is a third state that an
   attribute would have to spell out. The button keeps its own name when its state changes, as
   the disclosure pattern asks.
+- Before step 7.7 (`k-tabs` again): opening the panel from the rail should put the keyboard on
+  the tab that was opened, and the panel cannot do that without reaching into the tabs' shadow
+  root, so `focus()` on `k-tabs` now focuses the chosen tab (and does nothing if there are none),
+  which is also where a person enters the row with Tab. Delegating focus to the first focusable
+  thing in the row would have picked the first tab whichever was chosen.

@@ -42,7 +42,8 @@ export const TAB_CHANGE = 'k-tab-change';
  *
  * Left and Right move between the tabs (and choose each as they go, wrapping round at the
  * ends), Home and End go to the first and last, and only the chosen tab is in the Tab order,
- * so Tab goes into the row once and out of it once. A person choosing a tab changes
+ * so Tab goes into the row once and out of it once, and focusing the element focuses the chosen
+ * tab. A person choosing a tab changes
  * `selected` and sends `k-tab-change`.
  */
 export class KTabs extends LitElement {
@@ -163,6 +164,16 @@ export class KTabs extends LitElement {
     if (this.label === undefined || this.label.trim() === '') {
       throw new Error('A k-tabs needs a label, so that its row of tabs has a name.');
     }
+  }
+
+  /**
+   * Focuses the chosen tab, which is where the keyboard enters the row. The row has to have been
+   * drawn (`await tabs.updateComplete` after changing it).
+   */
+  override focus(options?: FocusOptions): void {
+    this.renderRoot
+      .querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
+      ?.focus(options);
   }
 
   private choose(id: string, focus: boolean): void {
