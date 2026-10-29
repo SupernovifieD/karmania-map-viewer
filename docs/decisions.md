@@ -1666,3 +1666,6 @@ was chosen, why.
   until a person types a code; the import makes one dataset of 12 cells whose one column holds the
   values, with the cell that had -9999 left empty and said so in a warning, and a box that is the
   outer edge of the grid (4 by 3 cells of 10 from the corner given), flat.
+- 8.13e: the OBJ sample, a pyramid whose square base is one face. A local grid in metres is chosen (a
+  model has no place on the Earth), the import splits the square into two triangles, says so in a note,
+  and loads a mesh of six triangles and five vertices, with a box from (0, 0, 0) to (10, 10, 8).
