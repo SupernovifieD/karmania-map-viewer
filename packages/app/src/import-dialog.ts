@@ -12,6 +12,7 @@ import { mappingProblems } from './import-mapping.js';
 import type { FileEntry } from './import-files.js';
 import './findings.js';
 import './mapping-step.js';
+import './nodata-step.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';
 
@@ -254,6 +255,15 @@ export class KarmaniaImportDialog extends LitElement {
           .draft=${this.draft}
           @karmania-draft-change=${this.onDraftChange}
         ></karmania-mapping-step>
+      </div>`;
+    }
+    if (this.step === 'nodata') {
+      return html`<div class="step" data-step="nodata">
+        <karmania-nodata-step
+          .entry=${this.current}
+          .draft=${this.draft}
+          @karmania-draft-change=${this.onDraftChange}
+        ></karmania-nodata-step>
       </div>`;
     }
     const found = IMPORT_STEPS.find((known) => known.id === this.step);

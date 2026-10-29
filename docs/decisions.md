@@ -1547,3 +1547,20 @@ was chosen, why.
   after the person has changed the box themselves. Found by the test of the long label: an inline
   input in a box of 16 made the box's content 5 high over (a line of text under it), and the detail
   left the label 14 wide.
+- Step 8.7 (the Nodata step). The words and numbers the kernel found that look like "no data" are
+  boxes, ticked to begin with, each with how often the preview had it ("1 in the preview": the counts
+  are from the preview's rows, not the whole file, and the step says so rather than imply they are
+  totals). Ticked by default because it is what a person is most likely to want and nothing is
+  changed silently: the kernel counts every value it turns into an empty one in a warning. An empty
+  cell is called "(empty cell)". Other values are typed in a field, separated by commas: what is a
+  plain number (a point for the decimals, and an exponent if need be) is a number and anything else
+  is a word, each once and words whatever their case; under the field the step says how it read
+  them, since "1,5" is two numbers and a person should see that before importing. A file that writes
+  its numbers with commas needs a different separator for this field; a comma in the file's numbers is
+  rare in a list of no-data values, and a person who does need one can say so with the decimal
+  setting. The step also holds two more choices the mapping contract needs: what to do with a row
+  that has an empty coordinate (stop with an error, or skip it and count it; the first to begin with,
+  since it is the one that loses nothing), and how the numbers in the file are written (a point or
+  a comma, found by the kernel, which a person can change). No choice here can stop a person going on.
+  A file with no columns says that there is nothing to set (an ASCII grid names its own no-data
+  value in its header, and that is used).

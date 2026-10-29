@@ -368,7 +368,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.5 Step "Mapping", part 2: required-role checks inline (missing X or Y,
   line ID, block size field for blocks); Next disabled with a visible reason.
 - [x] 8.6 Step "Mapping", part 3: per-column type override and rename.
-- [ ] 8.7 Step "Nodata": suggested tokens and numbers as checkboxes with counts;
+- [x] 8.7 Step "Nodata": suggested tokens and numbers as checkboxes with counts;
   custom value input; empty-coordinate policy.
 - [ ] 8.8 Step "CRS", part 1: the detected CRS with its source (the file's own
   `crs` member, a `.prj` file, or the GeoJSON default); typing an EPSG code as a
