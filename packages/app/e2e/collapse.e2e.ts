@@ -248,6 +248,33 @@ test.describe('collapsing the panel into a rail', () => {
     }
   });
 
+  test('puts the tooltip of a rail button to the left of it, over the map, and not over any button', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await setCollapsed(page, true);
+    const names = ['Expand panel', 'Legend', 'Data'];
+    const buttons = [expandButton(page), railButton(page, 'Legend'), railButton(page, 'Data')];
+    for (const [index, name] of names.entries()) {
+      const control = buttons[index] as Locator;
+      await control.hover();
+      await expect(tip(page, name)).toBeVisible();
+      const [bubble, place] = [
+        await boxOf(tip(page, name), 'the tooltip'),
+        await boxOf(host(page, name), 'the button'),
+      ];
+      // A gap of 4 to the left of the button, and centred on it from top to bottom.
+      expect(place.x - (bubble.x + bubble.width)).toBe(4);
+      expect(Math.abs(bubble.y + bubble.height / 2 - (place.y + place.height / 2))).toBeLessThan(1);
+      // It is over the map, and over none of the buttons of the rail.
+      for (const other of names) {
+        await assertNoOverlap(tip(page, name), host(page, other));
+      }
+      await page.mouse.move(5, 300);
+    }
+  });
+
   test('is kept between visits: folded away or open, and the tab', async ({ page }) => {
     await page.goto('/');
     expect(await kept(page)).toBeNull();

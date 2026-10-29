@@ -86,8 +86,9 @@ export class KarmaniaPanel extends LitElement {
         min-height: 0;
       }
 
-      /* Buttons stacked from the top, 8 from the top and 4 apart. At the sides there are 4 from
-         the edge of the panel, which is 1 more than the room beside the border on the left. */
+      /* Buttons stacked from the top, 8 from the top and 4 apart. At the sides there are 4 from the
+         edge of the panel, which is 1 more than the room beside the border on the left. (Their
+         tooltips go to the left, over the map: above or below, one would cover the next button.) */
       .rail {
         display: flex;
         flex-direction: column;
@@ -186,7 +187,7 @@ export class KarmaniaPanel extends LitElement {
           </k-tabs>
         </div>
         <div class="rail" ?hidden=${!this.collapsed}>
-          <k-tooltip text="Expand panel">
+          <k-tooltip text="Expand panel" placement="left">
             ${kButton({
               icon: 'chevrons-left',
               label: 'Expand panel',
@@ -197,7 +198,7 @@ export class KarmaniaPanel extends LitElement {
               },
             })}
           </k-tooltip>
-          <k-tooltip text="Legend">
+          <k-tooltip text="Legend" placement="left">
             ${kButton({
               icon: 'layers',
               label: 'Legend',
@@ -208,7 +209,7 @@ export class KarmaniaPanel extends LitElement {
               },
             })}
           </k-tooltip>
-          <k-tooltip text="Data">
+          <k-tooltip text="Data" placement="left">
             ${kButton({
               icon: 'table',
               label: 'Data',
