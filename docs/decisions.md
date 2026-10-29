@@ -1673,3 +1673,9 @@ was chosen, why.
   Mapping step finds the three centre columns and will not go on without the size of a block, says what
   is wrong with a size typed as "ten", and with 10 by 10 by 10 and a typed EPSG code the import makes a
   dense model of 18 blocks whose box is half a block beyond the outermost centres.
+- 8.13g: a CSV of points with no projection file. The coordinate system step finds nothing and Next
+  stays closed with the reason in the footer, through "an EPSG code with none given" and "an EPSG code
+  that is not one"; the test also asks the engine directly to import with no coordinate system, which
+  the wizard keeps a person from reaching, and checks that the kernel refuses with `crs.missing`
+  pointing at the coordinate system step and loads nothing; and a local grid in feet opens the way on
+  and is what is loaded.
