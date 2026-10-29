@@ -109,3 +109,42 @@ export function textsOf(locator: Locator): Promise<string[]> {
     all.map((element) => element.textContent.trim().replace(/\s+/g, ' ')),
   );
 }
+
+/** A fake engine that the test controls: imports that hang until told otherwise, and progress it reports. */
+export const FAKE_ENGINE = `(() => {
+  const control = { calls: 0, report: undefined, finish: undefined, fail: undefined, signal: undefined };
+  const engine = {
+    preview: async (files) => files.map((file) => ({
+      fileName: file.name, format: 'csv', suggestedKind: 'points', encoding: 'UTF-8',
+      crs: { crs: { kind: 'epsg', code: 32640 }, source: 'prj_file' },
+      table: { delimiter: 'comma', hasHeader: true, header: ['x', 'y'], rows: [['1', '2']], estimatedRows: 1,
+        decimalSeparator: '.', columnTypes: ['float', 'float'], roles: [{ role: 'x', confidence: 0.9 }, { role: 'y', confidence: 0.9 }],
+        nodata: { tokens: [], numbers: [] } },
+      findings: [],
+    })),
+    importFiles: (files, mapping, options) => new Promise((resolve, reject) => {
+      control.calls += 1;
+      control.report = options.onProgress;
+      control.signal = options.signal;
+      control.finish = resolve;
+      control.fail = (message) => reject(new Error(message));
+      options.signal.addEventListener('abort', () => reject(options.signal.reason));
+    }),
+    remove: async () => undefined,
+    datasets: () => [],
+    dispose: () => undefined,
+  };
+  window.fake = control;
+  return engine;
+})()`;
+
+/** Opens the wizard on a fake engine that the page controls (`window.fake`), and waits for the first step. */
+export async function openWithFakeEngine(page: Page): Promise<void> {
+  const w = wizard(page);
+  await w.host.evaluate((element, source) => {
+    const target = element as unknown as { engine: unknown; show: (files: File[]) => void };
+    target.engine = (0, eval)(source);
+    target.show([new File(['x,y\n1,2\n'], 'a.csv')]);
+  }, FAKE_ENGINE);
+  await expect(w.host.locator('karmania-file-step')).toBeVisible();
+}
