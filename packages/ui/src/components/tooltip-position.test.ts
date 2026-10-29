@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { placeTooltip } from './tooltip-position.js';
+import { isPlacement, placeTooltip } from './tooltip-position.js';
+import type { Placement } from './tooltip-position.js';
 
 const viewport = { width: 1000, height: 600 };
 const tip = { width: 100, height: 24 };
 const GAP = 4;
 const MARGIN = 8;
-const place = (left: number, top: number, width = 32, height = 32, preferred?: 'top' | 'bottom') =>
+const place = (left: number, top: number, width = 32, height = 32, preferred?: Placement) =>
   placeTooltip({ left, top, width, height }, tip, viewport, GAP, MARGIN, preferred);
 
 describe('where a tooltip goes', () => {
@@ -45,7 +46,7 @@ describe('where a tooltip goes', () => {
       [484, 568],
     ] as const;
     for (const [left, top] of corners) {
-      for (const preferred of ['top', 'bottom'] as const) {
+      for (const preferred of ['top', 'bottom', 'left', 'right'] as const) {
         const spot = place(left, top, 32, 32, preferred);
         expect(spot.left, `${String(left)},${String(top)}`).toBeGreaterThanOrEqual(MARGIN);
         expect(spot.top).toBeGreaterThanOrEqual(MARGIN);
@@ -88,5 +89,68 @@ describe('where a tooltip goes', () => {
       MARGIN,
     );
     expect(spot.left).toBe(MARGIN);
+  });
+});
+
+describe('where a tooltip goes beside its control', () => {
+  it('is to the left, a gap away, centred on the control from top to bottom', () => {
+    // A control of 32 by 32 at 500,300: its middle is 316, and the tooltip is 24 high.
+    expect(place(500, 300, 32, 32, 'left')).toEqual({ left: 396, top: 304, placement: 'left' });
+  });
+
+  it('is to the right, a gap away, when asked', () => {
+    expect(place(500, 300, 32, 32, 'right')).toEqual({ left: 536, top: 304, placement: 'right' });
+  });
+
+  it('flips to the other side when there is no room beside the control on the preferred one', () => {
+    // 100 pixels needed, and a gap and a margin: 112. A control at 100 has 100 - 4 - 8 = 88.
+    expect(place(100, 300, 32, 32, 'left')).toEqual({ left: 136, top: 304, placement: 'right' });
+    expect(place(868, 300, 32, 32, 'right').placement).toBe('left');
+  });
+
+  it('stays where it was asked when it only just fits', () => {
+    expect(place(112, 300, 32, 32, 'left').placement).toBe('left');
+    expect(place(111, 300, 32, 32, 'left').placement).toBe('right');
+  });
+
+  it('is slid up or down from the edge, a margin from it, and stays beside the control', () => {
+    expect(place(500, 0, 32, 32, 'left').top).toBe(MARGIN);
+    expect(place(500, 568, 32, 32, 'right').top).toBe(600 - MARGIN - 24);
+    expect(place(500, 0, 32, 32, 'left').placement).toBe('left');
+  });
+
+  it('takes the roomier side when neither has enough', () => {
+    // A window 160 wide and a tooltip of 100: 56 of room on the left of the control, 48 on the right.
+    const spot = placeTooltip(
+      { left: 68, top: 100, width: 32, height: 32 },
+      { width: 100, height: 24 },
+      { width: 160, height: 600 },
+      GAP,
+      MARGIN,
+      'left',
+    );
+    expect(spot.placement).toBe('left');
+    expect(spot.left).toBe(MARGIN);
+    // And the other way round: the right is the roomier side of a control nearer the left.
+    const mirrored = placeTooltip(
+      { left: 60, top: 100, width: 32, height: 32 },
+      { width: 100, height: 24 },
+      { width: 160, height: 600 },
+      GAP,
+      MARGIN,
+      'left',
+    );
+    expect(mirrored.placement).toBe('right');
+  });
+});
+
+describe('the sides of a tooltip', () => {
+  it('are top, bottom, left and right, and nothing else', () => {
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      expect(isPlacement(side)).toBe(true);
+    }
+    for (const other of ['', 'Top', 'center', 'above', 'toString']) {
+      expect(isPlacement(other)).toBe(false);
+    }
   });
 });

@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
-import { placeTooltip } from './tooltip-position.js';
+import { isPlacement, placeTooltip } from './tooltip-position.js';
 import type { Placement } from './tooltip-position.js';
 
 /**
@@ -68,7 +68,7 @@ export class KTooltip extends LitElement {
 
   /** What the tooltip says. Without text, there is no tooltip. */
   declare text: string | undefined;
-  /** The side it prefers: `top` (the default) or `bottom`. */
+  /** The side it prefers: `top` (the default), `bottom`, `left` or `right`. */
   declare placement: Placement;
 
   private hovered = false;
@@ -195,7 +195,7 @@ export class KTooltip extends LitElement {
       },
       this.spacing('--k-space-4'),
       this.spacing('--k-space-8'),
-      this.placement === 'bottom' ? 'bottom' : 'top',
+      isPlacement(this.placement) ? this.placement : 'top',
     );
     tip.style.left = `${String(spot.left)}px`;
     tip.style.top = `${String(spot.top)}px`;

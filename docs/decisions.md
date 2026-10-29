@@ -1319,3 +1319,12 @@ was chosen, why.
   `user-select: none` on the handle is for the browsers that are not tested; I mutated it away to
   see, and no test failed. In the Tab order the handle is after the map area's Import button and
   before the panel's tabs, as it is on the screen. It is not there when the panel is folded away.
+- Found while reviewing the 7.9 screenshots (`k-tooltip`): a tooltip above or below a button in the
+  rail covered the next button, which the checklist counts as a control with something over it. The
+  tooltip can now be put to the `left` or `right` of its control as well as above (`top`) or below,
+  centred on it from top to bottom, with the same rules as before: the preferred side if it fits,
+  the opposite one if not (the roomier one if neither does), and slid to stay a margin inside the
+  window. `placeTooltip` stays one pure function, tested for all four sides in Node and in the browser
+  for a control in the middle, near either side and at the top edge. The gallery shows it in a row of
+  its own, with room to its left, because in the row of the other examples it covered the button
+  before it: the same flaw, seen in the first picture.

@@ -66,6 +66,11 @@ export class KarmaniaGallery extends LitElement {
         margin-bottom: var(--k-space-8);
       }
 
+      /* A row that starts a good way in, so that a tooltip to the left of its button has room. */
+      .row.indented {
+        padding-left: calc(var(--k-space-48) * 4);
+      }
+
       /* A box that clips its content and has a transform, which would cut off an ordinary
          tooltip and also makes it the containing block of fixed-position children. */
       .clipping-box {

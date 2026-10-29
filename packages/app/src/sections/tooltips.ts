@@ -1,7 +1,7 @@
 import { kButton } from '@karmania/ui';
 import { html } from 'lit';
 
-/** Tooltips on buttons: the usual one, one that adds to the button's name, and one in a box that clips. */
+/** Tooltips on buttons: the usual one, one that adds to the button's name, one beside its button, and one in a box that clips. */
 export function tooltipsSection() {
   return html`
     <section data-section="tooltips">
@@ -21,6 +21,12 @@ export function tooltipsSection() {
         </k-tooltip>
         <k-tooltip id="tip-below" text="Preferred below" placement="bottom">
           ${kButton({ icon: 'search', label: 'Search', variant: 'ghost' })}
+        </k-tooltip>
+      </div>
+      <h3>Beside the control, over what is next to it</h3>
+      <div class="row indented">
+        <k-tooltip id="tip-left" text="Beside the control" placement="left">
+          ${kButton({ icon: 'layers', label: 'Layers', variant: 'ghost' })}
         </k-tooltip>
       </div>
       <h3>In a box that hides what overflows it</h3>
