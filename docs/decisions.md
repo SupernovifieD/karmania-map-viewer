@@ -1662,3 +1662,7 @@ was chosen, why.
   EPSG 4326 is the default and assumed, and the import makes one dataset of each kind, each saying it
   assumed the coordinate system, the first of them selected. The two points are not three-dimensional
   because only one of them has a height.
+- 8.13d: the ASCII grid sample, which has no coordinate system. Next waits at the coordinate system step
+  until a person types a code; the import makes one dataset of 12 cells whose one column holds the
+  values, with the cell that had -9999 left empty and said so in a warning, and a box that is the
+  outer edge of the grid (4 by 3 cells of 10 from the corner given), flat.
