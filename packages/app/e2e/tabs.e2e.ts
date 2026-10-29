@@ -133,6 +133,31 @@ test.describe('the tabs', () => {
     expect(await changes()).toEqual(['data', 'legend']);
   });
 
+  test('focus the chosen tab when the element is focused, whichever tab that is', async ({
+    page,
+  }) => {
+    await panelTabs(page).evaluate((element) => {
+      element.focus();
+    });
+    await expect(tab(page, 'legend')).toBeFocused();
+    await tab(page, 'data').click();
+    await page.locator('#legend-input').focus();
+    await panelTabs(page).evaluate((element) => {
+      element.focus();
+    });
+    await expect(tab(page, 'data')).toBeFocused();
+    // Nothing to focus is not an error: a row with no tabs ignores it.
+    const outcome = await page.evaluate(async () => {
+      const tabs = document.createElement('k-tabs');
+      tabs.label = 'Empty';
+      document.body.append(tabs);
+      await tabs.updateComplete;
+      tabs.focus();
+      return document.activeElement === tabs ? 'on the element' : 'nowhere';
+    });
+    expect(outcome).toBe('nowhere');
+  });
+
   test('send the event once per choice, when clicked, and none for the tab already chosen', async ({
     page,
   }) => {
