@@ -1730,3 +1730,19 @@ was chosen, why.
   what has padding will give itself some.
   The older test of the resize limits found the Legend's message by looking for any `.group` in the
   panel, and now finds two; it asks for the Legend's.
+- Step 9.2 (the dataset list). A row of 40 (a token, `--k-list-row-height`) for each dataset: the icon of
+  its kind, its name, how many elements it has (with thousands grouped, right-aligned, digits in line),
+  a badge with its number of warnings where it has any, and a remove button. The room of the badge and of
+  the button is always kept: the counts end at one place in every row, and the button, which is only seen
+  while the row is pointed at, has the keyboard or is selected (always, where there is no pointer),
+  takes no room when it appears, which a test checks. The row is a button that selects its dataset,
+  and the selected one says so by a bar at its edge, a tint, bold type and `aria-current`. A screen reader
+  gets the name from the row's own content (name, count, and what is counted and the warnings in
+  words that are not drawn), not from a label: a label that does not contain what is on the screen
+  is what axe fails, and the badge's own number is hidden from it since the words say it. Five rows
+  show; more scroll inside the list, so that what is under it keeps its room, and the selected row is
+  scrolled into sight when it changes. Removing asks first, in a dialog that says which dataset, how big,
+  and that the file it came from is not changed. The list only says what a person did
+  (`karmania-dataset-select`, `karmania-dataset-remove`); the app removes it from the engine, and
+  selects the dataset that takes its place (the next one, or the one before if it was last, or none),
+  and the keyboard goes to that row, or to Import when none is left.

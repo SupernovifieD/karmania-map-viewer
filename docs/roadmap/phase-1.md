@@ -400,7 +400,7 @@ Definitions and reprojection can be added later, with the features that need the
 ## M9: Data tab
 
 - [x] 9.1 Data tab empty state ("No data loaded" plus an Import button).
-- [ ] 9.2 Dataset list: kind icon, truncated name, tabular count, warning badge,
+- [x] 9.2 Dataset list: kind icon, truncated name, tabular count, warning badge,
   remove with confirmation; selection.
 - [ ] 9.3 Dataset summary: kind, count, CRS (EPSG code, or Local with its units),
   has_z, formatted bbox, columns; an expandable list of warnings and info.

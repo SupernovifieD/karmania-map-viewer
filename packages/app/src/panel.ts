@@ -35,6 +35,7 @@ export class KarmaniaPanel extends LitElement {
     tab: { type: String, reflect: true },
     collapsed: { type: Boolean, reflect: true },
     datasets: { attribute: false },
+    selected: { attribute: false },
   };
 
   static override styles = [
@@ -113,6 +114,8 @@ export class KarmaniaPanel extends LitElement {
   declare collapsed: boolean;
   /** The datasets that are loaded, which the Data tab shows. */
   declare datasets: readonly Summary[];
+  /** The `id` of the dataset that is selected. */
+  declare selected: number | undefined;
 
   private pendingFocus: FocusTarget | undefined;
 
@@ -121,6 +124,7 @@ export class KarmaniaPanel extends LitElement {
     this.tab = 'legend';
     this.collapsed = false;
     this.datasets = [];
+    this.selected = undefined;
     this.pendingFocus = undefined;
   }
 
@@ -195,7 +199,10 @@ export class KarmaniaPanel extends LitElement {
               <k-empty-state>Layers will appear here once maps are rendered.</k-empty-state>
             </div>
             <div slot="data" class="body flush" data-scroll-region>
-              <karmania-data-tab .datasets=${this.datasets}></karmania-data-tab>
+              <karmania-data-tab
+                .datasets=${this.datasets}
+                .selected=${this.selected}
+              ></karmania-data-tab>
             </div>
           </k-tabs>
         </div>
