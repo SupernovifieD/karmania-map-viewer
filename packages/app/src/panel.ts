@@ -1,7 +1,9 @@
+import type { Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import type { PropertyValues } from 'lit';
+import './data-tab.js';
 import { PANEL_TABS } from './panel-tabs.js';
 import type { PanelTab } from './panel-tabs.js';
 
@@ -32,6 +34,7 @@ export class KarmaniaPanel extends LitElement {
   static override properties = {
     tab: { type: String, reflect: true },
     collapsed: { type: Boolean, reflect: true },
+    datasets: { attribute: false },
   };
 
   static override styles = [
@@ -81,6 +84,11 @@ export class KarmaniaPanel extends LitElement {
         padding: var(--k-space-16);
       }
 
+      /* The Data tab keeps its own padding, since its table goes the whole width of the panel. */
+      .body.flush {
+        padding: 0;
+      }
+
       .body k-empty-state {
         flex: 1 1 auto;
         min-height: 0;
@@ -103,6 +111,8 @@ export class KarmaniaPanel extends LitElement {
   declare tab: PanelTab;
   /** Whether the panel is folded away into its rail. */
   declare collapsed: boolean;
+  /** The datasets that are loaded, which the Data tab shows. */
+  declare datasets: readonly Summary[];
 
   private pendingFocus: FocusTarget | undefined;
 
@@ -110,6 +120,7 @@ export class KarmaniaPanel extends LitElement {
     super();
     this.tab = 'legend';
     this.collapsed = false;
+    this.datasets = [];
     this.pendingFocus = undefined;
   }
 
@@ -183,7 +194,9 @@ export class KarmaniaPanel extends LitElement {
             <div slot="legend" class="body" data-scroll-region>
               <k-empty-state>Layers will appear here once maps are rendered.</k-empty-state>
             </div>
-            <div slot="data" class="body" data-scroll-region></div>
+            <div slot="data" class="body flush" data-scroll-region>
+              <karmania-data-tab .datasets=${this.datasets}></karmania-data-tab>
+            </div>
           </k-tabs>
         </div>
         <div class="rail" ?hidden=${!this.collapsed}>
