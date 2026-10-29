@@ -24,6 +24,10 @@ function parts(page: Page) {
     noColumns: step.locator('.note'),
     problems: host.locator('karmania-mapping-step .problems li'),
     note: host.locator('span[slot="footer-note"]'),
+    nameButtons: step.locator('thead .column-name'),
+    details: step.locator('.details'),
+    typeSelect: step.locator('.details k-select select'),
+    renameInput: step.locator('.details k-input input'),
     sizes: host.locator('karmania-mapping-step .block-size k-input'),
     sizeInputs: host.locator('karmania-mapping-step .block-size input'),
     next: host.locator('k-button[slot="footer-end"]').nth(1),
@@ -485,6 +489,188 @@ test.describe('the Mapping step', () => {
     expect((await rect(p.viewport)).height).toBeGreaterThanOrEqual(192);
   });
 
+  test('asks for a column to be chosen before it has a type and a name to set', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await expect(p.details).toContainText('Choose the name of a column');
+    await expect(p.typeSelect).toHaveCount(0);
+    await expect(p.step.locator('th[data-selected]')).toHaveCount(0);
+  });
+
+  test('chooses a column by its name, and says which in the table and in the panel', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.nameButtons.nth(4).click();
+    await expect(p.step.locator('th[data-selected]')).toHaveCount(1);
+    await expect(p.heads.nth(4)).toHaveAttribute('data-selected', '');
+    await expect(p.nameButtons.nth(4)).toHaveAttribute('aria-pressed', 'true');
+    await expect(p.nameButtons.nth(0)).toHaveAttribute('aria-pressed', 'false');
+    await expect(p.details.locator('.title')).toHaveText('Au_ppm');
+    await expect(p.renameInput).toHaveAttribute('placeholder', 'Au_ppm');
+    // Choosing another moves the choice.
+    await p.nameButtons.nth(5).click();
+    await expect(p.details.locator('.title')).toHaveText('Rock');
+    await expect(p.step.locator('th[data-selected]')).toHaveCount(1);
+  });
+
+  test('offers the types a column can be read as, with what the kernel found first', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.nameButtons.nth(4).click();
+    await expect(p.typeSelect.locator('option')).toHaveText([
+      'Auto (Float)',
+      'Float',
+      'Integer',
+      'Boolean',
+      'Text',
+      'Category',
+    ]);
+    await p.nameButtons.nth(3).click();
+    await expect(p.typeSelect.locator('option').first()).toHaveText(
+      /^\s*Auto \((Text|Category)\)\s*$/,
+    );
+    // A coordinate is a number, so that is all it can be read as.
+    await p.nameButtons.nth(0).click();
+    await expect(p.typeSelect.locator('option')).toHaveText(['Auto (Float)', 'Float', 'Integer']);
+  });
+
+  test("keeps the type a person sets, and goes back to the kernel's with Auto", async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    const draftTypes = () =>
+      p.host.evaluate((element) =>
+        (
+          element as unknown as { draft: { columns: { type: string | undefined }[] } }
+        ).draft.columns.map((column) => column.type ?? ''),
+      );
+    await p.nameButtons.nth(4).click();
+    await p.typeSelect.selectOption('text');
+    expect(await draftTypes()).toEqual(['', '', '', '', 'text', '']);
+    // It is still chosen when another column is looked at and this one is come back to.
+    await p.nameButtons.nth(5).click();
+    await p.nameButtons.nth(4).click();
+    expect(await p.typeSelect.inputValue()).toBe('text');
+    await p.typeSelect.selectOption('');
+    expect(await draftTypes()).toEqual(['', '', '', '', '', '']);
+  });
+
+  test("keeps the name a person gives a column, and the file's name when it is cleared", async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    const renames = () =>
+      p.host.evaluate((element) =>
+        (element as unknown as { draft: { columns: { rename: string }[] } }).draft.columns.map(
+          (column) => column.rename,
+        ),
+      );
+    await p.nameButtons.nth(4).click();
+    await p.renameInput.fill('Gold');
+    expect(await renames()).toEqual(['', '', '', '', 'Gold', '']);
+    await p.nameButtons.nth(5).click();
+    await p.nameButtons.nth(4).click();
+    await expect(p.renameInput).toHaveValue('Gold');
+    await p.renameInput.fill('');
+    expect(await renames()).toEqual(['', '', '', '', '', '']);
+    // The file's name shows through as the placeholder.
+    await expect(p.renameInput).toHaveAttribute('placeholder', 'Au_ppm');
+  });
+
+  test('offers a name only for an attribute, and says that an ignored column has nothing to set', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.nameButtons.nth(0).click();
+    await expect(p.typeSelect).toHaveCount(1);
+    await expect(p.renameInput).toHaveCount(0);
+    await p.selects.nth(5).selectOption('ignore');
+    await p.nameButtons.nth(5).click();
+    await expect(p.typeSelect).toHaveCount(0);
+    await expect(p.details).toContainText('is ignored, so there is nothing to set.');
+  });
+
+  test('says when a name is given to two columns, and when a coordinate is read as something else', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.nameButtons.nth(3).click();
+    await p.renameInput.fill('Rock');
+    await expect(p.problems.first()).toContainText(
+      'The column name "Rock" is used more than once.',
+    );
+    await expect(p.problems.first()).toContainText(
+      'Give each column a different name, or ignore the extra columns.',
+    );
+    await expect(p.next.locator('button')).toBeDisabled();
+    await p.renameInput.fill('Drill hole');
+    await expect(p.problems).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeEnabled();
+
+    // Read as text, a column cannot be a coordinate.
+    await p.nameButtons.nth(4).click();
+    await p.typeSelect.selectOption('text');
+    await p.selects.nth(4).selectOption('x');
+    await expect(
+      p.problems.filter({
+        hasText:
+          'The column "Au_ppm" is set as X (easting or longitude) but its type is text; coordinates must be numbers.',
+      }),
+    ).toHaveCount(1);
+    await expect(p.next.locator('button')).toBeDisabled();
+    // The type that is the trouble is still there to be seen, and changed.
+    await expect(p.typeSelect.locator('option')).toContainText([
+      'Auto (Float)',
+      'Float',
+      'Integer',
+      'Text',
+    ]);
+    await p.typeSelect.selectOption('float');
+    await expect(p.problems.filter({ hasText: 'coordinates must be numbers' })).toHaveCount(0);
+  });
+
+  test('moves nothing when a column is chosen, whatever its role', async ({ page }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await p.selects.nth(5).selectOption('ignore');
+    // Choosing a column far to the right scrolls the table to show it; where the table is, and its
+    // header and the panel under it, are what must stay.
+    const boxes = async () => {
+      await p.viewport.evaluate((element) => {
+        element.scrollLeft = 0;
+      });
+      return [await rect(p.viewport), await rect(p.heads.first()), await rect(p.details)];
+    };
+    const before = await boxes();
+    for (const index of [4, 0, 5, 3]) {
+      await p.nameButtons.nth(index).click();
+      expect(await boxes(), `column ${String(index)}`).toEqual(before);
+    }
+  });
+
+  test('can be gone through with the keyboard: the name of a column is a button', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await mappingOf(page, 'points.csv');
+    await page.keyboard.press('Shift');
+    await p.nameButtons.nth(1).focus();
+    await page.keyboard.press('Enter');
+    await expect(p.details.locator('.title')).toHaveText('Northing');
+    await page.keyboard.press('Tab');
+    await expect(p.selects.nth(1)).toBeFocused();
+  });
+
   test('has the keyboard go from one selector to the next, in the order of the columns', async ({
     page,
   }) => {
@@ -492,7 +678,10 @@ test.describe('the Mapping step', () => {
     await mappingOf(page, 'points.csv');
     await page.keyboard.press('Shift');
     await p.selects.first().focus();
+    // In each header the name comes first and then the role.
     for (let index = 1; index < 6; index += 1) {
+      await page.keyboard.press('Tab');
+      await expect(p.nameButtons.nth(index)).toBeFocused();
       await page.keyboard.press('Tab');
       await expect(p.selects.nth(index)).toBeFocused();
     }

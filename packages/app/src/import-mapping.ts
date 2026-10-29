@@ -1,4 +1,4 @@
-import type { Finding, Kind, Role, TablePreview } from '@karmania/engine';
+import type { ColumnType, Finding, Kind, Role, TablePreview } from '@karmania/engine';
 
 /** What a person has decided about one column of the file. */
 export interface ColumnDraft {
@@ -7,6 +7,10 @@ export interface ColumnDraft {
   readonly role: Role;
   /** Whether the role is what the kernel suggested and nobody has changed since. */
   readonly suggested: boolean;
+  /** The type to read the column as, when a person has said; `undefined` leaves it to the kernel. */
+  readonly type: ColumnType | undefined;
+  /** The name the column gets in the dataset, as typed; empty keeps the file's name. */
+  readonly rename: string;
 }
 
 /** What each role is called in a column's selector: short, because the room in a header is. */
@@ -51,7 +55,7 @@ export function columnsFromPreview(
     const suggestion = table.roles[index]?.role;
     const role =
       suggestion !== undefined && allowed.includes(suggestion) ? suggestion : 'attribute';
-    return { source, role, suggested: role !== 'attribute' };
+    return { source, role, suggested: role !== 'attribute', type: undefined, rename: '' };
   });
 }
 
@@ -62,9 +66,52 @@ export function withRole(
   role: Role,
 ): readonly ColumnDraft[] {
   return columns.map((column, at) =>
-    at === index ? { source: column.source, role, suggested: false } : column,
+    at === index ? { ...column, role, suggested: false } : column,
   );
 }
+
+/** The columns with the type of one of them set by a person; `undefined` goes back to the kernel's. */
+export function withType(
+  columns: readonly ColumnDraft[],
+  index: number,
+  type: ColumnType | undefined,
+): readonly ColumnDraft[] {
+  return columns.map((column, at) => (at === index ? { ...column, type } : column));
+}
+
+/** The columns with the name of one of them, as a person typed it; empty keeps the file's name. */
+export function withRename(
+  columns: readonly ColumnDraft[],
+  index: number,
+  rename: string,
+): readonly ColumnDraft[] {
+  return columns.map((column, at) => (at === index ? { ...column, rename } : column));
+}
+
+/** The name a column gets in the dataset: what a person typed, without spaces round it, or the file's name. */
+export function effectiveName(column: ColumnDraft): string {
+  const typed = column.rename.trim();
+  return typed === '' ? column.source : typed;
+}
+
+/** What each type is called in the wizard. */
+export const TYPE_NAMES: Readonly<Record<ColumnType, string>> = {
+  float: 'Float',
+  int: 'Integer',
+  bool: 'Boolean',
+  text: 'Text',
+  category: 'Category',
+};
+
+/** The types a column with each role can be read as: a coordinate is a number. */
+export const TYPES_BY_ROLE: Readonly<Record<Role, readonly ColumnType[]>> = {
+  x: ['float', 'int'],
+  y: ['float', 'int'],
+  z: ['float', 'int'],
+  line_id: ['int', 'text', 'category'],
+  attribute: ['float', 'int', 'bool', 'text', 'category'],
+  ignore: [],
+};
 
 /**
  * The columns after what the file is imported as has changed: a column with a role that the new kind
@@ -76,9 +123,7 @@ export function withKind(
 ): readonly ColumnDraft[] {
   const allowed = rolesFor(kind);
   return columns.map((column) =>
-    allowed.includes(column.role)
-      ? column
-      : { source: column.source, role: 'attribute', suggested: false },
+    allowed.includes(column.role) ? column : { ...column, role: 'attribute', suggested: false },
   );
 }
 
@@ -185,6 +230,38 @@ export function mappingProblems(
               `No column is set as ${ROLE_WORDS[role]}.`,
               'Choose the column that holds this coordinate.',
             ),
+      );
+    }
+  }
+  for (const column of columns) {
+    if (
+      (column.role === 'x' || column.role === 'y' || column.role === 'z') &&
+      column.type !== undefined &&
+      column.type !== 'float' &&
+      column.type !== 'int'
+    ) {
+      found.push(
+        problem(
+          'mapping.coordinate.not_numeric',
+          `The column "${column.source}" is set as ${ROLE_WORDS[column.role]} but its type is ${column.type}; coordinates must be numbers.`,
+          "Set the column's type to float or int, or choose another column.",
+        ),
+      );
+    }
+  }
+  const names = new Map<string, number>();
+  for (const column of columns.filter((each) => each.role === 'attribute')) {
+    const name = effectiveName(column);
+    names.set(name, (names.get(name) ?? 0) + 1);
+  }
+  for (const [name, count] of names) {
+    if (count > 1) {
+      found.push(
+        problem(
+          'table.column.name_duplicate',
+          `The column name "${name}" is used more than once.`,
+          'Give each column a different name, or ignore the extra columns.',
+        ),
       );
     }
   }

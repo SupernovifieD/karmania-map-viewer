@@ -119,6 +119,30 @@ test.describe('the select', () => {
     expect(await select(page, 'select-default').inputValue()).toBe('lines');
   });
 
+  test('shows the value it is given after a person has chosen another, and after its choices change', async ({
+    page,
+  }) => {
+    const host = demo(page, 'select-default').locator('k-select');
+    await select(page, 'select-default').selectOption('lines');
+    await host.evaluate(async (element) => {
+      const field = element as HTMLElementTagNameMap['k-select'];
+      field.value = 'blocks';
+      await field.updateComplete;
+    });
+    expect(await select(page, 'select-default').inputValue()).toBe('blocks');
+    // The choices change as well, as when one select serves for the columns of a table in turn.
+    await host.evaluate(async (element) => {
+      const field = element as HTMLElementTagNameMap['k-select'];
+      field.options = [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ];
+      field.value = 'b';
+      await field.updateComplete;
+    });
+    expect(await select(page, 'select-default').inputValue()).toBe('b');
+  });
+
   test('is skipped by Tab and looks disabled when it is', async ({ page }) => {
     await expect(select(page, 'select-disabled')).toBeDisabled();
     const colours = await styleOf(select(page, 'select-disabled'), 'cursor');

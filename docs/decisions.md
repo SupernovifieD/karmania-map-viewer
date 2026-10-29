@@ -1516,3 +1516,24 @@ was chosen, why.
   body's clip, counted as the dialog overflowing. The things that hold such text (a field, a
   finding) are now positioned, so that it stays with them, and the wizard's own hidden status line
   comes first in the body, where it is always in sight.
+- Step 8.6 (the Mapping step, part 3). A column's type and its name are set in a slim panel under the
+  table for the column a person has chosen, by clicking its name in the header (a button, marked
+  pressed and with a line under its header). They are not in every header: with a role selector, a
+  type selector and a name field in each, a header would be some 130 high and leave the smallest window
+  room for no rows. The panel is one row of a fixed height, whether a column is chosen or not, so
+  choosing moves nothing (a test checks that, for an attribute, a coordinate and an ignored column).
+  The type selector starts with Auto, which says what the kernel found ("Auto (Float)"); a coordinate
+  can be read as a float or an integer only, a line identifier as an integer, text or category, an
+  attribute as any of the five; a type that was chosen and has stopped being offered (the column was
+  then given the role of a coordinate) stays in the list, so that what is wrong can be seen and
+  changed. The name is only for an attribute, the file's name is its placeholder, and what was typed is
+  kept as typed (spaces and all) and trimmed where it is used, so that a space typed at the end of
+  half a name is not taken away. Two things are checked in the kernel's words: a coordinate set to
+  be read as something that is not a number (`mapping.coordinate.not_numeric`), and two attributes
+  with one name (`table.column.name_duplicate`), the name being the one a column will have, renamed or
+  not; the first is checked from what a person set, as the kernel does, and a column the kernel only
+  finds to be text is its business when it imports. The test of the wording covers them.
+- Found while testing 8.6: a native select that a person has changed no longer follows the
+  `selected` of its options, so `k-select`, used for the type of one column and then of another,
+  went on showing the first one's choice. It now sets the value of its select after every render, and
+  a test gives a select that a person has used a new value and new choices.

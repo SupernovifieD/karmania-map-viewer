@@ -9,8 +9,13 @@ import {
   ROLE_NAMES,
   ROLES_BY_KIND,
   rolesFor,
+  effectiveName,
+  TYPE_NAMES,
+  TYPES_BY_ROLE,
   withKind,
+  withRename,
   withRole,
+  withType,
 } from './import-mapping.js';
 
 const table = (header: string[], roles: Role[]): TablePreview => ({
@@ -54,10 +59,10 @@ describe('the columns a file starts with', () => {
       'points',
     );
     expect(columns).toEqual([
-      { source: 'E', role: 'x', suggested: true },
-      { source: 'N', role: 'y', suggested: true },
-      { source: 'RL', role: 'z', suggested: true },
-      { source: 'Hole', role: 'attribute', suggested: false },
+      { source: 'E', role: 'x', suggested: true, type: undefined, rename: '' },
+      { source: 'N', role: 'y', suggested: true, type: undefined, rename: '' },
+      { source: 'RL', role: 'z', suggested: true, type: undefined, rename: '' },
+      { source: 'Hole', role: 'attribute', suggested: false, type: undefined, rename: '' },
     ]);
   });
 
@@ -68,11 +73,15 @@ describe('the columns a file starts with', () => {
       source: 'Line',
       role: 'attribute',
       suggested: false,
+      type: undefined,
+      rename: '',
     });
     expect(columnsFromPreview(table(header, roles), 'lines')[0]).toEqual({
       source: 'Line',
       role: 'line_id',
       suggested: true,
+      type: undefined,
+      rename: '',
     });
   });
 
@@ -89,8 +98,8 @@ describe('changing a role', () => {
     const columns = columnsFromPreview(table(['X', 'Y'], ['x', 'y']), 'points');
     const changed = withRole(columns, 0, 'ignore');
     expect(changed).toEqual([
-      { source: 'X', role: 'ignore', suggested: false },
-      { source: 'Y', role: 'y', suggested: true },
+      { source: 'X', role: 'ignore', suggested: false, type: undefined, rename: '' },
+      { source: 'Y', role: 'y', suggested: true, type: undefined, rename: '' },
     ]);
     expect(columns[0]?.role).toBe('x');
   });
@@ -100,9 +109,9 @@ describe('changing what the file is imported as', () => {
   it('turns a role the new kind has not into an attribute, and leaves the rest alone', () => {
     const columns = columnsFromPreview(table(['Line', 'X', 'Y'], ['line_id', 'x', 'y']), 'lines');
     expect(withKind(columns, 'points')).toEqual([
-      { source: 'Line', role: 'attribute', suggested: false },
-      { source: 'X', role: 'x', suggested: true },
-      { source: 'Y', role: 'y', suggested: true },
+      { source: 'Line', role: 'attribute', suggested: false, type: undefined, rename: '' },
+      { source: 'X', role: 'x', suggested: true, type: undefined, rename: '' },
+      { source: 'Y', role: 'y', suggested: true, type: undefined, rename: '' },
     ]);
     expect(withKind(columns, 'blocks')[0]?.role).toBe('attribute');
     expect(withKind(columns, 'lines')).toEqual(columns);
@@ -145,7 +154,13 @@ describe('a block size as a person types it', () => {
 });
 
 const columnsOf = (...roles: Role[]) =>
-  roles.map((role, index) => ({ source: `C${String(index)}`, role, suggested: false }));
+  roles.map((role, index) => ({
+    source: `C${String(index)}`,
+    role,
+    suggested: false,
+    type: undefined,
+    rename: '',
+  }));
 
 const codes = (problems: readonly { code: string }[]): string[] => problems.map((p) => p.code);
 
@@ -211,5 +226,91 @@ describe('what is wrong with a mapping', () => {
   it('is nothing when there is no choice of kind, or nothing to map', () => {
     expect(mappingProblems(undefined, [], EMPTY_BLOCK_SIZE)).toEqual([]);
     expect(mappingProblems('grid', [], EMPTY_BLOCK_SIZE)).toEqual([]);
+  });
+});
+
+describe('the type and the name a person gives a column', () => {
+  const columns = columnsOf('x', 'y', 'attribute', 'attribute');
+
+  it('are set for that column only, and are kept when its role changes', () => {
+    const typed = withType(columns, 2, 'text');
+    expect(typed.map((c) => c.type)).toEqual([undefined, undefined, 'text', undefined]);
+    const renamed = withRename(typed, 2, 'Grade');
+    expect(renamed[2]).toMatchObject({ type: 'text', rename: 'Grade' });
+    expect(withRole(renamed, 2, 'ignore')[2]).toMatchObject({ type: 'text', rename: 'Grade' });
+    expect(withType(typed, 2, undefined)[2]?.type).toBeUndefined();
+  });
+
+  it('are kept when what the file is imported as changes', () => {
+    const edited = withRename(withType(columnsOf('line_id', 'x', 'y'), 0, 'text'), 0, 'Line');
+    expect(withKind(edited, 'points')[0]).toMatchObject({
+      role: 'attribute',
+      type: 'text',
+      rename: 'Line',
+    });
+  });
+
+  it('give the name a column has in the dataset: what was typed, trimmed, or the one in the file', () => {
+    const column = {
+      source: 'Au_ppm',
+      role: 'attribute' as const,
+      suggested: false,
+      type: undefined,
+      rename: '',
+    };
+    expect(effectiveName(column)).toBe('Au_ppm');
+    expect(effectiveName({ ...column, rename: '  Gold  ' })).toBe('Gold');
+    expect(effectiveName({ ...column, rename: '   ' })).toBe('Au_ppm');
+  });
+
+  it('are named, and a coordinate can only be a number', () => {
+    expect(TYPE_NAMES).toEqual({
+      float: 'Float',
+      int: 'Integer',
+      bool: 'Boolean',
+      text: 'Text',
+      category: 'Category',
+    });
+    expect(TYPES_BY_ROLE.x).toEqual(['float', 'int']);
+    expect(TYPES_BY_ROLE.attribute).toHaveLength(5);
+    expect(TYPES_BY_ROLE.ignore).toEqual([]);
+  });
+});
+
+describe('what is wrong with the types and names of columns', () => {
+  it('says when a coordinate is set to be read as something that is not a number', () => {
+    const columns = withType(columnsOf('x', 'y'), 0, 'text');
+    const found = mappingProblems('points', columns, EMPTY_BLOCK_SIZE);
+    expect(codes(found)).toEqual(['mapping.coordinate.not_numeric']);
+    expect(found[0]?.message).toBe(
+      'The column "C0" is set as X (easting or longitude) but its type is text; coordinates must be numbers.',
+    );
+    expect(
+      mappingProblems('points', withType(columnsOf('x', 'y'), 0, 'int'), EMPTY_BLOCK_SIZE),
+    ).toEqual([]);
+  });
+
+  it('says when two attributes would have the same name, once for each name', () => {
+    const columns = withRename(
+      withRename(columnsOf('x', 'y', 'attribute', 'attribute', 'attribute'), 2, 'grade'),
+      3,
+      ' grade ',
+    );
+    const found = mappingProblems('points', columns, EMPTY_BLOCK_SIZE);
+    expect(codes(found)).toEqual(['table.column.name_duplicate']);
+    expect(found[0]?.message).toBe('The column name "grade" is used more than once.');
+  });
+
+  it('counts a column that keeps its own name, and not a column that is ignored or has a role', () => {
+    const same = [
+      { source: 'a', role: 'attribute' as const, suggested: false, type: undefined, rename: '' },
+      { source: 'a', role: 'attribute' as const, suggested: false, type: undefined, rename: '' },
+      { source: 'x', role: 'x' as const, suggested: false, type: undefined, rename: '' },
+      { source: 'y', role: 'y' as const, suggested: false, type: undefined, rename: '' },
+    ];
+    expect(codes(mappingProblems('points', same, EMPTY_BLOCK_SIZE))).toEqual([
+      'table.column.name_duplicate',
+    ]);
+    expect(mappingProblems('points', withRole(same, 1, 'ignore'), EMPTY_BLOCK_SIZE)).toEqual([]);
   });
 });

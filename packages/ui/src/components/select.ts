@@ -109,6 +109,18 @@ export class KSelect extends LitElement {
     );
   };
 
+  /**
+   * Shows the value the page gave. A native select that a person has changed no longer follows the
+   * `selected` of its options, so a select that is given another value afterwards (the same select,
+   * used for another column) would go on showing the old one.
+   */
+  protected override updated(): void {
+    const select = this.renderRoot.querySelector('select');
+    if (select !== null && select.value !== this.value) {
+      select.value = this.value;
+    }
+  }
+
   override render() {
     return html`
       <div class="field">
