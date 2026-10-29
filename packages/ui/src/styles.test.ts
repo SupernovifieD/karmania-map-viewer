@@ -1,13 +1,15 @@
 /// <reference types="node" />
 /**
  * No magic numbers in the UI: the CSS of a component and the shared style sheets use tokens
- * for every color, length and duration. This reads each source file's styles and fails on
- * a raw color, or a length or duration with a unit, outside `var(...)`.
+ * for every color, length and duration, and so does the CSS of the app that is built from them.
+ * This reads each source file's styles and fails on a raw color, or a length or duration with a
+ * unit, outside `var(...)`.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const root = new URL('.', import.meta.url);
+/** Where the styles are: the components, and the app that uses them. */
+const roots = [new URL('.', import.meta.url), new URL('../../app/src/', import.meta.url)];
 
 /** Every source file that has styles, with those styles. */
 function styles(): [string, string][] {
@@ -27,7 +29,7 @@ function styles(): [string, string][] {
       }
     }
   };
-  visit(root);
+  roots.forEach(visit);
   return found;
 }
 
