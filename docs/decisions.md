@@ -1646,3 +1646,9 @@ was chosen, why.
   by. The last Load closes it. Cancelling part-way keeps what was already loaded and takes out only
   what the Review step in front of the person had made. The app selects the dataset that was loaded
   last.
+- Step 8.13 (the journeys). The step is split into one commit for each of its eight scenarios
+  (8.13a to 8.13h), which share `e2e/support/wizard.ts` (the wizard's controls, and what the app has
+  kept and the engine holds, as plain data). Each goes through the real steps with the real engine and
+  kernel and ends by looking at what was loaded: its kind, how much, its coordinate system, its
+  columns with their null counts and its box. 8.13a: a CSV of points with its projection file, edited
+  on the way (named, a column ignored, another renamed), loaded; it found nothing to fix.

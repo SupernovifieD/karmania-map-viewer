@@ -385,9 +385,15 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.12 On load: close the dialog, select the new dataset and open the Data
   tab. The map area is told how many datasets are loaded (its `datasets`
   property, added in 7.4), so that it shows "Map rendering arrives in phase 2".
-- [ ] 8.13 End-to-end tests, one commit each: CSV points happy path; CSV with
-  errors fixed in the wizard; GeoJSON mixed types; ASCII grid; OBJ mesh; block
-  model CSV; missing CRS; cancel during a large import.
+- [ ] 8.13 End-to-end tests, one commit each:
+  - [x] 8.13a CSV points happy path.
+  - [ ] 8.13b CSV with errors fixed in the wizard.
+  - [ ] 8.13c GeoJSON mixed types.
+  - [ ] 8.13d ASCII grid.
+  - [ ] 8.13e OBJ mesh.
+  - [ ] 8.13f Block model CSV.
+  - [ ] 8.13g Missing CRS.
+  - [ ] 8.13h Cancel during a large import.
 - [ ] 8.14 Wizard screenshot baselines for every step, including the error and
   warning states, reviewed and committed.
 
