@@ -1845,3 +1845,23 @@ was chosen, why.
   of a points file, which a person chose, as if they were computed. The summary's "Columns" list is
   the attributes only (as it was in 9.3), so for points with three attributes it says 3 above a table
   of six; if that misleads, the list could be called "Attributes", which is for the owner to say.
+- Step 9.10 (the keyboard in the table). The table is one stop for the keyboard (the scroll area, a
+  `grid`), with a cell that the keyboard is on, named by `aria-activedescendant` and ringed. It is
+  named only while it is drawn, since a name has to be of something that is there. The arrow keys move
+  it a cell; Page Up and Page Down a page (the rows that fit), the rows scrolling a page too, so that
+  the cell stays where it was in the table; Home and End to the first and last column; with Control,
+  Home and End to the first and last cell. The keys that move it do not also scroll the page; Alt and
+  Meta are left to the browser, and Shift is not used, since nothing is selected. The row numbers are
+  not somewhere the keyboard goes. A click on a cell puts the keyboard there (and shows no ring, as a
+  click does not, until a key is pressed). The table scrolls as far as shows the cell and no further,
+  and sideways keeps it clear of the row numbers, which cover what is under them. The ring is the
+  cell's while the cell is in view; the table's own would be half hidden by the header and the row
+  numbers, so it is shown only when the cell is not in view (the table having been scrolled away with
+  the mouse), so that there is always one ring. Past 8,000,000 rows the scroll bar cannot stop at each
+  row, so the keyboard keeps what its whole pixels leave out (`fine`) and the rows are put by that; a
+  person's own scrolling drops it and goes by the scroll bar. Three things were found with 50,000,000
+  rows and are covered by tests that fail without them: a browser does not always scroll to exactly the
+  place it is asked (the table goes by where it did scroll to, and keeps the difference in `fine`; a
+  test makes the browser round to multiples of 8), scroll anchoring moved the scroll bar when the
+  rows were moved, which is turned off for the table, and the sums for where the rows go were first
+  tried with a box of 10 million pixels, which led to the 8 million of step 9.8.

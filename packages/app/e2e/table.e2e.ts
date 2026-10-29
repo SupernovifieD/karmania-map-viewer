@@ -241,15 +241,26 @@ test.describe('the table', () => {
     await expect(p.rows.first()).toBeVisible();
     await page.keyboard.press('Shift');
     await p.viewport.focus();
-    const ring = await p.viewport.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return [style.outlineStyle, style.outlineWidth];
-    });
-    expect(ring).toEqual(['solid', '2px']);
+    const ringOf = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [style.outlineStyle, style.outlineWidth];
+      });
+    // The cell the keyboard is on has the ring, while it is in view, and the table has none, so that
+    // there is one and not a half of one under the header.
+    expect(await ringOf(p.demo.locator('.cell.active'))).toEqual(['solid', '2px']);
+    expect((await ringOf(p.viewport))[0]).toBe('none');
     await page.keyboard.press('PageDown');
     await expect
       .poll(async () => p.viewport.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(0);
+    // Scrolled away from that cell with the mouse, the table has the ring, so that the keyboard is
+    // still somewhere that can be seen.
+    await p.viewport.evaluate((element) => {
+      element.scrollTo(0, 28 * 60_000);
+    });
+    await expect.poll(async () => (await drawn(p.numbers)).includes(60_001)).toBe(true);
+    expect(await ringOf(p.viewport)).toEqual(['solid', '2px']);
   });
 
   test('starts again at the first row when it is given other rows', async ({ page }) => {
@@ -1001,6 +1012,438 @@ test.describe('the table', () => {
       expect(found.filter((start) => start > 512 && !near(start))).toEqual([]);
       expect(found.length).toBeLessThan(10);
       expect(found.some(near)).toBe(true);
+    });
+  });
+
+  test.describe('its keyboard', () => {
+    /** Where the keyboard is, and where that is in the table, from the cell the table names. */
+    interface Where {
+      readonly text: string;
+      readonly row: number;
+      readonly column: number;
+      readonly wholeInView: boolean;
+      readonly clearOfRowNumbers: boolean;
+    }
+
+    const where = (viewport: Locator): Promise<Where | null> =>
+      viewport.evaluate((element) => {
+        const id = element.getAttribute('aria-activedescendant');
+        const cell = id === null ? null : element.querySelector(`#${id}`);
+        if (cell === null) {
+          return null;
+        }
+        const box = cell.getBoundingClientRect();
+        const view = element.getBoundingClientRect();
+        const header = element.querySelector('.header')?.getBoundingClientRect().height ?? 0;
+        const stuck =
+          element.querySelector('.rows [role="rowheader"]')?.getBoundingClientRect().width ?? 0;
+        return {
+          text: cell.textContent,
+          row: Number(cell.parentElement?.getAttribute('aria-rowindex')) - 2,
+          column: Number(cell.getAttribute('aria-colindex')) - 2,
+          wholeInView:
+            box.top >= view.top + header - 0.5 &&
+            box.bottom <= view.top + element.clientHeight + 0.5,
+          clearOfRowNumbers:
+            box.left >= view.left + stuck - 0.5 &&
+            box.right <= view.left + element.clientWidth + 0.5,
+        };
+      });
+
+    /** Puts the keyboard on the table, as a person does who tabs to it. */
+    async function focusTable(page: Page, p: ReturnType<typeof parts>): Promise<void> {
+      await expect(p.rows.first()).toBeVisible();
+      await page.keyboard.press('Shift');
+      await p.viewport.focus();
+    }
+
+    test('is on the first cell when the table is entered, which says so, in a ring of its own', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-0-0');
+      expect(await where(p.viewport)).toMatchObject({ text: '1', row: 0, column: 0 });
+      const ring = await p.demo.locator('.cell.active').evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [style.outlineStyle, style.outlineWidth];
+      });
+      expect(ring).toEqual(['solid', '2px']);
+      // Only the one cell has it.
+      await expect(p.demo.locator('.cell.active')).toHaveCount(1);
+    });
+
+    test('moves a cell with the arrow keys, and stops at the edges', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowRight');
+      expect(await where(p.viewport)).toMatchObject({ row: 1, column: 2, text: 'Feature 2' });
+      await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('ArrowLeft');
+      expect(await where(p.viewport)).toMatchObject({ row: 0, column: 1 });
+      // At the first row and the first column there is nowhere to go.
+      await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowUp');
+      expect(await where(p.viewport)).toMatchObject({ row: 0, column: 0 });
+    });
+
+    test('scrolls as far as shows the cell, and no further, going down and up', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      const before = await p.viewport.evaluate((element) => element.scrollTop);
+      // A few rows are in view: the first moves leave the table where it is.
+      for (let step = 0; step < 4; step += 1) {
+        await page.keyboard.press('ArrowDown');
+      }
+      expect(await p.viewport.evaluate((element) => element.scrollTop)).toBe(before);
+      for (let step = 0; step < 30; step += 1) {
+        await page.keyboard.press('ArrowDown');
+        const at = await where(p.viewport);
+        expect(at?.wholeInView, `row ${String(at?.row)}`).toBe(true);
+      }
+      expect(await where(p.viewport)).toMatchObject({ row: 34, text: '35' });
+      expect(await p.viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+      for (let step = 0; step < 34; step += 1) {
+        await page.keyboard.press('ArrowUp');
+        expect((await where(p.viewport))?.wholeInView).toBe(true);
+      }
+      // Back at the top, the table is too.
+      expect(await p.viewport.evaluate((element) => element.scrollTop)).toBe(0);
+    });
+
+    test('moves a page with Page Down and Page Up, and the rows with it', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      const rowsPerPage = await p.viewport.evaluate((element) =>
+        Math.floor((element.clientHeight - 32) / 28),
+      );
+      expect(rowsPerPage).toBeGreaterThanOrEqual(8);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('PageDown');
+      expect(await where(p.viewport)).toMatchObject({ row: 1 + rowsPerPage, wholeInView: true });
+      const topAfter = await p.viewport.evaluate((element) => element.scrollTop);
+      // The rows moved by a page: what was at the top is a page further on, not just far enough to show it.
+      expect(topAfter).toBe(rowsPerPage * 28);
+      await page.keyboard.press('PageDown');
+      await page.keyboard.press('PageDown');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 1 + 3 * rowsPerPage,
+        wholeInView: true,
+      });
+      await page.keyboard.press('PageUp');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 1 + 2 * rowsPerPage,
+        wholeInView: true,
+      });
+      for (let step = 0; step < 5; step += 1) {
+        await page.keyboard.press('PageUp');
+      }
+      expect(await where(p.viewport)).toMatchObject({ row: 0, wholeInView: true });
+      expect(await p.viewport.evaluate((element) => element.scrollTop)).toBe(0);
+    });
+
+    test('goes to the first and last column with Home and End, and to the first and last cell with Control', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('End');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 2,
+        column: 5,
+        text: 'r3c6',
+        wholeInView: true,
+        clearOfRowNumbers: true,
+      });
+      expect(await p.viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(100);
+      await page.keyboard.press('Home');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 2,
+        column: 0,
+        text: '3',
+        clearOfRowNumbers: true,
+      });
+      expect(await p.viewport.evaluate((element) => element.scrollLeft)).toBe(0);
+      await page.keyboard.press('Control+End');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 99_999,
+        column: 5,
+        text: 'r100000c6',
+        wholeInView: true,
+        clearOfRowNumbers: true,
+      });
+      await page.keyboard.press('Control+Home');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 0,
+        column: 0,
+        text: '1',
+        wholeInView: true,
+      });
+      expect(
+        await p.viewport.evaluate((element) => [element.scrollTop, element.scrollLeft]),
+      ).toEqual([0, 0]);
+    });
+
+    test('keeps the cell clear of the row numbers when a column to its left has to be shown', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await page.keyboard.press('End');
+      for (let step = 0; step < 5; step += 1) {
+        await page.keyboard.press('ArrowLeft');
+        const at = await where(p.viewport);
+        expect(at?.clearOfRowNumbers, `column ${String(at?.column)}`).toBe(true);
+      }
+      expect((await where(p.viewport))?.column).toBe(0);
+    });
+
+    test('does not scroll the page, and leaves the keys that are not its own alone', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      const scrolled = await page.evaluate(() => window.scrollY);
+      for (const key of ['PageDown', 'End', 'ArrowDown', 'Control+End']) {
+        await page.keyboard.press(key);
+      }
+      expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+      await page.keyboard.press('Control+Home');
+      // A key with Alt is the browser's (back, forward), and a letter is nothing to a table.
+      await page.keyboard.press('Alt+ArrowDown');
+      await page.keyboard.press('a');
+      await page.keyboard.press('Escape');
+      expect(await where(p.viewport)).toMatchObject({ row: 0, column: 0 });
+    });
+
+    test('puts the keyboard on the cell that is clicked, which shows no ring until a key is pressed', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await expect(p.rows.first()).toBeVisible();
+      await p.rows.nth(3).locator('[role="gridcell"]').nth(2).click();
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-3-2');
+      expect(await where(p.viewport)).toMatchObject({ text: 'Feature 4' });
+      await page.keyboard.press('ArrowDown');
+      expect(await where(p.viewport)).toMatchObject({ row: 4, column: 2, text: 'Feature 5' });
+    });
+
+    test('names no cell that is not there: not one that was scrolled away from, and not before the rows are in', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-0-0');
+      await p.viewport.evaluate((element) => {
+        element.scrollTo(0, 28 * 50_000);
+      });
+      await expect.poll(async () => (await drawn(p.numbers)).includes(50_001)).toBe(true);
+      await expect(p.viewport).not.toHaveAttribute('aria-activedescendant', /.*/);
+      // The keyboard is still on the cell it was on, and scrolling back finds it.
+      await p.viewport.evaluate((element) => {
+        element.scrollTo(0, 0);
+      });
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-0-0');
+    });
+
+    test('starts again at the first cell when it is given other rows', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await focusTable(page, p);
+      await page.keyboard.press('Control+End');
+      expect(await where(p.viewport)).toMatchObject({ row: 99_999 });
+      await p.host.evaluate((element) => {
+        (element as unknown as { rowCount: number }).rowCount = 50;
+      });
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-0-0');
+    });
+
+    test('reaches the last row of two million, and each row on the way back, whole in view', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await focusTable(page, p);
+      await page.keyboard.press('Control+End');
+      expect(await where(p.viewport)).toMatchObject({
+        row: 1_999_999,
+        text: 'r2000000c6',
+        wholeInView: true,
+      });
+      for (let step = 1; step <= 40; step += 1) {
+        await page.keyboard.press('ArrowUp');
+        expect(await where(p.viewport), `step ${String(step)}`).toMatchObject({
+          row: 1_999_999 - step,
+          wholeInView: true,
+        });
+      }
+      await page.keyboard.press('Control+Home');
+      expect(await where(p.viewport)).toMatchObject({ row: 0, wholeInView: true });
+    });
+
+    test('stays on its cell when the browser does not scroll to exactly what it is asked', async ({
+      page,
+    }) => {
+      // A browser that holds a scroll position only to a multiple of 8 pixels, a good deal coarser than
+      // Chromium's every other pixel in a box taller than 8.4 million, asked for places it cannot be at.
+      await page.evaluate(async () => {
+        const holder = document.createElement('div');
+        holder.id = 'rounding';
+        holder.style.cssText = 'height: 300px; width: 400px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+        };
+        table.rowCount = 50_000_000;
+        table.fetch = (start, count) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'n',
+                values: Int32Array.from({ length: count }, (_, index) => start + index + 1),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+        holder.append(table);
+        document.body.append(holder);
+        // The scroll area is there once the table has drawn itself for the first time.
+        await (table as unknown as { updateComplete: Promise<boolean> }).updateComplete;
+        const viewport = table.shadowRoot?.querySelector('.viewport');
+        if (viewport) {
+          Object.defineProperty(viewport, 'scrollTop', {
+            configurable: true,
+            get() {
+              const value: unknown = Reflect.get(Element.prototype, 'scrollTop', viewport);
+              return typeof value === 'number' ? value : 0;
+            },
+            set(value: number) {
+              Reflect.set(Element.prototype, 'scrollTop', Math.round(value / 8) * 8, viewport);
+            },
+          });
+        }
+      });
+      const viewport = page.locator('#rounding .viewport');
+      await expect(viewport.locator('.rows [role="row"]').first()).toBeVisible();
+      await page.keyboard.press('Shift');
+      await viewport.focus();
+      const perPage = await viewport.evaluate((element) =>
+        Math.floor((element.clientHeight - 32) / 28),
+      );
+      await page.keyboard.press('Control+End');
+      for (let step = 1; step <= 30; step += 1) {
+        await page.keyboard.press('PageUp');
+        expect(await where(viewport), `page ${String(step)}`).toMatchObject({
+          row: 49_999_999 - step * perPage,
+          wholeInView: true,
+        });
+      }
+    });
+
+    test('reaches every row of fifty million, though a pixel of the scroll bar is six rows and more', async ({
+      page,
+    }) => {
+      await page.evaluate(() => {
+        const holder = document.createElement('div');
+        holder.id = 'giant';
+        holder.style.cssText = 'height: 300px; width: 400px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+        };
+        table.rowCount = 50_000_000;
+        table.fetch = (start, count) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'n',
+                values: Int32Array.from({ length: count }, (_, index) => start + index + 1),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+        holder.append(table);
+        document.body.append(holder);
+      });
+      const viewport = page.locator('#giant .viewport');
+      await expect(viewport.locator('.rows [role="row"]').first()).toBeVisible();
+      await page.keyboard.press('Shift');
+      await viewport.focus();
+      const perPage = await viewport.evaluate((element) =>
+        Math.floor((element.clientHeight - 32) / 28),
+      );
+      await page.keyboard.press('Control+End');
+      expect(await where(viewport)).toMatchObject({
+        row: 49_999_999,
+        text: '50000000',
+        wholeInView: true,
+      });
+      // A page at a time, from the end: each is where it is counted to be, and in view.
+      for (let step = 1; step <= 25; step += 1) {
+        await page.keyboard.press('PageUp');
+        expect(await where(viewport), `page ${String(step)}`).toMatchObject({
+          row: 49_999_999 - step * perPage,
+          wholeInView: true,
+        });
+      }
+      // Rows drawn past the foot of the table, near its end, are cut off: they do not make the box taller.
+      expect(await viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 8_000_000);
+      // And a row at a time, which the scroll bar could never be set to: each is one further.
+      let row = 49_999_999 - 25 * perPage;
+      for (let step = 0; step < 25; step += 1) {
+        await page.keyboard.press('ArrowDown');
+        row += 1;
+        const at = await where(viewport);
+        expect(at, `row ${String(row)}`).toMatchObject({
+          row,
+          text: String(row + 1),
+          wholeInView: true,
+        });
+      }
+      // A person's own scroll takes over from where the scroll bar is, and not from what the keys took
+      // up: a pixel of it, after the keys, puts the top exactly where the scroll bar's sum says,
+      // whatever the keys had added. They add up to half a pixel of the scroll bar, which is 87 pixels
+      // of rows (a pixel is 175), so that over a dozen places some of them add a good deal.
+      for (let presses = 1; presses <= 12; presses += 1) {
+        await viewport.focus();
+        await page.keyboard.press('Control+End');
+        for (let press = 0; press < presses; press += 1) {
+          await page.keyboard.press('PageUp');
+        }
+        const expected = await viewport.evaluate((element) => {
+          const body = element.clientHeight - 32;
+          const ratio = (50_000_000 * 28 - body) / (element.scrollHeight - 32 - body);
+          element.scrollTo(0, element.scrollTop + 1);
+          // Where the browser took it, which is the place that counts.
+          return Math.floor((element.scrollTop * ratio) / 28) + 1;
+        });
+        await expect
+          .poll(
+            async () =>
+              viewport.evaluate((element) => {
+                const top = element.getBoundingClientRect().top + 32;
+                const first = [...element.querySelectorAll('.rows [role="rowheader"]')].find(
+                  (cell) => {
+                    const box = cell.getBoundingClientRect();
+                    return box.top <= top + 0.5 && box.bottom > top + 0.5;
+                  },
+                );
+                return Number(first?.textContent);
+              }),
+            { message: `after ${String(presses)} pages up` },
+          )
+          .toBe(expected);
+      }
     });
   });
 

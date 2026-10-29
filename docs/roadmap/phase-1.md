@@ -416,7 +416,7 @@ Definitions and reprojection can be added later, with the features that need the
   the browser's maximum element height (about 33 million px in Chromium, lower
   in Firefox); test with 2,000,000 synthetic rows.
 - [x] 9.9 Geometry-derived columns shown first for each kind (section 8.4).
-- [ ] 9.10 Keyboard navigation in the table: arrows, Page Up and Down, Home and
+- [x] 9.10 Keyboard navigation in the table: arrows, Page Up and Down, Home and
   End, focus visible.
 - [ ] 9.11 Data tab screenshot baselines (empty, one dataset, many datasets,
   long names, warnings expanded), reviewed and committed.

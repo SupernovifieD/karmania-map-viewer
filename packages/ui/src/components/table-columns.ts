@@ -51,3 +51,25 @@ export function textWidth(
 export function isCut(width: number, column: number): boolean {
   return Math.ceil(width) > column - CELL_PADDING;
 }
+
+/**
+ * How far to scroll sideways for a column to be in view, `scrollLeft` being how far it is. The
+ * row numbers stay at the left, `stuck` wide, and cover what is scrolled under them, so the column has
+ * to be right of them, and left of the table's right edge. The same if it is, and as little
+ * more as is needed if not; a column wider than the room is at its left edge.
+ */
+export function scrollLeftToReveal(
+  column: { readonly left: number; readonly width: number },
+  scrollLeft: number,
+  clientWidth: number,
+  stuck: number,
+): number {
+  const right = column.left + column.width;
+  if (column.left < scrollLeft + stuck) {
+    return Math.max(0, column.left - stuck);
+  }
+  if (right > scrollLeft + clientWidth) {
+    return Math.max(0, Math.min(right - clientWidth, column.left - stuck));
+  }
+  return scrollLeft;
+}

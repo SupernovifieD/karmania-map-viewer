@@ -28,6 +28,12 @@ export interface WindowInput {
   readonly overscan: number;
   /** How tall the box that scrolls may be: `MAX_SCROLL_HEIGHT`, unless a test says otherwise. */
   readonly maxScrollHeight?: number;
+  /**
+   * Pixels of rows added to how far down the scroll bar says the rows are. With millions of rows a
+   * pixel of scrolling is more than a row, so the scroll bar cannot stop at each; the keyboard can,
+   * by taking up what the scroll bar's whole pixels leave out. Nothing, unless the keyboard has.
+   */
+  readonly fine?: number;
 }
 
 /** The rows to draw. */
@@ -40,6 +46,8 @@ export interface WindowResult {
   readonly firstRow: number;
   /** One past the last row to draw, including the extra rows after those in view. */
   readonly endRow: number;
+  /** How far down the rows the top of the table is, in pixels of rows: not of scrolling. */
+  readonly top: number;
   /**
    * Where the first row drawn goes, in pixels from the top of the box that scrolls. When the rows
    * are scrolled as they are, it is where the row would be if all of them were drawn. When they are
@@ -50,6 +58,11 @@ export interface WindowResult {
 }
 
 type Sizes = Pick<WindowInput, 'rowCount' | 'rowHeight' | 'viewportHeight' | 'maxScrollHeight'>;
+
+/** The most the top of the table can be down the rows, in pixels of rows: so that the last row is the last. */
+export function maxTop(input: Sizes): number {
+  return Math.max(0, input.rowCount * input.rowHeight - input.viewportHeight);
+}
 
 /** How tall the box that scrolls is: the rows together, or the most a browser allows. */
 export function scrollHeightOf(input: Sizes): number {
@@ -73,7 +86,7 @@ export function windowFor(input: WindowInput): WindowResult {
   const { rowCount, rowHeight, viewportHeight, overscan } = input;
   const real = Math.min(Math.max(0, input.scrollTop), maxScroll(input));
   // How far down the rows it is, which is the same as how far it is scrolled until there are too many.
-  const down = real * scrollRatio(input);
+  const down = Math.min(Math.max(0, real * scrollRatio(input) + (input.fine ?? 0)), maxTop(input));
   const topRow = Math.floor(down / rowHeight);
   // One more than fits, since the rows at the top and the bottom may be part in view.
   const inView = Math.ceil(viewportHeight / rowHeight) + 1;
@@ -83,6 +96,43 @@ export function windowFor(input: WindowInput): WindowResult {
     scaled: rowCount * rowHeight > (input.maxScrollHeight ?? MAX_SCROLL_HEIGHT),
     firstRow,
     endRow: Math.max(firstRow, Math.min(rowCount, topRow + inView + overscan)),
+    top: down,
     layerTop: Math.round(real + firstRow * rowHeight - down),
   };
+}
+
+/**
+ * How far to scroll, and the `fine` to go with it, to have the top of the table `top` pixels down
+ * the rows. Scrolled as they are, that is the scroll bar's own position; with too many rows for that, it
+ * is the nearest whole pixel of the scroll bar, and the rest is `fine`.
+ */
+export function scrollForTop(input: Sizes, top: number): { scrollTop: number; fine: number } {
+  const wanted = Math.min(Math.max(0, top), maxTop(input));
+  const ratio = scrollRatio(input);
+  if (ratio === 1) {
+    return { scrollTop: wanted, fine: 0 };
+  }
+  const scrollTop = Math.min(Math.max(0, Math.round(wanted / ratio)), maxScroll(input));
+  return { scrollTop, fine: wanted - scrollTop * ratio };
+}
+
+/**
+ * Where the top of the table has to be, `top` being where it is, for row `row` to be wholly in view:
+ * the same if it is, as little further up or down as is needed if it is not.
+ */
+export function topToReveal(input: Sizes, top: number, row: number): number {
+  const rowTop = row * input.rowHeight;
+  const rowBottom = rowTop + input.rowHeight;
+  const wanted =
+    rowTop < top
+      ? rowTop
+      : rowBottom > top + input.viewportHeight
+        ? rowBottom - input.viewportHeight
+        : top;
+  return Math.min(Math.max(0, wanted), maxTop(input));
+}
+
+/** How many rows a page of rows is: the rows that fit, and at least one. */
+export function pageRows(viewportHeight: number, rowHeight: number): number {
+  return Math.max(1, Math.floor(viewportHeight / rowHeight));
 }
