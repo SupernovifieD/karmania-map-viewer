@@ -404,4 +404,85 @@ test.describe('importing', () => {
     });
     expect(result.selected).toBe(dataset?.id);
   });
+
+  test('a file with no coordinate system: the wizard will not go on until one is chosen, and the kernel would not load it', async ({
+    page,
+  }) => {
+    const w = wizard(page);
+    await startWizard(page, 'points.csv');
+    await goTo(page, 'mapping');
+    await goTo(page, 'nodata');
+    await goTo(page, 'crs');
+
+    const crs = w.host.locator('karmania-crs-step');
+    const choice = crs.locator('.choice k-select').first().locator('select');
+    // Nothing found, nothing chosen: the way on is closed, and the footer says why.
+    await expect(crs.locator('.found-text')).toHaveText(
+      'No coordinate system was found in or beside the file.',
+    );
+    await expect(crs.locator('.summary-text')).toContainText('No coordinate system is chosen yet.');
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toHaveText('Choose a coordinate system: an EPSG code, or a local grid.');
+
+    // An EPSG code, but none given yet, and then one that is not a code.
+    await choice.selectOption('epsg');
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toHaveText('Enter the EPSG code of the coordinate system.');
+    await crs.locator('k-input input').fill('WGS84');
+    await expect(crs.locator('k-input .error')).toHaveText(
+      'An EPSG code is a whole number, such as 32640.',
+    );
+    await expect(w.next.locator('button')).toBeDisabled();
+
+    // The kernel's own rule, which the wizard keeps a person from reaching: with no coordinate
+    // system an import is stopped, and the finding says that the coordinate system step can fix it.
+    const refused = await page.evaluate(async () => {
+      const app = document.querySelector('karmania-app') as unknown as {
+        engine: {
+          importFiles: (
+            files: File[],
+            mapping: unknown,
+          ) => Promise<{ status: string; findings?: { code: string; step?: string }[] }>;
+        };
+      };
+      const result = await app.engine.importFiles([new File(['x,y\n1,2\n3,4\n'], 'bare.csv')], {
+        datasetName: 'bare',
+        kind: 'points',
+        columns: [
+          { source: 'x', role: 'x' },
+          { source: 'y', role: 'y' },
+        ],
+        nodata: { tokens: [], numbers: [] },
+        emptyCoordinates: 'error',
+        decimalSeparator: '.',
+        crs: null,
+      });
+      return {
+        status: result.status,
+        found: (result.findings ?? []).map((finding) => `${finding.code}:${finding.step ?? ''}`),
+      };
+    });
+    expect(refused.status).toBe('blocked');
+    expect(refused.found).toContain('crs.missing:crs');
+    expect((await kept(page)).inEngine).toEqual([]);
+
+    // A local grid is a choice, and a person can make it: the way on opens.
+    await choice.selectOption('local');
+    await crs.locator('.choice k-select').nth(1).locator('select').selectOption('ft');
+    await expect(w.next.locator('button')).toBeEnabled();
+    await expect(w.note).toHaveCount(0);
+    await expect(crs.locator('.summary-text')).toContainText('a local grid, in feet');
+    await goTo(page, 'review');
+    await expect(w.host.locator('karmania-review-step .verdict')).toHaveText('Ready to load');
+    await w.next.click();
+
+    await expect(w.dialog).toBeHidden();
+    const result = await kept(page);
+    expect(result.datasets).toHaveLength(1);
+    expect(result.datasets[0]).toMatchObject({
+      name: 'points',
+      kind: 'points',
+      crs: { kind: 'local', units: 'ft' },
+    });
+  });
 });
