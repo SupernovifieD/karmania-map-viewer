@@ -1809,3 +1809,19 @@ was chosen, why.
   goes. The scroll area is a `data-scroll-region` and does not pass a scroll that reached its end on
   to the panel. The Data tab no longer shrinks to the panel's height when its content is taller: it
   was a flex item that could, and its box was then smaller than what it held.
+- Step 9.8 (more rows than a browser can scroll). A browser cannot make a box taller than about 33
+  million pixels (Chromium) or 17 million (Firefox): past that, rows are not where they are said to
+  be and the end cannot be reached, which a test shows by taking the limit away (all eight fail at
+  2,000,000 rows). The box is never made taller than 10 million pixels, a limit under both, so up to
+  about 357,000 rows nothing changes. Past that the scroll bar is for all the rows, drawn smaller:
+  how far it is scrolled, as a share of how far it can be, is how far down the rows are, and the rows
+  drawn are put where they show at the top of the table (`layerTop`), not where they would be. At
+  2,000,000 rows a pixel of scrolling is 5.6 pixels of rows; while that is less than a row (up to
+  10,000,000 rows) every row can be reached with the scroll bar, which unit tests prove from the sums
+  (the end is the last row, the rows drawn always cover the table, scrolling on never goes back or
+  skips a row, any row is within one of where it is aimed at) and a browser test shows at 2,000,000
+  rows and with the real engine at 400,000. Past 10,000,000 rows a pixel is more than a row, and the
+  scroll bar alone cannot stop at each; the keyboard of step 9.10 will. A wheel notch or an arrow key
+  moves further through the rows the more rows there are. Checked in Chromium only: the project's
+  browser tests run in it alone, so the limits of Firefox and Safari are taken from their documentation
+  and not tried.

@@ -183,7 +183,7 @@ export const fetchFailing: TableFetch = () => Promise.reject(new Error('The rows
 export const fetchSynthetic: TableFetch = (start, count) =>
   Promise.resolve(syntheticRows(start, count));
 
-/** The table with few rows, with a hundred thousand, and with the widest and narrowest columns. */
+/** The table with few rows, with a hundred thousand and two million, and with the widest and narrowest columns. */
 export function tableSection() {
   return html`
     <section data-section="table">
@@ -196,6 +196,9 @@ export function tableSection() {
       </div>
       <div class="table-demo wide tall" id="table-values">
         <k-table label="Kinds of value" .rowCount=${10} .fetch=${fetchValues}></k-table>
+      </div>
+      <div class="table-demo" id="table-huge">
+        <k-table label="Two million rows" .rowCount=${2_000_000} .fetch=${fetchSynthetic}></k-table>
       </div>
       <div class="table-demo" id="table-failing">
         <k-table label="Rows that go" .rowCount=${1000} .fetch=${fetchFailingLater}></k-table>

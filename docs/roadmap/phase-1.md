@@ -412,7 +412,7 @@ Definitions and reprojection can be added later, with the features that need the
   booleans).
 - [x] 9.7 Virtualized table, part 4: page fetching through `engine.rows()` with
   prefetch of the next page.
-- [ ] 9.8 Very large row counts: scaled scrolling when the total height exceeds
+- [x] 9.8 Very large row counts: scaled scrolling when the total height exceeds
   the browser's maximum element height (about 33 million px in Chromium, lower
   in Firefox); test with 2,000,000 synthetic rows.
 - [ ] 9.9 Geometry-derived columns shown first for each kind (section 8.4).
