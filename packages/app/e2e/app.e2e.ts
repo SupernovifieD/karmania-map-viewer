@@ -18,6 +18,7 @@ test.describe('the app', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('karmania-app')).toHaveCount(1);
     expect(await page.evaluate(() => customElements.get('karmania-app') !== undefined)).toBe(true);
+    await expect(page.locator('karmania-app h1')).toHaveText('Karmania');
     await expect(page.locator('karmania-app karmania-map-area')).toHaveCount(1);
     await expect(page.locator('karmania-app karmania-panel')).toHaveCount(1);
     expect(errors).toEqual([]);
