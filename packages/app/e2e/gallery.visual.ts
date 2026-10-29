@@ -153,6 +153,7 @@ const SHOTS: Shot[] = [
   tooltipShot('tooltip-describes', 'tip-describes', 'focus'),
   tooltipShot('tooltip-long', 'tip-long', 'hover'),
   tooltipShot('tooltip-below', 'tip-below', 'hover'),
+  tooltipShot('tooltip-left', 'tip-left', 'hover'),
   tooltipShot('tooltip-clipped', 'tip-clipped', 'hover'),
   ...['full', 'message', 'small'].map((variant): Shot => ({
     name: `empty-${variant}`,

@@ -136,6 +136,46 @@ test.describe('the tooltip', () => {
     expect((await shown(page, 'at-top')).placement).toBe('bottom');
   });
 
+  test('sits beside the control when asked to: a gap of 4 away, centred on it from top to bottom', async ({
+    page,
+  }) => {
+    await tooltip(page, 'tip-left').hover();
+    const state = await shown(page, 'tip-left');
+    const trigger = await tooltip(page, 'tip-left').locator('k-button').boundingBox();
+    if (trigger === null) {
+      throw new Error('no trigger');
+    }
+    expect(state.placement).toBe('left');
+    expect(state.left + state.width + 4).toBeCloseTo(trigger.x, 0);
+    expect(state.top + state.height / 2).toBeCloseTo(trigger.y + trigger.height / 2, 0);
+  });
+
+  test('goes to the other side of the control when there is no room beside it, and stays inside the window', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      const place = async (id: string, style: string, side: string) => {
+        const holder = document.createElement('div');
+        holder.style.cssText = `position: fixed; ${style}`;
+        holder.innerHTML = `<k-tooltip id="${id}" text="Beside the control" placement="${side}"><k-button icon="x" label="Close"></k-button></k-tooltip>`;
+        document.body.append(holder);
+        await document.querySelector<HTMLElementTagNameMap['k-tooltip']>(`#${id}`)?.updateComplete;
+      };
+      await place('near-left', 'left: 10px; top: 300px;', 'left');
+      await place('near-right', 'right: 10px; top: 300px;', 'right');
+      await place('near-top', 'left: 500px; top: 0;', 'left');
+    });
+    await tooltip(page, 'near-left').hover();
+    expect((await shown(page, 'near-left')).placement).toBe('right');
+    await tooltip(page, 'near-right').hover();
+    expect((await shown(page, 'near-right')).placement).toBe('left');
+    // At the top edge it is slid down to be whole, and is still beside the control.
+    await tooltip(page, 'near-top').hover();
+    const slid = await shown(page, 'near-top');
+    expect(slid.placement).toBe('left');
+    expect(slid.top).toBeGreaterThanOrEqual(8);
+  });
+
   for (const [name, style] of [
     ['top left corner', 'left: 0; top: 0;'],
     ['top right corner', 'right: 0; top: 0;'],
