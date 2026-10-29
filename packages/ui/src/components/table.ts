@@ -82,10 +82,10 @@ function tokenPixels(element: Element, name: string, fallback: number): number {
  * are in the page at any time, and only 16 pages are kept: the others are let go of, and asked for
  * again if they are needed. The table is as tall as the room it is given.
  *
- * Up to about 350,000 rows the scroll bar is for the rows as they are, and the browser scrolls them.
+ * Up to about 285,000 rows the scroll bar is for the rows as they are, and the browser scrolls them.
  * Past that a browser cannot make a box tall enough, and the scroll bar is for all the rows drawn
- * smaller: a pixel of it is several pixels of rows, which is less than a row up to about ten
- * million, so every row can still be scrolled to. Past ten million rows a pixel is more than a row,
+ * smaller: a pixel of it is several pixels of rows, which is less than a row up to about eight
+ * million, so every row can still be scrolled to. Past eight million rows a pixel is more than a row,
  * and the scroll bar can no longer stop at each.
  *
  * A page that cannot be fetched is not asked for again until a person says to: when rows in view
@@ -163,7 +163,11 @@ export class KTable extends LitElement {
       /* The scroll bar is for all the rows, and the columns are as wide as they are, but never
          narrower than the room, so that the lines run to its edge. */
       .sizer {
+        /* Rows are drawn past its foot when the table is near the end, and are not to make it taller:
+           the scroll bar goes by its height. Clipped, not hidden, so that it does not scroll itself,
+           and the header and the row numbers still stick to the table. */
         min-width: 100%;
+        overflow: clip;
         position: relative;
         width: max-content;
       }

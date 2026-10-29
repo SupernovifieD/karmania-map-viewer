@@ -781,8 +781,8 @@ test.describe('the table', () => {
       const p = parts(page, 'table-huge');
       await expect(p.rows.first()).toBeVisible();
       const height = await p.viewport.evaluate((element) => element.scrollHeight);
-      // Ten million for the rows, and the header: not 56 million, which would not work.
-      expect(height).toBe(32 + 10_000_000);
+      // Eight million for the rows, and the header: not 56 million, which would not work.
+      expect(height).toBe(32 + 8_000_000);
       await expect(p.viewport).toHaveAttribute('aria-rowcount', String(ROWS + 1));
       expect(await p.rows.count()).toBeLessThan(25);
     });
@@ -806,6 +806,37 @@ test.describe('the table', () => {
         element.scrollTo(0, 1e12);
       });
       expect((await drawn(p.numbers)).at(-1)).toBe(ROWS);
+    });
+
+    test('stay the box they were from the last pixels of scrolling, which draw rows past its foot', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      for (const back of [3, 2, 1, 0]) {
+        await p.viewport.evaluate((element, pixels) => {
+          element.scrollTo(0, element.scrollHeight - element.clientHeight - pixels);
+        }, back);
+        await expect
+          .poll(async () => (await drawn(p.numbers)).at(-1), {
+            message: `${String(back)} from the end`,
+          })
+          .toBe(ROWS);
+        // The rows at the foot are cut off at the box's, and do not make it taller, so that there is
+        // no more to scroll than the table says.
+        expect(await p.viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 8_000_000);
+      }
+      // However far it is asked to go, it goes to the same place: the last row at the foot of the table.
+      await p.viewport.evaluate((element) => {
+        element.scrollTo(0, 1e12);
+      });
+      const last = await rect(p.rows.last());
+      const bottom = await p.viewport.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.y + element.clientHeight;
+      });
+      expect((await drawn(p.numbers)).at(-1)).toBe(ROWS);
+      expect(last.y + last.height).toBe(bottom);
     });
 
     test('are the rows that the scroll bar says, a share of the way down for the same share of the rows', async ({
@@ -860,8 +891,8 @@ test.describe('the table', () => {
       await expect(p.rows.first()).toBeVisible();
       const scale = await ratio(p);
       // A pixel of scrolling is a few pixels of rows, which is less than a row.
-      expect(scale).toBeGreaterThan(5);
-      expect(scale).toBeLessThan(6);
+      expect(scale).toBeGreaterThan(6.9);
+      expect(scale).toBeLessThan(7.1);
       for (const row of [0, 1, 255, 256, 99_999, 1_000_000, 1_234_567, 1_999_000]) {
         await p.viewport.evaluate(
           (viewport, [r, scaleBy]) => {
