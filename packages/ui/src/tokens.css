@@ -53,6 +53,9 @@
   --k-panel-rail-width: 40px;
   /* The strip along the panel's edge that can be grabbed to resize it. */
   --k-resize-hit-width: 6px;
+  /* How wide a column of the wizard's preview table is: room for the name of the column and the
+     selector of its role. */
+  --k-mapping-column-width: 160px;
 
   /* A dialog: as wide as this and, with room left at the window's edges, as tall; and the height
      of the bands at its top and bottom. */

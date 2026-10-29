@@ -5,11 +5,12 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './file-step.js';
 import type { DraftChange } from './file-step.js';
-import { draftFor } from './import-draft.js';
+import { applyDraftChange, draftFor } from './import-draft.js';
 import type { ImportDraft } from './import-draft.js';
 import { entriesOf, isImportable } from './import-files.js';
 import type { FileEntry } from './import-files.js';
 import './findings.js';
+import './mapping-step.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';
 
@@ -60,6 +61,12 @@ export class KarmaniaImportDialog extends LitElement {
 
       .step p {
         margin: 0;
+      }
+
+      /* The Mapping step has a table that scrolls in the room the step has, so the step has all of it. */
+      .step[data-step='mapping'] {
+        height: 100%;
+        min-height: 0;
       }
 
       .reading {
@@ -181,7 +188,7 @@ export class KarmaniaImportDialog extends LitElement {
 
   private readonly onDraftChange = (event: CustomEvent<DraftChange>): void => {
     if (this.draft !== undefined) {
-      this.draft = { ...this.draft, ...event.detail };
+      this.draft = applyDraftChange(this.draft, event.detail);
     }
   };
 
@@ -234,6 +241,15 @@ export class KarmaniaImportDialog extends LitElement {
   private body() {
     if (this.step === 'file') {
       return html`<div class="step" data-step="file">${this.fileStep()}</div>`;
+    }
+    if (this.step === 'mapping') {
+      return html`<div class="step" data-step="mapping">
+        <karmania-mapping-step
+          .entry=${this.current}
+          .draft=${this.draft}
+          @karmania-draft-change=${this.onDraftChange}
+        ></karmania-mapping-step>
+      </div>`;
     }
     const found = IMPORT_STEPS.find((known) => known.id === this.step);
     return html`
