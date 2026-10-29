@@ -1220,3 +1220,19 @@ was chosen, why.
   button is left out when there is data, since the toolbar still has one) and step 8.12 now says
   to set it. Nothing sets it yet; the tests set it directly. The map area is the page's `main`
   landmark, called "Map".
+- Step 7.5 (drop zone): the outline and its label are always in the map area and only become
+  visible, absolutely positioned 8 px inside its edges, so showing them cannot change a layout;
+  `pointer-events: none` keeps them from stealing the drag. They have a tinted background that
+  covers the empty state while they are shown, so that the label does not sit on top of its text.
+  The test records the box, the content size and the scroll position of every element of the app
+  (through shadow roots, apart from the overlay) before and during a drag and requires them to be
+  the same, in all six layouts; it was seen to fail when the overlay joined the flow while shown.
+  Moving the pointer from one part of the area to another fires `dragenter` for the new part
+  before `dragleave` for the old one, so the area counts how many parts the drag is over. Only
+  drags that carry files count: text dragged over the area is ignored. Files dropped anywhere
+  else are refused at the window (cancelled, with the drop effect `none`), because the browser
+  would otherwise open the file in place of the app and its state would be lost. The drop itself
+  is taken and discarded for now; passing the files on is step 8.2. A script cannot start a real
+  drag from outside the page, so the tests fire the drag events; the browser keeps `dropEffect`
+  at `none` for a `DataTransfer` that was not made by a real drag, so those tests record what
+  the page sets it to instead. How the pointer looks during a real drag is not tested.
