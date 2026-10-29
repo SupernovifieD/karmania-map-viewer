@@ -35,6 +35,7 @@ export class KarmaniaFileStep extends LitElement {
   static override properties = {
     entries: { attribute: false },
     current: { attribute: false },
+    done: { attribute: false },
     draft: { attribute: false },
   };
 
@@ -154,8 +155,10 @@ export class KarmaniaFileStep extends LitElement {
 
   /** Every file, as the kernel saw it. */
   declare entries: readonly FileEntry[];
-  /** The file being imported: the first one that can be. */
+  /** The file being imported: the first one that can be, that has not been loaded. */
   declare current: FileEntry | undefined;
+  /** The files that have been loaded already, when there were several. */
+  declare done: readonly FileEntry[];
   /** What is to be done with it. */
   declare draft: ImportDraft | undefined;
 
@@ -163,6 +166,7 @@ export class KarmaniaFileStep extends LitElement {
     super();
     this.entries = [];
     this.current = undefined;
+    this.done = [];
     this.draft = undefined;
   }
 
@@ -187,17 +191,21 @@ export class KarmaniaFileStep extends LitElement {
     const { preview, group } = entry;
     const state = !isImportable(preview)
       ? 'blocked'
-      : entry === this.current
-        ? 'current'
-        : 'waiting';
+      : this.done.includes(entry)
+        ? 'done'
+        : entry === this.current
+          ? 'current'
+          : 'waiting';
     const status =
       state === 'blocked'
         ? 'Cannot be imported'
-        : several
-          ? state === 'current'
-            ? 'Importing now'
-            : 'Waiting'
-          : '';
+        : state === 'done'
+          ? 'Loaded'
+          : several
+            ? state === 'current'
+              ? 'Importing now'
+              : 'Waiting'
+            : '';
     const described = describeFile(preview);
     const sidecars = group.sidecars.map((file) => file.name);
     const detail = [described, sidecars.length > 0 ? `with ${sidecars.join(', ')}` : undefined]
