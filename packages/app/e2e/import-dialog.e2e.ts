@@ -13,7 +13,8 @@ function parts(page: Page) {
     title: host.locator('dialog h2'),
     steps: host.locator('k-steps li'),
     body: host.locator('.step'),
-    status: host.locator('[role="status"]'),
+    // The dialog's own line; a step may have a status region of its own.
+    status: host.locator('span.visually-hidden[role="status"]'),
     cancel: host.locator('k-button[slot="footer-start"]'),
     back: host.locator('k-button[slot="footer-end"]').nth(0),
     next: host.locator('k-button[slot="footer-end"]').nth(1),

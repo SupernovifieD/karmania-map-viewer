@@ -3,8 +3,9 @@ import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
+import type { Units } from '@karmania/engine';
 import './findings.js';
-import { describeCrs, describeSource, epsgError } from './import-crs.js';
+import { describeCrs, describeSource, epsgError, summarizeCrs, UNIT_NAMES } from './import-crs.js';
 import type { CrsMode } from './import-crs.js';
 import type { ImportDraft } from './import-draft.js';
 import type { FileEntry } from './import-files.js';
@@ -14,12 +15,18 @@ function isMode(value: string): value is CrsMode {
   return value === 'detected' || value === 'epsg' || value === 'local';
 }
 
+const UNIT_OPTIONS: readonly SelectOption[] = (Object.entries(UNIT_NAMES) as [Units, string][]).map(
+  ([value, label]) => ({ value, label }),
+);
+
 /**
  * The wizard's coordinate system step. It says which coordinate system was found in or beside the file,
  * and where it came from (the file's own `crs` member, a `.prj` file next to it, or the default of
- * GeoJSON), and a person chooses what the coordinates are in: what was found, or an EPSG code that
- * they type. The code is shown as it was given. There is no name, kind or unit beside it, because the
- * kernel has no list of coordinate systems to look it up in.
+ * GeoJSON), and a person chooses what the coordinates are in: what was found, an EPSG code that they
+ * type, or a local grid, which is not tied to a place on the Earth (a mine grid) and has only its
+ * units. The code is shown as it was given. There is no name, kind or unit beside it, because the
+ * kernel has no list of coordinate systems to look it up in. A line at the end sums up what is chosen
+ * and where it came from.
  */
 export class KarmaniaCrsStep extends LitElement {
   static override properties = {
@@ -51,6 +58,21 @@ export class KarmaniaCrsStep extends LitElement {
         color: var(--k-info);
         flex: none;
         margin-top: var(--k-space-2);
+      }
+
+      .summary {
+        align-items: flex-start;
+        display: flex;
+        gap: var(--k-space-8);
+      }
+
+      .summary k-icon {
+        flex: none;
+        margin-top: var(--k-space-2);
+      }
+
+      .summary strong {
+        font-weight: var(--k-weight-medium);
       }
 
       /* The choice and what goes with it side by side, so that what goes with it appearing moves nothing. */
@@ -95,6 +117,7 @@ export class KarmaniaCrsStep extends LitElement {
         ? []
         : [{ value: 'detected', label: `The one found: ${describeCrs(found.crs)}` }]),
       { value: 'epsg', label: 'An EPSG code' },
+      { value: 'local', label: 'A local grid' },
     ];
     const about = findings.filter((finding) => finding.step === 'crs');
     return html`
@@ -140,9 +163,28 @@ export class KarmaniaCrsStep extends LitElement {
                   this.tell({ crs: { ...draft.crs, epsg: event.detail.value } });
                 }}
               ></k-input>`
-            : nothing
+            : draft.crs.mode === 'local'
+              ? html`<k-select
+                  label="Units of the grid"
+                  reserve
+                  .options=${UNIT_OPTIONS}
+                  .value=${draft.crs.units}
+                  @k-select-change=${(event: CustomEvent<SelectChange>) => {
+                    const { value } = event.detail;
+                    if (value === 'm' || value === 'ft' || value === 'us_ft') {
+                      this.tell({ crs: { ...draft.crs, units: value } });
+                    }
+                  }}
+                ></k-select>`
+              : nothing
         }
       </div>
+      <p class="summary" role="status">
+        <k-icon name=${draft.crs.mode === undefined ? 'circle-alert' : 'check'} size="16"></k-icon>
+        <span class="summary-text"
+          ><strong>Chosen:</strong> ${summarizeCrs(draft.crs, found, sidecar)}</span
+        >
+      </p>
     `;
   }
 }
