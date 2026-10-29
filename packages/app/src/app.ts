@@ -3,13 +3,22 @@ import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
 import './map-area.js';
 import './panel.js';
+import type { PanelChange } from './panel.js';
+import { browserStorage, loadPanelState, savePanelState } from './panel-state.js';
+import type { PanelState } from './panel-state.js';
 
 /**
  * The root of the app, `<karmania-app>`: the toolbar across the top (the name, and the Import
  * button), and under it the map area and the side panel, side by side. It fills the window and
  * never scrolls.
+ *
+ * It keeps whether the panel is folded away, and which tab is chosen, between visits.
  */
 export class KarmaniaApp extends LitElement {
+  static override properties = {
+    panel: { state: true },
+  };
+
   static override styles = [
     sharedStyles,
     css`
@@ -49,8 +58,20 @@ export class KarmaniaApp extends LitElement {
         min-height: 0;
         min-width: 0;
       }
+
+      .workspace[data-collapsed] {
+        grid-template-columns: minmax(0, 1fr) var(--k-panel-rail-width);
+      }
     `,
   ];
+
+  /** How the panel is: folded away or open, and the tab it is on. */
+  declare private panel: PanelState;
+
+  constructor() {
+    super();
+    this.panel = loadPanelState(browserStorage());
+  }
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -63,6 +84,12 @@ export class KarmaniaApp extends LitElement {
     window.removeEventListener('dragover', this.refuseStrayFiles);
     window.removeEventListener('drop', this.refuseStrayFiles);
   }
+
+  /** Does what a person asked of the panel, and keeps the panel that way. */
+  private readonly onPanelChange = (event: CustomEvent<PanelChange>): void => {
+    this.panel = { ...this.panel, ...event.detail };
+    savePanelState(browserStorage(), this.panel);
+  };
 
   /**
    * Files dropped anywhere but the map area do nothing. Left alone, the browser would open the file
@@ -83,9 +110,13 @@ export class KarmaniaApp extends LitElement {
         <h1 class="wordmark">Karmania</h1>
         ${kButton({ icon: 'upload', children: 'Import' })}
       </header>
-      <div class="workspace">
+      <div class="workspace" ?data-collapsed=${this.panel.collapsed}>
         <karmania-map-area></karmania-map-area>
-        <karmania-panel></karmania-panel>
+        <karmania-panel
+          .collapsed=${this.panel.collapsed}
+          .tab=${this.panel.tab}
+          @karmania-panel-change=${this.onPanelChange}
+        ></karmania-panel>
       </div>
     `;
   }

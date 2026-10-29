@@ -147,11 +147,12 @@ describe('the scales', () => {
     ]);
   });
 
-  it('the app shell has a toolbar of 48 and a side panel that starts 360 wide', () => {
-    expect([value('--k-toolbar-height'), value('--k-panel-width-default')]).toEqual([
-      '48px',
-      '360px',
-    ]);
+  it('the app shell has a toolbar of 48, and a side panel that starts 360 wide or is a rail of 40', () => {
+    expect([
+      value('--k-toolbar-height'),
+      value('--k-panel-width-default'),
+      value('--k-panel-rail-width'),
+    ]).toEqual(['48px', '360px', '40px']);
   });
 
   it('layers rise from base to tooltip', () => {

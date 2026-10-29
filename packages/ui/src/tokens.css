@@ -46,9 +46,11 @@
   --k-hit-target: 32px;
   --k-tab-height: 40px;
 
-  /* The app shell: the height of the toolbar, and how wide the side panel starts out. */
+  /* The app shell: the height of the toolbar, how wide the side panel starts out, and how wide
+     it is when it has been folded away into its rail of buttons. */
   --k-toolbar-height: 48px;
   --k-panel-width-default: 360px;
+  --k-panel-rail-width: 40px;
 
   /* The width of a control's border. Every variant of a control has one (it may be
      transparent), so they are all the same size. */

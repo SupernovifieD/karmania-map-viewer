@@ -43,6 +43,17 @@ describe('the properties of a button', () => {
     expect(kButton(opensNothing).values).toContain(undefined);
   });
 
+  it('can say what to do when the button is pressed, and need not', () => {
+    const press = (): void => undefined;
+    const withHandler: ButtonProps = { children: 'Import', onClick: press };
+    const iconAlone: ButtonProps = { icon: 'x', label: 'Close', onClick: press };
+    // @ts-expect-error a handler is a function, not a name
+    const notAFunction: ButtonProps = { children: 'Import', onClick: 'open' };
+    expect([withHandler, iconAlone, notAFunction]).toHaveLength(3);
+    expect(kButton(withHandler).values).toContain(press);
+    expect(kButton({ children: 'Import' }).values).not.toContain(press);
+  });
+
   it('make a template with what the button says', () => {
     expect(kButton({ children: 'Import' }).values).toContain('Import');
     expect(kButton({ icon: 'x', label: 'Close' }).values).toContain('Close');

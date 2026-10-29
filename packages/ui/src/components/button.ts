@@ -229,6 +229,8 @@ interface ButtonLook {
   readonly disabled?: boolean;
   /** Whether what the button opens is open. Leave it out for a button that opens nothing. */
   readonly expanded?: boolean;
+  /** What to do when the button is pressed, by click, Enter or Space. */
+  readonly onClick?: () => void;
 }
 
 /** A button that says what it does in words, and may have an icon beside them. */
@@ -262,6 +264,7 @@ export function kButton(props: ButtonProps): TemplateResult {
     label=${ifDefined(props.label)}
     ?disabled=${props.disabled ?? false}
     .expanded=${props.expanded}
+    @click=${props.onClick}
     >${props.children}</k-button
   >`;
 }

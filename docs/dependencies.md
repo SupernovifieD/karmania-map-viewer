@@ -27,7 +27,7 @@ Anything else needs the owner's approval first. That includes strong copyleft
 | @eslint/js (dev) | ^10.0.1 | MIT | ESLint's recommended rule set. | step 0.6 |
 | typescript-eslint (dev) | ^8.72.0 | MIT | Parser and the `strictTypeChecked` rule set (bans `any`, unsafe `unknown` use, floating promises, non-null assertions). | step 0.6 |
 | prettier (dev) | ^3.9.10 | MIT | Code formatting for TypeScript, JavaScript, JSON, YAML, CSS and HTML. | step 0.6 |
-| vitest (dev, `@karmania/engine`) | ^5.0.5 | MIT | TypeScript unit tests. | step 0.7 |
+| vitest (dev, `@karmania/engine`, `@karmania/ui`, `@karmania/app`) | ^5.0.5 | MIT | TypeScript unit tests. The UI package has used it since step 6.1, and the app since step 7.7, for the panel's state. | step 0.7 |
 | @types/node (dev, `@karmania/engine`) | ^24.19.2 | MIT | Node type declarations for the tests that load the built WebAssembly module in Node (pulls in `undici-types`, MIT). Referenced only from the test support file. | step 4.3b |
 | vite (dev, `@karmania/engine`) | ^8.3.5 | MIT | Required peer of vitest, and the app dev server and library builds later. Was 7.x from step 0.7 until step 0.13 (Vite 8 pulls in lightningcss, MPL-2.0, now accepted for dev-only tools). | step 0.7 |
 | lit (`@karmania/ui`, `@karmania/app`) | ^3.3.3 | BSD-3-Clause | The web component library the UI is built with: small, and its components work inside any host page. Brings `@lit/reactive-element`, `lit-element` and `lit-html` (all BSD-3-Clause), `@lit-labs/ssr-dom-shim` (BSD-3-Clause) and `@types/trusted-types` (MIT, types only). | step 6.1 |
