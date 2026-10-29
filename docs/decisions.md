@@ -1825,3 +1825,16 @@ was chosen, why.
   moves further through the rows the more rows there are. Checked in Chromium only: the project's
   browser tests run in it alone, so the limits of Firefox and Safari are taken from their documentation
   and not tried.
+- Step 9.9 (the columns that say what a row is). The engine puts them first in every page, as the
+  brief lists them, and the table draws the columns in the order it is given, so this step changed no
+  code: it fixes the result with a test for each kind, from the sample files (points, points without
+  heights, lines, polygons, a mesh, a grid and a block model), of the columns in order, how many rows,
+  the first row, and that these columns are numbers on the right. Four things that are as the engine
+  has them, and not as the brief's list reads: points without heights have no `Z`, a grid with one
+  layer has no `k`, a polygon's vertex count leaves out the closing position of each ring (which
+  GeoJSON repeats, so the sample's lease of 10 positions has 8), and a file that makes several datasets
+  shows each in its own table when it is chosen. The two kinds of column are not drawn differently:
+  the brief does not ask for it, their names say what they are, and a distinction would mark `X` and `Y`
+  of a points file, which a person chose, as if they were computed. The summary's "Columns" list is
+  the attributes only (as it was in 9.3), so for points with three attributes it says 3 above a table
+  of six; if that misleads, the list could be called "Attributes", which is for the owner to say.
