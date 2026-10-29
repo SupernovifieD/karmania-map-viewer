@@ -1,14 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertAligned, assertNoOverflow } from './support/layout.js';
-
-const fixture = (name: string): string =>
-  fileURLToPath(new URL(`../../../fixtures/${name}`, import.meta.url));
-
-type Pick = string | { name: string; mimeType: string; buffer: Buffer };
+import { pickFiles } from './support/picker.js';
+import type { Pick } from './support/picker.js';
 
 /** The parts of the File step. */
 function parts(page: Page) {
@@ -42,17 +37,12 @@ async function rect(locator: Locator) {
 
 /** Imports files the way a person does, and waits for the wizard to have read them. */
 async function importFiles(page: Page, ...picks: Pick[]): Promise<void> {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser', { timeout: 10_000 }),
-    page.locator('karmania-app header.toolbar k-button button').click(),
-  ]);
-  // Playwright takes paths or contents, not both in one call, so a sample file is read here.
-  await chooser.setFiles(
-    picks.map((pick) =>
-      typeof pick === 'string'
-        ? { name: pick, mimeType: 'text/plain', buffer: readFileSync(fixture(pick)) }
-        : pick,
-    ),
+  await pickFiles(
+    page,
+    async () => {
+      await page.locator('karmania-app header.toolbar k-button button').click();
+    },
+    picks,
   );
   await expect(parts(page).dialog).toBeVisible();
   await expect(parts(page).step).toBeVisible();

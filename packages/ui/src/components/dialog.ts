@@ -202,9 +202,13 @@ export class KDialog extends LitElement {
     }
   }
 
-  /** The dialog was closed. If a person did that, `open` is still set, and they are told. */
+  /**
+   * The dialog was closed. If a person did that, `open` is still set and the dialog is shut, and
+   * they are told. The browser sends this a moment after the dialog closes, so one that arrives
+   * after the dialog was opened again is the echo of an earlier close, and is not a person's.
+   */
   private readonly onNativeClose = (): void => {
-    if (this.open) {
+    if (this.open && this.dialog?.open === false) {
       this.open = false;
       this.dispatchEvent(new CustomEvent(DIALOG_CLOSE, { bubbles: true, composed: true }));
     }

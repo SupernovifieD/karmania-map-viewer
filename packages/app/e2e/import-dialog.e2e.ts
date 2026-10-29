@@ -1,8 +1,8 @@
-import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
+import { pickFiles } from './support/picker.js';
 
 /** The parts of the import dialog. */
 function parts(page: Page) {
@@ -29,17 +29,11 @@ async function rect(locator: Locator) {
   return box;
 }
 
-/** A sample file of the repository, by name. */
-const fixture = (name: string): string =>
-  fileURLToPath(new URL(`../../../fixtures/${name}`, import.meta.url));
-
 /** Opens the dialog as a person does: Import, and a file in the picker. Waits for the file to be read. */
 async function open(page: Page): Promise<void> {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser', { timeout: 10_000 }),
-    page.locator('karmania-app header.toolbar k-button button').click(),
-  ]);
-  await chooser.setFiles([fixture('points.csv')]);
+  await pickFiles(page, async () => {
+    await page.locator('karmania-app header.toolbar k-button button').click();
+  }, ['points.csv']);
   await expect(parts(page).dialog).toBeVisible();
   await expect(parts(page).host.locator('karmania-file-step')).toBeVisible();
 }

@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
+import { pickFiles } from './support/picker.js';
+import type { Sample } from './support/picker.js';
 
 const POINTS = { name: 'points.csv', mimeType: 'text/csv', buffer: Buffer.from('x,y\n1,2\n') };
 const PROJECTION = { name: 'points.prj', mimeType: 'text/plain', buffer: Buffer.from('PROJCS[]') };
@@ -39,16 +41,14 @@ function drop(target: Locator, kind: 'files' | 'text' = 'files'): Promise<boolea
 }
 
 /** Presses a button and chooses files in the picker that opens. */
-async function chooseWith(
-  page: Page,
-  button: Locator,
-  files: { name: string; mimeType: string; buffer: Buffer }[],
-) {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser', { timeout: 10_000 }),
-    button.click(),
-  ]);
-  await chooser.setFiles(files);
+async function chooseWith(page: Page, button: Locator, files: readonly Sample[]): Promise<void> {
+  await pickFiles(
+    page,
+    async () => {
+      await button.click();
+    },
+    files,
+  );
 }
 
 test.describe('opening the import wizard', () => {
@@ -147,11 +147,9 @@ test.describe('opening the import wizard', () => {
     // Pressing Enter does nothing useful if the button does not have the keyboard, and a test that
     // waited for a picker that never came would only say that it timed out.
     await expect(toolbarImport(page)).toBeFocused();
-    const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser', { timeout: 10_000 }),
-      page.keyboard.press('Enter'),
-    ]);
-    await chooser.setFiles([POINTS]);
+    await pickFiles(page, async () => {
+      await page.keyboard.press('Enter');
+    }, [POINTS]);
     await expect(dialog(page)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toBeHidden();

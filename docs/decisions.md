@@ -1464,7 +1464,17 @@ was chosen, why.
   no ring, instead of the browser's choice of the close button, whose tooltip opened at once when the
   dialog was opened with the keyboard; the first Tab goes to the first control. This was found by
   looking at the pictures of the step.
-- Two tests of the picker were seen to stall for a minute, twice among many runs, and not again in
-  more than 300 runs of the same tests on their own. They now check that the button has the keyboard
-  before pressing Enter, and wait for the picker for 10 seconds, so that a stall will say where it
-  was. The cause is not known.
+- CI (Linux) failed on four of the last pushes, which the same tests had passed on a Mac, and the
+  causes were three. (1) A race in `k-dialog`: the browser sends a dialog's `close` event a moment
+  after it closes, so a dialog closed and opened again at once (which a wizard that is cancelled and
+  reopened does) took the first close's echo for a person closing it, and shut. It now ignores a
+  `close` that arrives while the dialog is open; a test closes and reopens in one go, which is what
+  shows it, and was seen to fail without the fix. (2) A race in the tests: Playwright turns on its
+  hold on the file picker a moment after it is asked to, and a picker that opens before then is never
+  seen, which a quick key press does. Pressing Enter on the focused Import button did it in 5 of 80
+  runs of the old pattern, and 0 of 80 with a round trip to the page between asking for the picker
+  and pressing; every test that chooses files now goes through one helper (`support/picker.ts`) that
+  does that, and waits for the picker for 10 seconds, so that a stall says where it was. This was
+  also the stall seen twice on this Mac. (3) A test of the dialog read how often it had said it was
+  closed the moment the dialog was hidden, before the browser's event (fixed earlier, in `df38a18`).
+  Called flaky, the first was a real fault of the dialog and the other two were races in the tests.

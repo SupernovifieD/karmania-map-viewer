@@ -275,6 +275,33 @@ test.describe('the dialog', () => {
     await expect(p.close.locator('button')).toBeFocused();
   });
 
+  test('stays open when it is opened again straight after being closed, and says nothing', async ({
+    page,
+  }) => {
+    const p = parts(page, 'dialog-short');
+    await countCloses(page, 'dialog-short');
+    await p.trigger.click();
+    await expect(p.dialog).toBeVisible();
+    // Closed and opened again in one go, so that the browser's `close` event for the first is only
+    // sent afterwards, when the dialog is open once more: it must not be taken for a person closing it.
+    await p.host.evaluate(async (element) => {
+      const dialog = element as unknown as { open: boolean; updateComplete: Promise<boolean> };
+      dialog.open = false;
+      await dialog.updateComplete;
+      dialog.open = true;
+      await dialog.updateComplete;
+    });
+    expect(await closes(page)).toBe(0);
+    await expect(p.dialog).toBeVisible();
+    expect(await p.host.evaluate((element) => (element as unknown as { open: boolean }).open)).toBe(
+      true,
+    );
+    // And a person can still close it.
+    await page.keyboard.press('Escape');
+    await expect(p.dialog).toBeHidden();
+    expect(await closes(page)).toBe(1);
+  });
+
   test('keeps the keyboard inside while open', async ({ page }) => {
     const p = parts(page, 'dialog-short');
     await p.trigger.click();
