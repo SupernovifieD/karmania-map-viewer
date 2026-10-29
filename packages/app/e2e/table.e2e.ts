@@ -370,6 +370,212 @@ test.describe('the table', () => {
     expect(shown).toEqual(['# Row', 'quick']);
   });
 
+  test.describe('its columns', () => {
+    /** The widths of the columns of values, from the header. */
+    const widths = (p: ReturnType<typeof parts>): Promise<number[]> =>
+      p.headings.evaluateAll((all) =>
+        all.slice(1).map((heading) => heading.getBoundingClientRect().width),
+      );
+
+    /** Whether the words in a cell are cut off, which is when they are wider than the cell. */
+    const isCut = (locator: Locator): Promise<boolean> =>
+      locator.evaluate((element) => element.scrollWidth > element.clientWidth);
+
+    test('are as wide as the widest words in the first rows and the room round them, to a whole pixel', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-many');
+      await expect(p.rows.first()).toBeVisible();
+      const found = await p.viewport.evaluate((viewport) => {
+        // The words of the first 200 rows of a column, set as the table sets them, in a box of their own.
+        const natural = (texts: string[], weight: string): number => {
+          const probe = document.createElement('span');
+          probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font-weight: ${weight}`;
+          viewport.append(probe);
+          let widest = 0;
+          for (const text of texts) {
+            probe.textContent = text;
+            widest = Math.max(widest, probe.getBoundingClientRect().width);
+          }
+          probe.remove();
+          return widest;
+        };
+        const rows = Array.from({ length: 200 }, (_, index) => index + 1);
+        const regular = getComputedStyle(viewport).fontWeight;
+        const columns = [
+          { header: 'id', texts: rows.map(String) },
+          { header: 'easting', texts: rows.map((row) => String(500_000 + (row - 1) * 0.5)) },
+          { header: 'label', texts: rows.map((row) => `Feature ${String(row)}`) },
+          { header: 'inside', texts: rows.map((row) => String((row - 1) % 2)) },
+        ];
+        return columns.map(({ header, texts }) => {
+          const widest = Math.max(natural([header], '500'), natural(texts, regular));
+          return Math.min(320, Math.max(72, Math.ceil(widest) + 16));
+        });
+      });
+      const actual = (await widths(p)).slice(0, 4);
+      // A pixel either way, for the difference between measuring words one by one and drawing them.
+      actual.forEach((width, index) => {
+        expect(
+          Math.abs(width - (found[index] ?? 0)),
+          `column ${String(index + 1)}`,
+        ).toBeLessThanOrEqual(1);
+        expect(Number.isInteger(width)).toBe(true);
+      });
+    });
+
+    test('do not cut off any of the words they were measured from', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await expect(p.rows.first()).toBeVisible();
+      const cells = p.demo.locator(
+        '.rows [role="gridcell"], .rows [role="rowheader"], .header .cell',
+      );
+      const total = await cells.count();
+      for (let index = 0; index < total; index += 1) {
+        expect(await isCut(cells.nth(index)), `cell ${String(index)}`).toBe(false);
+      }
+      await expect(p.demo.locator('[title]')).toHaveCount(0);
+    });
+
+    test('are between 72 and 320 wide, however little or much is in them', async ({ page }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      const [n, description, header, amount, later] = await widths(p);
+      expect(n).toBe(72);
+      expect(description).toBe(320);
+      expect(header).toBe(320);
+      expect(amount).toBeGreaterThan(72);
+      expect(amount).toBeLessThan(320);
+      // Short for the first 200 rows, which are all that is looked at.
+      expect(later).toBeLessThan(120);
+    });
+
+    test('end words that do not fit in an ellipsis, and say them in full in the title', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      const row = p.rows.first();
+      const description = row.locator('[role="gridcell"]').nth(1);
+      const style = await description.evaluate((element) => {
+        const computed = getComputedStyle(element);
+        return [computed.textOverflow, computed.whiteSpace, computed.overflow];
+      });
+      expect(style).toEqual(['ellipsis', 'nowrap', 'hidden']);
+      expect(await isCut(description)).toBe(true);
+      await expect(description).toHaveAttribute(
+        'title',
+        /^A description that goes on and on.*, row 1$/,
+      );
+      // The words are all in the page for a screen reader, and the title says them again in full.
+      await expect(description).toHaveText(/row 1$/);
+      // The header that is too long says its name in full too.
+      const heading = p.headings.nth(3);
+      expect(await isCut(heading)).toBe(true);
+      await expect(heading).toHaveAttribute(
+        'title',
+        /^A header that is far longer than anything under it/,
+      );
+    });
+
+    test('give no title to words that fit, and a title to those that do not, past the first 200 rows', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      const later = (row: number) =>
+        p.rows
+          .filter({
+            has: page.locator(`[role="rowheader"]`, {
+              hasText: new RegExp(`^\\s*${String(row)}\\s*$`),
+            }),
+          })
+          .locator('[role="gridcell"]')
+          .nth(4);
+      await expect(later(1)).not.toHaveAttribute('title', /.*/);
+      await scrollTo(p.viewport, 0, 28 * 500);
+      await expect(later(501)).toHaveAttribute(
+        'title',
+        'much longer than the first two hundred rows were',
+      );
+      expect(await isCut(later(501))).toBe(true);
+    });
+
+    test('keep their widths while the table is scrolled', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await expect(p.rows.first()).toBeVisible();
+      const before = await widths(p);
+      await scrollTo(p.viewport, 0, 28 * 99_000);
+      await expect.poll(async () => (await drawn(p.numbers)).includes(99_001)).toBe(true);
+      expect(await widths(p)).toEqual(before);
+      // The rows are as wide as the header, so that the columns line up.
+      const lefts = await p.demo.evaluate((demo) => {
+        const header = [...demo.querySelectorAll('.header .cell')].map(
+          (cell) => cell.getBoundingClientRect().left,
+        );
+        const row = [...(demo.querySelector('.rows .row')?.children ?? [])].map(
+          (cell) => cell.getBoundingClientRect().left,
+        );
+        return { header, row };
+      });
+      expect(lefts.row).toEqual(lefts.header);
+    });
+
+    test('have room in the row numbers for the number of the last row', async ({ page }) => {
+      const p = parts(page, 'table-many');
+      await expect(p.rows.first()).toBeVisible();
+      await scrollTo(p.viewport, 0, 1e9);
+      await expect.poll(async () => (await drawn(p.numbers)).at(-1)).toBe(100_000);
+      expect(await isCut(p.numbers.last())).toBe(false);
+      const width = (await rect(p.numbers.last())).width;
+      // Six digits, the room round them and the line at the right: no wider than that by much.
+      expect(width).toBeGreaterThan(6 * 6 + 17);
+      expect(width).toBeLessThan(6 * 10 + 18);
+    });
+
+    test('scroll sideways inside the table when they are wider than the room', async ({ page }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      const sizes = await p.viewport.evaluate((element) => [
+        element.clientWidth,
+        element.scrollWidth,
+      ]);
+      expect(sizes[1]).toBeGreaterThan((sizes[0] ?? 0) + 100);
+      // The widths are the same however wide the table's room is.
+      const before = await widths(p);
+      await p.demo.evaluate((element) => {
+        element.style.width = '300px';
+      });
+      expect(await widths(p)).toEqual(before);
+    });
+
+    test('are laid out again for other rows', async ({ page }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      await p.host.evaluate((element) => {
+        const table = element as unknown as { fetch: unknown; rowCount: number };
+        table.fetch = (start: number, count: number) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'only',
+                values: Array.from(
+                  { length: count },
+                  () => 'a considerably longer value than any before it',
+                ),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+      });
+      await expect(p.headings).toHaveText(['# Row', 'only']);
+      const [only] = await widths(p);
+      expect(only).toBeGreaterThan(200);
+    });
+  });
+
   for (const theme of ['light', 'dark'] as const) {
     test(`has no serious accessibility violations (${theme} theme)`, async ({ page }) => {
       await page.goto(`/gallery.html?theme=${theme}`);

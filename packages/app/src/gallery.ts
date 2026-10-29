@@ -196,6 +196,10 @@ export class KarmaniaGallery extends LitElement {
         width: var(--k-panel-width-default);
       }
 
+      .table-demo.wide {
+        width: calc(var(--k-space-48) * 12);
+      }
+
       .grid {
         display: grid;
         gap: var(--k-space-16) var(--k-space-24);
