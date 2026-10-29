@@ -1381,3 +1381,15 @@ was chosen, why.
   interactive: going back is done with Back, and a finding sends a person to its step in 8.10. The
   overflow check used by the tests now lets text hidden from the eye and kept for screen readers
   (a box of a pixel, cut away by `clip-path`) be bigger than its box, as it is meant to be.
+- Step 8.1 (the wizard's frame): `karmania-import-dialog` puts `k-dialog`, `k-steps` and the footer
+  together: Cancel (ghost) on the left, Back (secondary) and Next (primary) on the right. It owns the
+  step a person is on and starts at File every time it is opened. Moving between steps leaves the
+  keyboard on the button that was pressed, so that Enter can be pressed again; where a person is, is
+  said to screen readers by a status line that is not drawn ("Step 2 of 5: Mapping"), because
+  moving focus to each step's heading would cost extra Tab presses. The body of every step says that
+  it is not built yet, and Load, the last step's button, is there but disabled: nothing has been
+  prepared to load. Both go in 8.3 to 8.11. Nothing opens the dialog yet (8.2 wires the buttons), so
+  its tests open it by setting `open`. The pictures of the wizard are 8.14's, when it has content.
+- The tests that count how often a dialog said it was closed wait a moment before reading the count:
+  a dialog is hidden before the browser sends its `close` event, so a test that read the count the
+  moment the dialog was hidden could, and once nearly did, read it too early.

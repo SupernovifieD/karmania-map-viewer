@@ -49,8 +49,19 @@ function countCloses(page: Page, id: string): Promise<void> {
   });
 }
 
+/**
+ * How many times the dialog has said it was closed. A dialog is hidden before the browser sends its
+ * `close` event, so a moment is left for that to be heard first.
+ */
 const closes = (page: Page): Promise<number> =>
-  page.evaluate(() => (window as unknown as { closes: number }).closes);
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        setTimeout(() => {
+          resolve((window as unknown as { closes: number }).closes);
+        }, 50);
+      }),
+  );
 
 test.describe('the dialog', () => {
   test.beforeEach(async ({ page }) => {

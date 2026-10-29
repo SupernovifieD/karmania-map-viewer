@@ -4,7 +4,7 @@ import { expectNoSeriousViolations } from './support/axe.js';
 import { inEveryLayout } from './support/layouts.js';
 import { assertAligned, assertNoOverflow, assertNoOverlap, boxOf } from './support/layout.js';
 
-const toolbar = (page: Page) => page.locator('karmania-app header');
+const toolbar = (page: Page) => page.locator('karmania-app header.toolbar');
 const wordmark = (page: Page) => toolbar(page).getByRole('heading', { name: 'Karmania' });
 const importButton = (page: Page) => toolbar(page).locator('k-button');
 

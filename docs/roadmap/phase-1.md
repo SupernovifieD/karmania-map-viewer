@@ -356,7 +356,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 ## M8: Import wizard
 
-- [ ] 8.1 Dialog frame: header, step indicator, scrolling body, footer layout
+- [x] 8.1 Dialog frame: header, step indicator, scrolling body, footer layout
   per section 7.2; focus handling; Esc.
 - [ ] 8.2 Wire the Import button and map-area drop to open the wizard with the
   selected files.

@@ -117,16 +117,6 @@ export class KSteps extends LitElement {
         color: var(--k-text);
         font-weight: var(--k-weight-medium);
       }
-
-      .visually-hidden {
-        clip-path: inset(50%);
-        height: var(--k-border-width);
-        margin: calc(var(--k-border-width) * -1);
-        overflow: hidden;
-        position: absolute;
-        white-space: nowrap;
-        width: var(--k-border-width);
-      }
     `,
   ];
 

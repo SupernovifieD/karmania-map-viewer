@@ -167,7 +167,7 @@ test.describe('the drop zone', () => {
   }) => {
     await page.goto('/');
     const elsewhere = [
-      page.locator('karmania-app header'),
+      page.locator('karmania-app header.toolbar'),
       page.locator('karmania-panel'),
       page.locator('karmania-app'),
     ];
