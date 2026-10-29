@@ -224,6 +224,7 @@ const SHOTS: Shot[] = [
     await page.keyboard.press('Shift');
     await dialog.locator('header k-button').focus();
   }),
+  dialogShot('dialog-note', 'dialog-note'),
   dialogShot('dialog-long', 'dialog-long'),
   dialogShot('dialog-long-scrolled', 'dialog-long', async (_page, dialog) => {
     await dialog.locator('.body').evaluate((element) => {

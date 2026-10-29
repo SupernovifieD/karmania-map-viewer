@@ -12,6 +12,9 @@ function openNeighbour(event: Event): void {
 const SENTENCE =
   'A paragraph of text that is long enough to take a few lines, so that the body of the dialog has something to fill and, when there is a lot of it, something to scroll.';
 
+const NOTE =
+  'Choose a column for X, and one for Y, before going on. A note that is a good deal longer than two lines of the room it has between the buttons is cut short.';
+
 /** Dialogs: a short one with no steps, and a tall one that is too much for the window. */
 export function dialogSection() {
   return html`
@@ -27,6 +30,16 @@ export function dialogSection() {
             <k-button slot="footer-start" variant="ghost">Cancel</k-button>
             <k-button slot="footer-end">Back</k-button>
             <k-button slot="footer-end" variant="primary">Next</k-button>
+          </k-dialog>
+        </div>
+        <div id="dialog-note" class="dialog-demo">
+          <k-button @click=${openNeighbour}>Open a dialog with a note</k-button>
+          <k-dialog heading="Import data">
+            <p>The note in the footer says why Next cannot be used.</p>
+            <k-button slot="footer-start" variant="ghost">Cancel</k-button>
+            <span slot="footer-note" title=${NOTE}>${NOTE}</span>
+            <k-button slot="footer-end" disabled>Back</k-button>
+            <k-button slot="footer-end" variant="primary" disabled>Next</k-button>
           </k-dialog>
         </div>
         <div id="dialog-long" class="dialog-demo">
