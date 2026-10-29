@@ -25,6 +25,9 @@ describe('the draft for a file', () => {
       kind: 'lines',
       columns: [],
       blockSize: { x: '', y: '', z: '' },
+      nodata: { tokens: [], numbers: [], other: '' },
+      emptyCoordinates: 'error',
+      decimalSeparator: '.',
     });
   });
 

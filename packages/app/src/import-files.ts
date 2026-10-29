@@ -114,6 +114,16 @@ export const NO_COLUMNS_NOTE: Readonly<Record<Format, string>> = {
   prj: '',
 };
 
+/** What the Nodata step says about a format that has no values to set as meaning "no data". */
+export const NO_NODATA_NOTE: Readonly<Record<Format, string>> = {
+  csv: '',
+  geojson: 'A GeoJSON file has no values that mean "no data" to set: a null is a null.',
+  ascii_grid:
+    'An ESRI ASCII grid says in its header which value means "no data", and that value is used.',
+  obj: 'An OBJ file has no values that mean "no data" to set.',
+  prj: '',
+};
+
 /** How many, written for people: `1,203`, grouped by thousands with a comma. */
 export function formatCount(count: number): string {
   return count.toLocaleString('en-US');
