@@ -83,6 +83,7 @@ const COLORS = [
   '--k-danger',
   '--k-warning',
   '--k-info',
+  '--k-scrim',
 ] as const;
 
 const light = new Map(COLORS.map((name) => [name, root.get(name) ?? '']));
