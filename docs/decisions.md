@@ -1297,3 +1297,25 @@ was chosen, why.
   a button that had keyboard focus and is then clicked with the mouse hands its `:focus-visible` to
   the button that replaces it, so that button's tooltip stays until focus moves on. `kButton` takes
   an `onClick` now.
+- Step 7.8 (resize handle): the handle is its own element, `karmania-resize-handle`, laid over
+  the edge of the panel by the app (a sibling of the map area and the panel, which neither knows
+  about it), and the app keeps the width with the rest of the panel's state. The handle only asks
+  for a width (`karmania-resize`); the app limits it (280 up to the least of half the window and
+  640, whole pixels), keeps it, and tells the handle the width, the limits and the usual width
+  back, which is what its `aria-value` attributes say. The strip is 6 wide: 3 either side of the
+  panel's outer edge, which puts the 1 px border on the panel's side (a strip centred on the
+  middle of a 1 px border would be on half pixels). The line is 2 wide and sits on the edge, one
+  pixel over the map and one over the border. It shows for the pointer over it, for keyboard focus
+  and while it is dragged, and it is the focus indicator, so the default outline is off; a click
+  focuses the handle without showing it. A drag moves the edge to follow the pointer exactly, by
+  how far the pointer has moved since it was pressed (so that grabbing the strip off-centre does
+  not make the panel jump); Left widens, since the edge moves left, and Right narrows, by 16; Home
+  and End are the narrowest and the widest; a double click is 360. The window is followed: the
+  width that was asked for is what is kept, and the width the panel has is that, limited by the
+  window as it is now, so a panel made wide in a big window is narrower in a small one and wide
+  again when the big window returns. The usual width is in two places, the token for the style
+  sheets and `PANEL_WIDTH.default` for the code; the browser test checks that the token says what
+  the code starts at. Dragging selects no text in Chromium whatever the handle's CSS says, so the
+  `user-select: none` on the handle is for the browsers that are not tested; I mutated it away to
+  see, and no test failed. In the Tab order the handle is after the map area's Import button and
+  before the panel's tabs, as it is on the screen. It is not there when the panel is folded away.

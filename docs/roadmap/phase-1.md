@@ -349,7 +349,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 7.6 Panel header with Legend and Data tabs; Legend empty state.
 - [x] 7.7 Collapse to rail and expand; rail buttons open the right tab;
   persistence; keyboard; aria-expanded.
-- [ ] 7.8 Panel resize handle (pointer, keyboard, double-click reset, clamping,
+- [x] 7.8 Panel resize handle (pointer, keyboard, double-click reset, clamping,
   persistence).
 - [ ] 7.9 Shell screenshot baselines (expanded, collapsed, both themes, three
   viewports), reviewed and committed.
