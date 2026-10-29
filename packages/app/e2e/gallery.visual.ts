@@ -141,6 +141,14 @@ const SHOTS: Shot[] = [
       return [target];
     },
   },
+  ...['action-tabs', 'crowded-action-tabs'].map((id): Shot => ({
+    name: id === 'action-tabs' ? 'tabs-actions' : 'tabs-actions-crowded',
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #${id}`);
+      await reveal(target);
+      return [target];
+    },
+  })),
   tooltipShot('tooltip-icon', 'tip-icon', 'hover'),
   tooltipShot('tooltip-describes', 'tip-describes', 'focus'),
   tooltipShot('tooltip-long', 'tip-long', 'hover'),

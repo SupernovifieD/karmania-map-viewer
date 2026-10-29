@@ -1236,3 +1236,13 @@ was chosen, why.
   drag from outside the page, so the tests fire the drag events; the browser keeps `dropEffect`
   at `none` for a `DataTransfer` that was not made by a real drag, so those tests record what
   the page sets it to instead. How the pointer looks during a real drag is not tested.
+- Before step 7.6 (`k-tabs`): the side panel needs its collapse button on the same row as the
+  tabs, and a body that fills the rest of the panel and scrolls, and `k-tabs` could do neither.
+  It now has a slot `actions` at the far end of the row (a tab can therefore not be called
+  `actions`, which throws like the other mistakes in the page), the row gives way to it by
+  cutting tab labels short, and the element is a column, so that given a height it gives the
+  chosen panel what the row leaves; what is in the panel can scroll in that. Without a height it
+  is as it was, and the 25 existing screenshot states are unchanged to the pixel. The row has no
+  padding of its own and exposes itself as `part="header"` so that a page can give it some, as the
+  panel will (a part, not a property, since the space is the page's business). The new gallery
+  demos have their own tab names so that the existing tests' locators stay unambiguous.

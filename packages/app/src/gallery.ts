@@ -95,6 +95,27 @@ export class KarmaniaGallery extends LitElement {
         max-width: calc(var(--k-space-48) * 8);
       }
 
+      /* A set height, which the panels of the tabs share out; the row is laid out as in the side
+         panel, with a little room at either end. */
+      .tall-tabs {
+        height: calc(var(--k-space-48) * 5);
+      }
+
+      .tall-tabs k-tabs {
+        height: 100%;
+      }
+
+      .with-action k-tabs::part(header) {
+        padding: 0 var(--k-space-8) 0 var(--k-space-4);
+      }
+
+      .scroll-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: var(--k-space-16);
+      }
+
       .narrow-tabs {
         width: calc(var(--k-space-48) * 4);
       }
