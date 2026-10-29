@@ -1,8 +1,10 @@
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
+import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import './import-dialog.js';
 import './map-area.js';
+import type { DroppedFiles } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -21,6 +23,9 @@ import type { ResizeRequest } from './resize-handle.js';
  * The root of the app, `<karmania-app>`: the toolbar across the top (the name, and the Import
  * button), and under it the map area and the side panel, side by side. It fills the window and
  * never scrolls.
+ *
+ * Files come in by the Import buttons (the toolbar's, and the map area's), which open the browser's
+ * file picker, and by being dropped on the map area. Either way the import wizard opens with them.
  *
  * It keeps whether the panel is folded away, which tab is chosen and how wide the panel is between
  * visits. The width is limited by the window, and follows it: a panel that was made wide does not
@@ -118,6 +123,30 @@ export class KarmaniaApp extends LitElement {
     this.viewportWidth = document.documentElement.clientWidth;
   };
 
+  /** Opens the file picker, which is an input that is not shown. */
+  private readonly chooseFiles = (): void => {
+    this.renderRoot.querySelector('input')?.click();
+  };
+
+  /** Opens the wizard with what was chosen in the picker, and clears the input so that the same file can be chosen again. */
+  private readonly onFilesChosen = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = '';
+    this.importFiles(files);
+  };
+
+  private readonly onFilesDropped = (event: CustomEvent<DroppedFiles>): void => {
+    this.importFiles(event.detail.files);
+  };
+
+  /** Opens the import wizard on `files`, if there are any. */
+  private importFiles(files: readonly File[]): void {
+    if (files.length > 0) {
+      this.renderRoot.querySelector('karmania-import-dialog')?.show(files);
+    }
+  }
+
   /** Does what a person asked of the panel, and keeps the panel that way. */
   private readonly onPanelChange = (event: CustomEvent<PanelChange>): void => {
     this.panel = { ...this.panel, ...event.detail };
@@ -150,14 +179,17 @@ export class KarmaniaApp extends LitElement {
     return html`
       <header class="toolbar">
         <h1 class="wordmark">Karmania</h1>
-        ${kButton({ icon: 'upload', children: 'Import' })}
+        ${kButton({ icon: 'upload', children: 'Import', onClick: this.chooseFiles })}
       </header>
       <div
         class="workspace"
         ?data-collapsed=${this.panel.collapsed}
         style=${`--k-panel-width: ${String(width)}px`}
       >
-        <karmania-map-area></karmania-map-area>
+        <karmania-map-area
+          @karmania-import-request=${this.chooseFiles}
+          @karmania-files-dropped=${this.onFilesDropped}
+        ></karmania-map-area>
         ${
           this.panel.collapsed
             ? nothing
@@ -175,6 +207,14 @@ export class KarmaniaApp extends LitElement {
           @karmania-panel-change=${this.onPanelChange}
         ></karmania-panel>
       </div>
+      <input
+        type="file"
+        multiple
+        hidden
+        accept=${IMPORT_FILE_ACCEPT}
+        aria-label="Choose files to import"
+        @change=${this.onFilesChosen}
+      />
       <karmania-import-dialog></karmania-import-dialog>
     `;
   }

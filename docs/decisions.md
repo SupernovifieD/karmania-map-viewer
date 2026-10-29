@@ -1393,3 +1393,17 @@ was chosen, why.
 - The tests that count how often a dialog said it was closed wait a moment before reading the count:
   a dialog is hidden before the browser sends its `close` event, so a test that read the count the
   moment the dialog was hidden could, and once nearly did, read it too early.
+- Step 8.2 (opening the wizard): both Import buttons open the browser's file picker, which is an
+  `<input type="file" multiple>` that is not shown (it is labelled, and out of the Tab order, so the
+  keyboard never stops at it); a drop on the map area opens the wizard with the files as well. The
+  map area does not decide what happens: it sends `karmania-import-request` for its button and
+  `karmania-files-dropped` with the files for a drop, and the app opens the wizard (`show(files)`,
+  which starts it on its first step). The picker offers the extensions the kernel reads, and `.txt`,
+  which delimited text often has; a person can still choose any file, and the wizard is where an
+  unreadable one is explained. The input is emptied once its files are taken, because a browser
+  sends no `change` for a file chosen again while it is still the input's value; Playwright does,
+  so the test checks that the input is empty, and it was seen to fail without. Closing the wizard
+  forgets its files. A drop of anything but files, or of files anywhere but the map area, does
+  nothing, as before.
+- A test that looks for "the header" of the app now finds two, since the wizard has one: the tests
+  of the toolbar ask for `header.toolbar`.

@@ -2,6 +2,17 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
 
+/** The name of the event the map area sends when a person asks to import files with its button. */
+export const IMPORT_REQUEST = 'karmania-import-request';
+
+/** The name of the event the map area sends when files have been dropped on it. */
+export const FILES_DROPPED = 'karmania-files-dropped';
+
+/** The files that were dropped. */
+export interface DroppedFiles {
+  readonly files: readonly File[];
+}
+
 /**
  * The map area. Nothing is drawn in phase 1: it says so, with an empty state in the middle. With
  * no data it invites people to drop files or import them; once datasets are loaded (`datasets`)
@@ -9,7 +20,9 @@ import { carriesFiles } from './drag.js';
  *
  * Files can be dropped on it. While some are being dragged over it, an outline and a label
  * (`Drop to import`) are shown inside its edges. They are laid over the area without being part of
- * its layout, so showing them moves and resizes nothing.
+ * its layout, so showing them moves and resizes nothing. A drop sends `karmania-files-dropped` with
+ * the files, and its Import button sends `karmania-import-request`: what to do about either is up
+ * to the app.
  */
 export class KarmaniaMapArea extends LitElement {
   static override properties = {
@@ -129,14 +142,31 @@ export class KarmaniaMapArea extends LitElement {
       event.preventDefault();
       this.depth = 0;
       this.dragging = false;
+      // The files are only there while the event is being handled.
+      const files = [...(event.dataTransfer?.files ?? [])];
+      if (files.length > 0) {
+        this.dispatchEvent(
+          new CustomEvent<DroppedFiles>(FILES_DROPPED, {
+            detail: { files },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      }
     }
+  };
+
+  private readonly onImport = (): void => {
+    this.dispatchEvent(new CustomEvent(IMPORT_REQUEST, { bubbles: true, composed: true }));
   };
 
   private empty() {
     return html`
       <k-empty-state icon="map" heading="No data yet">
         Drop files here or use Import
-        <span slot="action">${kButton({ icon: 'upload', children: 'Import' })}</span>
+        <span slot="action"
+          >${kButton({ icon: 'upload', children: 'Import', onClick: this.onImport })}</span
+        >
       </k-empty-state>
     `;
   }
@@ -156,5 +186,10 @@ customElements.define('karmania-map-area', KarmaniaMapArea);
 declare global {
   interface HTMLElementTagNameMap {
     'karmania-map-area': KarmaniaMapArea;
+  }
+
+  interface HTMLElementEventMap {
+    [IMPORT_REQUEST]: CustomEvent;
+    [FILES_DROPPED]: CustomEvent<DroppedFiles>;
   }
 }
