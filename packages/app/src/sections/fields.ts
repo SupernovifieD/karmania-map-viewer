@@ -91,6 +91,27 @@ export function fieldsSection() {
           <k-input label="Rename the column Easting" hide-label size="28" value="Easting"></k-input>
         </div>
       </div>
+      <h2>Progress</h2>
+      <div class="fields" id="fields-progress">
+        <div class="field-demo wide-field" id="progress-start">
+          <k-progress label="Reading the file" value="0"></k-progress>
+        </div>
+        <div class="field-demo wide-field" id="progress-half">
+          <k-progress label="Reading the file" value="0.42"></k-progress>
+        </div>
+        <div class="field-demo wide-field" id="progress-done">
+          <k-progress label="Checking the data" value="1"></k-progress>
+        </div>
+        <div class="field-demo wide-field" id="progress-unknown">
+          <k-progress label="Starting"></k-progress>
+        </div>
+        <div class="field-demo narrow-field" id="progress-long">
+          <k-progress
+            label="A label that is a good deal longer than the room it has, with a_very_long_unbroken_word_in_it"
+            value="0.5"
+          ></k-progress>
+        </div>
+      </div>
       <h2>Checkbox</h2>
       <div class="fields" id="fields-checkbox">
         <div class="field-demo" id="check-off"><k-checkbox>NA</k-checkbox></div>

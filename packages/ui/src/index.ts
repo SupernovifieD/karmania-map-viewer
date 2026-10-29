@@ -24,3 +24,4 @@ export { KSelect, SELECT_CHANGE } from './components/select.js';
 export type { SelectChange, SelectOption } from './components/select.js';
 export { CHECKBOX_CHANGE, KCheckbox } from './components/checkbox.js';
 export type { CheckboxChange } from './components/checkbox.js';
+export { KProgress } from './components/progress.js';

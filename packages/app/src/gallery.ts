@@ -165,6 +165,10 @@ export class KarmaniaGallery extends LitElement {
         width: calc(var(--k-space-48) * 5);
       }
 
+      .field-demo.wide-field {
+        width: calc(var(--k-space-48) * 7);
+      }
+
       .field-demo.narrow-field {
         width: calc(var(--k-space-48) * 3);
       }
