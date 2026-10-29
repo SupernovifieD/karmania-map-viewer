@@ -1,5 +1,6 @@
 import { KINDS } from '@karmania/engine';
-import type { Delimiter, Format, Kind, Preview, PreviewGroup } from '@karmania/engine';
+import type { Delimiter, Format, Kind, Preview, PreviewGroup, Summary } from '@karmania/engine';
+import type { IconName } from '@karmania/ui';
 
 /**
  * The kinds of file the file picker offers first: the extensions the kernel reads (the `.prj` of a
@@ -88,6 +89,32 @@ export const KINDS_BY_FORMAT: Readonly<Record<Format, readonly Kind[]>> = {
   obj: ['mesh'],
   prj: [],
 };
+
+/** The icon of each kind. */
+export const KIND_ICONS: Readonly<Record<Kind, IconName>> = {
+  points: 'map-pin',
+  lines: 'spline',
+  polygons: 'pentagon',
+  mesh: 'triangle',
+  grid: 'grid-3x3',
+  blocks: 'box',
+};
+
+/** What one element of each kind is called, and what many are: a point, points. */
+const ELEMENT_NOUNS: Readonly<Record<Kind, readonly [string, string]>> = {
+  points: ['point', 'points'],
+  lines: ['line', 'lines'],
+  polygons: ['polygon', 'polygons'],
+  mesh: ['triangle', 'triangles'],
+  grid: ['cell', 'cells'],
+  blocks: ['block', 'blocks'],
+};
+
+/** How much a dataset has, in words: `1,203 points`, `1 cell`. */
+export function describeSize(summary: Summary): string {
+  const [one, many] = ELEMENT_NOUNS[summary.kind];
+  return `${formatCount(summary.elementCount)} ${summary.elementCount === 1 ? one : many}`;
+}
 
 /** Whether some text, from a select say, is the name of a kind. */
 export function isKind(value: string): value is Kind {

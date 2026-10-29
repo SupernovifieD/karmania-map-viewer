@@ -1,8 +1,17 @@
 import type { Finding, Severity } from '@karmania/engine';
-import { sharedStyles } from '@karmania/ui';
+import { kButton, sharedStyles } from '@karmania/ui';
 import type { IconName } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { describeOccurrences, SEVERITY_NAMES } from './findings-text.js';
+import { IMPORT_STEPS } from './import-steps.js';
+
+/** The name of the event a finding's link sends: a person asked to go to the step that can fix it. */
+export const GO_TO_STEP = 'karmania-go-step';
+
+/** Where a person asked to go. */
+export interface GoToStep {
+  readonly step: string;
+}
 
 /** The icon of each severity: they differ by shape, not only by colour. */
 const SEVERITY_ICONS: Readonly<Record<Severity, IconName>> = {
@@ -20,6 +29,7 @@ const SEVERITY_ICONS: Readonly<Record<Severity, IconName>> = {
 export class KarmaniaFindings extends LitElement {
   static override properties = {
     findings: { attribute: false },
+    stepLinks: { type: Boolean },
   };
 
   static override styles = [
@@ -75,6 +85,10 @@ export class KarmaniaFindings extends LitElement {
         position: relative;
       }
 
+      .link {
+        margin-top: var(--k-space-8);
+      }
+
       .hint,
       .occurrences {
         color: var(--k-text-muted);
@@ -86,10 +100,38 @@ export class KarmaniaFindings extends LitElement {
 
   /** What was found, in the order to show it. */
   declare findings: readonly Finding[];
+  /** Whether a finding that a step can fix has a link to that step. */
+  declare stepLinks: boolean;
 
   constructor() {
     super();
     this.findings = [];
+    this.stepLinks = false;
+  }
+
+  /** The link to the step that can fix a finding, if it has one and links are wanted. */
+  private link(finding: Finding) {
+    const step = finding.step;
+    const label = IMPORT_STEPS.find((known) => known.id === step)?.label;
+    if (!this.stepLinks || step === undefined || label === undefined) {
+      return nothing;
+    }
+    return html`<div class="link">
+      ${kButton({
+        children: `Fix in the ${label} step`,
+        variant: 'secondary',
+        size: 28,
+        onClick: () => {
+          this.dispatchEvent(
+            new CustomEvent<GoToStep>(GO_TO_STEP, {
+              detail: { step },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        },
+      })}
+    </div>`;
   }
 
   override render() {
@@ -114,6 +156,7 @@ export class KarmaniaFindings extends LitElement {
                     ? nothing
                     : html`<div class="occurrences">${occurrences}</div>`
                 }
+                ${this.link(finding)}
               </div>
             </li>
           `;
@@ -128,5 +171,9 @@ customElements.define('karmania-findings', KarmaniaFindings);
 declare global {
   interface HTMLElementTagNameMap {
     'karmania-findings': KarmaniaFindings;
+  }
+
+  interface HTMLElementEventMap {
+    [GO_TO_STEP]: CustomEvent<GoToStep>;
   }
 }

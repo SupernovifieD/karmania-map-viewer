@@ -120,10 +120,10 @@ test.describe('the import dialog', () => {
         await p.next.click();
       }
     }
-    // On the last step the button that goes on is Load, which has nothing to load yet.
+    // On the last step the button that goes on is Load, once the import is done: the file has warnings.
     await expect(p.status).toHaveText('Step 5 of 5: Review');
-    await expect(p.next).toHaveText('Load');
-    await expect(p.next.locator('button')).toBeDisabled();
+    await expect(p.next).toHaveText(/^Load/);
+    await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.back.locator('button')).toBeEnabled();
     await p.back.click();
     await expect(p.body).toHaveAttribute('data-step', 'crs');
