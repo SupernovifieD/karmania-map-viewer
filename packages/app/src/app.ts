@@ -238,6 +238,8 @@ export class KarmaniaApp extends LitElement {
         <karmania-panel
           .collapsed=${this.panel.collapsed}
           .tab=${this.panel.tab}
+          .datasets=${this.datasets}
+          @karmania-import-request=${this.chooseFiles}
           @karmania-panel-change=${this.onPanelChange}
         ></karmania-panel>
       </div>

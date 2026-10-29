@@ -1711,3 +1711,22 @@ was chosen, why.
   the dialog is hidden, and the test read the files at once. The same race as the close counts,
   in the tests, not the app (Cancel and Load clear at once; only Esc and the close button go through
   the event). The two tests that read the wizard's state after Esc now wait for it to be so.
+
+## M9: the Data tab
+
+- How M9 is built. The Data tab is one element, `karmania-data-tab`, which the panel gives the datasets
+  the app keeps (`datasets`, and later which is selected and the engine). Its parts are elements of
+  their own, one for each step that makes them: the list of datasets, the summary of the selected
+  one, and the table. The table is a component of `@karmania/ui`, `k-table`, that knows nothing of
+  the engine: it is given its columns, how many rows there are, and a function that fetches a window
+  of rows, whose answer has the shape of the engine's `Page`, so that the app can hand it
+  `engine.rows` as it is. The pure part of its scrolling (which rows are in view, and how a scroll
+  position becomes a row when there are too many rows for the browser to scroll through) is a module
+  with its own unit tests.
+- Step 9.1 (the empty state). With nothing loaded the Data tab says "No data loaded" and offers Import,
+  centred in the tab like the Legend's empty state and with the same button as the map area's, which
+  opens the same file picker (the app listens for `karmania-import-request` from both). The tab
+  keeps no padding of its own at the panel's edge, since the table that comes will go the whole width;
+  what has padding will give itself some.
+  The older test of the resize limits found the Legend's message by looking for any `.group` in the
+  panel, and now finds two; it asks for the Legend's.

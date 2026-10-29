@@ -289,7 +289,7 @@ test.describe('the panel resize handle', () => {
       const outer = await boxOf(panel(page), 'the panel');
       expect((await textStartOf(tab(page, 'Legend'))) - (outer.x + 1)).toBe(16);
       // The message of the Legend is in the middle of the body, whatever the width.
-      const group = await boxOf(panel(page).locator('.group'), 'the message');
+      const group = await boxOf(panel(page).locator('[slot="legend"] .group'), 'the message');
       const body = await boxOf(panel(page).locator('.body[slot="legend"]'), 'the body');
       expect(Math.abs(group.x + group.width / 2 - (body.x + body.width / 2))).toBeLessThanOrEqual(
         0.5,

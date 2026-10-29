@@ -148,3 +148,19 @@ export async function openWithFakeEngine(page: Page): Promise<void> {
   }, FAKE_ENGINE);
   await expect(w.host.locator('karmania-file-step')).toBeVisible();
 }
+
+/**
+ * Imports files the way a person does, taking what each step suggests, and loads them. Every step
+ * must be one that nothing stops, so the files need a coordinate system (a projection file) and, for a
+ * block model, are not for this.
+ */
+export async function importAndLoad(page: Page, ...picks: Pick[]): Promise<void> {
+  const w = wizard(page);
+  await startWizard(page, ...picks);
+  for (const step of ['mapping', 'nodata', 'crs', 'review']) {
+    await goTo(page, step);
+  }
+  await expect(w.host.locator('karmania-review-step .verdict')).toHaveText('Ready to load');
+  await w.next.click();
+  await expect(w.dialog).toBeHidden();
+}
