@@ -1211,3 +1211,12 @@ was chosen, why.
   test measures that, and was seen to fail (11.5) without the padding. The name and the button
   are centred on each other rather than aligned on a baseline, since the name is not a control;
   the spec's baseline rule is for controls in a row.
+- Step 7.4 (map area): the empty state is `<k-empty-state>` with the `map` icon, the title "No data
+  yet", the line "Drop files here or use Import" and a second Import button (secondary, as in the
+  toolbar), so the spacing of 8 and 16 and the centring come from the component and are measured
+  here, in place, in every layout. The brief also says what the area shows once data is loaded
+  ("Map rendering arrives in phase 2" and the number of datasets), and no later step in the
+  roadmap did that, so the area has a `datasets` property that switches between the two (the
+  button is left out when there is data, since the toolbar still has one) and step 8.12 now says
+  to set it. Nothing sets it yet; the tests set it directly. The map area is the page's `main`
+  landmark, called "Map".

@@ -343,7 +343,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 7.2 Shell grid (toolbar plus main, map plus panel) with no content; layout
   assertions for adjacency and no overflow at all three viewports.
 - [x] 7.3 Toolbar contents exactly as in section 7.2.
-- [ ] 7.4 Map area empty state.
+- [x] 7.4 Map area empty state.
 - [ ] 7.5 Drop zone highlight with zero layout shift (test that bounding boxes
   are unchanged during drag-over).
 - [ ] 7.6 Panel header with Legend and Data tabs; Legend empty state.
@@ -383,7 +383,8 @@ Definitions and reprojection can be added later, with the features that need the
   disabled while there are errors and reads "Load with N warnings" when there
   are warnings.
 - [ ] 8.12 On load: close the dialog, select the new dataset and open the Data
-  tab.
+  tab. The map area is told how many datasets are loaded (its `datasets`
+  property, added in 7.4), so that it shows "Map rendering arrives in phase 2".
 - [ ] 8.13 End-to-end tests, one commit each: CSV points happy path; CSV with
   errors fixed in the wizard; GeoJSON mixed types; ASCII grid; OBJ mesh; block
   model CSV; missing CRS; cancel during a large import.

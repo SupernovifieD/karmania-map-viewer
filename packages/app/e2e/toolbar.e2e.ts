@@ -41,7 +41,7 @@ test.describe('the toolbar', () => {
     expect(await button.locator('k-icon').evaluate((e) => e.getBoundingClientRect().width)).toBe(
       16,
     );
-    await expect(page.getByRole('button', { name: 'Import' })).toHaveCount(1);
+    await expect(toolbar(page).getByRole('button', { name: 'Import' })).toHaveCount(1);
   });
 
   test('is 48 high with 16 at the sides and a border under it, and centres what is in it', async ({
@@ -86,7 +86,7 @@ test.describe('the toolbar', () => {
   }) => {
     await page.goto('/');
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Import' })).toBeFocused();
+    await expect(toolbar(page).getByRole('button', { name: 'Import' })).toBeFocused();
     const ring = await importButton(page)
       .locator('button')
       .evaluate((element) => {
