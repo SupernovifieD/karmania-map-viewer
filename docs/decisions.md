@@ -1618,3 +1618,15 @@ was chosen, why.
   the bar, the stop and the failure, which a real import is too quick to catch. The fixtures show that
   the kernel has no finding for a value it turns into an empty one through the no-data settings (it
   counts bad numbers, not these).
+- Step 8.11 (fix and retry). Review re-runs whenever it is shown, so that editing a step and going on
+  makes the datasets afresh (the old ones having been taken out when the step was left). To make the
+  loop short, a person who went from the last step to an earlier one by an error's link is taken
+  back in one step: the primary button there says "Check again" and goes straight to Review. It does
+  not skip a step that has something wrong with it now (changing the file to lines in the File step
+  needs a line identifier in the Mapping step, and Check again stops there and says so): it goes to
+  the first step after the current one that has a reason Next would be disabled, and to Review if none
+  has. Reaching Review ends it; so does closing the wizard, and the next opening starts at File
+  with Next saying Next. While there are errors Load is disabled and reads "Load", with the number of
+  errors in the footer; with warnings it reads "Load with N warnings" (these came with 8.10, where the
+  Review step is, and 8.11's tests cover them with the loop). The primary button's words change
+  with "Check again", and so does its width, which moves Back by as much, as on the last step.

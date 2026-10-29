@@ -379,7 +379,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.10 Step "Review": runs the import job with a progress bar and cancel;
   findings grouped by severity; each error links to the step in its "step"
   field.
-- [ ] 8.11 Fix-and-retry loop: after editing a step, Review re-runs. Load is
+- [x] 8.11 Fix-and-retry loop: after editing a step, Review re-runs. Load is
   disabled while there are errors and reads "Load with N warnings" when there
   are warnings.
 - [ ] 8.12 On load: close the dialog, select the new dataset and open the Data
