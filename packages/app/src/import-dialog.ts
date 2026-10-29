@@ -1,6 +1,10 @@
+import { groupFiles } from '@karmania/engine';
+import type { Engine } from '@karmania/engine';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import type { PropertyValues } from 'lit';
+import { entriesOf } from './import-files.js';
+import type { FileEntry } from './import-files.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';
 
@@ -23,6 +27,9 @@ export class KarmaniaImportDialog extends LitElement {
     open: { type: Boolean, reflect: true },
     step: { type: String, reflect: true },
     files: { attribute: false },
+    engine: { attribute: false },
+    entries: { state: true },
+    failure: { state: true },
   };
 
   static override styles = [
@@ -57,18 +64,53 @@ export class KarmaniaImportDialog extends LitElement {
   declare step: ImportStep;
   /** The files being imported: the ones chosen or dropped, which the steps are about. */
   declare files: readonly File[];
+  /** The engine that reads them. */
+  declare engine: Engine | undefined;
+  /** What the kernel made of each file, once it has looked: `undefined` until then. */
+  declare entries: readonly FileEntry[] | undefined;
+  /** Why the files could not be looked at (the engine could not start, say), if that is so. */
+  declare failure: string | undefined;
+
+  /** Counts the times files have been looked at, so that an answer that comes late is ignored. */
+  private readings = 0;
 
   constructor() {
     super();
     this.open = false;
     this.step = FIRST_STEP;
     this.files = [];
+    this.engine = undefined;
+    this.entries = undefined;
+    this.failure = undefined;
   }
 
-  /** Opens the dialog, on its first step, to import `files`. */
+  /** Opens the dialog, on its first step, to import `files`, and has the engine look at them. */
   show(files: readonly File[]): void {
     this.files = files;
     this.open = true;
+    void this.look(files);
+  }
+
+  /** Has the engine preview the files, and keeps what it says if the dialog is still about them. */
+  private async look(files: readonly File[]): Promise<void> {
+    const reading = ++this.readings;
+    this.entries = undefined;
+    this.failure = undefined;
+    const engine = this.engine;
+    if (engine === undefined) {
+      this.failure = 'The import engine is not available.';
+      return;
+    }
+    try {
+      const previews = await engine.preview(files);
+      if (reading === this.readings) {
+        this.entries = entriesOf(groupFiles(files), previews);
+      }
+    } catch (error) {
+      if (reading === this.readings) {
+        this.failure = error instanceof Error ? error.message : String(error);
+      }
+    }
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -92,6 +134,9 @@ export class KarmaniaImportDialog extends LitElement {
   private close(): void {
     this.open = false;
     this.files = [];
+    this.readings += 1;
+    this.entries = undefined;
+    this.failure = undefined;
     this.dispatchEvent(new CustomEvent(IMPORT_CLOSE, { bubbles: true, composed: true }));
   }
 

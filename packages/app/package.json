@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@karmania/engine": "workspace:*",
     "@karmania/ui": "workspace:*",
     "lit": "^3.3.3"
   },
