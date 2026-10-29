@@ -1,10 +1,7 @@
-import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-
-/** A sample file of the repository, by name. */
-const fixture = (name: string): string =>
-  fileURLToPath(new URL(`../../../fixtures/${name}`, import.meta.url));
+import { pickFiles } from './support/picker.js';
+import type { Pick } from './support/picker.js';
 
 const wizard = (page: Page): Locator => page.locator('karmania-import-dialog');
 const dialog = (page: Page): Locator => wizard(page).locator('dialog');
@@ -56,12 +53,14 @@ async function seen(page: Page): Promise<Seen> {
   });
 }
 
-async function importFiles(page: Page, ...names: string[]): Promise<void> {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser', { timeout: 10_000 }),
-    toolbarImport(page).click(),
-  ]);
-  await chooser.setFiles(names.map(fixture));
+async function importFiles(page: Page, ...picks: Pick[]): Promise<void> {
+  await pickFiles(
+    page,
+    async () => {
+      await toolbarImport(page).click();
+    },
+    picks,
+  );
   await expect(dialog(page)).toBeVisible();
 }
 
@@ -112,13 +111,11 @@ test.describe('the wizard reading the files it was given', () => {
   test('says what is wrong with a file the kernel cannot read, as findings and not as a failure', async ({
     page,
   }) => {
-    const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser', { timeout: 10_000 }),
-      toolbarImport(page).click(),
-    ]);
-    await chooser.setFiles([
-      { name: 'data.shp', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 0, 1]) },
-    ]);
+    await importFiles(page, {
+      name: 'data.shp',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from([0, 0, 1]),
+    });
     const result = await seen(page);
     expect(result.failure).toBeUndefined();
     expect(result.entries[0]).toMatchObject({
