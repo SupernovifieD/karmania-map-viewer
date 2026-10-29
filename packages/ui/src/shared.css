@@ -24,3 +24,15 @@ textarea {
   color: inherit;
   font: inherit;
 }
+
+/* Text that is for people who cannot see: hidden from the eye (a box of a pixel, cut away), and
+   read by screen readers. */
+.visually-hidden {
+  clip-path: inset(50%);
+  height: var(--k-border-width);
+  margin: calc(var(--k-border-width) * -1);
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: var(--k-border-width);
+}

@@ -1,6 +1,7 @@
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
+import './import-dialog.js';
 import './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
@@ -174,6 +175,7 @@ export class KarmaniaApp extends LitElement {
           @karmania-panel-change=${this.onPanelChange}
         ></karmania-panel>
       </div>
+      <karmania-import-dialog></karmania-import-dialog>
     `;
   }
 }
