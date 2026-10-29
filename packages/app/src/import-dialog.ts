@@ -54,6 +54,7 @@ export class KarmaniaImportDialog extends LitElement {
     failure: { state: true },
     draft: { state: true },
     run: { state: true },
+    returning: { state: true },
   };
 
   static override styles = [
@@ -108,6 +109,8 @@ export class KarmaniaImportDialog extends LitElement {
   declare draft: ImportDraft | undefined;
   /** What the import, which runs while the last step is shown, has come to. */
   declare run: RunState;
+  /** Whether a person went from the last step to an earlier one to fix something, and is to be taken back. */
+  declare returning: boolean;
 
   /** Counts the times files have been looked at, so that an answer that comes late is ignored. */
   private readings = 0;
@@ -128,6 +131,7 @@ export class KarmaniaImportDialog extends LitElement {
     this.failure = undefined;
     this.draft = undefined;
     this.run = IDLE;
+    this.returning = false;
   }
 
   /** The file being imported: the first one that can be. */
@@ -171,6 +175,11 @@ export class KarmaniaImportDialog extends LitElement {
     // Every visit starts at the beginning.
     if (changed.has('open') && this.open) {
       this.step = FIRST_STEP;
+      this.returning = false;
+    }
+    // Once the last step is shown, the way back to it has been taken.
+    if (changed.has('step') && this.step === 'review') {
+      this.returning = false;
     }
   }
 
@@ -275,6 +284,7 @@ export class KarmaniaImportDialog extends LitElement {
     const target = IMPORT_STEPS.find((known) => known.id === event.detail.step);
     if (target !== undefined) {
       this.step = target.id;
+      this.returning = true;
     }
   };
 
@@ -320,10 +330,24 @@ export class KarmaniaImportDialog extends LitElement {
     this.step = stepBefore(this.step) ?? this.step;
   };
 
+  /** The first step after `step`, before the last, that has something wrong with it now, if any. */
+  private firstBlockedAfter(step: ImportStep): ImportStep | undefined {
+    let at = stepAfter(step);
+    while (at !== undefined && at !== 'review') {
+      if (this.blockerOf(at) !== undefined) {
+        return at;
+      }
+      at = stepAfter(at);
+    }
+    return undefined;
+  }
+
   private readonly onNext = (): void => {
     const next = stepAfter(this.step);
     if (next === undefined) {
       this.load();
+    } else if (this.returning) {
+      this.step = this.firstBlockedAfter(this.step) ?? 'review';
     } else {
       this.step = next;
     }
@@ -337,17 +361,22 @@ export class KarmaniaImportDialog extends LitElement {
 
   /** Why a person cannot go on from this step yet, in words, or `undefined` if they can. */
   private get blocker(): string | undefined {
-    if (this.step === 'mapping' && this.draft !== undefined) {
+    return this.blockerOf(this.step);
+  }
+
+  /** Why a person cannot go on from `step`, in words, or `undefined` if they can. */
+  private blockerOf(step: ImportStep): string | undefined {
+    if (step === 'mapping' && this.draft !== undefined) {
       // The first thing that is wrong with the mapping, in the kernel's words.
       return mappingProblems(this.draft.kind, this.draft.columns, this.draft.blockSize)[0]?.message;
     }
-    if (this.step === 'crs' && this.draft !== undefined) {
+    if (step === 'crs' && this.draft !== undefined) {
       return crsBlocker(this.draft.crs, this.current?.preview.crs);
     }
-    if (this.step === 'review') {
+    if (step === 'review') {
       return loadBlocker(this.run);
     }
-    if (this.step !== 'file') {
+    if (step !== 'file') {
       return undefined;
     }
     if (this.failure !== undefined) {
@@ -435,7 +464,8 @@ export class KarmaniaImportDialog extends LitElement {
   /** What the primary button says: Next, or on the last step Load, with the warnings there are. */
   private nextLabel(last: boolean): string {
     if (!last) {
-      return 'Next';
+      // After going back to fix something, the way on is to the last step, to check again.
+      return this.returning ? 'Check again' : 'Next';
     }
     return this.run.status === 'loaded'
       ? loadLabel(groupFindings(this.run.findings).warnings.length)
