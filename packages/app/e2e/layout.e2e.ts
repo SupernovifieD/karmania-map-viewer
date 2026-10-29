@@ -180,6 +180,24 @@ test.describe('assertNoOverflow', () => {
     await assertNoOverflow(root);
   });
 
+  test('lets text hidden from the eye but kept for screen readers be bigger than its box', async ({
+    page,
+  }) => {
+    const hidden =
+      'position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap';
+    const root = await inject(
+      page,
+      `<p>Seen <span style="${hidden}">and a good deal more that is only heard</span></p>`,
+    );
+    await assertNoOverflow(root);
+    // The same box without the clipping is a box with too much in it.
+    const unclipped = await inject(
+      page,
+      `<p><span id="subject" style="display: block; width: 1px; height: 1px; overflow: hidden; white-space: nowrap">too much to see</span></p>`,
+    );
+    await expect(assertNoOverflow(unclipped)).rejects.toThrow(/span#subject/);
+  });
+
   test('lets a native text box scroll its own text', async ({ page }) => {
     const root = await inject(
       page,
