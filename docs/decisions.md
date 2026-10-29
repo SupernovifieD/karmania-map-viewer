@@ -1494,3 +1494,25 @@ was chosen, why.
   have a coordinate role have a tinted header, and ignored ones are muted. A file with no columns
   (GeoJSON, an ASCII grid, an OBJ mesh) says that there is nothing to map. A line under the table
   says how many rows are shown of about how many. No rule keeps a person from going on yet: those are 8.5.
+- Step 8.5 (the Mapping step, part 2). The step says what the chosen kind needs before anything is
+  wrong (points: X and Y; lines: X, Y and a line identifier; a block model: X, Y and Z, and the size
+  of a block), and then what is wrong: a role no column has, a role several columns have, a block
+  size that is missing or cannot be used. Those are the findings the kernel would make when the file
+  is imported (`mapping.*`), and the wizard words them exactly as the kernel does: a test reads the
+  hint and the example of each in `docs/validation-codes.md` and checks the wizard's are the same.
+  Next cannot be used while anything is wrong, and the footer says what, first thing first. What is
+  wrong is listed under the table, not over it: over it, a role changing would move the header and the
+  rows, which the rules forbid; under it, only the table's bottom edge gives way, and a test checks
+  that nothing else moves. The table keeps room for four rows whatever the rest of the step takes, so
+  a block model in the smallest window, with a problem to show, makes the body scroll a little rather
+  than squeeze the table to nothing. A block model's size is three fields (along X, Y and Z, "in the
+  units of the coordinates"), kept as typed since a number can be half typed; a point or a comma
+  does for the decimals, and anything but a plain number above 0 is wrong: a field that has text in it
+  that is not one says so under itself, in a line that is kept free so that it moves nothing, and an
+  empty field is only missing. The size starts empty: the kernel suggests none, and a guess at it
+  would be a silent default.
+- Found while testing 8.5: text that is hidden from the eye and kept for screen readers is placed
+  absolutely, so when the dialog's body scrolled, the hidden severity of a finding, outside the
+  body's clip, counted as the dialog overflowing. The things that hold such text (a field, a
+  finding) are now positioned, so that it stays with them, and the wizard's own hidden status line
+  comes first in the body, where it is always in sight.

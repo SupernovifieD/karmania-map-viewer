@@ -11,10 +11,13 @@ export const fieldStyles = css`
     min-width: 0;
   }
 
+  /* Positioned, so that a label hidden from the eye (which is placed absolutely) stays inside the
+     field, and is clipped with it by whatever scrolls the field away. */
   .field {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    position: relative;
   }
 
   label {

@@ -365,7 +365,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.4 Step "Mapping", part 1: preview table (first 100 rows) with a role
   selector in each column header; suggestions pre-filled and marked
   "suggested".
-- [ ] 8.5 Step "Mapping", part 2: required-role checks inline (missing X or Y,
+- [x] 8.5 Step "Mapping", part 2: required-role checks inline (missing X or Y,
   line ID, block size field for blocks); Next disabled with a visible reason.
 - [ ] 8.6 Step "Mapping", part 3: per-column type override and rename.
 - [ ] 8.7 Step "Nodata": suggested tokens and numbers as checkboxes with counts;
