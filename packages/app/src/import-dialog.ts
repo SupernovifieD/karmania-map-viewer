@@ -1,5 +1,5 @@
 import { groupFiles } from '@karmania/engine';
-import type { Engine } from '@karmania/engine';
+import type { Engine, Summary } from '@karmania/engine';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
@@ -13,13 +13,25 @@ import { mappingProblems } from './import-mapping.js';
 import type { FileEntry } from './import-files.js';
 import './crs-step.js';
 import './findings.js';
+import type { GoToStep } from './findings.js';
 import './mapping-step.js';
 import './nodata-step.js';
+import { buildMapping, groupFindings, IDLE, loadBlocker, loadLabel } from './import-run.js';
+import type { RunState } from './import-run.js';
+import './review-step.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';
 
 /** The name of the event the dialog sends when it has been closed, by Cancel, Esc or the close button. */
 export const IMPORT_CLOSE = 'karmania-import-close';
+
+/** The name of the event the dialog sends when a person has loaded what was imported. */
+export const IMPORT_LOADED = 'karmania-import-loaded';
+
+/** What was loaded. */
+export interface ImportLoaded {
+  readonly summaries: readonly Summary[];
+}
 
 /**
  * The import wizard's dialog: the frame the steps are shown in. It has the title, the indicator of
@@ -41,6 +53,7 @@ export class KarmaniaImportDialog extends LitElement {
     entries: { state: true },
     failure: { state: true },
     draft: { state: true },
+    run: { state: true },
   };
 
   static override styles = [
@@ -93,9 +106,17 @@ export class KarmaniaImportDialog extends LitElement {
   declare failure: string | undefined;
   /** What a person has decided about the file being imported. */
   declare draft: ImportDraft | undefined;
+  /** What the import, which runs while the last step is shown, has come to. */
+  declare run: RunState;
 
   /** Counts the times files have been looked at, so that an answer that comes late is ignored. */
   private readings = 0;
+  /** Counts the times the import has been started, for the same reason. */
+  private runs = 0;
+  /** Stops the import that is going on. */
+  private controller: AbortController | undefined;
+  /** The datasets the import has loaded into the engine, which are taken out again if it is not kept. */
+  private loadedIds: readonly number[] = [];
 
   constructor() {
     super();
@@ -106,6 +127,7 @@ export class KarmaniaImportDialog extends LitElement {
     this.entries = undefined;
     this.failure = undefined;
     this.draft = undefined;
+    this.run = IDLE;
   }
 
   /** The file being imported: the first one that can be. */
@@ -153,17 +175,129 @@ export class KarmaniaImportDialog extends LitElement {
   }
 
   protected override updated(changed: PropertyValues<this>): void {
-    // The body of a step starts at its top.
     if (changed.has('step')) {
+      // The body of a step starts at its top.
       const body = this.renderRoot.querySelector('k-dialog')?.shadowRoot?.querySelector('.body');
       if (body) {
         body.scrollTop = 0;
       }
+      // The import runs when the last step is shown, and what it did is undone when it is left.
+      if (this.step === 'review') {
+        void this.startRun();
+      } else if (changed.get('step') === 'review') {
+        this.discardRun();
+      }
     }
+  }
+
+  /** Runs the import with what a person decided, and keeps what comes of it while the step is shown. */
+  private async startRun(): Promise<void> {
+    this.discardRun();
+    const { engine, draft } = this;
+    const entry = this.current;
+    if (engine === undefined || entry === undefined || draft === undefined) {
+      this.run = { status: 'failed', message: 'There is nothing to import.' };
+      return;
+    }
+    const run = ++this.runs;
+    const controller = new AbortController();
+    this.controller = controller;
+    this.run = { status: 'running', phase: undefined, fraction: undefined };
+    try {
+      const result = await engine.importFiles(
+        [entry.group.file, ...entry.group.sidecars],
+        buildMapping(draft, entry),
+        {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            if (run === this.runs) {
+              this.run = { status: 'running', phase: progress.phase, fraction: progress.fraction };
+            }
+          },
+        },
+      );
+      if (run !== this.runs) {
+        // Another import was started, or the step was left, while this one was going on.
+        if (result.status === 'loaded') {
+          this.unload(result.summaries.map((summary) => summary.id));
+        }
+        return;
+      }
+      if (result.status === 'loaded') {
+        this.loadedIds = result.summaries.map((summary) => summary.id);
+        this.run = {
+          status: 'loaded',
+          summaries: result.summaries,
+          findings: result.summaries.flatMap((summary) => summary.findings),
+        };
+      } else {
+        this.run = { status: 'blocked', findings: result.findings };
+      }
+    } catch (error) {
+      if (run === this.runs) {
+        this.run = controller.signal.aborted
+          ? { status: 'cancelled' }
+          : { status: 'failed', message: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  }
+
+  /** Stops the import, if one is going on, and takes out of the engine what it loaded. */
+  private discardRun(): void {
+    this.runs += 1;
+    this.controller?.abort();
+    this.controller = undefined;
+    const ids = this.loadedIds;
+    this.loadedIds = [];
+    this.unload(ids);
+    this.run = IDLE;
+  }
+
+  /** Takes datasets out of the engine. */
+  private unload(ids: readonly number[]): void {
+    const engine = this.engine;
+    if (engine !== undefined) {
+      for (const id of ids) {
+        engine.remove(id).catch(() => undefined);
+      }
+    }
+  }
+
+  private readonly onRunCancel = (): void => {
+    this.controller?.abort();
+  };
+
+  private readonly onRunAgain = (): void => {
+    void this.startRun();
+  };
+
+  private readonly onGoToStep = (event: CustomEvent<GoToStep>): void => {
+    const target = IMPORT_STEPS.find((known) => known.id === event.detail.step);
+    if (target !== undefined) {
+      this.step = target.id;
+    }
+  };
+
+  /** Keeps what the import loaded: it stays in the engine, and the dialog closes. */
+  private load(): void {
+    if (this.run.status !== 'loaded') {
+      return;
+    }
+    const { summaries } = this.run;
+    this.loadedIds = [];
+    this.dispatchEvent(
+      new CustomEvent<ImportLoaded>(IMPORT_LOADED, {
+        detail: { summaries },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this.close();
   }
 
   /** Closes the dialog, and says so. */
   private close(): void {
+    this.discardRun();
     this.open = false;
     this.files = [];
     this.readings += 1;
@@ -187,7 +321,12 @@ export class KarmaniaImportDialog extends LitElement {
   };
 
   private readonly onNext = (): void => {
-    this.step = stepAfter(this.step) ?? this.step;
+    const next = stepAfter(this.step);
+    if (next === undefined) {
+      this.load();
+    } else {
+      this.step = next;
+    }
   };
 
   private readonly onDraftChange = (event: CustomEvent<DraftChange>): void => {
@@ -204,6 +343,9 @@ export class KarmaniaImportDialog extends LitElement {
     }
     if (this.step === 'crs' && this.draft !== undefined) {
       return crsBlocker(this.draft.crs, this.current?.preview.crs);
+    }
+    if (this.step === 'review') {
+      return loadBlocker(this.run);
     }
     if (this.step !== 'file') {
       return undefined;
@@ -280,13 +422,24 @@ export class KarmaniaImportDialog extends LitElement {
         ></karmania-crs-step>
       </div>`;
     }
-    const found = IMPORT_STEPS.find((known) => known.id === this.step);
-    return html`
-      <div class="step" data-step=${this.step}>
-        <h3>${found?.label ?? ''}</h3>
-        <p>This step is not built yet.</p>
-      </div>
-    `;
+    return html`<div class="step" data-step="review">
+      <karmania-review-step
+        .run=${this.run}
+        @karmania-run-cancel=${this.onRunCancel}
+        @karmania-run-again=${this.onRunAgain}
+        @karmania-go-step=${this.onGoToStep}
+      ></karmania-review-step>
+    </div>`;
+  }
+
+  /** What the primary button says: Next, or on the last step Load, with the warnings there are. */
+  private nextLabel(last: boolean): string {
+    if (!last) {
+      return 'Next';
+    }
+    return this.run.status === 'loaded'
+      ? loadLabel(groupFindings(this.run.findings).warnings.length)
+      : 'Load';
   }
 
   override render() {
@@ -316,13 +469,12 @@ export class KarmaniaImportDialog extends LitElement {
           @click=${this.onBack}
           >Back</k-button
         >
-        <!-- Nothing has been made to load yet, so the last step's button is there but cannot be used. -->
         <k-button
           slot="footer-end"
           variant="primary"
-          ?disabled=${last || blocker !== undefined}
+          ?disabled=${blocker !== undefined}
           @click=${this.onNext}
-          >${last ? 'Load' : 'Next'}</k-button
+          >${this.nextLabel(last)}</k-button
         >
       </k-dialog>
     `;
@@ -338,5 +490,6 @@ declare global {
 
   interface HTMLElementEventMap {
     [IMPORT_CLOSE]: CustomEvent;
+    [IMPORT_LOADED]: CustomEvent<ImportLoaded>;
   }
 }

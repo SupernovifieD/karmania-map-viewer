@@ -1593,3 +1593,28 @@ was chosen, why.
   as the progress while the box is not). Without a value it is a short bar that travels along the track,
   and, for people who ask for less motion, one that stays at the start; not knowing how far is not
   said to screen readers as 0 (it has no value). A value outside 0 to 1 is kept to the track.
+- Step 8.10 (the Review step). The import runs when the last step is shown, with a bar that says
+  what is being done (reading the file, reading the values, checking the data) and how far, and a
+  button that stops it; stopped, it says that nothing was loaded and offers to run again. When it
+  is done the step says what will be loaded (each dataset with how much is in it) and lists what was
+  found in three groups, errors, warnings and notes, in that order and with how many in each, each
+  finding once even when a file that gives several datasets gives each of them the same one. When the
+  kernel stops the import, nothing was loaded, and each error that a step can fix has a button to that
+  step (the finding's own `step`). Building what the kernel is given from the draft is one function
+  with its own tests (`buildMapping`): a name only for an attribute that was given one, a type only
+  where a person chose one, a block size only for a block model, and, for a file with no choice of
+  kind (GeoJSON), `points`, which the kernel ignores for it.
+- What the engine does that the wizard has to work round: there is no dry run. `importFiles` loads
+  what it makes into the engine as soon as the kernel has no error, so what the Review step shows as
+  "ready to load" is already loaded. The wizard therefore takes the datasets out of the engine again
+  whenever the import is not kept: when a person goes back from the Review step (so that going on
+  makes them once), when the wizard is cancelled or closed with Esc, and when an import finishes after
+  it was left. Load keeps them, and says so with `karmania-import-loaded`, with their summaries, and
+  closes the dialog. Load reads "Load" or "Load with N warnings" and cannot be used while the import
+  runs, is cancelled or has failed, or while there are errors; the footer says which. Every answer
+  that arrives after the import was left is ignored.
+- The test of the Review step runs the real engine for the answers (a file with a point twice for a
+  warning, one with a coordinate missing for an error) and a fake one that the test controls for
+  the bar, the stop and the failure, which a real import is too quick to catch. The fixtures show that
+  the kernel has no finding for a value it turns into an empty one through the no-data settings (it
+  counts bad numbers, not these).

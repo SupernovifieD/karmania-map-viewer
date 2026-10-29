@@ -376,7 +376,7 @@ Definitions and reprojection can be added later, with the features that need the
   because the core has no definitions (owner decision, 3.25).
 - [x] 8.9 Step "CRS", part 2: the Local grid option with units; the chosen CRS
   summary.
-- [ ] 8.10 Step "Review": runs the import job with a progress bar and cancel;
+- [x] 8.10 Step "Review": runs the import job with a progress bar and cancel;
   findings grouped by severity; each error links to the step in its "step"
   field.
 - [ ] 8.11 Fix-and-retry loop: after editing a step, Review re-runs. Load is
