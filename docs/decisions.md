@@ -1328,3 +1328,8 @@ was chosen, why.
   for a control in the middle, near either side and at the top edge. The gallery shows it in a row of
   its own, with room to its left, because in the row of the other examples it covered the button
   before it: the same flaw, seen in the first picture.
+- Found while reviewing the 7.9 screenshots (the rail): the tooltips of the three rail buttons now go
+  to the left of their buttons, over the map, instead of above them, where the Data tooltip covered
+  the Legend button. A test hovers each button and checks that its tooltip is 4 to the left of it,
+  centred on it, and over none of the rail's buttons; it was seen to fail with the tooltip above
+  (the gap was -28).
