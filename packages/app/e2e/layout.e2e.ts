@@ -416,9 +416,33 @@ test.describe('assertAligned', () => {
     ).rejects.toThrow(/baseline/);
   });
 
+  test('compares where text starts, which the padding of the box around it does not change', async ({
+    page,
+  }) => {
+    const root = await inject(
+      page,
+      '<div id="a" style="position: absolute; left: 20px; top: 0">Legend</div><div id="b" style="position: absolute; left: 8px; top: 30px; padding-left: 12px">Layers</div><div id="c" style="position: absolute; left: 4px; top: 60px"><div style="padding-left: 16px">Data</div></div>',
+    );
+    const [a, b, c] = [root.locator('#a'), root.locator('#b'), root.locator('#c')];
+    await assertAligned([a, b, c], 'text-left');
+    // The boxes themselves are not aligned: that is the difference between the two checks.
+    await expect(assertAligned([a, b, c], 'left')).rejects.toThrow(/left/);
+  });
+
+  test('fails text that starts in different places, and lists where', async ({ page }) => {
+    const root = await inject(
+      page,
+      '<div id="a" style="position: absolute; left: 20px; top: 0">Legend</div><div id="b" style="position: absolute; left: 21px; top: 30px">Layers</div>',
+    );
+    await expect(
+      assertAligned([root.locator('#a'), root.locator('#b')], 'text-left'),
+    ).rejects.toThrow(/text-left[\s\S]*20[\s\S]*21/);
+  });
+
   test('says when there is no text to take a baseline from', async ({ page }) => {
     const root = await inject(page, '<div id="a" style="width: 10px; height: 10px"></div>');
     await expect(assertAligned([root.locator('#a')], 'baseline')).rejects.toThrow(/no text/);
+    await expect(assertAligned([root.locator('#a')], 'text-left')).rejects.toThrow(/no text/);
   });
 });
 

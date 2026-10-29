@@ -171,13 +171,21 @@ export async function assertAdjacent(
 
 /** The edges `assertAligned` can compare. */
 export type Edge =
-  'left' | 'right' | 'top' | 'bottom' | 'baseline' | 'horizontal-centre' | 'vertical-centre';
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'baseline'
+  | 'text-left'
+  | 'horizontal-centre'
+  | 'vertical-centre';
 
 /**
- * Where the first line of text of an element sits: the baseline, in window coordinates. Found
- * from the text's own box and the font's descent, so it works through slots and shadow roots.
+ * Where the first line of text of an element sits, in window coordinates: where it starts, and its
+ * baseline. Found from the text's own box and the font's descent, so it works through slots and
+ * shadow roots, and is not changed by the padding or the height of the box around the text.
  */
-function baselineOf(locator: Locator): Promise<number> {
+function firstLineOf(locator: Locator): Promise<{ left: number; baseline: number }> {
   return locator.evaluate((element) => {
     const firstText = (node: Node): Text | undefined => {
       for (const child of node.childNodes) {
@@ -196,14 +204,14 @@ function baselineOf(locator: Locator): Promise<number> {
     };
     const text = firstText(element);
     if (text === undefined) {
-      throw new Error('There is no text in this element, so it has no baseline.');
+      throw new Error('There is no text in this element to measure.');
     }
     const range = document.createRange();
     range.selectNodeContents(text);
     const line = range.getClientRects()[0];
     const parent = text.parentElement;
     if (line === undefined || parent === null) {
-      throw new Error('The text is not shown, so it has no baseline.');
+      throw new Error('The text is not shown, so there is nothing to measure.');
     }
     const style = getComputedStyle(parent);
     const context = document.createElement('canvas').getContext('2d');
@@ -211,19 +219,29 @@ function baselineOf(locator: Locator): Promise<number> {
       throw new Error('No canvas to measure the font with.');
     }
     context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    return line.bottom - context.measureText('Hg').fontBoundingBoxDescent;
+    return {
+      left: line.left,
+      baseline: line.bottom - context.measureText('Hg').fontBoundingBoxDescent,
+    };
   });
+}
+
+/** Where the first line of text of an element starts, in window coordinates. */
+export async function textStartOf(locator: Locator): Promise<number> {
+  return (await firstLineOf(locator)).left;
 }
 
 /**
  * Fails unless all of the elements have the same `edge` (a left or right or top or bottom edge,
- * a centre, or the baseline of their text), to within half a pixel.
+ * a centre, the baseline of their text, or the place where their text starts), to within half a
+ * pixel.
  */
 export async function assertAligned(elements: readonly Locator[], edge: Edge): Promise<void> {
   const positions: number[] = [];
   for (const [index, element] of elements.entries()) {
-    if (edge === 'baseline') {
-      positions.push(await baselineOf(element));
+    if (edge === 'baseline' || edge === 'text-left') {
+      const line = await firstLineOf(element);
+      positions.push(edge === 'baseline' ? line.baseline : line.left);
       continue;
     }
     const box = await boxOf(element, `Element ${String(index + 1)}`);
