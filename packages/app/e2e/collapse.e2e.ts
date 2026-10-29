@@ -401,15 +401,23 @@ test.describe('collapsing the panel into a rail', () => {
       }
       return seen;
     };
-    // The toolbar's Import, the map's Import, the chosen tab (not the other), the collapse button.
-    expect(await stops(4)).toEqual(['Import', 'Import', 'Legend', 'Collapse panel']);
+    // The toolbar's Import, the map's Import, the handle on the panel's edge, the chosen tab (not
+    // the other) and the collapse button.
+    expect(await stops(5)).toEqual([
+      'Import',
+      'Import',
+      'Resize panel',
+      'Legend',
+      'Collapse panel',
+    ]);
 
     await setCollapsed(page, true);
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
     });
     await page.locator('karmania-map-area k-button').getByRole('button').focus();
-    // The rail's three buttons follow the map's Import, and nothing hidden is in the way.
+    // The rail's three buttons follow the map's Import, and nothing hidden is in the way: the
+    // handle is not there, since a rail has nothing to resize.
     expect(await stops(3)).toEqual(['Expand panel', 'Legend', 'Data']);
   });
 
