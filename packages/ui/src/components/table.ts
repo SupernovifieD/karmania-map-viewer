@@ -5,11 +5,24 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
-import { columnWidth, isCut, rowNumberWidth, SAMPLE_ROWS } from './table-columns.js';
+import {
+  columnWidth,
+  isCut,
+  rowNumberWidth,
+  SAMPLE_ROWS,
+  scrollLeftToReveal,
+} from './table-columns.js';
 import { formatCell, isNull, isNumeric } from './table-format.js';
 import { createMeasurer, loadFonts } from './table-measure.js';
 import type { Measurer } from './table-measure.js';
-import { windowFor } from './table-window.js';
+import {
+  maxTop,
+  pageRows,
+  scrollForTop,
+  scrollRatio,
+  topToReveal,
+  windowFor,
+} from './table-window.js';
 import './button.js';
 import './icon.js';
 
@@ -53,6 +66,11 @@ const MAX_PAGES = 16;
 const UNMEASURED_COLUMN_WIDTH = 120;
 const UNMEASURED_DIGIT_WIDTH = 8;
 
+/** The `id` of a cell, which the table names as the one the keyboard is on. */
+function cellId(row: number, column: number): string {
+  return `cell-${String(row)}-${String(column)}`;
+}
+
 /** How wide the columns are, once they have been measured. */
 interface ColumnLayout {
   /** The column of row numbers. */
@@ -88,6 +106,13 @@ function tokenPixels(element: Element, name: string, fallback: number): number {
  * million, so every row can still be scrolled to. Past eight million rows a pixel is more than a row,
  * and the scroll bar can no longer stop at each.
  *
+ * The table is one stop for the keyboard, and has a cell that the keyboard is on, which it names to
+ * assistive technology (`aria-activedescendant`) and rings. The arrow keys move it a cell, Page Up and
+ * Page Down a page, Home and End to the first and last column, and with Control to the first and last
+ * row as well. A click on a cell puts it there. The table scrolls as far as shows the cell, and no
+ * further. Past eight million rows the scroll bar cannot stop at every row, and the keyboard takes up
+ * what its whole pixels leave out, so that it still reaches each.
+ *
  * A page that cannot be fetched is not asked for again until a person says to: when rows in view
  * are in it, the table says so, and offers to try again. A page that nothing in view needs is
  * left alone, and says nothing.
@@ -106,6 +131,9 @@ export class KTable extends LitElement {
     columns: { state: true },
     layout: { state: true },
     scrolled: { state: true },
+    fine: { state: true },
+    activeRow: { state: true },
+    activeColumn: { state: true },
     bodyHeight: { state: true },
   };
 
@@ -126,6 +154,9 @@ export class KTable extends LitElement {
 
       .viewport {
         inset: 0;
+        /* The rows are put where the table says. The browser is not to move the scroll bar to keep
+           what it was looking at where it was, which is what it would do when the rows are moved. */
+        overflow-anchor: none;
         overflow: auto;
         /* The end of the rows is not a reason for the panel round the table to start scrolling. */
         overscroll-behavior: contain;
@@ -239,8 +270,21 @@ export class KTable extends LitElement {
         background: var(--k-surface-raised);
       }
 
-      /* The scroll area is a control: the keyboard can scroll it. Its ring is drawn inside. */
+      /* The scroll area is a control, and has the keyboard: its ring is drawn inside, and the cell the
+         keyboard is on has one of its own, which is what says where it is. */
       .viewport:focus-visible {
+        outline-offset: calc(var(--k-focus-width) * -1);
+      }
+
+      /* While that cell is in view, its ring is the one: the table's own would be half hidden by the
+         header and the row numbers. When it is not (the table has been scrolled away from it), the
+         table's is. */
+      .viewport[data-active-cell]:focus-visible {
+        outline: none;
+      }
+
+      .viewport:focus-visible .cell.active {
+        outline: var(--k-focus-width) solid var(--k-accent);
         outline-offset: calc(var(--k-focus-width) * -1);
       }
     `,
@@ -258,6 +302,11 @@ export class KTable extends LitElement {
   declare private layout: ColumnLayout | undefined;
   /** How far the rows have been scrolled. */
   declare private scrolled: number;
+  /** Pixels of rows that the keyboard has added to what the scroll bar says, which are not whole pixels of it. */
+  declare private fine: number;
+  /** The row the keyboard is on, counting from 0, and the column of values (not the row numbers). */
+  declare private activeRow: number;
+  declare private activeColumn: number;
   /** How high the room for rows is: the table's height less its header. */
   declare private bodyHeight: number;
 
@@ -288,6 +337,9 @@ export class KTable extends LitElement {
     this.columns = [];
     this.layout = undefined;
     this.scrolled = 0;
+    this.fine = 0;
+    this.activeRow = 0;
+    this.activeColumn = 0;
     this.bodyHeight = 0;
   }
 
@@ -319,6 +371,9 @@ export class KTable extends LitElement {
       this.layout = undefined;
       this.measurer = undefined;
       this.scrolled = 0;
+      this.fine = 0;
+      this.activeRow = 0;
+      this.activeColumn = 0;
       this.startedAgain = true;
     }
   }
@@ -354,7 +409,113 @@ export class KTable extends LitElement {
   }
 
   private readonly onScroll = (event: Event): void => {
-    this.scrolled = (event.currentTarget as HTMLElement).scrollTop;
+    const top = (event.currentTarget as HTMLElement).scrollTop;
+    // The keyboard's own scroll is where `scrolled` says already, and keeps what it took up that the
+    // scroll bar could not. Any other is a person's, and starts from the scroll bar.
+    if (Math.abs(top - this.scrolled) >= 1) {
+      this.fine = 0;
+    }
+    this.scrolled = top;
+  };
+
+  /** Puts the keyboard on a cell, and scrolls as far as shows it, which is not at all if it is in view. */
+  private moveTo(row: number, column: number, pages: number): void {
+    const viewport = this.viewport;
+    const layout = this.layout;
+    if (viewport === null || layout === undefined) {
+      return;
+    }
+    const sizes = {
+      rowCount: this.rowCount,
+      rowHeight: this.rowHeight,
+      viewportHeight: this.bodyHeight,
+    };
+    // A page up or down moves the rows by a page, and the keyboard with them.
+    const shifted =
+      this.currentWindow().top + pages * pageRows(this.bodyHeight, this.rowHeight) * this.rowHeight;
+    const { scrollTop, fine } = scrollForTop(
+      sizes,
+      topToReveal(sizes, Math.min(Math.max(0, shifted), maxTop(sizes)), row),
+    );
+    this.activeRow = row;
+    this.activeColumn = column;
+    viewport.scrollTop = scrollTop;
+    // A browser does not always scroll to exactly what it is asked, a long way down: the table goes
+    // by where it did scroll to, and what is left over is for `fine`, so that the keyboard's row is
+    // where it was meant to be whatever the browser did.
+    const actual = viewport.scrollTop;
+    this.scrolled = actual;
+    this.fine = fine + (scrollTop - actual) * scrollRatio(sizes);
+    const left = layout.widths
+      .slice(0, column)
+      .reduce((sum, width) => sum + width, layout.rowNumber);
+    viewport.scrollLeft = scrollLeftToReveal(
+      { left, width: layout.widths[column] ?? 0 },
+      viewport.scrollLeft,
+      viewport.clientWidth,
+      layout.rowNumber,
+    );
+  }
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.altKey || event.metaKey || this.layout === undefined || this.rowCount === 0) {
+      return;
+    }
+    const lastRow = this.rowCount - 1;
+    const lastColumn = this.columns.length - 1;
+    const page = pageRows(this.bodyHeight, this.rowHeight);
+    let row = this.activeRow;
+    let column = this.activeColumn;
+    let pages = 0;
+    switch (event.key) {
+      case 'ArrowDown':
+        row += 1;
+        break;
+      case 'ArrowUp':
+        row -= 1;
+        break;
+      case 'ArrowRight':
+        column += 1;
+        break;
+      case 'ArrowLeft':
+        column -= 1;
+        break;
+      case 'PageDown':
+        row += page;
+        pages = 1;
+        break;
+      case 'PageUp':
+        row -= page;
+        pages = -1;
+        break;
+      case 'Home':
+        column = 0;
+        row = event.ctrlKey ? 0 : row;
+        break;
+      case 'End':
+        column = lastColumn;
+        row = event.ctrlKey ? lastRow : row;
+        break;
+      default:
+        return;
+    }
+    // The keys that move the keyboard do not also scroll the page.
+    event.preventDefault();
+    this.moveTo(
+      Math.min(Math.max(0, row), lastRow),
+      Math.min(Math.max(0, column), lastColumn),
+      pages,
+    );
+  };
+
+  /** A click on a cell puts the keyboard there. */
+  private readonly onClick = (event: MouseEvent): void => {
+    const cell = event.target instanceof Element ? event.target.closest('[role="gridcell"]') : null;
+    const row = Number(cell?.parentElement?.getAttribute('aria-rowindex'));
+    const column = Number(cell?.getAttribute('aria-colindex'));
+    if (cell !== null && Number.isInteger(row) && Number.isInteger(column)) {
+      this.moveTo(row - 2, column - 2, 0);
+    }
   };
 
   /** The rows that are drawn now. */
@@ -364,6 +525,7 @@ export class KTable extends LitElement {
       rowHeight: this.rowHeight,
       viewportHeight: this.bodyHeight,
       scrollTop: this.scrolled,
+      fine: this.fine,
       overscan: OVERSCAN,
     });
   }
@@ -538,7 +700,13 @@ export class KTable extends LitElement {
         ${this.columns.map((column, index) => {
           const cell = this.cell(row, index);
           return html`<div
-            class=${classMap({ cell: true, numeric: isNumeric(column.values), null: cell.isNull })}
+            id=${cellId(row, index)}
+            class=${classMap({
+              cell: true,
+              numeric: isNumeric(column.values),
+              null: cell.isNull,
+              active: row === this.activeRow && index === this.activeColumn,
+            })}
             role="gridcell"
             aria-colindex=${index + 2}
             title=${ifDefined(this.fullText(cell.text, widths[index] ?? 0, false))}
@@ -600,6 +768,12 @@ export class KTable extends LitElement {
 
   override render() {
     const layout = this.layout;
+    const { firstRow, endRow } = this.currentWindow();
+    // The cell the keyboard is on is only named while it is drawn: a name must be of something there.
+    const active =
+      layout !== undefined && this.activeRow >= firstRow && this.activeRow < endRow
+        ? cellId(this.activeRow, this.activeColumn)
+        : undefined;
     return html`
       <div
         class="viewport"
@@ -610,7 +784,11 @@ export class KTable extends LitElement {
         aria-rowcount=${this.rowCount + 1}
         aria-colcount=${this.columns.length + 1}
         aria-busy=${layout === undefined ? 'true' : 'false'}
+        aria-activedescendant=${ifDefined(active)}
+        ?data-active-cell=${active !== undefined}
         @scroll=${this.onScroll}
+        @keydown=${this.onKeyDown}
+        @click=${this.onClick}
       >
         ${layout === undefined ? nothing : this.renderTable(layout)}
       </div>

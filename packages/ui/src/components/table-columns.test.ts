@@ -6,6 +6,7 @@ import {
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
   rowNumberWidth,
+  scrollLeftToReveal,
   textWidth,
 } from './table-columns.js';
 
@@ -66,5 +67,35 @@ describe('whether text is cut', () => {
     expect(isCut(104.1, 120)).toBe(true);
     expect(isCut(105, 120)).toBe(true);
     expect(isCut(0, 72)).toBe(false);
+  });
+});
+
+describe('scrolling sideways for a column to be in view', () => {
+  // A table 400 wide, with the row numbers 60 wide at the left: the columns are seen between 60 and 400.
+  const reveal = (left: number, width: number, scrollLeft: number): number =>
+    scrollLeftToReveal({ left, width }, scrollLeft, 400, 60);
+
+  it('does nothing for a column that is in view', () => {
+    expect(reveal(60, 120, 0)).toBe(0);
+    expect(reveal(300, 100, 0)).toBe(0);
+    expect(reveal(500, 100, 300)).toBe(300);
+  });
+
+  it('brings a column that is further right in, as far as its right edge', () => {
+    // The column ends at 500, and the table at 400: 100 more.
+    expect(reveal(380, 120, 0)).toBe(100);
+  });
+
+  it('brings a column that is further left in, past the row numbers that cover the edge', () => {
+    expect(reveal(200, 120, 300)).toBe(140);
+    expect(reveal(60, 120, 300)).toBe(0);
+  });
+
+  it('shows the left edge of a column that is wider than the room', () => {
+    expect(reveal(200, 800, 0)).toBe(140);
+  });
+
+  it('is never before the start', () => {
+    expect(reveal(0, 50, 20)).toBe(0);
   });
 });

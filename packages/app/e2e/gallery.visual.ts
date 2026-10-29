@@ -298,6 +298,21 @@ const SHOTS: Shot[] = [
       return [target];
     },
   },
+  {
+    // The keyboard on a cell in the middle of the table, which is the one that is ringed.
+    name: 'table-many-focus',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-many');
+      await reveal(target);
+      await target.locator('.rows [role="row"]').first().waitFor();
+      await focusByKeyboard(page, target.locator('.viewport'));
+      for (const key of ['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowRight']) {
+        await page.keyboard.press(key);
+      }
+      await target.locator('.cell.active').waitFor();
+      return [target];
+    },
+  },
   dialogShot('dialog-short', 'dialog-short'),
   dialogShot(
     'dialog-short-close-focus',
