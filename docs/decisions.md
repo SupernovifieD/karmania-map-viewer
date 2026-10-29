@@ -1746,3 +1746,17 @@ was chosen, why.
   (`karmania-dataset-select`, `karmania-dataset-remove`); the app removes it from the engine, and
   selects the dataset that takes its place (the next one, or the one before if it was last, or none),
   and the keyboard goes to that row, or to Import when none is left.
+- Step 9.3 (the summary). Under the list, for the selected dataset: its kind, its size ("8 points", "6
+  triangles", "12 cells"), the vertices where it has them (lines, polygons, meshes), the coordinate
+  system as `EPSG 32640` or `Local grid, US survey feet`, whether it has heights, and the box round it,
+  a row for X and Y and, with heights, Z. A coordinate is shown with up to six decimals and no zeros
+  at the end (a negative one with twelve is cut, and has all its digits in a title), and never as
+  minus zero. Two lists are there to be opened and are shut to begin with, since they can be long and
+  the table under them is what the tab is for: the columns (name, type, and how many values are empty,
+  from the summary's null counts), and the warnings and notes, in the same two groups as the
+  Review step, with their hints and where they happened. A dataset with neither says "No warnings or
+  notes". They are native `<details>`, so the keyboard and the browser's own handling of what is shut
+  are free; the arrow turns when one opens, and nothing moves but what is under it. The tests look at
+  the `open` attribute, not whether the shut content is "visible": a browser lays a shut `<details>`
+  out at a small size without painting it. The property that carries the dataset is called `summary`
+  because `dataset` is what every HTML element already calls its `data-*` attributes.

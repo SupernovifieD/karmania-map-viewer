@@ -3,6 +3,7 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import type { PropertyValues } from 'lit';
 import './dataset-list.js';
+import './dataset-summary.js';
 import { IMPORT_REQUEST } from './map-area.js';
 
 /**
@@ -65,10 +66,15 @@ export class KarmaniaDataTab extends LitElement {
 
   override render() {
     if (this.datasets.length > 0) {
-      return html`<karmania-dataset-list
-        .datasets=${this.datasets}
-        .selected=${this.selected}
-      ></karmania-dataset-list>`;
+      return html`
+        <karmania-dataset-list
+          .datasets=${this.datasets}
+          .selected=${this.selected}
+        ></karmania-dataset-list>
+        <karmania-dataset-summary
+          .summary=${this.datasets.find((dataset) => dataset.id === this.selected)}
+        ></karmania-dataset-summary>
+      `;
     }
     return html`
       <k-empty-state icon="table" heading="No data loaded">
