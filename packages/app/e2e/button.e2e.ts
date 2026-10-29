@@ -205,6 +205,55 @@ test.describe('the button', () => {
     ).toBeDisabled();
   });
 
+  test('says whether what it opens is open, to a screen reader, when told, and says nothing when not', async ({
+    page,
+  }) => {
+    const states = await page.evaluate(async () => {
+      const button = document.createElement('k-button');
+      button.icon = 'chevrons-right';
+      button.label = 'Collapse panel';
+      document.body.append(button);
+      const inner = () => button.shadowRoot?.querySelector('button')?.getAttribute('aria-expanded');
+      const seen: (string | null | undefined)[] = [];
+      await button.updateComplete;
+      seen.push(inner());
+      button.expanded = true;
+      await button.updateComplete;
+      seen.push(inner());
+      button.expanded = false;
+      await button.updateComplete;
+      seen.push(inner());
+      button.expanded = undefined;
+      await button.updateComplete;
+      seen.push(inner());
+      button.remove();
+      return seen;
+    });
+    // Nothing at first, then true, false, and nothing again once it is unset.
+    expect(states).toEqual([null, 'true', 'false', null]);
+  });
+
+  test('is a button with the state expanded, as the accessibility tree sees it', async ({
+    page,
+  }) => {
+    await page.goto('/gallery.html');
+    await page.evaluate(async () => {
+      const button = document.createElement('k-button');
+      button.id = 'disclosure';
+      button.icon = 'chevrons-right';
+      button.label = 'Collapse panel';
+      button.expanded = true;
+      document.body.append(button);
+      await button.updateComplete;
+    });
+    await expect(
+      page.locator('#disclosure').getByRole('button', { name: 'Collapse panel', expanded: true }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator('#disclosure').getByRole('button', { name: 'Collapse panel', expanded: false }),
+    ).toHaveCount(0);
+  });
+
   test('throws, as a mistake in the page that uses it, when it has no name at all', async ({
     page,
   }) => {

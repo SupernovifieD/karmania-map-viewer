@@ -1263,3 +1263,10 @@ was chosen, why.
   change the empty state's existing screenshots, so it is left. `assertAligned` has a new edge,
   `text-left`, for where text starts whatever box is around it; the panel test measures the first
   label with it.
+- Before step 7.7 (`k-button`): the brief wants `aria-expanded` on the buttons that collapse and
+  expand the panel, and a `k-button` could not say it, because its `<button>` is inside its shadow
+  root where a page cannot reach it. It now has an `expanded` property (`true`, `false`, or unset
+  for a button that opens nothing, in which case the attribute is left out), and `kButton` takes
+  `expanded` too. It is a property and not an attribute because unset is a third state that an
+  attribute would have to spell out. The button keeps its own name when its state changes, as
+  the disclosure pattern asks.
