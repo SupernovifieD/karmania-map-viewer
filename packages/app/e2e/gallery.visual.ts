@@ -258,6 +258,31 @@ const SHOTS: Shot[] = [
       return [target];
     },
   },
+  {
+    // Past the first page, which is all the source has: the rows that could not be loaded are empty,
+    // and the foot of the table says so.
+    name: 'table-failing',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-failing');
+      await reveal(target);
+      await target.locator('.rows [role="row"]').first().waitFor();
+      await target.locator('.viewport').evaluate((element) => {
+        element.scrollTo(0, 300 * 28);
+      });
+      await target.locator('.problem').waitFor();
+      return [target];
+    },
+  },
+  {
+    // Nothing could be loaded, so there is no table to show, only what is wrong.
+    name: 'table-failed',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-failed');
+      await reveal(target);
+      await target.locator('.problem').waitFor();
+      return [target];
+    },
+  },
   dialogShot('dialog-short', 'dialog-short'),
   dialogShot(
     'dialog-short-close-focus',

@@ -277,7 +277,7 @@ test.describe('the table', () => {
     await expect.poll(async () => p.rows.count()).toBeGreaterThan(before + 10);
   });
 
-  test('asks for pages of 256 rows, only for those in view, and each only once', async ({
+  test('asks for pages of 256 rows, for those in view and the one on either side, and each only once', async ({
     page,
   }) => {
     const asked = await page.evaluate(async () => {
@@ -317,11 +317,17 @@ test.describe('the table', () => {
       holder.remove();
       return result;
     });
-    expect(asked.atTop).toEqual([[0, 256]]);
-    // Row 600 is in the third page (512 to 767), and the rows round it are in it too.
+    // The rows in view are in the first page, and the page after it is on its way.
+    expect(asked.atTop).toEqual([
+      [0, 256],
+      [256, 256],
+    ]);
+    // Row 600 is in the third page (512 to 767): that, and the one after it (the last, which is short).
     expect(asked.after).toEqual([
       [0, 256],
+      [256, 256],
       [512, 256],
+      [768, 232],
     ]);
   });
 
@@ -738,6 +744,244 @@ test.describe('the table', () => {
       expect(result.count).toBeGreaterThan(5);
       expect(result.texts).toEqual(['']);
       expect(result.marked).toBe(0);
+    });
+  });
+
+  test.describe('its pages', () => {
+    /** What a table made in the page, and the source it is given, let the test do and see. */
+    interface Probe {
+      /** The starts of the pages that were asked for, in order. */
+      calls: number[];
+      /** The pages (from 0) that fail when asked for. */
+      failing: Set<number>;
+      /** Whether the source throws at once, without a promise. */
+      throws: boolean;
+      table: HTMLElement;
+      holder: HTMLElement;
+    }
+
+    /**
+     * Makes a table of `rowCount` rows, in a box 300 high, with a source the test can break. The
+     * pages in `failing` (from 0) fail from the start: the table asks for pages as soon as it is made.
+     */
+    async function mount(page: Page, rowCount: number, failing: number[] = []): Promise<void> {
+      await page.evaluate(
+        ({ count, broken }) => {
+          const holder = document.createElement('div');
+          holder.id = 'probe';
+          holder.style.cssText = 'height: 300px; width: 400px; position: relative;';
+          const table = document.createElement('k-table') as HTMLElement & {
+            rowCount: number;
+            fetch: (start: number, count: number) => unknown;
+          };
+          const probe: Probe = {
+            calls: [],
+            failing: new Set(broken),
+            throws: false,
+            table,
+            holder,
+          };
+          (window as unknown as { probe: Probe }).probe = probe;
+          table.rowCount = count;
+          table.fetch = (start, size) => {
+            probe.calls.push(start);
+            if (probe.throws) {
+              throw new Error('The source threw.');
+            }
+            if (probe.failing.has(start / 256)) {
+              return Promise.reject(new Error('The page failed.'));
+            }
+            return Promise.resolve({
+              start,
+              count: size,
+              columns: [
+                {
+                  name: 'n',
+                  values: Int32Array.from({ length: size }, (_, index) => start + index + 1),
+                  nulls: new Uint8Array(size),
+                },
+              ],
+            });
+          };
+          holder.append(table);
+          document.body.append(holder);
+        },
+        { count: rowCount, broken: failing },
+      );
+    }
+
+    const probeOf = (page: Page) => ({
+      calls: () => page.evaluate(() => (window as unknown as { probe: Probe }).probe.calls.slice()),
+      fail: (...pages: number[]) =>
+        page.evaluate((list) => {
+          const { failing } = (window as unknown as { probe: Probe }).probe;
+          failing.clear();
+          list.forEach((item) => failing.add(item));
+        }, pages),
+      scrollToRow: (row: number) =>
+        page.evaluate((target) => {
+          (window as unknown as { probe: Probe }).probe.table.shadowRoot
+            ?.querySelector('.viewport')
+            ?.scrollTo(0, target * 28);
+        }, row),
+      // A moment, for what was asked for to come, and to be drawn.
+      settle: () => page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 80))),
+      problem: () =>
+        page.evaluate(() => {
+          const root = (window as unknown as { probe: Probe }).probe.table.shadowRoot;
+          const bar = root?.querySelector('.problem');
+          return bar === null || bar === undefined
+            ? null
+            : {
+                role: bar.getAttribute('role'),
+                text: (bar.querySelector('.message')?.textContent ?? '').trim(),
+                alone: bar.classList.contains('alone'),
+                button: (bar.querySelector('k-button')?.textContent ?? '').trim(),
+              };
+        }),
+      retry: () => page.locator('#probe .problem k-button button').click(),
+      texts: () =>
+        page.evaluate(() => {
+          const root = (window as unknown as { probe: Probe }).probe.table.shadowRoot;
+          return [...(root?.querySelectorAll('.rows [role="rowheader"]') ?? [])].map(
+            (cell) => cell.textContent,
+          );
+        }),
+      cells: () =>
+        page.evaluate(() => {
+          const root = (window as unknown as { probe: Probe }).probe.table.shadowRoot;
+          return [...(root?.querySelectorAll('.rows [role="gridcell"]') ?? [])].map(
+            (cell) => cell.textContent,
+          );
+        }),
+      focusIsOnViewport: () =>
+        page.evaluate(() => {
+          const root = (window as unknown as { probe: Probe }).probe.table.shadowRoot;
+          return root?.activeElement?.classList.contains('viewport') === true;
+        }),
+    });
+
+    test('lets go of the pages that are far from view, and asks again if one is needed', async ({
+      page,
+    }) => {
+      await mount(page, 25_600);
+      const probe = probeOf(page);
+      await probe.settle();
+      // Down through forty pages, a page at a time.
+      for (let step = 1; step <= 40; step += 1) {
+        await probe.scrollToRow(step * 256);
+        await probe.settle();
+      }
+      const before = await probe.calls();
+      expect(before.filter((start) => start === 3 * 256)).toHaveLength(1);
+      // Back where it was long ago: the page has been let go of, and is asked for again.
+      await probe.scrollToRow(3 * 256 + 5);
+      await probe.settle();
+      const after = await probe.calls();
+      expect(after.filter((start) => start === 3 * 256)).toHaveLength(2);
+      expect((await probe.cells()).length).toBeGreaterThan(5);
+      // The page it is on, and its neighbours, are not asked for again when it moves a little.
+      const asked = after.length;
+      await probe.scrollToRow(3 * 256 + 40);
+      await probe.settle();
+      expect(await probe.calls()).toHaveLength(asked);
+    });
+
+    test('says nothing of a page that failed and is not in view, which is only one that was asked for ahead', async ({
+      page,
+    }) => {
+      await mount(page, 1000, [1]);
+      const probe = probeOf(page);
+      await probe.settle();
+      // The page after the first is asked for, and fails; the rows in view are in the first.
+      expect(await probe.calls()).toEqual([0, 256]);
+      expect(await probe.problem()).toBeNull();
+      expect((await probe.texts())[0]).toBe('1');
+    });
+
+    test('says so when rows in view could not be loaded, once, and not again until asked', async ({
+      page,
+    }) => {
+      await mount(page, 1000, [1]);
+      const probe = probeOf(page);
+      await probe.settle();
+      await probe.scrollToRow(300);
+      await probe.settle();
+      expect(await probe.problem()).toEqual({
+        role: 'alert',
+        text: 'Could not load the rows.',
+        alone: false,
+        button: 'Try again',
+      });
+      // The page is not asked for over and over: once, however the table is moved about.
+      for (const row of [301, 305, 299, 310]) {
+        await probe.scrollToRow(row);
+        await probe.settle();
+      }
+      const calls = await probe.calls();
+      expect(calls.filter((start) => start === 256)).toHaveLength(1);
+      // The rows of the page that came are drawn, and those that did not are empty.
+      expect((await probe.cells()).every((text) => text === '')).toBe(true);
+      // Away from the page that failed, there is nothing to say.
+      await probe.scrollToRow(600);
+      await probe.settle();
+      expect(await probe.problem()).toBeNull();
+    });
+
+    test('asks again when told to, and goes on from there, with the keyboard on the table', async ({
+      page,
+    }) => {
+      await mount(page, 1000, [1]);
+      const probe = probeOf(page);
+      await probe.scrollToRow(300);
+      await probe.settle();
+      expect((await probe.problem())?.button).toBe('Try again');
+      await probe.fail();
+      await probe.retry();
+      await expect.poll(probe.problem).toBeNull();
+      await expect.poll(async () => (await probe.cells()).includes('301')).toBe(true);
+      await expect.poll(probe.focusIsOnViewport).toBe(true);
+      expect((await probe.calls()).filter((start) => start === 256)).toHaveLength(2);
+    });
+
+    test('says so, alone, when the first page could not be loaded, and shows the table once it can', async ({
+      page,
+    }) => {
+      await mount(page, 1000, [0]);
+      const probe = probeOf(page);
+      await probe.settle();
+      // Nothing is drawn but the problem, at the top.
+      expect(await probe.problem()).toEqual({
+        role: 'alert',
+        text: 'Could not load the rows.',
+        alone: true,
+        button: 'Try again',
+      });
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { probe: Probe }).probe.table.shadowRoot?.querySelectorAll(
+              '.header',
+            ).length,
+        ),
+      ).toBe(0);
+      await probe.fail();
+      await probe.retry();
+      await expect.poll(probe.problem).toBeNull();
+      await expect.poll(async () => (await probe.texts())[0]).toBe('1');
+    });
+
+    test('treats a source that throws, without a promise, as one that failed', async ({ page }) => {
+      await mount(page, 1000);
+      await page.evaluate(() => {
+        const { probe } = window as unknown as { probe: Probe };
+        probe.throws = true;
+        // Start again, with the source throwing.
+        (probe.table as unknown as { rowCount: number }).rowCount = 999;
+      });
+      const probe = probeOf(page);
+      await probe.settle();
+      expect((await probe.problem())?.alone).toBe(true);
     });
   });
 

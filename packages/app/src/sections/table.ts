@@ -170,6 +170,15 @@ export function valueRows(start: number, count: number): TableRows {
 /** A source of the rows of each kind of value. */
 export const fetchValues: TableFetch = (start, count) => Promise.resolve(valueRows(start, count));
 
+/** A source that has the first page, and fails for every other. */
+export const fetchFailingLater: TableFetch = (start, count) =>
+  start === 0
+    ? Promise.resolve(syntheticRows(start, count))
+    : Promise.reject(new Error('The rows are gone.'));
+
+/** A source that fails for every page. */
+export const fetchFailing: TableFetch = () => Promise.reject(new Error('The rows are gone.'));
+
 /** A source of `rowCount` made-up rows. */
 export const fetchSynthetic: TableFetch = (start, count) =>
   Promise.resolve(syntheticRows(start, count));
@@ -187,6 +196,12 @@ export function tableSection() {
       </div>
       <div class="table-demo wide tall" id="table-values">
         <k-table label="Kinds of value" .rowCount=${10} .fetch=${fetchValues}></k-table>
+      </div>
+      <div class="table-demo" id="table-failing">
+        <k-table label="Rows that go" .rowCount=${1000} .fetch=${fetchFailingLater}></k-table>
+      </div>
+      <div class="table-demo" id="table-failed">
+        <k-table label="Rows that never come" .rowCount=${1000} .fetch=${fetchFailing}></k-table>
       </div>
       <div class="table-demo wide" id="table-clamped">
         <k-table
