@@ -200,6 +200,11 @@ export class KarmaniaGallery extends LitElement {
         width: calc(var(--k-space-48) * 12);
       }
 
+      /* Room for a dozen rows, to show every one of a short table. */
+      .table-demo.tall {
+        height: calc(var(--k-space-48) * 8);
+      }
+
       .grid {
         display: grid;
         gap: var(--k-space-16) var(--k-space-24);

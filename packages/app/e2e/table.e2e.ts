@@ -576,6 +576,171 @@ test.describe('the table', () => {
     });
   });
 
+  test.describe('its cells', () => {
+    const EXPECTED = [
+      ['plain', '42', '-2000', 'true', 'plain'],
+      ['a decimal', '1234567.5', '2147483647', 'false', '  spaced  '],
+      ['noise', '0.3', '0', 'true', 'Ünï "quoted" & <tagged>'],
+      ['minus zero', '0', '-1', 'false', ''],
+      ['large', '1.5e+25', '1', 'true', 'null'],
+      ['small', '1.5e-7', '10', 'false', 'x'],
+      ['not a number', 'NaN', '100', 'true', 'x'],
+      ['infinite', 'Infinity', '1000', 'false', 'x'],
+      ['minus infinite', '-Infinity', '10000', 'true', 'x'],
+      ['null', 'null', 'null', 'null', 'null'],
+    ];
+
+    const cell = (p: ReturnType<typeof parts>, row: number, column: number): Locator =>
+      p.rows.nth(row).locator('[role="gridcell"]').nth(column);
+
+    test('say each kind of value as it is: numbers plain, flags in words, text as it is, null as "null"', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const texts = await p.rows.evaluateAll((all) =>
+        all.map((row) =>
+          [...row.querySelectorAll('[role="gridcell"]')].map((element) => element.textContent),
+        ),
+      );
+      expect(texts).toEqual(EXPECTED);
+    });
+
+    test('show text as text, and not as what it looks like', async ({ page }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const target = cell(p, 2, 4);
+      await expect(target).toHaveText('Ünï "quoted" & <tagged>');
+      expect(await target.evaluate((element) => element.children.length)).toBe(0);
+    });
+
+    test('mark the nulls, and only those: the word "null" is a value like any other', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const marked = await p.rows.evaluateAll((all) =>
+        all.map((row) =>
+          [...row.querySelectorAll('[role="gridcell"]')].map((element) =>
+            element.classList.contains('null'),
+          ),
+        ),
+      );
+      marked.forEach((row, index) => {
+        expect(row, `row ${String(index + 1)}`).toEqual(
+          index === 9 ? [false, true, true, true, true] : [false, false, false, false, false],
+        );
+      });
+    });
+
+    test('show a null in a muted colour, upright, and in the same column as the numbers round it', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const style = (locator: Locator) =>
+        locator.evaluate((element) => {
+          const computed = getComputedStyle(element);
+          return {
+            color: computed.color,
+            italic: computed.fontStyle,
+            align: computed.textAlign,
+            weight: computed.fontWeight,
+          };
+        });
+      const muted = await style(p.numbers.first());
+      const plain = await style(cell(p, 0, 1));
+      const nullNumber = await style(cell(p, 9, 1));
+      const nullText = await style(cell(p, 9, 4));
+      expect(nullNumber.color).toBe(muted.color);
+      expect(nullText.color).toBe(muted.color);
+      expect(plain.color).not.toBe(muted.color);
+      expect([nullNumber.italic, nullText.italic]).toEqual(['normal', 'normal']);
+      expect(nullNumber.weight).toBe(plain.weight);
+      // A null is on the side its column's numbers are on.
+      expect(nullNumber.align).toBe(plain.align);
+      expect(nullNumber.align).toBe('right');
+      expect(nullText.align).not.toBe('right');
+    });
+
+    test('set numbers on the right with digits in line, and flags and text on the left', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const kinds = await p.rows
+        .first()
+        .locator('[role="gridcell"]')
+        .evaluateAll((all) =>
+          all.map((element) => [
+            element.classList.contains('numeric'),
+            getComputedStyle(element).fontVariantNumeric,
+          ]),
+        );
+      expect(kinds.map(([numeric]) => numeric)).toEqual([false, true, true, false, false]);
+      for (const [, numerals] of kinds) {
+        expect(numerals).toContain('tabular-nums');
+      }
+    });
+
+    test('are wide enough for all of them', async ({ page }) => {
+      const p = parts(page, 'table-values');
+      await expect(p.rows).toHaveCount(10);
+      const cells = p.demo.locator('.rows [role="gridcell"], .header .cell');
+      const total = await cells.count();
+      for (let index = 0; index < total; index += 1) {
+        const cut = await cells
+          .nth(index)
+          .evaluate((element) => element.scrollWidth > element.clientWidth);
+        expect(cut, `cell ${String(index)}`).toBe(false);
+      }
+    });
+
+    test('are empty, and not null, until their rows have come', async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const holder = document.createElement('div');
+        holder.style.cssText = 'height: 300px; width: 400px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+        };
+        table.rowCount = 1000;
+        // The first page comes at once, and no other ever does.
+        table.fetch = (start, count) =>
+          start === 0
+            ? Promise.resolve({
+                start,
+                count,
+                columns: [
+                  {
+                    name: 'n',
+                    values: Int32Array.from({ length: count }, (_, index) => index),
+                    nulls: new Uint8Array(count),
+                  },
+                ],
+              })
+            : new Promise(() => undefined);
+        holder.append(table);
+        document.body.append(holder);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const viewport = table.shadowRoot?.querySelector('.viewport');
+        viewport?.scrollTo(0, 28 * 600);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const cells = [...(table.shadowRoot?.querySelectorAll('.rows [role="gridcell"]') ?? [])];
+        const found = {
+          count: cells.length,
+          texts: [...new Set(cells.map((element) => element.textContent))],
+          marked: cells.filter((element) => element.classList.contains('null')).length,
+        };
+        holder.remove();
+        return found;
+      });
+      expect(result.count).toBeGreaterThan(5);
+      expect(result.texts).toEqual(['']);
+      expect(result.marked).toBe(0);
+    });
+  });
+
   for (const theme of ['light', 'dark'] as const) {
     test(`has no serious accessibility violations (${theme} theme)`, async ({ page }) => {
       await page.goto(`/gallery.html?theme=${theme}`);
