@@ -418,7 +418,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 9.9 Geometry-derived columns shown first for each kind (section 8.4).
 - [x] 9.10 Keyboard navigation in the table: arrows, Page Up and Down, Home and
   End, focus visible.
-- [ ] 9.11 Data tab screenshot baselines (empty, one dataset, many datasets,
+- [x] 9.11 Data tab screenshot baselines (empty, one dataset, many datasets,
   long names, warnings expanded), reviewed and committed.
 
 ## M10: Hardening

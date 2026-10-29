@@ -1865,3 +1865,17 @@ was chosen, why.
   test makes the browser round to multiples of 8), scroll anchoring moved the scroll bar when the
   rows were moved, which is turned off for the table, and the sums for where the rows go were first
   tried with a box of 10 million pixels, which led to the 8 million of step 9.8.
+- Step 9.11 (photographs of the Data tab). The whole app, with the panel on the Data tab, in the states
+  that look different, at three window sizes in both themes: nothing loaded; one dataset; six
+  datasets, which is one more than the list shows, so that it scrolls and the selected row (the one
+  loaded last) is in it; two datasets with a name that no row is wide enough for, and a column
+  whose name is longer than a column can be; a dataset with a warning, with its list opened; and the
+  keyboard on a cell of the table. All come from real files through the wizard and the engine. They
+  were looked at one by one against the checklist (alignment, spacing, truncation, contrast in both
+  themes, the smallest and the largest window). One thing was found and mended: the lines under the
+  rows were the cells', so for a dataset with few columns in a panel that is wide they stopped
+  at the last column while the header's band ran the whole width, which looked unfinished; they are
+  now the rows' own, and a test asks for it. At the smallest window a dataset list of five rows,
+  a summary and the two lists under it leave the table less than its minimum, so the panel scrolls
+  and the table is partly below the fold: that is the minimum at work, not a fault. Nothing in the
+  six states is left that is believed wrong.
