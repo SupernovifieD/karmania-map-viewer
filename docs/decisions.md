@@ -1706,3 +1706,8 @@ was chosen, why.
   the dialog can show, so the body scrolls and the list of what is wrong is under the table, below
   what is visible (the footer says the first thing that is wrong). Making room for it would take the
   table's room, which is what the step is for.
+- CI failed the large-import commit (4238f6e) on a test that was already there: after Esc, the
+  wizard forgets its files when the browser sends the dialog's `close` event, which is a moment after
+  the dialog is hidden, and the test read the files at once. The same race as the close counts,
+  in the tests, not the app (Cancel and Load clear at once; only Esc and the close button go through
+  the event). The two tests that read the wizard's state after Esc now wait for it to be so.
