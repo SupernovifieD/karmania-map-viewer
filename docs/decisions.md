@@ -1346,3 +1346,30 @@ was chosen, why.
   left alone: at the usual width the Legend's line wraps with "rendered." alone on its second
   line, and balancing the lines (`text-wrap: balance`) would change the empty state's existing
   pictures for a purely cosmetic gain.
+
+## M8: the import wizard
+
+- How M8 is built. The wizard is one dialog in the app (`karmania-import-dialog`) that shows one step
+  at a time. The parts that are not specific to it go in `@karmania/ui`, each in a commit of its own
+  before the step that needs it, with a gallery demo, a browser test and pictures: `k-dialog`, then
+  the step indicator, form controls and so on as the steps call for them. The wizard imports one data
+  file at a time, because one mapping describes one file: with several files, the File step lists
+  them all, and after one is loaded the wizard moves on to the next (the sidecar `.prj` goes with its
+  data file). The kernel applies the chosen name and coordinate system to every format, but only
+  CSV has columns to map and values to treat as missing, so for the other formats the Mapping and
+  Nodata steps say there is nothing to set (GeoJSON: the shape of the data decides the kind; ASCII
+  grid: its header has the missing-value marker; OBJ: nothing), and Next goes on.
+- `k-dialog`: a native `<dialog>` opened with `showModal()`, so that the page behind is inert, Tab
+  stays inside, Esc closes it and the keyboard goes back to where it was. It is open while `open` is
+  set; a person closing it (Esc or the close button) sets `open` to false and sends
+  `k-dialog-close`, and closing it by setting `open` sends nothing, so the page that owns it hears
+  only about what a person did. A click outside does not close it: a wizard holds work that would be
+  lost. The header, footer and size are the specification's (56, 64, `min(720, window - 48)`); the
+  bands' heights and the size are tokens, and so is the colour that dims the page (`--k-scrim`, a
+  dark one in both themes: the text colour would have lightened the page in the dark theme). The
+  footer has 1 below its buttons for the 1 of its border above them, so that they sit on whole
+  pixels, as in the toolbar. The steps band is hidden while nothing is in the `steps` slot, so that
+  a dialog without steps has no gap under its header.
+- The dialog's pictures hide the rest of the gallery first (the dialog is made visible again), so
+  that what shows round the dialog, under the dimming, is the same whatever else the gallery holds:
+  the lesson of `tooltip-below`, which was moved by a heading added above it.

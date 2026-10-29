@@ -81,6 +81,32 @@ const tooltipShot = (name: string, id: string, how: 'hover' | 'focus'): Shot => 
   },
 });
 
+/** The dialog of a gallery demo, opened with its button; the dialog is what is photographed. */
+const dialogShot = (
+  name: string,
+  id: string,
+  prepare: (page: Page, dialog: Locator) => Promise<void> = () => Promise.resolve(),
+): Shot => ({
+  name,
+  show: async (page) => {
+    const demo = gallery(page, `karmania-gallery #${id}`);
+    await reveal(demo);
+    await demo.locator(':scope > k-button').click();
+    const dialog = demo.locator('dialog');
+    await dialog.waitFor();
+    // The rest of the gallery is hidden, so that what shows round the dialog, under the
+    // dimming, does not change with what else the gallery shows.
+    await page.locator('karmania-gallery').evaluate((host) => {
+      host.style.visibility = 'hidden';
+    });
+    await dialog.evaluate((element) => {
+      element.style.visibility = 'visible';
+    });
+    await prepare(page, dialog);
+    return [dialog];
+  },
+});
+
 const tab = (page: Page, id: string): Locator =>
   gallery(page, `karmania-gallery #panel-tabs [role="tab"][data-id="${id}"]`);
 
@@ -163,6 +189,17 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
+  dialogShot('dialog-short', 'dialog-short'),
+  dialogShot('dialog-short-close-focus', 'dialog-short', async (page, dialog) => {
+    await page.keyboard.press('Shift');
+    await dialog.locator('header k-button').focus();
+  }),
+  dialogShot('dialog-long', 'dialog-long'),
+  dialogShot('dialog-long-scrolled', 'dialog-long', async (_page, dialog) => {
+    await dialog.locator('.body').evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+  }),
 ];
 
 for (const shot of SHOTS) {

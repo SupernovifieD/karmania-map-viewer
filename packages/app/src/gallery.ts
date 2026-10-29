@@ -9,6 +9,7 @@ import '@karmania/ui/base.css';
 import { PACKAGE_NAME, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { buttonsSection } from './sections/buttons.js';
+import { dialogSection } from './sections/dialog.js';
 import { emptyStateSection } from './sections/empty-state.js';
 import { iconsSection } from './sections/icons.js';
 import { tabsSection } from './sections/tabs.js';
@@ -186,7 +187,7 @@ export class KarmaniaGallery extends LitElement {
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
       ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
-      ${emptyStateSection()}
+      ${emptyStateSection()} ${dialogSection()}
     `;
   }
 }

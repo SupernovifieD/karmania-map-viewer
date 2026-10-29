@@ -80,6 +80,14 @@ The focus ring is drawn on `:focus-visible` and must never be clipped by an
 | `--k-panel-rail-width`     | 40px  | The side panel folded away into its rail of buttons |
 | `--k-resize-hit-width`     | 6px   | The strip along the panel's edge that can be grabbed to resize it |
 
+### The dialog
+
+| Token                       | Value | Use                                          |
+| --------------------------- | ----- | -------------------------------------------- |
+| `--k-dialog-max-size`       | 720px | The most a dialog is wide and tall; the window less 48 if that is less |
+| `--k-dialog-header-height`  | 56px  | The band with the title and the close button |
+| `--k-dialog-footer-height`  | 64px  | The band with the buttons                    |
+
 ## Motion
 
 | Token                  | Value    | Use                                     |
@@ -121,6 +129,7 @@ value. Dark follows `prefers-color-scheme`, and a `data-theme="light"` or
 | `--k-danger`          | `#b42318` | `#ff8b82` | Errors                                           |
 | `--k-warning`         | `#8a5300` | `#f0b94a` | Warnings                                         |
 | `--k-info`            | `#0b6580` | `#63c9e8` | Information                                      |
+| `--k-scrim`           | `#0a0c10` | `#000000` | The page behind a dialog, at about 40% opacity   |
 
 ### Contrast
 

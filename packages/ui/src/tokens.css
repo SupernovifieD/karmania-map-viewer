@@ -54,6 +54,12 @@
   /* The strip along the panel's edge that can be grabbed to resize it. */
   --k-resize-hit-width: 6px;
 
+  /* A dialog: as wide as this and, with room left at the window's edges, as tall; and the height
+     of the bands at its top and bottom. */
+  --k-dialog-max-size: 720px;
+  --k-dialog-header-height: 56px;
+  --k-dialog-footer-height: 64px;
+
   /* The width of a control's border. Every variant of a control has one (it may be
      transparent), so they are all the same size. */
   --k-border-width: 1px;
@@ -92,6 +98,8 @@
   --k-danger: #b42318;
   --k-warning: #8a5300;
   --k-info: #0b6580;
+  /* Over the page behind a dialog, at 40% opacity or so. */
+  --k-scrim: #0a0c10;
 }
 
 /* Colors, dark: when the system prefers it, unless the page forces light... */
@@ -109,6 +117,7 @@
     --k-danger: #ff8b82;
     --k-warning: #f0b94a;
     --k-info: #63c9e8;
+    --k-scrim: #000000;
   }
 }
 
@@ -128,6 +137,7 @@
   --k-danger: #ff8b82;
   --k-warning: #f0b94a;
   --k-info: #63c9e8;
+  --k-scrim: #000000;
 }
 
 :root[data-theme='light'] {
