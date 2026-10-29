@@ -18,3 +18,7 @@ export { KEmptyState } from './components/empty-state.js';
 export { DIALOG_CLOSE, KDialog } from './components/dialog.js';
 export { KSteps } from './components/steps.js';
 export type { StepDefinition } from './components/steps.js';
+export { KInput, INPUT_CHANGE } from './components/input.js';
+export type { InputChange, InputMode } from './components/input.js';
+export { KSelect, SELECT_CHANGE } from './components/select.js';
+export type { SelectChange, SelectOption } from './components/select.js';

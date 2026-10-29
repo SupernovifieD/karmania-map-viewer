@@ -1407,3 +1407,15 @@ was chosen, why.
   nothing, as before.
 - A test that looks for "the header" of the app now finds two, since the wizard has one: the tests
   of the toolbar ask for `header.toolbar`.
+- `k-select` and `k-input` (in `@karmania/ui`, with the `chevron-down` icon): a label above the control,
+  the control at the height of a button (32, or 28 compact with `hide-label`, which keeps the label
+  for screen readers), and a line under it for help or for what is wrong. Both are native controls
+  inside (`<select>`, `<input>`), so the keyboard and what screen readers say are the browser's own.
+  A wrong value is said in words with an icon and marked `aria-invalid`, never by colour alone.
+  `reserve` keeps the line's room free, so that a message appearing moves nothing (the wizard's
+  fields will use it); without it the field grows by the line, and a test checks both. The value is
+  the page's to keep, as for any native control; a person's change is sent as `k-select-change` or
+  `k-input-change` (every keystroke), because `change` does not leave a shadow root. The test of the
+  select chooses by typing a letter, not by the arrow keys: on a Mac an arrow opens the list, on
+  Windows and Linux it changes the value. The gallery's demos are each as tall as their own content,
+  so that a field's picture does not depend on the field beside it.

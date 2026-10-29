@@ -189,6 +189,28 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
+  ...['select', 'input'].map((kind): Shot => ({
+    name: `fields-${kind}`,
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #fields-${kind}`);
+      await reveal(target);
+      return [target];
+    },
+  })),
+  ...[
+    ['select-focus', 'select-default', 'select'],
+    ['select-compact-focus', 'select-compact', 'select'],
+    ['input-focus', 'input-default', 'input'],
+    ['input-error-focus', 'input-error', 'input'],
+  ].map(([name, id, control]): Shot => ({
+    name: name ?? '',
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #${id ?? ''}`);
+      await reveal(target);
+      await focusByKeyboard(page, target.locator(control ?? ''));
+      return [target];
+    },
+  })),
   ...['first', 'middle', 'last', 'crowded'].map((where): Shot => ({
     name: `steps-${where}`,
     show: async (page) => {

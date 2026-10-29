@@ -4,6 +4,7 @@
  */
 import box from 'lucide-static/icons/box.svg?raw';
 import check from 'lucide-static/icons/check.svg?raw';
+import chevronDown from 'lucide-static/icons/chevron-down.svg?raw';
 import chevronsLeft from 'lucide-static/icons/chevrons-left.svg?raw';
 import chevronsRight from 'lucide-static/icons/chevrons-right.svg?raw';
 import circleAlert from 'lucide-static/icons/circle-alert.svg?raw';
@@ -27,6 +28,7 @@ import x from 'lucide-static/icons/x.svg?raw';
 export const ICON_NAMES = [
   'box',
   'check',
+  'chevron-down',
   'chevrons-left',
   'chevrons-right',
   'circle-alert',
@@ -53,6 +55,7 @@ export type IconName = (typeof ICON_NAMES)[number];
 const DRAWINGS: Readonly<Record<IconName, string>> = {
   box,
   check,
+  'chevron-down': chevronDown,
   'chevrons-left': chevronsLeft,
   'chevrons-right': chevronsRight,
   'circle-alert': circleAlert,
