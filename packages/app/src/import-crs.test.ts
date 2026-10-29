@@ -116,7 +116,7 @@ describe('writing a coordinate system for people', () => {
   it('gives the code as it is, and a local grid with its units', () => {
     expect(describeCrs({ kind: 'epsg', code: 32640 })).toBe('EPSG 32640');
     expect(describeCrs({ kind: 'local', units: 'm' })).toBe('a local grid, in metres');
-    expect(describeCrs({ kind: 'local', units: 'us_ft' })).toBe('a local grid, in us survey feet');
+    expect(describeCrs({ kind: 'local', units: 'us_ft' })).toBe('a local grid, in US survey feet');
   });
 
   it('says where a found one came from', () => {

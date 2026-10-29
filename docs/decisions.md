@@ -1577,3 +1577,13 @@ was chosen, why.
   a projection file that was found but could not be used is explained by the kernel's own finding
   (that it describes a system but gives no EPSG code), shown in the step. The tests of the wizard's
   frame now open it with a data file and its projection file, so that no step stops them.
+- Step 8.9 (the coordinate system step, part 2). "A local grid" is a third choice, with the units of
+  the grid (metres, feet or US survey feet, metres to begin with) in the place where the field for an
+  EPSG code goes, so that choosing moves nothing: a test checks the two take the same box. It is
+  an explicit choice, as the brief says it must be (a mine grid has no EPSG code), and it can be made
+  even when a coordinate system was found; the found one stays in the list to go back to. A line at the
+  end says what is chosen and where it came from ("EPSG 32640, from the .prj file points.prj."; "a
+  local grid, in US survey feet: the coordinates are not tied to a place on the Earth, only to each
+  other"; "No coordinate system is chosen yet."), with a tick when something is chosen and a mark
+  of alarm when not, and it is a status region, so that a screen reader says it when the choice
+  changes. Units are named as in a sentence ("US survey feet", not lower-cased "us survey feet").

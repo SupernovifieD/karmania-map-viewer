@@ -374,7 +374,7 @@ Definitions and reprojection can be added later, with the features that need the
   `crs` member, a `.prj` file, or the GeoJSON default); typing an EPSG code as a
   number. The code is shown as given: there is no name, kind or units lookup,
   because the core has no definitions (owner decision, 3.25).
-- [ ] 8.9 Step "CRS", part 2: the Local grid option with units; the chosen CRS
+- [x] 8.9 Step "CRS", part 2: the Local grid option with units; the chosen CRS
   summary.
 - [ ] 8.10 Step "Review": runs the import job with a progress bar and cancel;
   findings grouped by severity; each error links to the step in its "step"

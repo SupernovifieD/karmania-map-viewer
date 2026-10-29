@@ -16,9 +16,13 @@ function parts(page: Page) {
     found: step.locator('.found-text'),
     findings: step.locator('karmania-findings li'),
     choice: step.locator('.choice'),
-    select: step.locator('.choice k-select select'),
+    select: step.locator('.choice k-select').first().locator('select'),
     code: step.locator('.choice k-input'),
     codeInput: step.locator('.choice k-input input'),
+    units: step.locator('.choice k-select').nth(1),
+    unitsSelect: step.locator('.choice k-select').nth(1).locator('select'),
+    summary: step.locator('.summary-text'),
+    summaryIcon: step.locator('.summary k-icon'),
     note: host.locator('span[slot="footer-note"]'),
     next: host.locator('k-button[slot="footer-end"]').nth(1),
     back: host.locator('k-button[slot="footer-end"]').nth(0),
@@ -92,7 +96,11 @@ test.describe('the coordinate system step', () => {
     await crsOf(page, 'points.csv', 'points.prj');
     await expect(p.found).toHaveText('Found EPSG 32640, from the .prj file points.prj.');
     expect(await p.select.inputValue()).toBe('detected');
-    expect(await optionsOf(p.select)).toEqual(['The one found: EPSG 32640', 'An EPSG code']);
+    expect(await optionsOf(p.select)).toEqual([
+      'The one found: EPSG 32640',
+      'An EPSG code',
+      'A local grid',
+    ]);
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
   });
@@ -121,7 +129,7 @@ test.describe('the coordinate system step', () => {
     const p = parts(page);
     await crsOf(page, 'points.csv');
     await expect(p.found).toHaveText('No coordinate system was found in or beside the file.');
-    expect(await optionsOf(p.select)).toEqual(['Choose one…', 'An EPSG code']);
+    expect(await optionsOf(p.select)).toEqual(['Choose one…', 'An EPSG code', 'A local grid']);
     expect(await p.select.inputValue()).toBe('');
     await expect(p.next.locator('button')).toBeDisabled();
     await expect(p.note).toHaveText('Choose a coordinate system: an EPSG code, or a local grid.');
@@ -206,6 +214,86 @@ test.describe('the coordinate system step', () => {
     const [select, code] = [await rect(p.step.locator('.choice k-select')), await rect(p.code)];
     expect(code.y).toBe(select.y);
     expect(code.height).toBe(select.height);
+  });
+
+  test('offers a local grid, with its units, for coordinates that are not tied to a place', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('local');
+    await expect(p.unitsSelect).toBeVisible();
+    await expect(p.units.locator('label')).toHaveText('Units of the grid');
+    expect(await optionsOf(p.unitsSelect)).toEqual(['Metres', 'Feet', 'US survey feet']);
+    expect(await p.unitsSelect.inputValue()).toBe('m');
+    await expect(p.next.locator('button')).toBeEnabled();
+    await expect(p.note).toHaveCount(0);
+    expect(await draftCrs(page)).toMatchObject({ mode: 'local', units: 'm' });
+    await p.unitsSelect.selectOption('us_ft');
+    expect(await draftCrs(page)).toMatchObject({ mode: 'local', units: 'us_ft' });
+  });
+
+  test('lets a local grid be chosen over a coordinate system that was found: it is a choice', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv', 'points.prj');
+    await p.select.selectOption('local');
+    await expect(p.unitsSelect).toBeVisible();
+    await expect(p.next.locator('button')).toBeEnabled();
+    // And the one that was found is still there to go back to.
+    await p.select.selectOption('detected');
+    await expect(p.unitsSelect).toHaveCount(0);
+    await expect(p.summary).toContainText('EPSG 32640');
+  });
+
+  test('sums up what is chosen and where it came from, as the choice changes', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv', 'points.prj');
+    await expect(p.summary).toHaveText('Chosen: EPSG 32640, from the .prj file points.prj.');
+    await p.select.selectOption('epsg');
+    await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
+    await p.codeInput.fill('28350');
+    await expect(p.summary).toHaveText('Chosen: EPSG 28350, as you entered it.');
+    await p.select.selectOption('local');
+    await expect(p.summary).toContainText('Chosen: a local grid, in metres');
+    await p.unitsSelect.selectOption('us_ft');
+    await expect(p.summary).toContainText('a local grid, in US survey feet');
+    await expect(p.summary).toContainText('not tied to a place on the Earth');
+  });
+
+  test('says when nothing is chosen, with a different mark from when something is', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'circle-alert');
+    await p.select.selectOption('local');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'check');
+  });
+
+  test('tells screen readers when the choice changes, in a status region', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await expect(p.step.getByRole('status')).toContainText('No coordinate system is chosen yet.');
+    await p.select.selectOption('local');
+    await expect(p.step.getByRole('status')).toContainText('a local grid');
+  });
+
+  test('moves nothing when the units take the place of the code, or the other way about', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    const withCode = [await rect(p.choice), await rect(p.select), await rect(p.code)];
+    await p.select.selectOption('local');
+    const withUnits = [await rect(p.choice), await rect(p.select), await rect(p.units)];
+    expect(withUnits[0]).toEqual(withCode[0]);
+    expect(withUnits[1]).toEqual(withCode[1]);
+    // The units are where the code was.
+    expect(withUnits[2]).toEqual(withCode[2]);
   });
 
   test('goes back to the step before and on again with what was chosen kept', async ({ page }) => {
