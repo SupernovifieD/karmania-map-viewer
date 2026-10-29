@@ -285,9 +285,58 @@ test.describe('the dialog', () => {
     expect(dialog.x).toBe(24);
   });
 
+  test('has room for a note between Cancel and the buttons, of two lines at most, over nothing', async ({
+    page,
+  }) => {
+    const p = parts(page, 'dialog-note');
+    await p.trigger.click();
+    const note = p.host.locator('.note');
+    const [cancel, box, back, footer] = [
+      await rect(p.start),
+      await rect(note),
+      await rect(p.end.nth(0)),
+      await rect(p.footer),
+    ];
+    expect(box.x).toBeGreaterThanOrEqual(cancel.x + cancel.width);
+    expect(box.x + box.width).toBeLessThanOrEqual(back.x);
+    expect(footer.height).toBe(64);
+    // The note is long, so it fills two lines of 20 and is cut after them.
+    expect(box.height).toBe(40);
+    expect(
+      await note.evaluate((element) => ({
+        cut: element.scrollHeight > element.clientHeight,
+        clamp: getComputedStyle(element).webkitLineClamp,
+        size: getComputedStyle(element).fontSize,
+        line: getComputedStyle(element).lineHeight,
+      })),
+    ).toEqual({ cut: true, clamp: '2', size: '13px', line: '20px' });
+    // The whole of it is there for whoever points at it.
+    await expect(p.host.locator('span[slot="footer-note"]')).toHaveAttribute(
+      'title',
+      /A note that is a good deal longer/,
+    );
+    // The buttons are where they were, and the note is in the middle of the footer's height.
+    expect(box.y + box.height / 2).toBeCloseTo(footer.y + footer.height / 2, 0);
+  });
+
+  test('sets a short note on one line, in the middle of the footer', async ({ page }) => {
+    const p = parts(page, 'dialog-note');
+    await p.trigger.click();
+    await p.host.locator('span[slot="footer-note"]').evaluate((element) => {
+      element.textContent = 'Choose a column for X.';
+    });
+    const [box, footer] = [await rect(p.host.locator('.note')), await rect(p.footer)];
+    expect(box.height).toBe(20);
+    expect(box.y + box.height / 2).toBeCloseTo(footer.y + footer.height / 2, 0);
+  });
+
   test('has no serious accessibility violations, open', async ({ page }) => {
     const p = parts(page, 'dialog-short');
     await p.trigger.click();
     await expectNoSeriousViolations(page, ['karmania-gallery', '#dialog-short']);
+    await page.keyboard.press('Escape');
+    const withNote = parts(page, 'dialog-note');
+    await withNote.trigger.click();
+    await expectNoSeriousViolations(page, ['karmania-gallery', '#dialog-note']);
   });
 });

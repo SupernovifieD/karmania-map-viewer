@@ -1419,3 +1419,7 @@ was chosen, why.
   select chooses by typing a letter, not by the arrow keys: on a Mac an arrow opens the list, on
   Windows and Linux it changes the value. The gallery's demos are each as tall as their own content,
   so that a field's picture does not depend on the field beside it.
+- `k-dialog` has a `footer-note` slot between the footer's two sides, for why the primary action
+  cannot be used yet (8.5 says Next is disabled "with a visible reason", and the same goes for the
+  other steps). It is muted 13/20 text of at most two lines, cut with an ellipsis after that; whoever
+  fills it puts the whole text in a `title`. The footer stays 64 high.

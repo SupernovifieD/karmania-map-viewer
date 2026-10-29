@@ -22,7 +22,8 @@ export const DIALOG_CLOSE = 'k-dialog-close';
  *
  * From the top: a header with the title and a close button; the `steps` slot, if anything is in
  * it; the body, which is the only part that scrolls; and a footer with `footer-start` on its left
- * and `footer-end` on its right, the primary action last.
+ * and `footer-end` on its right, the primary action last. Between them `footer-note` has room for a
+ * line or two of muted text, such as why the primary action cannot be used yet.
  *
  * It is a native `<dialog>` opened with `showModal()`, so the rest of the page is inert while it
  * is open, Tab stays inside it and Esc closes it, and, when it closes, the keyboard goes back to
@@ -124,6 +125,20 @@ export class KDialog extends LitElement {
         padding: 0 var(--k-space-24) var(--k-border-width);
       }
 
+      /* Room for a note between the buttons: at most two lines, cut with an ellipsis after that. */
+      .note {
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        color: var(--k-text-muted);
+        display: -webkit-box;
+        flex: 1 1 auto;
+        font-size: var(--k-font-size-secondary);
+        line-height: var(--k-line-height-secondary);
+        min-width: 0;
+        overflow: hidden;
+        padding: 0 var(--k-space-8);
+      }
+
       .end {
         align-items: center;
         display: flex;
@@ -203,6 +218,7 @@ export class KDialog extends LitElement {
         <div class="body" data-scroll-region><slot></slot></div>
         <footer>
           <slot name="footer-start"></slot>
+          <div class="note"><slot name="footer-note"></slot></div>
           <div class="end"><slot name="footer-end"></slot></div>
         </footer>
       </dialog>
