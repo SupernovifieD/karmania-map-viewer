@@ -1275,3 +1275,25 @@ was chosen, why.
   root, so `focus()` on `k-tabs` now focuses the chosen tab (and does nothing if there are none),
   which is also where a person enters the row with Tab. Delegating focus to the first focusable
   thing in the row would have picked the first tab whichever was chosen.
+- Step 7.7 (collapse to a rail): the app keeps `{ collapsed, tab }` and the panel shows it; a
+  person's request (collapse, expand, a rail button, a tab) leaves the panel as a
+  `karmania-panel-change` event and comes back as the new state, which the app also writes to
+  `localStorage` under `karmania.panel`. Reading is as careful as for any outside text: no
+  storage, a storage that throws on reading or writing, text that is not JSON or not an object,
+  or a field of the wrong type each fall back to the default, field by field, and nothing is
+  logged. That logic is plain functions (`panel-state.ts`, unit tests in Node), which is why the
+  app now has Vitest (the version the UI package uses; no new package). The open view is hidden,
+  not removed, when the panel is folded away, so what is in the bodies keeps its state, and it is
+  out of the Tab order and the accessibility tree while hidden. In the rail, the brief says "8 px
+  padding and 4 px gaps" for buttons that are 32 px (the minimum target) in a rail of 40: 8 can
+  only be the padding above and below, so the sides have 4, which the panel's 1 px border takes
+  one pixel of on the left (3 beside the border, 4 from the edge of the panel); the test measures
+  4 from either edge. `aria-expanded` is on every button that folds or opens the panel: `true` on
+  Collapse panel and `false` on the three buttons of the rail, each of which opens it. The brief
+  gives Collapse and Expand different names, so the name does not change with the state. Where the
+  keyboard goes matters, since the pressed button disappears: Collapse puts it on Expand panel,
+  Expand puts it on Collapse panel, and a tab's rail button puts it on that tab. It does this only
+  for a change a person asked for, so a change made some other way leaves focus alone. A known edge:
+  a button that had keyboard focus and is then clicked with the mouse hands its `:focus-visible` to
+  the button that replaces it, so that button's tooltip stays until focus moves on. `kButton` takes
+  an `onClick` now.

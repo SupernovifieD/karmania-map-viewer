@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { contrastBetween } from './support/color.js';
+import { layoutOf } from './support/layout-snapshot.js';
 import { inEveryLayout } from './support/layouts.js';
 import { boxOf } from './support/layout.js';
 
@@ -53,42 +54,6 @@ function fire(
   );
 }
 
-/**
- * The box of every element of the app, through its shadow roots, with how big its content is and
- * how far it is scrolled, leaving out the drop zone itself. If showing the drop zone changes any
- * of this for any other element, it has shifted the layout.
- */
-function layoutOf(page: Page) {
-  return page.evaluate(() => {
-    const found: [string, number, number, number, number, number, number, number, number][] = [];
-    const visit = (node: Element, path: string): void => {
-      if (node.classList.contains('drop-zone')) {
-        return;
-      }
-      const box = node.getBoundingClientRect();
-      found.push([
-        path,
-        box.x,
-        box.y,
-        box.width,
-        box.height,
-        node.scrollWidth,
-        node.scrollHeight,
-        node.scrollLeft,
-        node.scrollTop,
-      ]);
-      [...(node.shadowRoot?.children ?? []), ...node.children].forEach((child, index) => {
-        visit(child, `${path}>${child.tagName.toLowerCase()}[${String(index)}]`);
-      });
-    };
-    const app = document.querySelector('karmania-app');
-    if (app !== null) {
-      visit(app, 'app');
-    }
-    return found;
-  });
-}
-
 test.describe('the drop zone', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -135,17 +100,17 @@ test.describe('the drop zone', () => {
     page,
   }) => {
     await inEveryLayout(page, '/', async () => {
-      const before = await layoutOf(page);
+      const before = await layoutOf(page, '.drop-zone');
       expect(before.length).toBeGreaterThan(10);
 
       await fire(main(page), 'dragenter');
       await fire(main(page), 'dragover');
       await expect(zone(page)).toBeVisible();
-      expect(await layoutOf(page)).toEqual(before);
+      expect(await layoutOf(page, '.drop-zone')).toEqual(before);
 
       await fire(main(page), 'dragleave');
       await expect(zone(page)).toBeHidden();
-      expect(await layoutOf(page)).toEqual(before);
+      expect(await layoutOf(page, '.drop-zone')).toEqual(before);
     });
   });
 
@@ -155,10 +120,10 @@ test.describe('the drop zone', () => {
       (element as unknown as { datasets: number }).datasets = 4;
       await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
     });
-    const before = await layoutOf(page);
+    const before = await layoutOf(page, '.drop-zone');
     await fire(main(page), 'dragenter');
     await expect(zone(page)).toBeVisible();
-    expect(await layoutOf(page)).toEqual(before);
+    expect(await layoutOf(page, '.drop-zone')).toEqual(before);
   });
 
   test('stays while the drag moves from one part of the area to another, and goes when it leaves', async ({

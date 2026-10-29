@@ -77,6 +77,7 @@ The focus ring is drawn on `:focus-visible` and must never be clipped by an
 | -------------------------- | ----- | -------------------------------------------- |
 | `--k-toolbar-height`       | 48px  | The toolbar across the top                   |
 | `--k-panel-width-default`  | 360px | How wide the side panel is until it is resized |
+| `--k-panel-rail-width`     | 40px  | The side panel folded away into its rail of buttons |
 
 ## Motion
 
