@@ -1373,3 +1373,11 @@ was chosen, why.
 - The dialog's pictures hide the rest of the gallery first (the dialog is made visible again), so
   that what shows round the dialog, under the dimming, is the same whatever else the gallery holds:
   the lesson of `tooltip-below`, which was moved by a heading added above it.
+- `k-steps` (the wizard's step indicator, in `@karmania/ui`): a row of numbered, labelled circles
+  joined by lines. Done, current and to do differ by more than colour: a tick in an outlined circle,
+  a number in a filled circle with a bold label, a number in a grey circle. Screen readers get
+  `aria-current="step"` on the current step and ", done" or ", to do" in text that is not drawn
+  (a listitem takes no name from its content, so a label would not have been read). It is not
+  interactive: going back is done with Back, and a finding sends a person to its step in 8.10. The
+  overflow check used by the tests now lets text hidden from the eye and kept for screen readers
+  (a box of a pixel, cut away by `clip-path`) be bigger than its box, as it is meant to be.

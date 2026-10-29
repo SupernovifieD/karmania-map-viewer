@@ -60,6 +60,12 @@ export async function assertNoOverflow(
     };
 
     const visit = (node: Element, inRegion: boolean): void => {
+      // Text that is hidden from the eye and kept for screen readers (a box of a pixel, cut away
+      // by `clip-path`) is meant to be bigger than its box.
+      const here = node.getBoundingClientRect();
+      if (getComputedStyle(node).clipPath !== 'none' && here.width <= 1 && here.height <= 1) {
+        return;
+      }
       const isRegion = node.hasAttribute('data-scroll-region');
       const rects = node.getClientRects();
       const shown = rects.length > 0 && getComputedStyle(node).visibility !== 'hidden';

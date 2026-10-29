@@ -189,6 +189,14 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
+  ...['first', 'middle', 'last', 'crowded'].map((where): Shot => ({
+    name: `steps-${where}`,
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #steps-${where}`);
+      await reveal(target);
+      return [target];
+    },
+  })),
   dialogShot('dialog-short', 'dialog-short'),
   dialogShot('dialog-short-close-focus', 'dialog-short', async (page, dialog) => {
     await page.keyboard.press('Shift');

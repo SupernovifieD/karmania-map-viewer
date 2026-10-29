@@ -16,3 +16,5 @@ export { placeTooltip } from './components/tooltip-position.js';
 export type { Box, Placement, Position } from './components/tooltip-position.js';
 export { KEmptyState } from './components/empty-state.js';
 export { DIALOG_CLOSE, KDialog } from './components/dialog.js';
+export { KSteps } from './components/steps.js';
+export type { StepDefinition } from './components/steps.js';

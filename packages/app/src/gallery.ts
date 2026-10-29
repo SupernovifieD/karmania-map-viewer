@@ -12,6 +12,7 @@ import { buttonsSection } from './sections/buttons.js';
 import { dialogSection } from './sections/dialog.js';
 import { emptyStateSection } from './sections/empty-state.js';
 import { iconsSection } from './sections/icons.js';
+import { stepsSection } from './sections/steps.js';
 import { tabsSection } from './sections/tabs.js';
 import { tooltipsSection } from './sections/tooltips.js';
 import { forceThemeFromAddress } from './theme.js';
@@ -150,6 +151,16 @@ export class KarmaniaGallery extends LitElement {
         display: inline-flex;
       }
 
+      /* As wide as the room inside the wizard's dialog. */
+      .steps-demo {
+        margin-bottom: var(--k-space-16);
+        width: calc(var(--k-dialog-max-size) - var(--k-space-48));
+      }
+
+      .steps-demo.narrow {
+        width: calc(var(--k-space-48) * 6);
+      }
+
       .narrow {
         width: calc(var(--k-space-48) * 4);
       }
@@ -187,7 +198,7 @@ export class KarmaniaGallery extends LitElement {
       <h1>Karmania components</h1>
       <p>From ${PACKAGE_NAME}.</p>
       ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
-      ${emptyStateSection()} ${dialogSection()}
+      ${emptyStateSection()} ${stepsSection()} ${dialogSection()}
     `;
   }
 }
