@@ -231,4 +231,64 @@ test.describe('importing', () => {
     expect(result.selected).toBe(result.datasets[0]?.id);
     expect(result.inEngine).toEqual(result.datasets.map((dataset) => dataset.id));
   });
+
+  test('an ESRI ASCII grid with no coordinate system: one is typed, the cell with no data is a null, and a grid is loaded', async ({
+    page,
+  }) => {
+    const w = wizard(page);
+    await startWizard(page, 'grid.asc');
+    await expect(w.host.locator('karmania-file-step .detail')).toHaveText(
+      'ESRI ASCII grid · UTF-8',
+    );
+    // A grid is a grid: the kind cannot be changed.
+    await expect(w.host.locator('karmania-file-step k-select select')).toBeDisabled();
+    await expect(w.host.locator('karmania-file-step k-select .help')).toContainText(
+      'always imported as a grid',
+    );
+    await goTo(page, 'mapping');
+    await expect(w.host.locator('karmania-mapping-step .note')).toContainText(
+      'its cells are the values of the grid',
+    );
+    await goTo(page, 'nodata');
+    await expect(w.host.locator('karmania-nodata-step .note')).toContainText(
+      'says in its header which value means "no data"',
+    );
+    await goTo(page, 'crs');
+
+    // CRS: nothing was found, so Next waits until a person says what the coordinates are in.
+    const crs = w.host.locator('karmania-crs-step');
+    await expect(crs.locator('.found-text')).toHaveText(
+      'No coordinate system was found in or beside the file.',
+    );
+    await expect(w.next.locator('button')).toBeDisabled();
+    await crs.locator('.choice k-select').first().locator('select').selectOption('epsg');
+    await crs.locator('k-input input').fill('32640');
+    await goTo(page, 'review');
+
+    // Review: it loads, and says that the cell with no data became a null.
+    const review = w.host.locator('karmania-review-step');
+    await expect(review.locator('.verdict')).toHaveText('Ready to load');
+    expect(await textsOf(review.locator('.dataset'))).toEqual(['grid 12 cells']);
+    await expect(review.locator('.group[data-severity="warning"] li')).toContainText('no data');
+    await w.next.click();
+
+    await expect(w.dialog).toBeHidden();
+    const result = await kept(page);
+    expect(result.datasets).toHaveLength(1);
+    const [dataset] = result.datasets;
+    expect(dataset).toMatchObject({
+      name: 'grid',
+      kind: 'grid',
+      elementCount: 12,
+      crs: { kind: 'epsg', code: 32640 },
+    });
+    // The grid's one column is its values, with the cell that had -9999 left empty.
+    expect(dataset?.columns).toHaveLength(1);
+    expect(dataset?.columns[0]?.nullCount).toBe(1);
+    // 4 by 3 cells of 10, from the corner given: the box is the grid's outer edge.
+    expect(dataset?.bbox).toEqual({
+      min: [500000, 2765000, 0],
+      max: [500040, 2765030, 0],
+    });
+  });
 });
