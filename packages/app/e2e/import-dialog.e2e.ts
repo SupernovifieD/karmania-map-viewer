@@ -31,9 +31,10 @@ async function rect(locator: Locator) {
 
 /** Opens the dialog as a person does: Import, and a file in the picker. Waits for the file to be read. */
 async function open(page: Page): Promise<void> {
+  // With its projection file, so that the coordinate system is known and no step stops a person.
   await pickFiles(page, async () => {
     await page.locator('karmania-app header.toolbar k-button button').click();
-  }, ['points.csv']);
+  }, ['points.csv', 'points.prj']);
   await expect(parts(page).dialog).toBeVisible();
   await expect(parts(page).host.locator('karmania-file-step')).toBeVisible();
 }

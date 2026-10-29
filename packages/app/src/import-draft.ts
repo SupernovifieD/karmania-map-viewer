@@ -3,6 +3,8 @@ import { KINDS_BY_FORMAT } from './import-files.js';
 import type { FileEntry } from './import-files.js';
 import { columnsFromPreview, EMPTY_BLOCK_SIZE, withKind } from './import-mapping.js';
 import type { BlockSizeDraft, ColumnDraft } from './import-mapping.js';
+import { crsDraftFor } from './import-crs.js';
+import type { CrsDraft } from './import-crs.js';
 import { NO_NODATA, nodataFromSuggestions } from './import-nodata.js';
 import type { EmptyCoordinates, NodataDraft } from './import-nodata.js';
 
@@ -25,6 +27,8 @@ export interface ImportDraft {
   readonly emptyCoordinates: EmptyCoordinates;
   /** How decimal numbers are written in the file. */
   readonly decimalSeparator: DecimalSeparator;
+  /** The coordinate system. */
+  readonly crs: CrsDraft;
 }
 
 /** A file's name without its extension: `collars.csv` is `collars`, `a.b.csv` is `a.b`. */
@@ -48,6 +52,7 @@ export function draftFor(entry: FileEntry): ImportDraft {
     nodata: table === undefined ? NO_NODATA : nodataFromSuggestions(table.nodata),
     emptyCoordinates: 'error',
     decimalSeparator: table?.decimalSeparator ?? '.',
+    crs: crsDraftFor(entry.preview.crs),
   };
 }
 
