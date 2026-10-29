@@ -1333,3 +1333,16 @@ was chosen, why.
   the Legend button. A test hovers each button and checks that its tooltip is 4 to the left of it,
   centred on it, and over none of the rail's buttons; it was seen to fail with the tooltip above
   (the gap was -28).
+- Step 7.9 (shell screenshots): nine states of the whole app, each at 1024x640, 1440x900 and
+  1920x1080 in both themes (54 pictures, 1.1 MB): open, folded away, with data loaded ("Map
+  rendering arrives in phase 2"), with files dragged over the map, a tooltip in the rail, the
+  resize handle pointed at and with keyboard focus, and the panel at its widest and narrowest. Each
+  state starts from a fresh load with the panel kept as the state needs, and with the pointer out
+  of the way. The Data tab is not photographed: its body is empty until M9, and a picture of
+  nothing would only have to be taken again. Reviewing the pictures with the checklist found the
+  rail tooltip covering a button (fixed: see the entries above for the tooltip and the rail), and
+  nothing else: nothing bleeds, clips or overflows, the empty states are in the middle, the edges
+  line up, the line on the handle shows for hover and focus, and dark mode reads well. One thing
+  left alone: at the usual width the Legend's line wraps with "rendered." alone on its second
+  line, and balancing the lines (`text-wrap: balance`) would change the empty state's existing
+  pictures for a purely cosmetic gain.

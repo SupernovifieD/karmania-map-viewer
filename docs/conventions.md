@@ -127,4 +127,7 @@ small; if the change is meant, `pnpm test:visual:update` takes the pictures agai
 pictures must be looked at before they are committed**, with the checklist of section 7.5 of the
 brief (nothing bleeds, clips, overflows or overlaps; edges and baselines line up; the composition
 is balanced; truncated text has an ellipsis; focus rings show and are not clipped; dark mode is
-readable; nothing shifts between states). A new state is a new entry in `SHOTS`.
+readable; nothing shifts between states). A new state is a new entry in `SHOTS`. The whole app is photographed the same way in
+`e2e/shell.visual.ts`: open and folded away, with data loaded, with files dragged over the map, a
+tooltip in the rail, the resize handle pointed at and focused, and the panel at its widest and
+narrowest.

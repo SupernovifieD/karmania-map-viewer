@@ -351,7 +351,7 @@ Definitions and reprojection can be added later, with the features that need the
   persistence; keyboard; aria-expanded.
 - [x] 7.8 Panel resize handle (pointer, keyboard, double-click reset, clamping,
   persistence).
-- [ ] 7.9 Shell screenshot baselines (expanded, collapsed, both themes, three
+- [x] 7.9 Shell screenshot baselines (expanded, collapsed, both themes, three
   viewports), reviewed and committed.
 
 ## M8: Import wizard
