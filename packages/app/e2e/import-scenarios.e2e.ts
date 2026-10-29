@@ -291,4 +291,52 @@ test.describe('importing', () => {
       max: [500040, 2765030, 0],
     });
   });
+
+  test('an OBJ mesh: a local grid in metres is chosen, the square base is split into triangles, and a mesh is loaded', async ({
+    page,
+  }) => {
+    const w = wizard(page);
+    await startWizard(page, 'mesh.obj');
+    await expect(w.host.locator('karmania-file-step .detail')).toHaveText('OBJ mesh · UTF-8');
+    await expect(w.host.locator('karmania-file-step k-select select')).toBeDisabled();
+    await expect(w.host.locator('karmania-file-step k-select .help')).toContainText(
+      'always imported as a mesh',
+    );
+    await goTo(page, 'mapping');
+    await expect(w.host.locator('karmania-mapping-step .note')).toContainText(
+      'vertices and faces of a mesh',
+    );
+    await goTo(page, 'nodata');
+    await goTo(page, 'crs');
+
+    // CRS: a model like this one has no place on the Earth, so it is a local grid, in metres.
+    const crs = w.host.locator('karmania-crs-step');
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toHaveText('Choose a coordinate system: an EPSG code, or a local grid.');
+    await crs.locator('.choice k-select').first().locator('select').selectOption('local');
+    await expect(crs.locator('.summary-text')).toContainText('a local grid, in metres');
+    await goTo(page, 'review');
+
+    const review = w.host.locator('karmania-review-step');
+    await expect(review.locator('.verdict')).toHaveText('Ready to load');
+    // Five vertices; four triangles and a square, which is two more.
+    expect(await textsOf(review.locator('.dataset'))).toEqual(['mesh 6 triangles']);
+    await expect(review.locator('.group[data-severity="info"] li').first()).toBeVisible();
+    await w.next.click();
+
+    await expect(w.dialog).toBeHidden();
+    const result = await kept(page);
+    expect(result.datasets).toHaveLength(1);
+    const [dataset] = result.datasets;
+    expect(dataset).toMatchObject({
+      name: 'mesh',
+      kind: 'mesh',
+      elementCount: 6,
+      vertexCount: 5,
+      hasZ: true,
+      crs: { kind: 'local', units: 'm' },
+    });
+    expect(dataset?.bbox).toEqual({ min: [0, 0, 0], max: [10, 10, 8] });
+    expect(result.selected).toBe(dataset?.id);
+  });
 });
