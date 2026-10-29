@@ -1015,6 +1015,54 @@ test.describe('the table', () => {
     });
   });
 
+  test('draws the line under the header and under each row the whole width of the table, though the columns are not', async ({
+    page,
+  }) => {
+    const found = await page.evaluate(async () => {
+      const holder = document.createElement('div');
+      holder.style.cssText = 'height: 300px; width: 600px;';
+      const table = document.createElement('k-table') as HTMLElement & {
+        rowCount: number;
+        fetch: (start: number, count: number) => Promise<unknown>;
+        updateComplete: Promise<boolean>;
+      };
+      table.rowCount = 5;
+      table.fetch = (start, count) =>
+        Promise.resolve({
+          start,
+          count,
+          columns: [{ name: 'n', values: Int32Array.of(1, 2, 3, 4, 5), nulls: new Uint8Array(5) }],
+        });
+      holder.append(table);
+      document.body.append(holder);
+      await table.updateComplete;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const root = table.shadowRoot;
+      const viewport = root?.querySelector('.viewport');
+      const lines = [root?.querySelector('.header'), ...(root?.querySelectorAll('.row') ?? [])].map(
+        (element) => {
+          const style = element ? getComputedStyle(element) : undefined;
+          return [element?.getBoundingClientRect().width, style?.borderBottomWidth];
+        },
+      );
+      const cells = [...(root?.querySelectorAll('.cell') ?? [])].map(
+        (element) => getComputedStyle(element).borderBottomWidth,
+      );
+      const result = { room: viewport?.clientWidth, lines, cells };
+      holder.remove();
+      return result;
+    });
+    // A column or two, in a table that is a good deal wider: the header and the five rows are as wide
+    // as the table, each with its line, and no cell has a line of its own.
+    expect(found.room).toBeGreaterThan(500);
+    expect(found.lines).toHaveLength(6);
+    for (const [width, line] of found.lines) {
+      expect(width).toBe(found.room);
+      expect(line).toBe('1px');
+    }
+    expect(new Set(found.cells)).toEqual(new Set(['0px']));
+  });
+
   test.describe('its keyboard', () => {
     /** Where the keyboard is, and where that is in the table, from the cell the table names. */
     interface Where {

@@ -210,8 +210,11 @@ export class KTable extends LitElement {
         grid-template-columns: var(--columns);
       }
 
+      /* The line under a row, and under the header, is the row's own, so that it runs to the edge of
+         the table when the columns do not (a dataset of two, in a panel that is wide). */
       .header {
         background: var(--k-surface-raised);
+        border-bottom: var(--k-border-width) solid var(--k-border);
         height: var(--k-table-header-height);
         position: sticky;
         top: 0;
@@ -227,12 +230,12 @@ export class KTable extends LitElement {
       }
 
       .row {
+        border-bottom: var(--k-border-width) solid var(--k-border);
         height: var(--k-table-row-height);
       }
 
       /* The line is as tall as the cell, which sets the words on its middle. */
       .cell {
-        border-bottom: var(--k-border-width) solid var(--k-border);
         line-height: calc(var(--k-table-row-height) - var(--k-border-width));
         min-width: 0;
         overflow: hidden;
