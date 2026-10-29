@@ -1687,3 +1687,22 @@ was chosen, why.
   frame over a second: the finer measure of long tasks is 10.3's); and cancelling the wizard takes
   the three million points out of the engine. The test was run six times in a row and seen to fail when
   the stop does nothing.
+- Step 8.14 (the wizard's pictures). Seventeen states of the wizard, each at 1024x640, 1440x900 and
+  1920x1080 in both themes (102 pictures, 4 MB): the File step (one file, several files with two that
+  cannot be imported, a warning about the encoding, the engine failing), the Mapping step (with a
+  column chosen, with a missing coordinate, a block model with a size that is wrong), the Nodata step,
+  the coordinate system step (found, nothing found with a code that is wrong, a local grid), the Review
+  step (running, cancelled, ready to load, ready with a warning, stopped by an error) and the second
+  file of two. Each is taken from a fresh load, through the real steps with the real engine, except
+  the two that a real import is too quick to hold (running and cancelled), which use the fake engine
+  of the tests. The app behind the dialog is hidden (the dialog made visible again), so that what shows
+  at the dialog's edges, under the dimming, does not change with the app. Looked at with the checklist:
+  nothing bleeds, clips or overflows outside a scroll region; nothing overlaps; the edges line up at
+  24 and the fields at 16; the footer's reason and buttons are where the specification puts them, in
+  the same place at every step; truncated text has its ellipsis; the focus is not in the pictures (the
+  keyboard is taken off whatever has it, and the focus rings are in the pictures of the components);
+  both themes read; and nothing moves between the states of one step. One thing left, which a person
+  will notice: at the smallest window, a block model with a size that is wrong has more than the body of
+  the dialog can show, so the body scrolls and the list of what is wrong is under the table, below
+  what is visible (the footer says the first thing that is wrong). Making room for it would take the
+  table's room, which is what the step is for.
