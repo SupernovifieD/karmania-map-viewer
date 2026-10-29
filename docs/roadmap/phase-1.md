@@ -382,7 +382,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.11 Fix-and-retry loop: after editing a step, Review re-runs. Load is
   disabled while there are errors and reads "Load with N warnings" when there
   are warnings.
-- [ ] 8.12 On load: close the dialog, select the new dataset and open the Data
+- [x] 8.12 On load: close the dialog, select the new dataset and open the Data
   tab. The map area is told how many datasets are loaded (its `datasets`
   property, added in 7.4), so that it shows "Map rendering arrives in phase 2".
 - [ ] 8.13 End-to-end tests, one commit each: CSV points happy path; CSV with

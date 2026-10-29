@@ -55,6 +55,7 @@ export class KarmaniaImportDialog extends LitElement {
     draft: { state: true },
     run: { state: true },
     returning: { state: true },
+    position: { state: true },
   };
 
   static override styles = [
@@ -111,6 +112,8 @@ export class KarmaniaImportDialog extends LitElement {
   declare run: RunState;
   /** Whether a person went from the last step to an earlier one to fix something, and is to be taken back. */
   declare returning: boolean;
+  /** How many of the files that can be imported have been loaded: the one to import now comes next. */
+  declare position: number;
 
   /** Counts the times files have been looked at, so that an answer that comes late is ignored. */
   private readings = 0;
@@ -132,11 +135,22 @@ export class KarmaniaImportDialog extends LitElement {
     this.draft = undefined;
     this.run = IDLE;
     this.returning = false;
+    this.position = 0;
   }
 
-  /** The file being imported: the first one that can be. */
+  /** The files that can be imported, in the order they were given: one is imported at a time. */
+  private get queue(): readonly FileEntry[] {
+    return this.entries?.filter((entry) => isImportable(entry.preview)) ?? [];
+  }
+
+  /** The file being imported: the first of those that can be that has not been loaded. */
   private get current(): FileEntry | undefined {
-    return this.entries?.find((entry) => isImportable(entry.preview));
+    return this.queue[this.position];
+  }
+
+  /** The files that have been loaded, which the File step says. */
+  private get done(): readonly FileEntry[] {
+    return this.queue.slice(0, this.position);
   }
 
   /** Opens the dialog, on its first step, to import `files`, and has the engine look at them. */
@@ -152,6 +166,7 @@ export class KarmaniaImportDialog extends LitElement {
     this.entries = undefined;
     this.failure = undefined;
     this.draft = undefined;
+    this.position = 0;
     const engine = this.engine;
     if (engine === undefined) {
       this.failure = 'The import engine is not available.';
@@ -302,7 +317,17 @@ export class KarmaniaImportDialog extends LitElement {
         composed: true,
       }),
     );
-    this.close();
+    if (this.position + 1 < this.queue.length) {
+      // Another file is waiting: it is imported next, from the start.
+      this.position += 1;
+      const next = this.current;
+      this.draft = next === undefined ? undefined : draftFor(next);
+      this.run = IDLE;
+      this.returning = false;
+      this.step = FIRST_STEP;
+    } else {
+      this.close();
+    }
   }
 
   /** Closes the dialog, and says so. */
@@ -415,6 +440,7 @@ export class KarmaniaImportDialog extends LitElement {
     return html`<karmania-file-step
       .entries=${this.entries}
       .current=${this.current}
+      .done=${this.done}
       .draft=${this.draft}
       @karmania-draft-change=${this.onDraftChange}
     ></karmania-file-step>`;

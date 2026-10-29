@@ -1630,3 +1630,19 @@ was chosen, why.
   errors in the footer; with warnings it reads "Load with N warnings" (these came with 8.10, where the
   Review step is, and 8.11's tests cover them with the loop). The primary button's words change
   with "Check again", and so does its width, which moves Back by as much, as on the last step.
+- Step 8.12 (on load). When Load is pressed the wizard says what was loaded
+  (`karmania-import-loaded`, with the summaries), and the app, which is the one that knows what is
+  kept, takes the datasets the engine holds, selects the first of the new ones (so, of a GeoJSON file
+  that gave several, the first), shows the Data tab and opens the panel if it was folded away, which
+  is kept like any other choice of tab. The map area is given how many datasets there are, and says it
+  ("1 dataset loaded"). The app does not follow the engine's own `datasets` event for this: the
+  engine announces a dataset when an import makes it, which is while the Review step still waits for
+  a person, and a count that went up and down behind the dialog would be telling something untrue.
+  The keyboard goes back to the Import button, as for any close.
+- The queue, as decided at the start of M8: the wizard imports one file at a time, and with several
+  that can be imported it does not drop the rest. After Load it stays, at the start, for the next one
+  (its name, kind, columns and the rest from its own preview), and the File step says which are
+  `Loaded`, which is `Importing now` and which are `Waiting`; a file that cannot be imported is passed
+  by. The last Load closes it. Cancelling part-way keeps what was already loaded and takes out only
+  what the Review step in front of the person had made. The app selects the dataset that was loaded
+  last.

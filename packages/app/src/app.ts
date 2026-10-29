@@ -1,10 +1,11 @@
 import { createEngine } from '@karmania/engine';
-import type { Engine } from '@karmania/engine';
+import type { Engine, Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import './import-dialog.js';
+import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
 import type { DroppedFiles } from './map-area.js';
 import './panel.js';
@@ -37,6 +38,8 @@ export class KarmaniaApp extends LitElement {
   static override properties = {
     panel: { state: true },
     viewportWidth: { state: true },
+    datasets: { state: true },
+    selected: { state: true },
   };
 
   static override styles = [
@@ -100,11 +103,17 @@ export class KarmaniaApp extends LitElement {
   declare private panel: PanelState;
   /** How wide the window is, which limits how wide the panel can be. */
   declare private viewportWidth: number;
+  /** The datasets that have been loaded and kept, in the order they were loaded. */
+  declare private datasets: readonly Summary[];
+  /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
+  declare private selected: number | undefined;
 
   constructor() {
     super();
     this.panel = loadPanelState(browserStorage());
     this.viewportWidth = document.documentElement.clientWidth;
+    this.datasets = [];
+    this.selected = undefined;
   }
 
   /** The engine, which is started when the first files arrive, not before. */
@@ -159,8 +168,22 @@ export class KarmaniaApp extends LitElement {
 
   /** Does what a person asked of the panel, and keeps the panel that way. */
   private readonly onPanelChange = (event: CustomEvent<PanelChange>): void => {
-    this.panel = { ...this.panel, ...event.detail };
+    this.changePanel(event.detail);
+  };
+
+  private changePanel(change: PanelChange): void {
+    this.panel = { ...this.panel, ...change };
     savePanelState(browserStorage(), this.panel);
+  }
+
+  /**
+   * Something has been loaded: the datasets are those the engine holds, the new one is selected, and
+   * the panel shows the Data tab, open, whatever it was showing.
+   */
+  private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
+    this.datasets = this.engine?.datasets() ?? [];
+    this.selected = event.detail.summaries[0]?.id;
+    this.changePanel({ tab: 'data', collapsed: false });
   };
 
   /** Gives the panel the width that was asked for, as far as the window allows. */
@@ -197,6 +220,7 @@ export class KarmaniaApp extends LitElement {
         style=${`--k-panel-width: ${String(width)}px`}
       >
         <karmania-map-area
+          .datasets=${this.datasets.length}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
@@ -225,7 +249,9 @@ export class KarmaniaApp extends LitElement {
         aria-label="Choose files to import"
         @change=${this.onFilesChosen}
       />
-      <karmania-import-dialog></karmania-import-dialog>
+      <karmania-import-dialog
+        @karmania-import-loaded=${this.onImportLoaded}
+      ></karmania-import-dialog>
     `;
   }
 }
