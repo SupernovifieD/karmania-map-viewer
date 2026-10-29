@@ -485,4 +485,96 @@ test.describe('importing', () => {
       crs: { kind: 'local', units: 'ft' },
     });
   });
+
+  test('cancelling a large import: the wizard answers at once, nothing is loaded, and the import can be run again', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const w = wizard(page);
+    // Three million rows, built from a chunk of a few thousand so that the page does not hold the whole
+    // text in a string, and given to the wizard as the app does when files are dropped on it.
+    const rows = 3_000_000;
+    await page.evaluate((total) => {
+      const chunkRows = 10_000;
+      const chunk = Array.from(
+        { length: chunkRows },
+        (_, i) =>
+          `${String(500000 + (i % 1000) + 0.5)},${String(2765000 + Math.floor(i / 1000) + 0.25)},${String(100 + (i % 7))},${String((i % 97) / 10)}\n`,
+      ).join('');
+      const parts: BlobPart[] = ['x,y,z,grade\n'];
+      for (let i = 0; i < total / chunkRows; i += 1) {
+        parts.push(chunk);
+      }
+      const file = new File(parts, 'large.csv', { type: 'text/csv' });
+      const prj = new File(['PROJCS["x",AUTHORITY["EPSG","32640"]]'], 'large.prj');
+      (
+        document.querySelector('karmania-app') as unknown as {
+          importFiles: (files: File[]) => void;
+        }
+      ).importFiles([file, prj]);
+    }, rows);
+    await expect(w.host.locator('karmania-file-step')).toBeVisible({ timeout: 60_000 });
+    await expect(w.host.locator('karmania-file-step .detail')).toContainText(
+      'about 3,000,000 rows',
+    );
+    await goTo(page, 'mapping');
+    await goTo(page, 'nodata');
+    await goTo(page, 'crs');
+
+    // Frames of the page are watched from here on: while the import goes on in the worker, the page
+    // must go on drawing, or a person could not press Cancel.
+    await page.evaluate(() => {
+      const watch = window as unknown as { longestFrame: number };
+      watch.longestFrame = 0;
+      let last = performance.now();
+      const tick = (now: number) => {
+        watch.longestFrame = Math.max(watch.longestFrame, now - last);
+        last = now;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    const review = w.host.locator('karmania-review-step');
+    await w.next.click();
+    await expect(w.step).toHaveAttribute('data-step', 'review');
+    // The bar is there, with what is being done, and a button to stop it.
+    await expect(review.locator('k-progress')).toBeVisible();
+    await expect(review.getByRole('button', { name: 'Cancel import' })).toBeVisible();
+    await expect(review.locator('k-progress').locator('.percent')).toBeVisible({ timeout: 30_000 });
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toHaveText('Importing…');
+
+    const stoppedAt = Date.now();
+    await review.getByRole('button', { name: 'Cancel import' }).click();
+    await expect(review).toContainText('The import was cancelled. Nothing was loaded.', {
+      timeout: 5_000,
+    });
+    // Stopped within a moment, not after the rest of the file was read.
+    expect(Date.now() - stoppedAt).toBeLessThan(5_000);
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toContainText('cancelled');
+    expect((await kept(page)).inEngine).toEqual([]);
+    // A moment later nothing has been loaded by an import that was thought to be stopped.
+    await page.waitForTimeout(1_500);
+    expect((await kept(page)).inEngine).toEqual([]);
+
+    // It can be run again, and this time it is let finish.
+    await review.getByRole('button', { name: 'Import again' }).click();
+    await expect(review.locator('.verdict')).toHaveText('Ready to load', { timeout: 90_000 });
+    expect(await textsOf(review.locator('.dataset'))).toEqual(['large 3,000,000 points']);
+    expect((await kept(page)).inEngine).toHaveLength(1);
+
+    // The page went on drawing through all of it.
+    const longest = await page.evaluate(
+      () => (window as unknown as { longestFrame: number }).longestFrame,
+    );
+    expect(longest).toBeLessThan(1_000);
+
+    // And cancelling the wizard now takes the three million points out of the engine again.
+    await w.cancel.click();
+    await expect(w.dialog).toBeHidden();
+    await expect.poll(async () => (await kept(page)).inEngine.length).toBe(0);
+    await expect(w.map).toContainText('No data yet');
+  });
 });

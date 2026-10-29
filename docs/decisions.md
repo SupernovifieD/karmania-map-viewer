@@ -1679,3 +1679,11 @@ was chosen, why.
   the wizard keeps a person from reaching, and checks that the kernel refuses with `crs.missing`
   pointing at the coordinate system step and loads nothing; and a local grid in feet opens the way on
   and is what is loaded.
+- 8.13h: a file of three million rows, built in the page from a chunk (a million rows import in about a
+  second here, too quick to stop, and a text of that size would be a string of 100 MB), given to
+  the wizard as the app gives it files that are dropped. The Review step shows the bar, stopping
+  answers within a moment and says nothing was loaded, which is still so a moment later; the import is
+  run again and let finish (three million points, listed); the page went on drawing throughout (no
+  frame over a second: the finer measure of long tasks is 10.3's); and cancelling the wizard takes
+  the three million points out of the engine. The test was run six times in a row and seen to fail when
+  the stop does nothing.
