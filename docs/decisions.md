@@ -1202,3 +1202,12 @@ was chosen, why.
   content yet, so the 7.1 smoke test no longer looks for the `h1`; the wordmark of 7.3 brings
   it back, with its own check. The checks of `styles.test.ts` (no raw colors, lengths or durations)
   now read the app's CSS as well as the UI package's.
+- Step 7.3 (toolbar): the name is the page's `h1` (16/24, medium) and the Import button is
+  `<k-button>` in its secondary variant with the upload icon; clicking it does nothing yet, since
+  opening the wizard is step 8.2. The toolbar is 48 high including its 1 px border, so the
+  contents would sit on 7.5 px (a half pixel, blurred at the edges) if they were centred in what
+  is left; the toolbar has the same 1 px of padding above that the border takes below, which puts
+  the 32 px button at 8 and the 24 px name at 12, centred on the 48 and on whole pixels. The
+  test measures that, and was seen to fail (11.5) without the padding. The name and the button
+  are centred on each other rather than aligned on a baseline, since the name is not a control;
+  the spec's baseline rule is for controls in a row.

@@ -1,11 +1,12 @@
-import { sharedStyles } from '@karmania/ui';
+import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import './map-area.js';
 import './panel.js';
 
 /**
- * The root of the app, `<karmania-app>`: the toolbar across the top, and under it the map area
- * and the side panel, side by side. It fills the window and never scrolls.
+ * The root of the app, `<karmania-app>`: the toolbar across the top (the name, and the Import
+ * button), and under it the map area and the side panel, side by side. It fills the window and
+ * never scrolls.
  */
 export class KarmaniaApp extends LitElement {
   static override styles = [
@@ -20,9 +21,23 @@ export class KarmaniaApp extends LitElement {
         width: 100%;
       }
 
+      /* The border takes a pixel at the bottom; the same above keeps the contents on the middle
+         of the 48, on whole pixels. */
       .toolbar {
+        align-items: center;
         border-bottom: var(--k-border-width) solid var(--k-border);
+        display: flex;
+        gap: var(--k-space-16);
         min-width: 0;
+        padding: var(--k-border-width) var(--k-space-16) 0;
+      }
+
+      .wordmark {
+        flex: none;
+        font-size: var(--k-font-size-section-title);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-section-title);
+        margin: 0;
       }
 
       /* The map takes what the panel leaves. The panel's width is --k-panel-width, which
@@ -38,7 +53,10 @@ export class KarmaniaApp extends LitElement {
 
   override render() {
     return html`
-      <header class="toolbar"></header>
+      <header class="toolbar">
+        <h1 class="wordmark">Karmania</h1>
+        ${kButton({ icon: 'upload', children: 'Import' })}
+      </header>
       <div class="workspace">
         <karmania-map-area></karmania-map-area>
         <karmania-panel></karmania-panel>

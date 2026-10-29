@@ -342,7 +342,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 7.1 Vite app mounting `<karmania-app>`; a Playwright smoke test.
 - [x] 7.2 Shell grid (toolbar plus main, map plus panel) with no content; layout
   assertions for adjacency and no overflow at all three viewports.
-- [ ] 7.3 Toolbar contents exactly as in section 7.2.
+- [x] 7.3 Toolbar contents exactly as in section 7.2.
 - [ ] 7.4 Map area empty state.
 - [ ] 7.5 Drop zone highlight with zero layout shift (test that bounding boxes
   are unchanged during drag-over).
