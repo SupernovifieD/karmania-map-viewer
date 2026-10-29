@@ -28,6 +28,7 @@ describe('the draft for a file', () => {
       nodata: { tokens: [], numbers: [], other: '' },
       emptyCoordinates: 'error',
       decimalSeparator: '.',
+      crs: { mode: undefined, epsg: '', units: 'm' },
     });
   });
 

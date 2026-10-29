@@ -1564,3 +1564,16 @@ was chosen, why.
   a comma, found by the kernel, which a person can change). No choice here can stop a person going on.
   A file with no columns says that there is nothing to set (an ASCII grid names its own no-data
   value in its header, and that is used).
+- Step 8.8 (the coordinate system step, part 1). The step says which coordinate system was found in or
+  beside the file and where it came from: the `.prj` file (by name), the file's own `crs` member, or
+  the default of GeoJSON, which it says is assumed because the file names none. A person chooses what
+  the coordinates are in: the one found, or an EPSG code that they type, which is shown as it was given
+  and nothing more (the kernel has no list to look it up in, so no name, kind or units are shown, and
+  a test checks that none is). A code is a whole number from 1, of up to six digits; anything else is
+  said to be wrong in words. The step is stopped at when nothing has been chosen: the kernel counts a
+  missing coordinate system an error (`crs.missing`) when it validates the dataset, so letting a
+  person go on without one would only send them back from the Review step, and the footer says what to
+  do. The choice is a select and the code a field beside it, so that the field appearing moves nothing;
+  a projection file that was found but could not be used is explained by the kernel's own finding
+  (that it describes a system but gives no EPSG code), shown in the step. The tests of the wizard's
+  frame now open it with a data file and its projection file, so that no step stops them.

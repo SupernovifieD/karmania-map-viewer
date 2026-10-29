@@ -370,7 +370,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 8.6 Step "Mapping", part 3: per-column type override and rename.
 - [x] 8.7 Step "Nodata": suggested tokens and numbers as checkboxes with counts;
   custom value input; empty-coordinate policy.
-- [ ] 8.8 Step "CRS", part 1: the detected CRS with its source (the file's own
+- [x] 8.8 Step "CRS", part 1: the detected CRS with its source (the file's own
   `crs` member, a `.prj` file, or the GeoJSON default); typing an EPSG code as a
   number. The code is shown as given: there is no name, kind or units lookup,
   because the core has no definitions (owner decision, 3.25).

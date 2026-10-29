@@ -7,9 +7,11 @@ import './file-step.js';
 import type { DraftChange } from './file-step.js';
 import { applyDraftChange, draftFor } from './import-draft.js';
 import type { ImportDraft } from './import-draft.js';
+import { crsBlocker } from './import-crs.js';
 import { entriesOf, isImportable } from './import-files.js';
 import { mappingProblems } from './import-mapping.js';
 import type { FileEntry } from './import-files.js';
+import './crs-step.js';
 import './findings.js';
 import './mapping-step.js';
 import './nodata-step.js';
@@ -200,6 +202,9 @@ export class KarmaniaImportDialog extends LitElement {
       // The first thing that is wrong with the mapping, in the kernel's words.
       return mappingProblems(this.draft.kind, this.draft.columns, this.draft.blockSize)[0]?.message;
     }
+    if (this.step === 'crs' && this.draft !== undefined) {
+      return crsBlocker(this.draft.crs, this.current?.preview.crs);
+    }
     if (this.step !== 'file') {
       return undefined;
     }
@@ -264,6 +269,15 @@ export class KarmaniaImportDialog extends LitElement {
           .draft=${this.draft}
           @karmania-draft-change=${this.onDraftChange}
         ></karmania-nodata-step>
+      </div>`;
+    }
+    if (this.step === 'crs') {
+      return html`<div class="step" data-step="crs">
+        <karmania-crs-step
+          .entry=${this.current}
+          .draft=${this.draft}
+          @karmania-draft-change=${this.onDraftChange}
+        ></karmania-crs-step>
       </div>`;
     }
     const found = IMPORT_STEPS.find((known) => known.id === this.step);
