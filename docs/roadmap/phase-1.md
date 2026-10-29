@@ -391,7 +391,7 @@ Definitions and reprojection can be added later, with the features that need the
   - [x] 8.13c GeoJSON mixed types.
   - [x] 8.13d ASCII grid.
   - [x] 8.13e OBJ mesh.
-  - [ ] 8.13f Block model CSV.
+  - [x] 8.13f Block model CSV.
   - [ ] 8.13g Missing CRS.
   - [ ] 8.13h Cancel during a large import.
 - [ ] 8.14 Wizard screenshot baselines for every step, including the error and

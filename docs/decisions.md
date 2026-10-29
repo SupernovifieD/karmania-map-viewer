@@ -1669,3 +1669,7 @@ was chosen, why.
 - 8.13e: the OBJ sample, a pyramid whose square base is one face. A local grid in metres is chosen (a
   model has no place on the Earth), the import splits the square into two triangles, says so in a note,
   and loads a mesh of six triangles and five vertices, with a box from (0, 0, 0) to (10, 10, 8).
+- 8.13f: the block model sample (3 by 3 by 2 block centres). The File step suggests a block model, the
+  Mapping step finds the three centre columns and will not go on without the size of a block, says what
+  is wrong with a size typed as "ten", and with 10 by 10 by 10 and a typed EPSG code the import makes a
+  dense model of 18 blocks whose box is half a block beyond the outermost centres.

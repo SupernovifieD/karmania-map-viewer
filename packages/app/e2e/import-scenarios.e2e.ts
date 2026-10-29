@@ -339,4 +339,69 @@ test.describe('importing', () => {
     expect(dataset?.bbox).toEqual({ min: [0, 0, 0], max: [10, 10, 8] });
     expect(result.selected).toBe(dataset?.id);
   });
+
+  test('a block model: the size of a block is asked for, the centres become a lattice, and blocks are loaded', async ({
+    page,
+  }) => {
+    const w = wizard(page);
+    await startWizard(page, 'blocks.csv');
+    // File: the kernel saw block centres, and suggests a block model.
+    await expect(w.host.locator('karmania-file-step k-select select')).toHaveValue('blocks');
+    await goTo(page, 'mapping');
+
+    // Mapping: the centres were found, and nothing can go on without the size of a block.
+    const mapping = w.host.locator('karmania-mapping-step');
+    expect(
+      await mapping
+        .locator('thead select')
+        .evaluateAll((all) => all.map((select) => (select as HTMLSelectElement).value)),
+    ).toEqual(['x', 'y', 'z', 'attribute', 'attribute']);
+    await expect(mapping.locator('.problems li')).toContainText('The block size is missing.');
+    await expect(w.next.locator('button')).toBeDisabled();
+    await expect(w.note).toHaveText('The block size is missing.');
+    const sizes = mapping.locator('.block-size input');
+    await sizes.nth(0).fill('10');
+    await sizes.nth(1).fill('ten');
+    await expect(mapping.locator('.block-size .error')).toHaveText('Enter a number above 0.');
+    await expect(w.next.locator('button')).toBeDisabled();
+    await sizes.nth(1).fill('10');
+    await sizes.nth(2).fill('10');
+    await expect(mapping.locator('.problems li')).toHaveCount(0);
+    await goTo(page, 'nodata');
+    await goTo(page, 'crs');
+
+    // CRS: nothing was found; the code is typed.
+    const crs = w.host.locator('karmania-crs-step');
+    await crs.locator('.choice k-select').first().locator('select').selectOption('epsg');
+    await crs.locator('k-input input').fill('32640');
+    await goTo(page, 'review');
+
+    const review = w.host.locator('karmania-review-step');
+    await expect(review.locator('.verdict')).toHaveText('Ready to load');
+    expect(await textsOf(review.locator('.dataset'))).toEqual(['blocks 18 blocks']);
+    await w.next.click();
+
+    await expect(w.dialog).toBeHidden();
+    const result = await kept(page);
+    expect(result.datasets).toHaveLength(1);
+    const [dataset] = result.datasets;
+    expect(dataset).toMatchObject({
+      name: 'blocks',
+      kind: 'blocks',
+      elementCount: 18,
+      hasZ: true,
+      crs: { kind: 'epsg', code: 32640 },
+    });
+    expect(dataset?.columns.map((column) => column.name)).toEqual(['Density', 'Domain']);
+    expect(dataset?.columns.find((column) => column.name === 'Density')).toMatchObject({
+      type: 'float',
+      nullCount: 0,
+    });
+    // 3 by 3 by 2 blocks of 10: the box is the outer edge of the lattice, half a block beyond the centres.
+    expect(dataset?.bbox).toEqual({
+      min: [500000, 2765000, 90],
+      max: [500030, 2765030, 110],
+    });
+    expect(result.selected).toBe(dataset?.id);
+  });
 });
