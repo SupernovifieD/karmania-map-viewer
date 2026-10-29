@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
@@ -28,12 +29,19 @@ async function rect(locator: Locator) {
   return box;
 }
 
-/** Opens the dialog, as the Import button will (step 8.2). */
+/** A sample file of the repository, by name. */
+const fixture = (name: string): string =>
+  fileURLToPath(new URL(`../../../fixtures/${name}`, import.meta.url));
+
+/** Opens the dialog as a person does: Import, and a file in the picker. Waits for the file to be read. */
 async function open(page: Page): Promise<void> {
-  await page.locator('karmania-import-dialog').evaluate((element) => {
-    (element as unknown as { open: boolean }).open = true;
-  });
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser', { timeout: 10_000 }),
+    page.locator('karmania-app header.toolbar k-button button').click(),
+  ]);
+  await chooser.setFiles([fixture('points.csv')]);
   await expect(parts(page).dialog).toBeVisible();
+  await expect(parts(page).host.locator('karmania-file-step')).toBeVisible();
 }
 
 /** The steps' states, in order: `done`, `current` or `pending`. */
@@ -126,6 +134,34 @@ test.describe('the import dialog', () => {
     await expect(p.next).toHaveText('Next');
     await expect(p.status).toHaveText('Step 4 of 5: CRS');
     expect(await states(page)).toEqual(['done', 'done', 'done', 'current', 'pending']);
+  });
+
+  test('keeps the dialog the same size and its buttons where they are, from step to step', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await open(page);
+    const first = {
+      dialog: await rect(p.dialog),
+      back: await rect(p.back),
+      next: await rect(p.next),
+      cancel: await rect(p.cancel),
+    };
+    for (let step = 2; step <= 5; step += 1) {
+      await p.next.click();
+      expect(await rect(p.dialog), `dialog at step ${String(step)}`).toEqual(first.dialog);
+      expect(await rect(p.cancel), `Cancel at step ${String(step)}`).toEqual(first.cancel);
+      const next = await rect(p.next);
+      // The primary button stays at the right; on the last step its words are different ("Load"),
+      // and so may be its width, which moves Back by as much.
+      expect(next.x + next.width, `right edge of Next at step ${String(step)}`).toBe(
+        first.next.x + first.next.width,
+      );
+      if (step < 5) {
+        expect(next).toEqual(first.next);
+        expect(await rect(p.back)).toEqual(first.back);
+      }
+    }
   });
 
   test('leaves the keyboard on the button that was pressed, so that Enter can go on', async ({

@@ -6,6 +6,7 @@ import {
   formatCount,
   IMPORT_FILE_ACCEPT,
   isImportable,
+  isKind,
   KIND_NAMES,
   KINDS_BY_FORMAT,
 } from './import-files.js';
@@ -94,6 +95,17 @@ describe('the kinds a format can be imported as', () => {
         expect(KIND_NAMES[kind]).not.toBe('');
       }
     }
+  });
+});
+
+describe('recognising a kind', () => {
+  it('knows the six, and nothing else', () => {
+    for (const kind of ['points', 'lines', 'polygons', 'mesh', 'grid', 'blocks']) {
+      expect(isKind(kind)).toBe(true);
+    }
+    expect(isKind('Points')).toBe(false);
+    expect(isKind('decided-by-the-file')).toBe(false);
+    expect(isKind('')).toBe(false);
   });
 });
 

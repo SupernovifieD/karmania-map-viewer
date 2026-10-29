@@ -249,6 +249,32 @@ test.describe('the dialog', () => {
     expect(await closes(page)).toBe(0);
   });
 
+  test('puts the keyboard on the dialog when it opens, and the first Tab goes to its first control', async ({
+    page,
+  }) => {
+    const p = parts(page, 'dialog-short');
+    await page.keyboard.press('Shift');
+    await p.trigger.locator('button').focus();
+    await page.keyboard.press('Enter');
+    await expect(p.dialog).toBeVisible();
+    // The dialog has it: not the close button, whose tooltip would have opened with it.
+    expect(
+      await p.host.evaluate((host) => host.shadowRoot?.activeElement?.localName ?? 'none'),
+    ).toBe('dialog');
+    expect(
+      await p.host.evaluate(
+        (host) =>
+          host.shadowRoot?.querySelector('k-tooltip .tip')?.matches(':popover-open') ?? false,
+      ),
+    ).toBe(false);
+    // No ring is drawn round the whole dialog.
+    expect(await p.dialog.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe(
+      'none',
+    );
+    await page.keyboard.press('Tab');
+    await expect(p.close.locator('button')).toBeFocused();
+  });
+
   test('keeps the keyboard inside while open', async ({ page }) => {
     const p = parts(page, 'dialog-short');
     await p.trigger.click();
@@ -328,6 +354,27 @@ test.describe('the dialog', () => {
     const [box, footer] = [await rect(p.host.locator('.note')), await rect(p.footer)];
     expect(box.height).toBe(20);
     expect(box.y + box.height / 2).toBeCloseTo(footer.y + footer.height / 2, 0);
+  });
+
+  test('is as tall as it can be, whatever is in it, when it is asked to fill', async ({ page }) => {
+    for (const size of [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 640 },
+    ]) {
+      await page.setViewportSize(size);
+      const p = parts(page, 'dialog-fill');
+      await p.trigger.click();
+      const dialog = await rect(p.dialog);
+      expect(dialog.height).toBe(Math.min(720, size.height - 48));
+      // The buttons are at the bottom, as far down as the dialog goes.
+      const footer = await rect(p.footer);
+      expect(footer.y + footer.height).toBeCloseTo(dialog.y + dialog.height - 1, 0);
+      await page.keyboard.press('Escape');
+    }
+    // One that does not fill is as tall as its content.
+    const short = parts(page, 'dialog-short');
+    await short.trigger.click();
+    expect((await rect(short.dialog)).height).toBeLessThan(300);
   });
 
   test('has no serious accessibility violations, open', async ({ page }) => {

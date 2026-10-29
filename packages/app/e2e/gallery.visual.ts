@@ -86,8 +86,10 @@ const dialogShot = (
   name: string,
   id: string,
   prepare: (page: Page, dialog: Locator) => Promise<void> = () => Promise.resolve(),
+  padding = 8,
 ): Shot => ({
   name,
+  padding,
   show: async (page) => {
     const demo = gallery(page, `karmania-gallery #${id}`);
     await reveal(demo);
@@ -220,11 +222,18 @@ const SHOTS: Shot[] = [
     },
   })),
   dialogShot('dialog-short', 'dialog-short'),
-  dialogShot('dialog-short-close-focus', 'dialog-short', async (page, dialog) => {
-    await page.keyboard.press('Shift');
-    await dialog.locator('header k-button').focus();
-  }),
+  dialogShot(
+    'dialog-short-close-focus',
+    'dialog-short',
+    async (page, dialog) => {
+      await page.keyboard.press('Shift');
+      await dialog.locator('header k-button').focus();
+      // Room round the dialog for the tooltip that opens above the button.
+    },
+    40,
+  ),
   dialogShot('dialog-note', 'dialog-note'),
+  dialogShot('dialog-fill', 'dialog-fill'),
   dialogShot('dialog-long', 'dialog-long'),
   dialogShot('dialog-long-scrolled', 'dialog-long', async (_page, dialog) => {
     await dialog.locator('.body').evaluate((element) => {

@@ -58,7 +58,7 @@ async function seen(page: Page): Promise<Seen> {
 
 async function importFiles(page: Page, ...names: string[]): Promise<void> {
   const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser'),
+    page.waitForEvent('filechooser', { timeout: 10_000 }),
     toolbarImport(page).click(),
   ]);
   await chooser.setFiles(names.map(fixture));
@@ -113,7 +113,7 @@ test.describe('the wizard reading the files it was given', () => {
     page,
   }) => {
     const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
+      page.waitForEvent('filechooser', { timeout: 10_000 }),
       toolbarImport(page).click(),
     ]);
     await chooser.setFiles([

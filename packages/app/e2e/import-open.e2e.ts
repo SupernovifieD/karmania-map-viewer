@@ -44,7 +44,10 @@ async function chooseWith(
   button: Locator,
   files: { name: string; mimeType: string; buffer: Buffer }[],
 ) {
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), button.click()]);
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser', { timeout: 10_000 }),
+    button.click(),
+  ]);
   await chooser.setFiles(files);
 }
 
@@ -141,8 +144,11 @@ test.describe('opening the import wizard', () => {
   test('gives the keyboard back to the Import button when closed with Esc', async ({ page }) => {
     await page.keyboard.press('Shift');
     await toolbarImport(page).focus();
+    // Pressing Enter does nothing useful if the button does not have the keyboard, and a test that
+    // waited for a picker that never came would only say that it timed out.
+    await expect(toolbarImport(page)).toBeFocused();
     const [chooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
+      page.waitForEvent('filechooser', { timeout: 10_000 }),
       page.keyboard.press('Enter'),
     ]);
     await chooser.setFiles([POINTS]);

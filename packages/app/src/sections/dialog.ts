@@ -42,6 +42,15 @@ export function dialogSection() {
             <k-button slot="footer-end" variant="primary" disabled>Next</k-button>
           </k-dialog>
         </div>
+        <div id="dialog-fill" class="dialog-demo">
+          <k-button @click=${openNeighbour}>Open a dialog that fills</k-button>
+          <k-dialog heading="Import data" fill>
+            <p>With little in it, a dialog that fills is as tall as it can be.</p>
+            <k-button slot="footer-start" variant="ghost">Cancel</k-button>
+            <k-button slot="footer-end">Back</k-button>
+            <k-button slot="footer-end" variant="primary">Next</k-button>
+          </k-dialog>
+        </div>
         <div id="dialog-long" class="dialog-demo">
           <k-button @click=${openNeighbour}>Open a dialog with a lot in it</k-button>
           <k-dialog

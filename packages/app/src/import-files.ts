@@ -1,3 +1,4 @@
+import { KINDS } from '@karmania/engine';
 import type { Delimiter, Format, Kind, Preview, PreviewGroup } from '@karmania/engine';
 
 /**
@@ -86,6 +87,21 @@ export const KINDS_BY_FORMAT: Readonly<Record<Format, readonly Kind[]>> = {
   ascii_grid: ['grid'],
   obj: ['mesh'],
   prj: [],
+};
+
+/** Whether some text, from a select say, is the name of a kind. */
+export function isKind(value: string): value is Kind {
+  return KINDS.some((kind) => kind === value);
+}
+
+/** What to tell a person about the choice of kind a format gives them, or does not. */
+export const KIND_HELP: Readonly<Record<Format, string>> = {
+  csv: 'A CSV file can hold points, lines or a block model.',
+  geojson:
+    'The shapes in a GeoJSON file decide. A file with several kinds of shape gives a dataset for each.',
+  ascii_grid: 'An ESRI ASCII grid is always imported as a grid.',
+  obj: 'An OBJ file is always imported as a mesh.',
+  prj: '',
 };
 
 /** How many, written for people: `1,203`, grouped by thousands with a comma. */
