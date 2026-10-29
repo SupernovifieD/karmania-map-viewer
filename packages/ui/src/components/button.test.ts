@@ -31,6 +31,18 @@ describe('the properties of a button', () => {
     expect([noIcon, wrongSize, wrongVariant]).toHaveLength(3);
   });
 
+  it('can say whether what the button opens is open, and need not', () => {
+    const open: ButtonProps = { icon: 'chevrons-right', label: 'Collapse panel', expanded: true };
+    const closed: ButtonProps = { children: 'Menu', expanded: false };
+    const opensNothing: ButtonProps = { children: 'Import' };
+    // @ts-expect-error it is true or false, not a word
+    const word: ButtonProps = { children: 'Menu', expanded: 'yes' };
+    expect([open, closed, opensNothing, word]).toHaveLength(4);
+    expect(kButton(open).values).toContain(true);
+    expect(kButton(closed).values).toContain(false);
+    expect(kButton(opensNothing).values).toContain(undefined);
+  });
+
   it('make a template with what the button says', () => {
     expect(kButton({ children: 'Import' }).values).toContain('Import');
     expect(kButton({ icon: 'x', label: 'Close' }).values).toContain('Close');

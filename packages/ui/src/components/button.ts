@@ -18,6 +18,10 @@ export type ButtonSize = 28 | 32;
  * `<button>` inside, so it is focused, pressed and announced as one, and it fires the
  * ordinary `click` event.
  *
+ * A button that opens or closes something (a panel, a menu) says whether it is open with
+ * `expanded`, which a screen reader announces. It is a property, not an attribute: `true` and
+ * `false` both mean something, and so does leaving it unset, for a button that opens nothing.
+ *
  * A button needs a name for people who cannot see it: its text, or, with an icon alone, its
  * `label`. A button with neither is a mistake in the page that uses it, and throws. In
  * TypeScript, make buttons with {@link kButton}, which does not compile without one.
@@ -32,6 +36,7 @@ export class KButton extends LitElement {
     icon: { type: String },
     label: { type: String },
     disabled: { type: Boolean, reflect: true },
+    expanded: { attribute: false },
   };
 
   static override styles = [
@@ -152,6 +157,8 @@ export class KButton extends LitElement {
   /** The button's name, for when its content is an icon alone. */
   declare label: string | undefined;
   declare disabled: boolean;
+  /** Whether what the button opens is open; `undefined` for a button that opens nothing. */
+  declare expanded: boolean | undefined;
 
   constructor() {
     super();
@@ -160,6 +167,7 @@ export class KButton extends LitElement {
     this.icon = undefined;
     this.label = undefined;
     this.disabled = false;
+    this.expanded = undefined;
   }
 
   /** Whether the button has anything to read: text between its tags. */
@@ -178,6 +186,7 @@ export class KButton extends LitElement {
         class=${iconOnly ? 'icon-only' : ''}
         ?disabled=${this.disabled}
         aria-label=${ifDefined(this.label === '' ? undefined : this.label)}
+        aria-expanded=${ifDefined(this.expanded === undefined ? undefined : String(this.expanded))}
       >
         ${
           icon !== undefined && isIconName(icon)
@@ -218,6 +227,8 @@ interface ButtonLook {
   readonly variant?: ButtonVariant;
   readonly size?: ButtonSize;
   readonly disabled?: boolean;
+  /** Whether what the button opens is open. Leave it out for a button that opens nothing. */
+  readonly expanded?: boolean;
 }
 
 /** A button that says what it does in words, and may have an icon beside them. */
@@ -250,6 +261,7 @@ export function kButton(props: ButtonProps): TemplateResult {
     icon=${ifDefined(props.icon)}
     label=${ifDefined(props.label)}
     ?disabled=${props.disabled ?? false}
+    .expanded=${props.expanded}
     >${props.children}</k-button
   >`;
 }
