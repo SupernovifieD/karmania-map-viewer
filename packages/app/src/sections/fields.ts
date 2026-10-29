@@ -13,7 +13,7 @@ const LONG_OPTIONS: readonly SelectOption[] = [
   { value: 'short', label: 'Short' },
 ];
 
-/** Selects and text inputs: at rest, with help, with an error, disabled, compact, and cramped. */
+/** Selects, text inputs and checkboxes: at rest, with help, with an error, disabled, compact, and cramped. */
 export function fieldsSection() {
   return html`
     <section data-section="fields">
@@ -89,6 +89,28 @@ export function fieldsSection() {
         </div>
         <div class="field-demo" id="input-compact">
           <k-input label="Rename the column Easting" hide-label size="28" value="Easting"></k-input>
+        </div>
+      </div>
+      <h2>Checkbox</h2>
+      <div class="fields" id="fields-checkbox">
+        <div class="field-demo" id="check-off"><k-checkbox>NA</k-checkbox></div>
+        <div class="field-demo" id="check-on">
+          <k-checkbox checked detail="12 times">N/A</k-checkbox>
+        </div>
+        <div class="field-demo" id="check-disabled">
+          <k-checkbox disabled>Not available</k-checkbox>
+          <k-checkbox disabled checked>Not available, and ticked</k-checkbox>
+        </div>
+        <div class="field-demo narrow-field" id="check-long">
+          <k-checkbox checked detail="1,204,000 times"
+            >A label that is a good deal longer than the room it has, and
+            a_very_long_unbroken_word_in_the_middle_of_it</k-checkbox
+          >
+        </div>
+        <div class="field-demo" id="check-list">
+          <k-checkbox checked detail="3 times">-999</k-checkbox>
+          <k-checkbox checked detail="12 times">-9999</k-checkbox>
+          <k-checkbox detail="1 time">1e30</k-checkbox>
         </div>
       </div>
     </section>

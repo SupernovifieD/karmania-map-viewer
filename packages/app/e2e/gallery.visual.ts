@@ -191,7 +191,7 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
-  ...['select', 'input'].map((kind): Shot => ({
+  ...['select', 'input', 'checkbox'].map((kind): Shot => ({
     name: `fields-${kind}`,
     show: async (page) => {
       const target = gallery(page, `karmania-gallery #fields-${kind}`);
@@ -204,6 +204,7 @@ const SHOTS: Shot[] = [
     ['select-compact-focus', 'select-compact', 'select'],
     ['input-focus', 'input-default', 'input'],
     ['input-error-focus', 'input-error', 'input'],
+    ['checkbox-focus', 'check-on', 'input'],
   ].map(([name, id, control]): Shot => ({
     name: name ?? '',
     show: async (page) => {
