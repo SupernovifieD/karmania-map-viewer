@@ -404,7 +404,7 @@ Definitions and reprojection can be added later, with the features that need the
   remove with confirmation; selection.
 - [x] 9.3 Dataset summary: kind, count, CRS (EPSG code, or Local with its units),
   has_z, formatted bbox, columns; an expandable list of warnings and info.
-- [ ] 9.4 Virtualized table, part 1: fixed rows, sticky header, row-number
+- [x] 9.4 Virtualized table, part 1: fixed rows, sticky header, row-number
   column, windowed rendering.
 - [ ] 9.5 Virtualized table, part 2: column width measurement and clamping;
   ellipsis plus full value; horizontal scroll inside the table.

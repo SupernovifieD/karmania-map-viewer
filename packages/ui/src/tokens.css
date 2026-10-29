@@ -47,6 +47,9 @@
   --k-tab-height: 40px;
   /* A row of a list: the datasets of the Data tab. */
   --k-list-row-height: 40px;
+  /* A table of many rows: the height of a row, and of the header over them. */
+  --k-table-row-height: 28px;
+  --k-table-header-height: 32px;
 
   /* The app shell: the height of the toolbar, how wide the side panel starts out, and how wide
      it is when it has been folded away into its rail of buttons. */

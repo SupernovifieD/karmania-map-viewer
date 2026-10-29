@@ -222,6 +222,28 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
+  ...['few', 'many'].map((which): Shot => ({
+    name: `table-${which}`,
+    show: async (page) => {
+      const target = gallery(page, `karmania-gallery #table-${which}`);
+      await reveal(target);
+      await target.locator('.rows [role="row"]').first().waitFor();
+      return [target];
+    },
+  })),
+  {
+    // Down 1,234 rows and all the way to the right: the header and the row numbers stay in view.
+    name: 'table-many-scrolled',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-many');
+      await reveal(target);
+      await target.locator('.viewport').evaluate((element) => {
+        element.scrollTo(element.scrollWidth, 1233 * 28);
+      });
+      await target.locator('.rows [role="rowheader"]', { hasText: /^\s*1235\s*$/ }).waitFor();
+      return [target];
+    },
+  },
   dialogShot('dialog-short', 'dialog-short'),
   dialogShot(
     'dialog-short-close-focus',
