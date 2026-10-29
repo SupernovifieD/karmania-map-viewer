@@ -4,6 +4,8 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
+import type { DatasetChoice } from './dataset-list.js';
+import { selectionAfterRemoving } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
@@ -171,6 +173,23 @@ export class KarmaniaApp extends LitElement {
     this.changePanel(event.detail);
   };
 
+  private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
+    this.selected = event.detail.id;
+  };
+
+  /** Removes a dataset from the engine, and from what is shown, and selects the one that takes its place. */
+  private readonly onDatasetRemove = async (event: CustomEvent<DatasetChoice>): Promise<void> => {
+    const engine = this.engine;
+    if (engine === undefined) {
+      return;
+    }
+    const { id } = event.detail;
+    const next = selectionAfterRemoving(this.datasets, id, this.selected);
+    await engine.remove(id);
+    this.datasets = engine.datasets();
+    this.selected = next;
+  };
+
   private changePanel(change: PanelChange): void {
     this.panel = { ...this.panel, ...change };
     savePanelState(browserStorage(), this.panel);
@@ -239,7 +258,10 @@ export class KarmaniaApp extends LitElement {
           .collapsed=${this.panel.collapsed}
           .tab=${this.panel.tab}
           .datasets=${this.datasets}
+          .selected=${this.selected}
           @karmania-import-request=${this.chooseFiles}
+          @karmania-dataset-select=${this.onDatasetSelect}
+          @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}
         ></karmania-panel>
       </div>
