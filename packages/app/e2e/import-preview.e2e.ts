@@ -132,9 +132,12 @@ test.describe('the wizard reading the files it was given', () => {
     expect((await seen(page)).entries.map((entry) => entry.file)).toEqual(['points.csv']);
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toBeHidden();
-    expect(
-      await wizard(page).evaluate((element) => (element as unknown as Internals).entries),
-    ).toBeUndefined();
+    // It forgets when the browser tells it the dialog has closed, a moment after the dialog is hidden.
+    await expect
+      .poll(() =>
+        wizard(page).evaluate((element) => (element as unknown as Internals).entries === undefined),
+      )
+      .toBe(true);
     await importFiles(page, 'grid.asc');
     expect((await seen(page)).entries.map((entry) => entry.file)).toEqual(['grid.asc']);
   });

@@ -112,7 +112,9 @@ test.describe('opening the import wizard', () => {
     ).toBe('');
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toBeHidden();
-    expect(await heldFiles(page)).toEqual([]);
+    // The wizard forgets its files when the browser tells it the dialog has closed, which is a moment
+    // after the dialog is hidden.
+    await expect.poll(() => heldFiles(page)).toEqual([]);
     await chooseWith(page, toolbarImport(page), [POINTS]);
     await expect(dialog(page)).toBeVisible();
     expect(await heldFiles(page)).toEqual(['points.csv']);
