@@ -1423,3 +1423,13 @@ was chosen, why.
   cannot be used yet (8.5 says Next is disabled "with a visible reason", and the same goes for the
   other steps). It is muted 13/20 text of at most two lines, cut with an ellipsis after that; whoever
   fills it puts the whole text in a `title`. The footer stays 64 high.
+- The app now depends on `@karmania/engine` (a workspace link: 3 lines of the lockfile, nothing from
+  outside). The engine, and with it the worker and the 630 KB WebAssembly module, is started when
+  the first files arrive, not when the page loads, so a person who never imports pays nothing and the
+  shell's tests do not start a worker. The build emits the worker and the module as files of their
+  own (`worker: { format: 'es' }` in the app's Vite config). The wizard has the engine look at the
+  files as soon as it opens (`entries`: one for each file that is not a sidecar, with the data file,
+  its sidecars and what the kernel made of them) and ignores an answer that arrives after the files
+  have been changed or the dialog closed; a failure of the engine itself (it could not start) is
+  kept as `failure`, whereas a file it cannot read is a finding about that file. The tests run the
+  real worker and kernel on the files in `fixtures/`.

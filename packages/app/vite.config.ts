@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 
 /** The pages of the app: the app itself, and the gallery that shows the components in isolation. */
 export default defineConfig({
+  // The engine's worker is a module worker (it imports other modules).
+  worker: { format: 'es' },
   build: {
     target: 'es2022',
     rolldownOptions: {

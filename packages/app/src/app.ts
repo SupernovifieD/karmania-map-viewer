@@ -1,3 +1,5 @@
+import { createEngine } from '@karmania/engine';
+import type { Engine } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
@@ -105,6 +107,9 @@ export class KarmaniaApp extends LitElement {
     this.viewportWidth = document.documentElement.clientWidth;
   }
 
+  /** The engine, which is started when the first files arrive, not before. */
+  private engine: Engine | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener('dragover', this.refuseStrayFiles);
@@ -117,6 +122,8 @@ export class KarmaniaApp extends LitElement {
     window.removeEventListener('dragover', this.refuseStrayFiles);
     window.removeEventListener('drop', this.refuseStrayFiles);
     window.removeEventListener('resize', this.onWindowResize);
+    this.engine?.dispose();
+    this.engine = undefined;
   }
 
   private readonly onWindowResize = (): void => {
@@ -142,8 +149,11 @@ export class KarmaniaApp extends LitElement {
 
   /** Opens the import wizard on `files`, if there are any. */
   private importFiles(files: readonly File[]): void {
-    if (files.length > 0) {
-      this.renderRoot.querySelector('karmania-import-dialog')?.show(files);
+    const wizard = this.renderRoot.querySelector('karmania-import-dialog');
+    if (files.length > 0 && wizard) {
+      this.engine ??= createEngine();
+      wizard.engine = this.engine;
+      wizard.show(files);
     }
   }
 
