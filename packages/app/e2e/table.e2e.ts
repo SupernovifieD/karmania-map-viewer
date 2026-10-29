@@ -747,6 +747,232 @@ test.describe('the table', () => {
     });
   });
 
+  test.describe('with more rows than a browser can scroll through', () => {
+    const ROWS = 2_000_000;
+
+    /** The row at the top of the rows, from where the rows are. */
+    const topRow = (p: ReturnType<typeof parts>): Promise<number> =>
+      p.viewport.evaluate((viewport) => {
+        const top = viewport.getBoundingClientRect().top + 32;
+        const rows = [...viewport.querySelectorAll('.rows [role="row"]')];
+        const at = rows.find((row) => {
+          const box = row.getBoundingClientRect();
+          return box.top <= top + 0.5 && box.bottom > top + 0.5;
+        });
+        return Number(at?.querySelector('[role="rowheader"]')?.textContent ?? Number.NaN);
+      });
+
+    /** How much of the rows one pixel of scrolling is. */
+    const ratio = (p: ReturnType<typeof parts>): Promise<number> =>
+      p.viewport.evaluate((viewport) => {
+        const body = viewport.clientHeight - 32;
+        return (2_000_000 * 28 - body) / (viewport.scrollHeight - 32 - body);
+      });
+
+    /** Goes to a place in the box that scrolls, as far down as `fraction` of the way. */
+    const goTo = (p: ReturnType<typeof parts>, fraction: number): Promise<void> =>
+      p.viewport.evaluate((viewport, f) => {
+        viewport.scrollTo(0, f * (viewport.scrollHeight - viewport.clientHeight));
+      }, fraction);
+
+    test('are in a box that is no taller than a browser allows, and the scroll bar is for all of them', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      const height = await p.viewport.evaluate((element) => element.scrollHeight);
+      // Ten million for the rows, and the header: not 56 million, which would not work.
+      expect(height).toBe(32 + 10_000_000);
+      await expect(p.viewport).toHaveAttribute('aria-rowcount', String(ROWS + 1));
+      expect(await p.rows.count()).toBeLessThan(25);
+    });
+
+    test('begin at the first row, and end at the last, at the bottom of the table', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      expect(await topRow(p)).toBe(1);
+      await goTo(p, 1);
+      await expect.poll(async () => (await drawn(p.numbers)).at(-1)).toBe(ROWS);
+      const last = await rect(p.rows.last());
+      const bottom = await p.viewport.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.y + element.clientHeight;
+      });
+      expect(last.y + last.height).toBe(bottom);
+      // Further than that is not further.
+      await p.viewport.evaluate((element) => {
+        element.scrollTo(0, 1e12);
+      });
+      expect((await drawn(p.numbers)).at(-1)).toBe(ROWS);
+    });
+
+    test('are the rows that the scroll bar says, a share of the way down for the same share of the rows', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      for (const fraction of [0.1, 0.25, 0.5, 0.75, 0.9, 0.999]) {
+        await goTo(p, fraction);
+        const wanted = Math.floor((fraction * (ROWS * 28 - 256)) / 28) + 1;
+        await expect
+          .poll(async () => Math.abs((await topRow(p)) - wanted), {
+            message: `at ${String(fraction)}`,
+          })
+          .toBeLessThanOrEqual(1);
+      }
+    });
+
+    test('are each in its own place, one under the other, with the cells of the row they belong to', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      for (const fraction of [0, 0.37, 0.8, 1]) {
+        await goTo(p, fraction);
+        await expect.poll(async () => (await drawn(p.numbers)).length).toBeGreaterThan(10);
+        const numbers = await drawn(p.numbers);
+        numbers.forEach((number, index) => {
+          expect(number, `at ${String(fraction)}`).toBe((numbers[0] ?? 0) + index);
+        });
+        await expect
+          .poll(async () =>
+            p.rows.evaluateAll((all) =>
+              all.every((row) => {
+                const [number, id, , label] = [...row.children].map((cell) => cell.textContent);
+                return id === number && label === `Feature ${number ?? ''}`;
+              }),
+            ),
+          )
+          .toBe(true);
+        const tops = await p.rows.evaluateAll((all) =>
+          all.map((row) => row.getBoundingClientRect().top),
+        );
+        tops.slice(1).forEach((top, index) => {
+          expect(top - (tops[index] ?? 0)).toBe(28);
+        });
+      }
+    });
+
+    test('can be scrolled to any row, to within one', async ({ page }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      const scale = await ratio(p);
+      // A pixel of scrolling is a few pixels of rows, which is less than a row.
+      expect(scale).toBeGreaterThan(5);
+      expect(scale).toBeLessThan(6);
+      for (const row of [0, 1, 255, 256, 99_999, 1_000_000, 1_234_567, 1_999_000]) {
+        await p.viewport.evaluate(
+          (viewport, [r, scaleBy]) => {
+            viewport.scrollTo(0, ((r ?? 0) * 28) / (scaleBy ?? 1));
+          },
+          [row, scale],
+        );
+        await expect
+          .poll(async () => Math.abs((await topRow(p)) - (row + 1)), {
+            message: `row ${String(row)}`,
+          })
+          .toBeLessThanOrEqual(1);
+      }
+    });
+
+    test('move by no more than a row for a pixel of scrolling, and never back', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      await goTo(p, 0.5);
+      await expect.poll(async () => topRow(p)).toBeGreaterThan(1_000_000 - 100);
+      const tops = await p.viewport.evaluate(async (viewport) => {
+        const frame = (): Promise<void> =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => {
+              resolve();
+            }),
+          );
+        const found: number[] = [];
+        const start = viewport.scrollTop;
+        for (let step = 0; step < 60; step += 1) {
+          viewport.scrollTo(0, start + step);
+          await frame();
+          await frame();
+          const top = viewport.getBoundingClientRect().top + 32;
+          const row = [...viewport.querySelectorAll('.rows [role="row"]')].find((element) => {
+            const box = element.getBoundingClientRect();
+            return box.top <= top + 0.5 && box.bottom > top + 0.5;
+          });
+          found.push(Number(row?.querySelector('[role="rowheader"]')?.textContent ?? Number.NaN));
+        }
+        return found;
+      });
+      tops.slice(1).forEach((row, index) => {
+        const change = row - (tops[index] ?? 0);
+        expect(change, `step ${String(index + 1)}`).toBeGreaterThanOrEqual(0);
+        expect(change, `step ${String(index + 1)}`).toBeLessThanOrEqual(1);
+      });
+      expect(tops.at(-1)).toBeGreaterThan(tops[0] ?? Number.POSITIVE_INFINITY);
+    });
+
+    test('keep the header at the top, and the row numbers at the left, as when there are fewer', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-huge');
+      await expect(p.rows.first()).toBeVisible();
+      await goTo(p, 0.6);
+      await expect.poll(async () => (await topRow(p)) > 1_000_000).toBe(true);
+      const viewport = await rect(p.viewport);
+      expect((await rect(p.header)).y).toBe(viewport.y);
+      await p.viewport.evaluate((element) => {
+        element.scrollTo(element.scrollWidth, element.scrollTop);
+      });
+      expect((await rect(p.numbers.first())).x).toBe(viewport.x);
+    });
+
+    test('are asked for only where they are in view, and not for all the pages between', async ({
+      page,
+    }) => {
+      const found = await page.evaluate(async () => {
+        const calls: number[] = [];
+        const holder = document.createElement('div');
+        holder.style.cssText = 'height: 300px; width: 400px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+        };
+        table.rowCount = 2_000_000;
+        table.fetch = (start, count) => {
+          calls.push(start);
+          return Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'n',
+                values: Int32Array.from({ length: count }, (_, index) => start + index),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+        };
+        holder.append(table);
+        document.body.append(holder);
+        const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 150));
+        await settle();
+        const viewport = table.shadowRoot?.querySelector<HTMLElement>('.viewport');
+        viewport?.scrollTo(0, ((viewport.scrollHeight - viewport.clientHeight) * 3) / 4);
+        await settle();
+        holder.remove();
+        return calls;
+      });
+      // The first page, the page after it, and the pages round row 1,500,000: nothing else.
+      const near = (start: number): boolean => start >= 1_499_000 && start <= 1_500_500;
+      expect(found.filter((start) => start > 512 && !near(start))).toEqual([]);
+      expect(found.length).toBeLessThan(10);
+      expect(found.some(near)).toBe(true);
+    });
+  });
+
   test.describe('its pages', () => {
     /** What a table made in the page, and the source it is given, let the test do and see. */
     interface Probe {

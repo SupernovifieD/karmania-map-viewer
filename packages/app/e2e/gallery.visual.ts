@@ -283,6 +283,21 @@ const SHOTS: Shot[] = [
       return [target];
     },
   },
+  {
+    // Two million rows, scrolled to the very end: the last row is at the foot of the table, and the
+    // row numbers are seven digits wide.
+    name: 'table-huge-end',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-huge');
+      await reveal(target);
+      await target.locator('.rows [role="row"]').first().waitFor();
+      await target.locator('.viewport').evaluate((element) => {
+        element.scrollTo(0, element.scrollHeight);
+      });
+      await target.locator('.rows [role="rowheader"]', { hasText: /^\s*2000000\s*$/ }).waitFor();
+      return [target];
+    },
+  },
   dialogShot('dialog-short', 'dialog-short'),
   dialogShot(
     'dialog-short-close-focus',

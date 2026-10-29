@@ -61,6 +61,34 @@ function pointsFile(name: string, count: number): [Sample, Sample] {
   ];
 }
 
+/** A points file of `count` rows with only the three coordinates, for as many rows as can be made quickly. */
+function coordinatesFile(name: string, count: number): [Sample, Sample] {
+  const lines = ['Easting,Northing,RL'];
+  for (let row = 0; row < count; row += 1) {
+    lines.push(
+      `${String(500_000 + row * 0.5)},${String(2_765_000 + row * 0.25)},${String(100 + (row % 40) * 0.25)}`,
+    );
+  }
+  return [
+    { name: `${name}.csv`, mimeType: 'text/csv', buffer: Buffer.from(`${lines.join('\n')}\n`) },
+    {
+      name: `${name}.prj`,
+      mimeType: 'text/plain',
+      buffer: readFileSync(fixturePath('points.prj')),
+    },
+  ];
+}
+
+/** What row `row` (from 0) of `coordinatesFile` shows in the table. */
+function shownCoordinates(row: number): string[] {
+  return [
+    String(row + 1),
+    String(500_000 + row * 0.5),
+    String(2_765_000 + row * 0.25),
+    String(100 + (row % 40) * 0.25),
+  ];
+}
+
 /** What row `row` (from 0) of `pointsFile` shows in the table. */
 function shownRow(row: number): string[] {
   const au = row % 7 === 0 ? 'null' : String((row % 10) / 4);
@@ -163,6 +191,39 @@ test.describe('the table of the Data tab', () => {
     await scrollTo(p.viewport, 1e9);
     await expect.poll(async () => (await drawn(p.rows)).at(-1)?.[0]).toBe('20000');
     expect((await drawn(p.rows)).at(-1)).toEqual(shownRow(19_999));
+    const bottom = await p.viewport.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return box.y + element.clientHeight;
+    });
+    const last = await rect(p.rows.last());
+    expect(last.y + last.height).toBe(bottom);
+  });
+
+  test('scrolls through 400,000 rows of a real file, more than a browser can scroll as they are, to the last', async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    const p = parts(page);
+    await importAndLoad(page, ...coordinatesFile('huge', 400_000));
+    await expect(p.viewport).toHaveAttribute('aria-rowcount', '400001');
+    await expect(p.rows.first()).toBeVisible();
+    // 400,000 rows of 28 are 11.2 million pixels: the box is made as tall as is allowed, not that.
+    expect(await p.viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 10_000_000);
+    expect((await drawn(p.rows))[0]).toEqual(shownCoordinates(0));
+    for (const fraction of [0.3, 0.5, 0.9]) {
+      await p.viewport.evaluate((element, f) => {
+        element.scrollTo(0, f * (element.scrollHeight - element.clientHeight));
+      }, fraction);
+      await expect
+        .poll(async () => Number((await drawn(p.rows))[0]?.[0]))
+        .toBeGreaterThan(fraction * 400_000 - 200);
+      for (const cells of await drawn(p.rows)) {
+        expect(cells, `row ${cells[0] ?? '?'}`).toEqual(shownCoordinates(Number(cells[0]) - 1));
+      }
+    }
+    await scrollTo(p.viewport, 1e12);
+    await expect.poll(async () => (await drawn(p.rows)).at(-1)?.[0]).toBe('400000');
+    expect((await drawn(p.rows)).at(-1)).toEqual(shownCoordinates(399_999));
     const bottom = await p.viewport.evaluate((element) => {
       const box = element.getBoundingClientRect();
       return box.y + element.clientHeight;
