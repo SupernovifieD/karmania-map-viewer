@@ -91,7 +91,9 @@ describe('changing a draft', () => {
 
   it('takes the columns it is given along with a new kind as they are', () => {
     const draft = draftFor(withTable(['line_id', 'x', 'y']));
-    const columns = [{ source: 'Line', role: 'line_id' as const, suggested: false }];
+    const columns = [
+      { source: 'Line', role: 'line_id' as const, suggested: false, type: undefined, rename: '' },
+    ];
     expect(applyDraftChange(draft, { kind: 'points', columns }).columns).toBe(columns);
   });
 

@@ -1,6 +1,7 @@
 import { sharedStyles } from '@karmania/ui';
 import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
 import type { ImportDraft } from './import-draft.js';
@@ -12,12 +13,16 @@ import {
   REQUIREMENTS_NOTE,
   ROLE_NAMES,
   rolesFor,
+  TYPE_NAMES,
+  TYPES_BY_ROLE,
+  withRename,
   withRole,
+  withType,
 } from './import-mapping.js';
 import type { BlockSizeDraft } from './import-mapping.js';
 import './findings.js';
-import { ROLES } from '@karmania/engine';
-import type { Role } from '@karmania/engine';
+import { COLUMN_TYPES, ROLES } from '@karmania/engine';
+import type { ColumnType, Role } from '@karmania/engine';
 
 /** How many rows of the file the table shows. */
 export const PREVIEW_ROWS = 100;
@@ -25,6 +30,11 @@ export const PREVIEW_ROWS = 100;
 /** Whether some text, from a select say, is the name of a role. */
 function isRole(value: string): value is Role {
   return ROLES.some((role) => role === value);
+}
+
+/** Whether some text, from a select say, is the name of a column type. */
+function isColumnType(value: string): value is ColumnType {
+  return COLUMN_TYPES.some((type) => type === value);
 }
 
 /**
@@ -39,6 +49,7 @@ export class KarmaniaMappingStep extends LitElement {
   static override properties = {
     entry: { attribute: false },
     draft: { attribute: false },
+    selected: { state: true },
   };
 
   static override styles = [
@@ -155,12 +166,62 @@ export class KarmaniaMappingStep extends LitElement {
         min-width: 0;
       }
 
+      /* The name of a column is a button: it chooses the column, to set its type and its name. */
       .column-name {
+        background: none;
+        border: none;
+        border-radius: var(--k-radius-sm);
+        cursor: pointer;
         font-weight: var(--k-weight-medium);
+        min-width: 0;
+        overflow: hidden;
+        padding: 0;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .column-name:hover {
+        text-decoration: underline;
+      }
+
+      /* The chosen column has a line under its header, as well as being said in the panel below. */
+      th[data-selected] {
+        box-shadow: inset 0 calc(var(--k-border-width) * -2) 0 var(--k-accent);
+      }
+
+      /* What is set for the chosen column: one row, as high whether or not there is a column. */
+      .details {
+        align-items: center;
+        display: flex;
+        flex: none;
+        gap: var(--k-space-8);
+        min-height: var(--k-control-height-compact);
+        min-width: 0;
+      }
+
+      .details .title {
+        font-weight: var(--k-weight-medium);
+        max-width: calc(var(--k-space-48) * 4);
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .details .caption {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-secondary);
+        line-height: var(--k-line-height-secondary);
+      }
+
+      .details k-select {
+        width: calc(var(--k-space-48) * 4);
+      }
+
+      .details k-input {
+        flex: 1 1 auto;
+        max-width: calc(var(--k-space-48) * 6);
       }
 
       .suggested {
@@ -200,11 +261,21 @@ export class KarmaniaMappingStep extends LitElement {
   declare entry: FileEntry | undefined;
   /** What is to be done with it. */
   declare draft: ImportDraft | undefined;
+  /** The column a person has chosen, to set its type and its name. */
+  declare private selected: number | undefined;
 
   constructor() {
     super();
     this.entry = undefined;
     this.draft = undefined;
+    this.selected = undefined;
+  }
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    // A column of one file is not a column of the next.
+    if (changed.has('entry')) {
+      this.selected = undefined;
+    }
   }
 
   private tell(change: DraftChange): void {
@@ -260,9 +331,20 @@ export class KarmaniaMappingStep extends LitElement {
     options: readonly SelectOption[],
   ) {
     return html`
-      <th scope="col" data-role=${role}>
+      <th scope="col" data-role=${role} ?data-selected=${this.selected === index}>
         <div class="head">
-          <span class="column-name" data-truncate title=${source}>${source}</span>
+          <button
+            type="button"
+            class="column-name"
+            data-truncate
+            title=${source}
+            aria-pressed=${this.selected === index ? 'true' : 'false'}
+            @click=${() => {
+              this.selected = index;
+            }}
+          >
+            ${source}
+          </button>
           ${suggested ? html`<span class="suggested">suggested</span>` : nothing}
         </div>
         <k-select
@@ -277,6 +359,76 @@ export class KarmaniaMappingStep extends LitElement {
         ></k-select>
       </th>
     `;
+  }
+
+  private onType(index: number, event: CustomEvent<SelectChange>): void {
+    const { value } = event.detail;
+    if (this.draft !== undefined && (value === '' || isColumnType(value))) {
+      this.tell({ columns: withType(this.draft.columns, index, value === '' ? undefined : value) });
+    }
+  }
+
+  private onRename(index: number, event: CustomEvent<InputChange>): void {
+    if (this.draft !== undefined) {
+      this.tell({ columns: withRename(this.draft.columns, index, event.detail.value) });
+    }
+  }
+
+  /** The type and the name of the column that was chosen, or what to do to choose one. */
+  private details(draft: ImportDraft, detected: readonly ColumnType[]) {
+    const index = this.selected;
+    const column = index === undefined ? undefined : draft.columns[index];
+    if (index === undefined || column === undefined) {
+      return html`<div class="details">
+        <span class="caption"
+          >Choose the name of a column to set its type, or the name it gets in the dataset.</span
+        >
+      </div>`;
+    }
+    if (column.role === 'ignore') {
+      return html`<div class="details">
+        <span class="title" title=${column.source}>${column.source}</span>
+        <span class="caption">is ignored, so there is nothing to set.</span>
+      </div>`;
+    }
+    const sniffed = detected[index];
+    // The types a role can be read as, and the one that was chosen if it has stopped being one.
+    const types = TYPES_BY_ROLE[column.role];
+    const offered =
+      column.type === undefined || types.includes(column.type) ? types : [...types, column.type];
+    const options: SelectOption[] = [
+      { value: '', label: sniffed === undefined ? 'Auto' : `Auto (${TYPE_NAMES[sniffed]})` },
+      ...offered.map((type) => ({ value: type, label: TYPE_NAMES[type] })),
+    ];
+    return html`<div class="details">
+      <span class="title" title=${column.source}>${column.source}</span>
+      <span class="caption" aria-hidden="true">Type</span>
+      <k-select
+        size="28"
+        hide-label
+        label=${`Type of the column "${column.source}"`}
+        .options=${options}
+        .value=${column.type ?? ''}
+        @k-select-change=${(event: CustomEvent<SelectChange>) => {
+          this.onType(index, event);
+        }}
+      ></k-select>
+      ${
+        column.role === 'attribute'
+          ? html`<span class="caption" aria-hidden="true">Name</span>
+              <k-input
+                size="28"
+                hide-label
+                label=${`Name of the column "${column.source}" in the dataset`}
+                placeholder=${column.source}
+                .value=${column.rename}
+                @k-input-change=${(event: CustomEvent<InputChange>) => {
+                  this.onRename(index, event);
+                }}
+              ></k-input>`
+          : nothing
+      }
+    </div>`;
   }
 
   override render() {
@@ -330,6 +482,7 @@ export class KarmaniaMappingStep extends LitElement {
           </tbody>
         </table>
       </div>
+      ${this.details(draft, table.columnTypes)}
       ${
         problems.length === 0
           ? nothing
