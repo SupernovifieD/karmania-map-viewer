@@ -22,6 +22,7 @@ export class KarmaniaImportDialog extends LitElement {
   static override properties = {
     open: { type: Boolean, reflect: true },
     step: { type: String, reflect: true },
+    files: { attribute: false },
   };
 
   static override styles = [
@@ -54,11 +55,20 @@ export class KarmaniaImportDialog extends LitElement {
   declare open: boolean;
   /** The step a person is on. */
   declare step: ImportStep;
+  /** The files being imported: the ones chosen or dropped, which the steps are about. */
+  declare files: readonly File[];
 
   constructor() {
     super();
     this.open = false;
     this.step = FIRST_STEP;
+    this.files = [];
+  }
+
+  /** Opens the dialog, on its first step, to import `files`. */
+  show(files: readonly File[]): void {
+    this.files = files;
+    this.open = true;
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -81,6 +91,7 @@ export class KarmaniaImportDialog extends LitElement {
   /** Closes the dialog, and says so. */
   private close(): void {
     this.open = false;
+    this.files = [];
     this.dispatchEvent(new CustomEvent(IMPORT_CLOSE, { bubbles: true, composed: true }));
   }
 
