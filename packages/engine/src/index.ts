@@ -4,6 +4,7 @@ export const PACKAGE_NAME = '@karmania/engine';
 export { IMPORT_PHASES } from './api.js';
 export { blocks, grid, lines, mesh, points, polygons } from './builders.js';
 export { createEngine } from './engine.js';
+export { groupFiles } from './grouping.js';
 export { EngineDisposedError, EngineError } from './errors.js';
 export type {
   Engine,
@@ -27,6 +28,7 @@ export {
   SEVERITIES,
   WIZARD_STEPS,
 } from './types.js';
+export type { PreviewGroup } from './protocol.js';
 export type {
   AttributeColumn,
   AttributeValue,
