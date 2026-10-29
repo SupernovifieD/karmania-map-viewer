@@ -410,7 +410,7 @@ Definitions and reprojection can be added later, with the features that need the
   ellipsis plus full value; horizontal scroll inside the table.
 - [x] 9.6 Virtualized table, part 3: cell formatting (numbers, null, categories,
   booleans).
-- [ ] 9.7 Virtualized table, part 4: page fetching through `engine.rows()` with
+- [x] 9.7 Virtualized table, part 4: page fetching through `engine.rows()` with
   prefetch of the next page.
 - [ ] 9.8 Very large row counts: scaled scrolling when the total height exceeds
   the browser's maximum element height (about 33 million px in Chromium, lower

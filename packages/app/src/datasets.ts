@@ -1,4 +1,7 @@
-import type { Summary } from '@karmania/engine';
+import type { Engine, Summary } from '@karmania/engine';
+
+/** Gets rows of a loaded dataset, as the engine's `rows` does. */
+export type RowSource = Engine['rows'];
 
 /** How many of a dataset's findings are warnings. (Errors would have stopped it loading; notes are not warned of.) */
 export function warningCount(summary: Summary): number {

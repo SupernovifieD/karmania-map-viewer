@@ -1793,3 +1793,19 @@ was chosen, why.
   text: a value that looks like markup is not markup. The rows do not say a category from text, so
   both are text. A cell whose page has not come is empty, not "null", so that waiting and a null
   differ. The widths of step 9.5 are measured from these same words, so "null" and "-Infinity" fit.
+- Step 9.7 (rows from the engine). The Data tab gives `k-table` the selected dataset's `elementCount`
+  and a function that asks `engine.rows` for it. The function is made once for each dataset and kept
+  while the dataset is loaded: a table starts again at the top when it is given another function, so a
+  new one on every draw would send it back to the top each time something else in the tab changed. A
+  table that was scrolled stays where it is when another dataset is removed, and starts at the top when
+  another is chosen; where each dataset was scrolled to is not remembered. The table asks for the page
+  that the rows in view are in, and the one on either side, and keeps 16 pages: the engine keeps 64
+  of its own, so a page the table has let go of costs a copy and not a read. A page that fails is not
+  asked for again until a person says to, since asking again at once would ask until the source
+  recovered; it is only said when rows in view are in it, so the page that was asked for ahead and
+  failed makes no noise. The message is "Could not load the rows." with Try again, laid over the foot
+  of the table (or at its top when there is no table yet), so that it appearing moves nothing; the
+  engine's own message is not shown. After Try again the keyboard goes to the table, since the button
+  goes. The scroll area is a `data-scroll-region` and does not pass a scroll that reached its end on
+  to the panel. The Data tab no longer shrinks to the panel's height when its content is taller: it
+  was a flex item that could, and its box was then smaller than what it held.

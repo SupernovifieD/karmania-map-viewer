@@ -10,6 +10,8 @@ import { formatCell, isNull, isNumeric } from './table-format.js';
 import { createMeasurer, loadFonts } from './table-measure.js';
 import type { Measurer } from './table-measure.js';
 import { windowFor } from './table-window.js';
+import './button.js';
+import './icon.js';
 
 /** What a column of rows holds: the kinds of array the engine returns. */
 export type TableValues = Float64Array | Int32Array | Uint8Array | readonly string[];
@@ -40,6 +42,13 @@ export const TABLE_PAGE_SIZE = 256;
 /** How many rows beyond those in view are drawn at each end. */
 const OVERSCAN = 4;
 
+/**
+ * How many pages are kept, the ones that are in view and the nearest to them: a table that has
+ * been scrolled through a million rows does not hold them all. A page that is let go of is asked for
+ * again if it is needed, and the source can have it ready.
+ */
+const MAX_PAGES = 16;
+
 /** How wide a column of values is, and the row numbers' digits, when there is no way to measure. */
 const UNMEASURED_COLUMN_WIDTH = 120;
 const UNMEASURED_DIGIT_WIDTH = 8;
@@ -68,8 +77,14 @@ function tokenPixels(element: Element, name: string, fallback: number): number {
  * ```
  *
  * It knows nothing of where its rows come from. It is given how many there are and a function that
- * gets some, and it asks for them in pages of 256 as they come into view. Only the rows in view,
- * and a few beyond, are in the page at any time. The table is as tall as the room it is given.
+ * gets some, and it asks for them in pages of 256 as they come into view, with the page on either
+ * side so that it is there when the table is scrolled on. Only the rows in view, and a few beyond,
+ * are in the page at any time, and only 16 pages are kept: the others are let go of, and asked for
+ * again if they are needed. The table is as tall as the room it is given.
+ *
+ * A page that cannot be fetched is not asked for again until a person says to: when rows in view
+ * are in it, the table says so, and offers to try again. A page that nothing in view needs is
+ * left alone, and says nothing.
  *
  * The first page also gives the names of the columns, and the first 200 rows of it are measured to
  * see how wide each column has to be, between 72 and 320 pixels. Nothing is drawn until that is
@@ -106,7 +121,37 @@ export class KTable extends LitElement {
       .viewport {
         inset: 0;
         overflow: auto;
+        /* The end of the rows is not a reason for the panel round the table to start scrolling. */
+        overscroll-behavior: contain;
         position: absolute;
+      }
+
+      /* What could not be loaded, over the foot of the rows, so that it moving them is not one more
+         thing that changes; or at the top, where there are no rows. */
+      .problem {
+        align-items: center;
+        background: var(--k-surface-raised);
+        border-top: var(--k-border-width) solid var(--k-border);
+        bottom: 0;
+        display: flex;
+        gap: var(--k-space-8);
+        left: 0;
+        padding: var(--k-space-8) var(--k-space-16);
+        position: absolute;
+        right: 0;
+        z-index: calc(var(--k-z-sticky) + 1);
+      }
+
+      .problem.alone {
+        border-bottom: var(--k-border-width) solid var(--k-border);
+        border-top: none;
+        bottom: auto;
+        top: 0;
+      }
+
+      .problem .message {
+        flex: 1 1 auto;
+        min-width: 0;
       }
 
       /* The scroll bar is for all the rows, and the columns are as wide as they are, but never
@@ -213,6 +258,12 @@ export class KTable extends LitElement {
   /** Counts the times the table has started again, so that a late answer to an earlier ask is known. */
   private generation = 0;
   private startedAgain = false;
+  /** The pages that could not be fetched, which are not asked for again until a person says so. */
+  private readonly failedPages = new Set<number>();
+  /** Whether the columns have been laid out, or are being, so that the first page is not used twice. */
+  private layoutStarted = false;
+  /** Whether a person asked to try again, and the keyboard has to be found a place when that is done. */
+  private retrying = false;
   /** Measures words as the table sets them, once the columns have been laid out. */
   private measurer: Measurer | undefined;
   private rowHeight = 28;
@@ -251,6 +302,9 @@ export class KTable extends LitElement {
       this.generation += 1;
       this.pages.clear();
       this.asked.clear();
+      this.failedPages.clear();
+      this.layoutStarted = false;
+      this.retrying = false;
       this.columns = [];
       this.layout = undefined;
       this.measurer = undefined;
@@ -282,6 +336,11 @@ export class KTable extends LitElement {
       }
     }
     this.askForPages();
+    this.forgetFarPages();
+    if (this.retrying && !this.hasProblem()) {
+      this.retrying = false;
+      this.viewport?.focus();
+    }
   }
 
   private readonly onScroll = (event: Event): void => {
@@ -299,25 +358,36 @@ export class KTable extends LitElement {
     });
   }
 
-  /** Asks for the pages that the rows drawn are in, and the first, which has the names of the columns. */
+  /** The numbers of the first and the last page that the rows drawn are in. */
+  private pagesInView(): { first: number; last: number } {
+    const { firstRow, endRow } = this.currentWindow();
+    return {
+      first: Math.floor(firstRow / TABLE_PAGE_SIZE),
+      last: Math.floor(Math.max(firstRow, endRow - 1) / TABLE_PAGE_SIZE),
+    };
+  }
+
+  /**
+   * Asks for the pages that the rows drawn are in, and the first, which has the names of the
+   * columns. The page on either side is asked for as well, so that it is there when the table is
+   * scrolled on, and the rows are not empty for a moment.
+   */
   private askForPages(): void {
     if (this.fetch === undefined || this.rowCount === 0) {
       return;
     }
-    const { firstRow, endRow } = this.currentWindow();
+    const { first, last } = this.pagesInView();
     this.ask(0);
-    for (
-      let page = Math.floor(firstRow / TABLE_PAGE_SIZE);
-      page * TABLE_PAGE_SIZE < endRow;
-      page += 1
-    ) {
+    for (let page = first; page <= last; page += 1) {
       this.ask(page);
     }
+    this.ask(last + 1);
+    this.ask(first - 1);
   }
 
   private ask(page: number): void {
     const fetch = this.fetch;
-    if (fetch === undefined || this.asked.has(page)) {
+    if (fetch === undefined || page < 0 || this.asked.has(page) || this.failedPages.has(page)) {
       return;
     }
     const start = page * TABLE_PAGE_SIZE;
@@ -326,25 +396,69 @@ export class KTable extends LitElement {
     }
     this.asked.add(page);
     const generation = this.generation;
-    fetch(start, Math.min(TABLE_PAGE_SIZE, this.rowCount - start)).then(
+    // A source that fails at once, without a promise, is a source that failed.
+    new Promise<TableRows>((resolve) => {
+      resolve(fetch(start, Math.min(TABLE_PAGE_SIZE, this.rowCount - start)));
+    }).then(
       (rows) => {
         if (generation !== this.generation) {
           return;
         }
         this.pages.set(page, rows);
-        if (page === 0) {
+        if (page === 0 && !this.layoutStarted) {
+          this.layoutStarted = true;
           void this.layOut(rows, generation);
         }
         this.requestUpdate();
       },
       () => {
-        // Forgotten, so that scrolling to the page asks again.
         if (generation === this.generation) {
           this.asked.delete(page);
+          this.failedPages.add(page);
+          this.requestUpdate();
         }
       },
     );
   }
+
+  /** Lets go of the pages furthest from those in view, when there are more than are kept. */
+  private forgetFarPages(): void {
+    if (this.pages.size <= MAX_PAGES) {
+      return;
+    }
+    const { first, last } = this.pagesInView();
+    const centre = (first + last) / 2;
+    const far = [...this.pages.keys()]
+      .filter((page) => page < first - 1 || page > last + 1)
+      .sort((a, b) => Math.abs(b - centre) - Math.abs(a - centre))
+      .slice(0, this.pages.size - MAX_PAGES);
+    for (const page of far) {
+      this.pages.delete(page);
+      this.asked.delete(page);
+    }
+  }
+
+  /**
+   * Whether rows that are in view could not be fetched: the first page, if nothing can be drawn
+   * without it, or a page that some of the rows drawn are in.
+   */
+  private hasProblem(): boolean {
+    if (this.failedPages.size === 0) {
+      return false;
+    }
+    if (this.layout === undefined) {
+      return this.failedPages.has(0);
+    }
+    const { first, last } = this.pagesInView();
+    return [...this.failedPages].some((page) => page >= first && page <= last);
+  }
+
+  /** Asks again for the pages that could not be fetched. */
+  private readonly retry = (): void => {
+    this.retrying = true;
+    this.failedPages.clear();
+    this.requestUpdate();
+  };
 
   /**
    * Works out how wide each column is, from its name and the first rows of it, once the fonts the
@@ -463,11 +577,23 @@ export class KTable extends LitElement {
     `;
   }
 
+  /** Says that rows could not be loaded, and offers to try again: at the foot of the table, or alone. */
+  private renderProblem(alone: boolean) {
+    return html`
+      <div class=${classMap({ problem: true, alone })} role="alert">
+        <k-icon name="triangle-alert" size="16"></k-icon>
+        <span class="message">Could not load the rows.</span>
+        <k-button variant="secondary" size="28" @click=${this.retry}>Try again</k-button>
+      </div>
+    `;
+  }
+
   override render() {
     const layout = this.layout;
     return html`
       <div
         class="viewport"
+        data-scroll-region
         role="grid"
         tabindex="0"
         aria-label=${this.label}
@@ -478,6 +604,7 @@ export class KTable extends LitElement {
       >
         ${layout === undefined ? nothing : this.renderTable(layout)}
       </div>
+      ${this.hasProblem() ? this.renderProblem(layout === undefined) : nothing}
     `;
   }
 }

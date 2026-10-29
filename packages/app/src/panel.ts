@@ -4,6 +4,7 @@ import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
+import type { RowSource } from './datasets.js';
 import { PANEL_TABS } from './panel-tabs.js';
 import type { PanelTab } from './panel-tabs.js';
 
@@ -36,6 +37,7 @@ export class KarmaniaPanel extends LitElement {
     collapsed: { type: Boolean, reflect: true },
     datasets: { attribute: false },
     selected: { attribute: false },
+    rows: { attribute: false },
   };
 
   static override styles = [
@@ -116,6 +118,8 @@ export class KarmaniaPanel extends LitElement {
   declare datasets: readonly Summary[];
   /** The `id` of the dataset that is selected. */
   declare selected: number | undefined;
+  /** Gets the rows of a dataset, for the table of the Data tab. */
+  declare rows: RowSource | undefined;
 
   private pendingFocus: FocusTarget | undefined;
 
@@ -125,6 +129,7 @@ export class KarmaniaPanel extends LitElement {
     this.collapsed = false;
     this.datasets = [];
     this.selected = undefined;
+    this.rows = undefined;
     this.pendingFocus = undefined;
   }
 
@@ -202,6 +207,7 @@ export class KarmaniaPanel extends LitElement {
               <karmania-data-tab
                 .datasets=${this.datasets}
                 .selected=${this.selected}
+                .rows=${this.rows}
               ></karmania-data-tab>
             </div>
           </k-tabs>

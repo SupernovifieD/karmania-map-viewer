@@ -6,6 +6,7 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import { selectionAfterRemoving } from './datasets.js';
+import type { RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
@@ -120,6 +121,14 @@ export class KarmaniaApp extends LitElement {
 
   /** The engine, which is started when the first files arrive, not before. */
   private engine: Engine | undefined;
+
+  /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the app is. */
+  private readonly rows: RowSource = (id, start, count) => {
+    const engine = this.engine;
+    return engine === undefined
+      ? Promise.reject(new Error('There is no engine to ask for rows.'))
+      : engine.rows(id, start, count);
+  };
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -259,6 +268,7 @@ export class KarmaniaApp extends LitElement {
           .tab=${this.panel.tab}
           .datasets=${this.datasets}
           .selected=${this.selected}
+          .rows=${this.rows}
           @karmania-import-request=${this.chooseFiles}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
