@@ -406,7 +406,7 @@ Definitions and reprojection can be added later, with the features that need the
   has_z, formatted bbox, columns; an expandable list of warnings and info.
 - [x] 9.4 Virtualized table, part 1: fixed rows, sticky header, row-number
   column, windowed rendering.
-- [ ] 9.5 Virtualized table, part 2: column width measurement and clamping;
+- [x] 9.5 Virtualized table, part 2: column width measurement and clamping;
   ellipsis plus full value; horizontal scroll inside the table.
 - [ ] 9.6 Virtualized table, part 3: cell formatting (numbers, null, categories,
   booleans).

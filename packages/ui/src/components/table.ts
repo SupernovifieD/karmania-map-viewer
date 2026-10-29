@@ -1,8 +1,12 @@
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
+import { columnWidth, isCut, rowNumberWidth, SAMPLE_ROWS } from './table-columns.js';
+import { createMeasurer, loadFonts } from './table-measure.js';
+import type { Measurer } from './table-measure.js';
 import { windowFor } from './table-window.js';
 
 /** What a column of rows holds: the kinds of array the engine returns. */
@@ -34,8 +38,17 @@ export const TABLE_PAGE_SIZE = 256;
 /** How many rows beyond those in view are drawn at each end. */
 const OVERSCAN = 4;
 
-/** How wide a column of values is. */
-const COLUMN_WIDTH = 120;
+/** How wide a column of values is, and the row numbers' digits, when there is no way to measure. */
+const UNMEASURED_COLUMN_WIDTH = 120;
+const UNMEASURED_DIGIT_WIDTH = 8;
+
+/** How wide the columns are, once they have been measured. */
+interface ColumnLayout {
+  /** The column of row numbers. */
+  readonly rowNumber: number;
+  /** Each column of values. */
+  readonly widths: readonly number[];
+}
 
 /** The size a token gives, in pixels, or `fallback` if the page has no such token. */
 function tokenPixels(element: Element, name: string, fallback: number): number {
@@ -46,6 +59,15 @@ function tokenPixels(element: Element, name: string, fallback: number): number {
 /** Whether a column holds numbers, which are set on the right. */
 function isNumeric(values: TableValues): boolean {
   return values instanceof Float64Array || values instanceof Int32Array;
+}
+
+/** The text of a cell: nothing, if it is null. */
+function cellText(column: TableColumn, row: number): string {
+  if (column.nulls[row] === 1) {
+    return '';
+  }
+  const value = column.values[row];
+  return value === undefined ? '' : String(value);
 }
 
 /**
@@ -61,7 +83,11 @@ function isNumeric(values: TableValues): boolean {
  * gets some, and it asks for them in pages of 256 as they come into view. Only the rows in view,
  * and a few beyond, are in the page at any time. The table is as tall as the room it is given.
  *
- * The first page also gives the names of the columns, so nothing is drawn until it has arrived.
+ * The first page also gives the names of the columns, and the first 200 rows of it are measured to
+ * see how wide each column has to be, between 72 and 320 pixels. Nothing is drawn until that is
+ * done, so that nothing moves afterwards. Words that do not fit end in an ellipsis, and are in the
+ * cell's `title` in full. The columns that do not fit in the room are scrolled to sideways, in the
+ * table.
  */
 export class KTable extends LitElement {
   static override properties = {
@@ -69,6 +95,7 @@ export class KTable extends LitElement {
     fetch: { attribute: false },
     label: { type: String },
     columns: { state: true },
+    layout: { state: true },
     scrolled: { state: true },
     bodyHeight: { state: true },
   };
@@ -129,22 +156,24 @@ export class KTable extends LitElement {
         height: var(--k-table-row-height);
       }
 
+      /* The line is as tall as the cell, which sets the words on its middle. */
       .cell {
-        align-items: center;
         border-bottom: var(--k-border-width) solid var(--k-border);
-        display: flex;
+        line-height: calc(var(--k-table-row-height) - var(--k-border-width));
         min-width: 0;
         overflow: hidden;
         padding: 0 var(--k-space-8);
+        text-overflow: ellipsis;
         white-space: nowrap;
       }
 
       .cell.numeric {
-        justify-content: flex-end;
+        text-align: right;
       }
 
       .head {
         font-weight: var(--k-weight-medium);
+        line-height: calc(var(--k-table-header-height) - var(--k-border-width));
       }
 
       /* The row numbers stay at the left as the values go by under them. */
@@ -152,9 +181,9 @@ export class KTable extends LitElement {
         background: var(--k-surface);
         border-right: var(--k-border-width) solid var(--k-border);
         color: var(--k-text-muted);
-        justify-content: flex-end;
         left: 0;
         position: sticky;
+        text-align: right;
         z-index: 1;
       }
 
@@ -177,6 +206,8 @@ export class KTable extends LitElement {
   declare label: string;
   /** The names of the columns, once the first page is in. */
   declare private columns: readonly TableColumn[];
+  /** How wide the columns are, once they have been measured. */
+  declare private layout: ColumnLayout | undefined;
   /** How far the rows have been scrolled. */
   declare private scrolled: number;
   /** How high the room for rows is: the table's height less its header. */
@@ -189,6 +220,8 @@ export class KTable extends LitElement {
   /** Counts the times the table has started again, so that a late answer to an earlier ask is known. */
   private generation = 0;
   private startedAgain = false;
+  /** Measures words as the table sets them, once the columns have been laid out. */
+  private measurer: Measurer | undefined;
   private rowHeight = 28;
   private headerHeight = 32;
   private observer: ResizeObserver | undefined;
@@ -199,6 +232,7 @@ export class KTable extends LitElement {
     this.fetch = undefined;
     this.label = 'Table';
     this.columns = [];
+    this.layout = undefined;
     this.scrolled = 0;
     this.bodyHeight = 0;
   }
@@ -225,6 +259,8 @@ export class KTable extends LitElement {
       this.pages.clear();
       this.asked.clear();
       this.columns = [];
+      this.layout = undefined;
+      this.measurer = undefined;
       this.scrolled = 0;
       this.startedAgain = true;
     }
@@ -304,7 +340,7 @@ export class KTable extends LitElement {
         }
         this.pages.set(page, rows);
         if (page === 0) {
-          this.columns = rows.columns;
+          void this.layOut(rows, generation);
         }
         this.requestUpdate();
       },
@@ -317,46 +353,121 @@ export class KTable extends LitElement {
     );
   }
 
+  /**
+   * Works out how wide each column is, from its name and the first rows of it, once the fonts the
+   * words are in have arrived, and then lets the table be drawn.
+   */
+  private async layOut(rows: TableRows, generation: number): Promise<void> {
+    const viewport = this.viewport;
+    if (viewport === null) {
+      return;
+    }
+    const heavy = tokenPixels(this, '--k-weight-medium', 500);
+    const sample = rows.columns.map((column) =>
+      Array.from({ length: Math.min(SAMPLE_ROWS, rows.count) }, (_, at) => cellText(column, at)),
+    );
+    const letters = new Set(
+      rows.columns.flatMap((column, index) => [column.name, ...(sample[index] ?? [])]).join(''),
+    );
+    try {
+      await loadFonts(viewport, heavy, [...letters].join(''));
+    } catch {
+      // The words are measured in whatever font there is.
+    }
+    if (generation !== this.generation) {
+      return;
+    }
+    const measurer = createMeasurer(viewport, heavy);
+    this.measurer = measurer;
+    const widths = rows.columns.map((column, index) => {
+      if (measurer === undefined) {
+        return UNMEASURED_COLUMN_WIDTH;
+      }
+      const words = sample[index] ?? [];
+      const longest = words.reduce(
+        (most, word) => Math.max(most, measurer.width(word, false)),
+        measurer.width(column.name, true),
+      );
+      return columnWidth(longest);
+    });
+    this.layout = {
+      rowNumber: rowNumberWidth(this.rowCount, measurer?.digitWidth ?? UNMEASURED_DIGIT_WIDTH),
+      widths,
+    };
+    this.columns = rows.columns;
+  }
+
   /** The text of a cell, or nothing if its page has not come. */
   private text(row: number, column: number): string {
     const rows = this.pages.get(Math.floor(row / TABLE_PAGE_SIZE));
     const values = rows?.columns[column];
-    if (rows === undefined || values === undefined) {
-      return '';
-    }
-    const at = row - rows.start;
-    if (values.nulls[at] === 1) {
-      return '';
-    }
-    const value = values.values[at];
-    return value === undefined ? '' : String(value);
+    return rows === undefined || values === undefined ? '' : cellText(values, row - rows.start);
   }
 
-  private renderRow(row: number) {
+  /** The words in full, for a cell that cuts them off, and nothing for one that does not. */
+  private fullText(text: string, width: number, header: boolean): string | undefined {
+    const measurer = this.measurer;
+    return measurer !== undefined && isCut(measurer.width(text, header), width) ? text : undefined;
+  }
+
+  private renderRow(row: number, widths: readonly number[]) {
     return html`
       <div class="row" role="row" aria-rowindex=${row + 2}>
         <div class="cell number" role="rowheader">${row + 1}</div>
-        ${this.columns.map(
-          (column, index) => html`
-            <div
-              class="cell ${isNumeric(column.values) ? 'numeric' : ''}"
-              role="gridcell"
-              aria-colindex=${index + 2}
-            >
-              ${this.text(row, index)}
-            </div>
-          `,
-        )}
+        ${this.columns.map((column, index) => {
+          const text = this.text(row, index);
+          return html`<div
+            class="cell ${isNumeric(column.values) ? 'numeric' : ''}"
+            role="gridcell"
+            aria-colindex=${index + 2}
+            title=${ifDefined(this.fullText(text, widths[index] ?? 0, false))}
+            .textContent=${text}
+          ></div>`;
+        })}
+      </div>
+    `;
+  }
+
+  private renderTable(layout: ColumnLayout) {
+    const { scrollHeight, firstRow, endRow } = this.currentWindow();
+    const columns = [layout.rowNumber, ...layout.widths]
+      .map((width) => `${String(width)}px`)
+      .join(' ');
+    const rows = Array.from({ length: endRow - firstRow }, (_, index) => firstRow + index);
+    return html`
+      <div
+        class="sizer"
+        style="--columns: ${columns}; height: ${this.headerHeight + scrollHeight}px"
+      >
+        <div class="header" role="row" aria-rowindex="1">
+          <div class="cell head number" role="columnheader">
+            <span aria-hidden="true">#</span>
+            <span class="visually-hidden">Row</span>
+          </div>
+          ${this.columns.map(
+            (column, index) =>
+              html`<div
+                class="cell head ${isNumeric(column.values) ? 'numeric' : ''}"
+                role="columnheader"
+                aria-colindex=${index + 2}
+                title=${ifDefined(this.fullText(column.name, layout.widths[index] ?? 0, true))}
+                .textContent=${column.name}
+              ></div>`,
+          )}
+        </div>
+        <div class="rows" style="top: ${this.headerHeight + firstRow * this.rowHeight}px">
+          ${repeat(
+            rows,
+            (row) => row,
+            (row) => this.renderRow(row, layout.widths),
+          )}
+        </div>
       </div>
     `;
   }
 
   override render() {
-    const ready = this.columns.length > 0;
-    const { scrollHeight, firstRow, endRow } = this.currentWindow();
-    const digits = Math.max(3, String(this.rowCount).length);
-    const columns = `calc(${String(digits)}ch + var(--k-space-16)) repeat(${String(this.columns.length)}, ${String(COLUMN_WIDTH)}px)`;
-    const rows = Array.from({ length: endRow - firstRow }, (_, index) => firstRow + index);
+    const layout = this.layout;
     return html`
       <div
         class="viewport"
@@ -365,44 +476,10 @@ export class KTable extends LitElement {
         aria-label=${this.label}
         aria-rowcount=${this.rowCount + 1}
         aria-colcount=${this.columns.length + 1}
-        aria-busy=${ready ? 'false' : 'true'}
+        aria-busy=${layout === undefined ? 'true' : 'false'}
         @scroll=${this.onScroll}
       >
-        ${
-          ready
-            ? html`
-                <div
-                  class="sizer"
-                  style="--columns: ${columns}; height: ${this.headerHeight + scrollHeight}px"
-                >
-                  <div class="header" role="row" aria-rowindex="1">
-                    <div class="cell head number" role="columnheader">
-                      <span aria-hidden="true">#</span>
-                      <span class="visually-hidden">Row</span>
-                    </div>
-                    ${this.columns.map(
-                      (column, index) => html`
-                        <div
-                          class="cell head ${isNumeric(column.values) ? 'numeric' : ''}"
-                          role="columnheader"
-                          aria-colindex=${index + 2}
-                        >
-                          ${column.name}
-                        </div>
-                      `,
-                    )}
-                  </div>
-                  <div class="rows" style="top: ${this.headerHeight + firstRow * this.rowHeight}px">
-                    ${repeat(
-                      rows,
-                      (row) => row,
-                      (row) => this.renderRow(row),
-                    )}
-                  </div>
-                </div>
-              `
-            : nothing
-        }
+        ${layout === undefined ? nothing : this.renderTable(layout)}
       </div>
     `;
   }

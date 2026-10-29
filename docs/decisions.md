@@ -1760,3 +1760,26 @@ was chosen, why.
   the `open` attribute, not whether the shut content is "visible": a browser lays a shut `<details>`
   out at a small size without painting it. The property that carries the dataset is called `summary`
   because `dataset` is what every HTML element already calls its `data-*` attributes.
+- Step 9.4 (the table, windowed). `k-table` is given `rowCount` and `fetch(start, count)` and asks for
+  pages of 256 rows as they come into view. It draws the rows in view and four beyond at each end, laid
+  out at the heights they would have if all of them were drawn, in a box as tall as all of them, so
+  that the browser scrolls them and nothing lags behind the scroll bar. The header is sticky at the top,
+  and the row numbers (counting from 1, muted, right-aligned) are sticky at the left. Row and header
+  heights are tokens (28 and 32), read from the page. The scroll area fills the element by absolute
+  position rather than `height: 100%`: a percentage of a height that is not set gives the height of all
+  the rows, and the first version drew 100,000 of them and hung the page. Replacing `rowCount` or
+  `fetch` starts again at the first row, and an answer to an earlier ask is ignored. A property of the
+  table is called `scrolled`, not `scrollTop`, which every element already has. The scrolling sums are
+  in `table-window.ts`, with unit tests. Past about a million rows the box is taller than a browser
+  allows, which step 9.8 deals with.
+- Step 9.5 (widths). A column is as wide as the widest of its name and the first 200 of its values,
+  and the room round them (8 and 8), between 72 and 320, whole pixels. They are measured once, when the
+  first page arrives, after the fonts have been fetched (Inter's latin-ext file comes only when a
+  character in it is on the page), and the table is drawn only then, so nothing moves afterwards. Rows
+  after the 200 may be longer than the column and are cut: that is the rule, and the gallery shows it.
+  The page sets every digit one width, which a canvas does not know, so digits are measured by drawing
+  twenty of them and the rest of the word with a canvas (`table-measure.ts`); a test compares that with
+  words drawn in the page, to a pixel, and fails if the digits are measured as the canvas has them.
+  Words that do not fit end in an ellipsis and are in the cell's `title` in full, which only those
+  cells have; the whole text is in the page for a screen reader. The row-number column has room for the
+  last row's number, and at least three digits.

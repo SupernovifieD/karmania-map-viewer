@@ -222,7 +222,7 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
-  ...['few', 'many'].map((which): Shot => ({
+  ...['few', 'many', 'clamped'].map((which): Shot => ({
     name: `table-${which}`,
     show: async (page) => {
       const target = gallery(page, `karmania-gallery #table-${which}`);
@@ -241,6 +241,20 @@ const SHOTS: Shot[] = [
         element.scrollTo(element.scrollWidth, 1233 * 28);
       });
       await target.locator('.rows [role="rowheader"]', { hasText: /^\s*1235\s*$/ }).waitFor();
+      return [target];
+    },
+  },
+  {
+    // Past the first 200 rows, where a column is longer than the rows its width came from, and
+    // sideways to the last column.
+    name: 'table-clamped-scrolled',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #table-clamped');
+      await reveal(target);
+      await target.locator('.viewport').evaluate((element) => {
+        element.scrollTo(element.scrollWidth, 499 * 28);
+      });
+      await target.locator('.rows [role="rowheader"]', { hasText: /^\s*501\s*$/ }).waitFor();
       return [target];
     },
   },
