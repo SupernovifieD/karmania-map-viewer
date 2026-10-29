@@ -79,6 +79,7 @@ The focus ring is drawn on `:focus-visible` and must never be clipped by an
 | `--k-panel-width-default`  | 360px | How wide the side panel is until it is resized |
 | `--k-panel-rail-width`     | 40px  | The side panel folded away into its rail of buttons |
 | `--k-resize-hit-width`     | 6px   | The strip along the panel's edge that can be grabbed to resize it |
+| `--k-mapping-column-width` | 160px | A column of the import wizard's preview table |
 
 ### The dialog
 

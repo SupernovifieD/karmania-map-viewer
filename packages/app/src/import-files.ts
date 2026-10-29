@@ -104,6 +104,16 @@ export const KIND_HELP: Readonly<Record<Format, string>> = {
   prj: '',
 };
 
+/** What the Mapping step says about a format that has no columns to map. */
+export const NO_COLUMNS_NOTE: Readonly<Record<Format, string>> = {
+  csv: '',
+  geojson:
+    'A GeoJSON file has no columns to set up. The shapes in it, and the properties of each, are used as they are.',
+  ascii_grid: 'An ESRI ASCII grid has no columns to set up: its cells are the values of the grid.',
+  obj: 'An OBJ file has no columns to set up: it holds the vertices and faces of a mesh.',
+  prj: '',
+};
+
 /** How many, written for people: `1,203`, grouped by thousands with a comma. */
 export function formatCount(count: number): string {
   return count.toLocaleString('en-US');

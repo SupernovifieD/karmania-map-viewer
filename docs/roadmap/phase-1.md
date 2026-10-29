@@ -362,7 +362,7 @@ Definitions and reprojection can be added later, with the features that need the
   selected files.
 - [x] 8.3 Step "File": the file list, detected format, encoding and delimiter; a
   kind selector offering only kinds valid for that format; preview findings.
-- [ ] 8.4 Step "Mapping", part 1: preview table (first 100 rows) with a role
+- [x] 8.4 Step "Mapping", part 1: preview table (first 100 rows) with a role
   selector in each column header; suggestions pre-filled and marked
   "suggested".
 - [ ] 8.5 Step "Mapping", part 2: required-role checks inline (missing X or Y,

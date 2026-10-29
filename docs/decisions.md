@@ -1478,3 +1478,19 @@ was chosen, why.
   also the stall seen twice on this Mac. (3) A test of the dialog read how often it had said it was
   closed the moment the dialog was hidden, before the browser's event (fixed earlier, in `df38a18`).
   Called flaky, the first was a real fault of the dialog and the other two were races in the tests.
+- Step 8.4 (the Mapping step, part 1). For a CSV file it shows the first 100 rows as a table, with
+  over each column its name and a selector of its role (X, Y, Z, Line ID for lines, Attribute,
+  Ignore: short names, because the room in a header is short; the roles a kind has are in
+  `ROLES_BY_KIND`, and the line identifier is only for lines). The roles the kernel suggested are
+  filled in and marked "suggested" until a person changes them; the kernel suggests a role for each
+  column and calls an ordinary one an attribute, so only the others are marked, and a suggestion the
+  chosen kind cannot have (a line identifier, for points) becomes an attribute. Changing what the
+  file is imported as, back in the File step, turns a column whose role the new kind has not into an
+  attribute, and does not give it back if the kind is changed back: it is a person's to set again. The
+  table has all the room of the step and scrolls inside itself, in both directions, with its header and
+  the selectors kept in view, so that the dialog's own body has nothing to scroll; columns are 160 wide
+  (`--k-mapping-column-width`) and rows 28 high, numbers to the right, text to the left, and a cell
+  or name that is too long is cut with an ellipsis and has its whole text as a title. Columns that
+  have a coordinate role have a tinted header, and ignored ones are muted. A file with no columns
+  (GeoJSON, an ASCII grid, an OBJ mesh) says that there is nothing to map. A line under the table
+  says how many rows are shown of about how many. No rule keeps a person from going on yet: those are 8.5.
