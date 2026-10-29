@@ -1433,3 +1433,38 @@ was chosen, why.
   have been changed or the dialog closed; a failure of the engine itself (it could not start) is
   kept as `failure`, whereas a file it cannot read is a finding about that file. The tests run the
   real worker and kernel on the files in `fixtures/`.
+- Step 8.3 (the File step). It lists every file with what the kernel found (format, encoding, the
+  delimiter and about how many rows, and the projection file that goes with it); one that cannot be
+  imported (a projection file on its own, a format the kernel does not read, a file with an error)
+  says so, with the kernel's own findings under it. With more than one importable file each row says
+  whether it is being imported now or waits; with one there is nothing to say. Under the list, the
+  file being imported (the first that can be) has its settings: what to import it as, and the
+  dataset's name, which starts as the file's name without its extension. The kinds offered are those
+  the format can be, in `KINDS_BY_FORMAT`: points, lines or a block model for CSV; a grid for an ASCII
+  grid; a mesh for OBJ; and for GeoJSON none to choose, since the kernel makes a dataset of each kind
+  of shape in it. A format with one kind shows it in a select that is disabled, with a line saying
+  why, rather than leaving the choice out, so that the step looks the same for every file. What the
+  kernel found about the file that is not an error (the encoding it fell back to, say) is shown under
+  the settings. Next cannot be used while the files are being read, when none can be imported, or
+  while the name is empty, and the footer says which; a failure of the engine itself is shown as an
+  error with what to do.
+- The wizard's state is kept in a draft (`ImportDraft`) that the wizard owns and each step edits
+  through `karmania-draft-change`; it starts from what the kernel suggested (`draftFor`) and later
+  steps add their parts. A step shows what it is given and says what a person changed, as the side
+  panel does.
+- `karmania-findings` lists findings for people: an icon whose shape tells the severity (a circle with
+  a mark, a triangle, an "i"), the message, the hint, and for one that happened more than once how
+  often and where (`Seen 12 times: line 3, line 8, line 15 and 9 more.`; one that happened once has its
+  place in its message, and nothing is said twice). The severity is also said in words that are not
+  drawn. Rows and elements are counted from 1 there, as a person counts; lines already are.
+- `k-dialog` gained `fill`, and the wizard uses it: the dialog is as tall as it can be at every step,
+  so that its buttons are where they were when the step changes, and a person can press Next again
+  without moving the pointer. (On the last step the button reads Load, and its width may differ, which
+  moves Back; its right edge stays.) The dialog also takes the keyboard itself when it opens, with
+  no ring, instead of the browser's choice of the close button, whose tooltip opened at once when the
+  dialog was opened with the keyboard; the first Tab goes to the first control. This was found by
+  looking at the pictures of the step.
+- Two tests of the picker were seen to stall for a minute, twice among many runs, and not again in
+  more than 300 runs of the same tests on their own. They now check that the button has the keyboard
+  before pressing Enter, and wait for the picker for 10 seconds, so that a stall will say where it
+  was. The cause is not known.

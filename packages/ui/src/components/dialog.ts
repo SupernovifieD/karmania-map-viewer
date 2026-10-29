@@ -27,15 +27,19 @@ export const DIALOG_CLOSE = 'k-dialog-close';
  *
  * It is a native `<dialog>` opened with `showModal()`, so the rest of the page is inert while it
  * is open, Tab stays inside it and Esc closes it, and, when it closes, the keyboard goes back to
- * the control that was focused before it opened. It is open while `open` is set. When a person
+ * the control that was focused before it opened. When it opens the keyboard is on the dialog
+ * itself, which a screen reader announces by name, and the first Tab goes to its first control. It is open while `open` is set. When a person
  * closes it (Esc, or the close button), it sets `open` to false and sends `k-dialog-close`;
  * closing it by setting `open` sends nothing. Clicking outside it does not close it: what a
- * dialog holds is often work that would be lost.
+ * dialog holds is often work that would be lost. A dialog is as tall as what is in it, up to its
+ * limit; with `fill` it is as tall as it can be whatever is in it, which suits one whose content
+ * changes (a wizard), since its buttons then stay where they are.
  */
 export class KDialog extends LitElement {
   static override properties = {
     heading: { type: String },
     open: { type: Boolean, reflect: true },
+    fill: { type: Boolean, reflect: true },
     hasSteps: { state: true },
   };
 
@@ -65,6 +69,17 @@ export class KDialog extends LitElement {
 
       dialog[open] {
         display: flex;
+      }
+
+      /* As tall as a dialog gets, whatever is in it, so that the buttons stay where they are. */
+      :host([fill]) dialog {
+        height: min(var(--k-dialog-max-size), calc(100dvh - var(--k-space-48)));
+      }
+
+      /* The dialog itself has the keyboard when it opens, so that its name is read and no control
+         is picked for the person. Nothing about it can be operated, so it shows no ring. */
+      dialog:focus-visible {
+        outline: none;
       }
 
       dialog::backdrop {
@@ -152,6 +167,8 @@ export class KDialog extends LitElement {
   declare heading: string;
   /** Whether the dialog is open. */
   declare open: boolean;
+  /** Whether it is as tall as it can be, instead of as tall as what is in it. */
+  declare fill: boolean;
   /** Whether anything is in the `steps` slot. */
   declare private hasSteps: boolean;
 
@@ -159,6 +176,7 @@ export class KDialog extends LitElement {
     super();
     this.heading = '';
     this.open = false;
+    this.fill = false;
     this.hasSteps = false;
   }
 
@@ -176,6 +194,9 @@ export class KDialog extends LitElement {
     }
     if (this.open && !dialog.open) {
       dialog.showModal();
+      // The browser puts the keyboard on the first control, the close button, whose tooltip would
+      // then open at once. The dialog itself takes it instead.
+      dialog.focus({ preventScroll: true });
     } else if (!this.open && dialog.open) {
       dialog.close();
     }
@@ -200,7 +221,7 @@ export class KDialog extends LitElement {
 
   override render() {
     return html`
-      <dialog aria-labelledby="title" @close=${this.onNativeClose}>
+      <dialog aria-labelledby="title" tabindex="-1" @close=${this.onNativeClose}>
         <header>
           <h2 id="title" data-truncate>${this.heading}</h2>
           <k-tooltip text="Close" class="close">
