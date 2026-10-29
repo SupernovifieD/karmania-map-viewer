@@ -1,14 +1,20 @@
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
+import { carriesFiles } from './drag.js';
 
 /**
  * The map area. Nothing is drawn in phase 1: it says so, with an empty state in the middle. With
  * no data it invites people to drop files or import them; once datasets are loaded (`datasets`)
  * it says that the map itself comes in phase 2, and how many datasets there are.
+ *
+ * Files can be dropped on it. While some are being dragged over it, an outline and a label
+ * (`Drop to import`) are shown inside its edges. They are laid over the area without being part of
+ * its layout, so showing them moves and resizes nothing.
  */
 export class KarmaniaMapArea extends LitElement {
   static override properties = {
     datasets: { type: Number },
+    dragging: { state: true },
   };
 
   static override styles = [
@@ -25,20 +31,106 @@ export class KarmaniaMapArea extends LitElement {
         height: 100%;
         position: relative;
       }
+
+      /* Over the area, 8 inside its edges, and not in the way of the pointer. It is there all
+         the time and only becomes visible, so nothing is added to or taken from the layout. */
+      .drop-zone {
+        align-items: center;
+        background: color-mix(in srgb, var(--k-accent) 10%, var(--k-surface-map));
+        border: calc(var(--k-border-width) * 2) dashed var(--k-accent);
+        border-radius: var(--k-radius-lg);
+        display: flex;
+        inset: var(--k-space-8);
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        position: absolute;
+        transition:
+          opacity var(--k-motion-duration) var(--k-motion-easing),
+          visibility var(--k-motion-duration) var(--k-motion-easing);
+        visibility: hidden;
+      }
+
+      .drop-zone[data-active] {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .drop-label {
+        font-size: var(--k-font-size-section-title);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-section-title);
+      }
     `,
   ];
 
   /** How many datasets are loaded. */
   declare datasets: number;
+  /** Whether files are being dragged over the area. */
+  declare private dragging: boolean;
+
+  /**
+   * How many of the area's elements the drag is over. Moving onto a child fires `dragenter` for
+   * it before `dragleave` for the one just left, so the drag is over the area while this is not 0.
+   */
+  private depth = 0;
 
   constructor() {
     super();
     this.datasets = 0;
+    this.dragging = false;
   }
 
   override render() {
-    return html`<main aria-label="Map">${this.datasets > 0 ? this.loaded() : this.empty()}</main>`;
+    return html`
+      <main
+        aria-label="Map"
+        @dragenter=${this.onDragEnter}
+        @dragover=${this.onDragOver}
+        @dragleave=${this.onDragLeave}
+        @drop=${this.onDrop}
+      >
+        ${this.datasets > 0 ? this.loaded() : this.empty()}
+        <div class="drop-zone" ?data-active=${this.dragging} aria-hidden="true">
+          <span class="drop-label">Drop to import</span>
+        </div>
+      </main>
+    `;
   }
+
+  private readonly onDragEnter = (event: DragEvent): void => {
+    if (carriesFiles(event)) {
+      event.preventDefault();
+      this.depth += 1;
+      this.dragging = true;
+    }
+  };
+
+  /** Agrees to take the files, which is what makes dropping them possible. */
+  private readonly onDragOver = (event: DragEvent): void => {
+    if (carriesFiles(event)) {
+      event.preventDefault();
+      if (event.dataTransfer !== null) {
+        event.dataTransfer.dropEffect = 'copy';
+      }
+    }
+  };
+
+  private readonly onDragLeave = (event: DragEvent): void => {
+    if (carriesFiles(event)) {
+      this.depth = Math.max(0, this.depth - 1);
+      this.dragging = this.depth > 0;
+    }
+  };
+
+  /** Takes the files away from the browser, which would otherwise open one and leave the app. */
+  private readonly onDrop = (event: DragEvent): void => {
+    if (carriesFiles(event)) {
+      event.preventDefault();
+      this.depth = 0;
+      this.dragging = false;
+    }
+  };
 
   private empty() {
     return html`
