@@ -1587,3 +1587,9 @@ was chosen, why.
   other"; "No coordinate system is chosen yet."), with a tick when something is chosen and a mark
   of alarm when not, and it is a status region, so that a screen reader says it when the choice
   changes. Units are named as in a sentence ("US survey feet", not lower-cased "us survey feet").
+- `k-progress` (in `@karmania/ui`, for the Review step's import): a label over a bar of 8, with the
+  percentage at the end of the label's line when there is a value. The bar is drawn by scaling, not
+  by changing its width, so that it moves nothing round it (and a test checks the drawing is as long
+  as the progress while the box is not). Without a value it is a short bar that travels along the track,
+  and, for people who ask for less motion, one that stays at the start; not knowing how far is not
+  said to screen readers as 0 (it has no value). A value outside 0 to 1 is kept to the track.

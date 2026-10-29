@@ -558,3 +558,130 @@ test.describe('the checkbox', () => {
     });
   }
 });
+
+const progress = (page: Page, id: string): Locator => demo(page, id).locator('k-progress');
+const bar = (page: Page, id: string): Locator => progress(page, id).locator('.bar');
+
+test.describe('the progress bar', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/gallery.html');
+  });
+
+  test('is a progress bar to screen readers, with its name and, when it has one, its value', async ({
+    page,
+  }) => {
+    const named = demo(page, 'progress-half').getByRole('progressbar', {
+      name: 'Reading the file',
+    });
+    await expect(named).toHaveAttribute('aria-valuenow', '42');
+    await expect(named).toHaveAttribute('aria-valuemin', '0');
+    await expect(named).toHaveAttribute('aria-valuemax', '100');
+    await expect(demo(page, 'progress-start').getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '0',
+    );
+    await expect(demo(page, 'progress-done').getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '100',
+    );
+    // Not knowing how far is not saying 0.
+    await expect(demo(page, 'progress-unknown').getByRole('progressbar')).not.toHaveAttribute(
+      'aria-valuenow',
+    );
+  });
+
+  test('says the percentage at the end of the label line, and none when it does not know', async ({
+    page,
+  }) => {
+    await expect(progress(page, 'progress-half').locator('.percent')).toHaveText('42%');
+    await expect(progress(page, 'progress-unknown').locator('.percent')).toHaveCount(0);
+    const [host, percent] = [
+      await rect(progress(page, 'progress-half')),
+      await rect(progress(page, 'progress-half').locator('.percent')),
+    ];
+    expect(percent.x + percent.width).toBeCloseTo(host.x + host.width, 0);
+  });
+
+  test('draws the bar by scaling it, as long as what has been done, on a track of 8', async ({
+    page,
+  }) => {
+    const track = await rect(progress(page, 'progress-half').locator('.track'));
+    expect(track.height).toBe(8);
+    const scale = await bar(page, 'progress-half').evaluate(
+      (element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).a,
+    );
+    expect(scale).toBeCloseTo(0.42, 2);
+    // Its box is the track's whole width; it is the drawing that is as long as the progress.
+    expect((await rect(bar(page, 'progress-half'))).width).toBeCloseTo(track.width * 0.42, 0);
+    expect((await rect(bar(page, 'progress-done'))).width).toBeCloseTo(
+      (await rect(progress(page, 'progress-done').locator('.track'))).width,
+      0,
+    );
+    expect((await rect(bar(page, 'progress-start'))).width).toBeLessThan(1);
+  });
+
+  test('keeps a value that is out of range to the track', async ({ page }) => {
+    for (const [value, valuenow] of [
+      [2, '100'],
+      [-1, '0'],
+    ] as const) {
+      await progress(page, 'progress-half').evaluate(async (element, set) => {
+        const field = element as HTMLElementTagNameMap['k-progress'];
+        field.value = set;
+        await field.updateComplete;
+      }, value);
+      await expect(
+        demo(page, 'progress-half').getByRole('progressbar'),
+        String(value),
+      ).toHaveAttribute('aria-valuenow', valuenow);
+    }
+  });
+
+  test('shows a short bar when it does not know how far, which travels unless motion is not wanted', async ({
+    page,
+  }) => {
+    const track = await rect(progress(page, 'progress-unknown').locator('.track'));
+    const unknown = bar(page, 'progress-unknown');
+    expect((await rect(unknown)).width).toBeCloseTo(track.width * 0.3, 0);
+    expect(await unknown.evaluate((element) => getComputedStyle(element).animationName)).toBe(
+      'none',
+    );
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(await unknown.evaluate((element) => getComputedStyle(element).animationName)).toBe(
+      'travel',
+    );
+    // It stays inside the track as it travels.
+    await page.waitForTimeout(300);
+    const moved = await rect(unknown);
+    expect(moved.x + moved.width).toBeLessThanOrEqual(track.x + track.width + 1);
+  });
+
+  test('wraps a long label, and nothing overflows', async ({ page }) => {
+    const long = demo(page, 'progress-long');
+    await assertNoOverflow(long, { window: 'horizontal' });
+    expect((await rect(progress(page, 'progress-long').locator('.label'))).height).toBeGreaterThan(
+      40,
+    );
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`can be told from its track and has no serious accessibility violations (${theme} theme)`, async ({
+      page,
+    }) => {
+      await page.goto(`/gallery.html?theme=${theme}`);
+      const fill = await styleOf(bar(page, 'progress-half'), 'background-color');
+      const track = await styleOf(
+        progress(page, 'progress-half').locator('.track'),
+        'background-color',
+      );
+      expect(
+        contrastBetween(fill['background-color'] ?? '', track['background-color'] ?? ''),
+      ).toBeGreaterThanOrEqual(3);
+      const surface = await surfaceOf(page);
+      const percent = await styleOf(progress(page, 'progress-half').locator('.percent'), 'color');
+      expect(contrastBetween(percent['color'] ?? '', surface)).toBeGreaterThanOrEqual(4.5);
+      await expectNoSeriousViolations(page, ['karmania-gallery', '#fields-progress']);
+    });
+  }
+});

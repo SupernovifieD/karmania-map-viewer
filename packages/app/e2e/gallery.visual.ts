@@ -191,7 +191,7 @@ const SHOTS: Shot[] = [
       return [target];
     },
   })),
-  ...['select', 'input', 'checkbox'].map((kind): Shot => ({
+  ...['select', 'input', 'progress', 'checkbox'].map((kind): Shot => ({
     name: `fields-${kind}`,
     show: async (page) => {
       const target = gallery(page, `karmania-gallery #fields-${kind}`);
