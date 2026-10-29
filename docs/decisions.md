@@ -1191,3 +1191,14 @@ was chosen, why.
   element is registered and rendered, that nothing is logged as an error, the theme switch, and
   axe in both themes. Each of its checks was seen to fail when the thing it checks was broken
   (the theme call removed, the element renamed).
+- Step 7.2 (shell grid): the app is two rows, the toolbar (`--k-toolbar-height`, 48) and the rest,
+  and the rest is two columns, the map area (`minmax(0, 1fr)`, so that nothing inside it can push
+  the panel out of the window) and the panel (`--k-panel-width`). That variable is not set yet and
+  falls back to the new token `--k-panel-width-default` (360); the app sets it once the panel can be
+  resized (7.8). The map area and the panel are already elements of their own, empty
+  (`karmania-map-area`, `karmania-panel`), so that the next steps fill them instead of
+  restructuring the grid. They are landmarks: the toolbar is the banner, the map area is `main`,
+  and the panel is a complementary region called "Side panel". The step says the toolbar has no
+  content yet, so the 7.1 smoke test no longer looks for the `h1`; the wordmark of 7.3 brings
+  it back, with its own check. The checks of `styles.test.ts` (no raw colors, lengths or durations)
+  now read the app's CSS as well as the UI package's.

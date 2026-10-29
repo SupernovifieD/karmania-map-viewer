@@ -71,6 +71,13 @@ and there are only two weights.
 The focus ring is drawn on `:focus-visible` and must never be clipped by an
 `overflow` ancestor.
 
+### The app shell
+
+| Token                      | Value | Use                                          |
+| -------------------------- | ----- | -------------------------------------------- |
+| `--k-toolbar-height`       | 48px  | The toolbar across the top                   |
+| `--k-panel-width-default`  | 360px | How wide the side panel is until it is resized |
+
 ## Motion
 
 | Token                  | Value    | Use                                     |

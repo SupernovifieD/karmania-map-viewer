@@ -115,7 +115,7 @@ export async function assertNoOverflow(
 }
 
 /** A locator's box in the window, or a failure that says what was being measured. */
-async function boxOf(locator: Locator, what: string) {
+export async function boxOf(locator: Locator, what: string) {
   const box = await locator.boundingBox();
   if (box === null) {
     throw new Error(`${what} is not shown, so it has no box to measure.`);
