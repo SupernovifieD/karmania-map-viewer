@@ -13,11 +13,9 @@ import { emptyStateSection } from './sections/empty-state.js';
 import { iconsSection } from './sections/icons.js';
 import { tabsSection } from './sections/tabs.js';
 import { tooltipsSection } from './sections/tooltips.js';
+import { forceThemeFromAddress } from './theme.js';
 
-const theme = new URLSearchParams(location.search).get('theme');
-if (theme === 'light' || theme === 'dark') {
-  document.documentElement.dataset['theme'] = theme;
-}
+forceThemeFromAddress();
 
 export class KarmaniaGallery extends LitElement {
   static override styles = [

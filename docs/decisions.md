@@ -1183,3 +1183,11 @@ was chosen, why.
   had a faint boundary in the dark theme, so it is now drawn with the tokens. In this review
   nothing else bled, clipped, overflowed or overlapped, rows and baselines lined up, focus rings
   were whole, and nothing moved between states of one control.
+- Step 7.1 (app page): `index.html` mounts `<karmania-app>` from `src/main.ts`, and the Vite
+  build now has two pages, the app and the gallery. Reading `?theme=light|dark` moved out of
+  the gallery into `src/theme.ts`, so both pages force a theme the same way (the layout helper
+  already promised this). For now the app shows only its name in an `h1`; the shell replaces
+  that in 7.2. The smoke test (`e2e/app.e2e.ts`) checks the title, the language, that the
+  element is registered and rendered, that nothing is logged as an error, the theme switch, and
+  axe in both themes. Each of its checks was seen to fail when the thing it checks was broken
+  (the theme call removed, the element renamed).
