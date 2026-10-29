@@ -387,7 +387,7 @@ Definitions and reprojection can be added later, with the features that need the
   property, added in 7.4), so that it shows "Map rendering arrives in phase 2".
 - [ ] 8.13 End-to-end tests, one commit each:
   - [x] 8.13a CSV points happy path.
-  - [ ] 8.13b CSV with errors fixed in the wizard.
+  - [x] 8.13b CSV with errors fixed in the wizard.
   - [ ] 8.13c GeoJSON mixed types.
   - [ ] 8.13d ASCII grid.
   - [ ] 8.13e OBJ mesh.

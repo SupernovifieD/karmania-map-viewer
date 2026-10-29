@@ -1652,3 +1652,8 @@ was chosen, why.
   kernel and ends by looking at what was loaded: its kind, how much, its coordinate system, its
   columns with their null counts and its box. 8.13a: a CSV of points with its projection file, edited
   on the way (named, a column ignored, another renamed), loaded; it found nothing to fix.
+- 8.13b: a semicolon CSV with decimal commas, a missing northing and an NA. The kernel reads the
+  numbers with commas and finds the NA by itself; the level is said by a person to be the height; the
+  import is stopped for the empty coordinate, the error links to the Nodata step, "skip" and "Check
+  again" load three of the four rows with a warning, the NA is the grade's one null and the box is
+  that of the rows that were kept.
