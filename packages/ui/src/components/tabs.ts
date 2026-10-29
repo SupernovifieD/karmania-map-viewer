@@ -2,9 +2,12 @@ import { css, html, LitElement } from 'lit';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
 
+/** The slot for what goes at the end of the row of tabs, so no tab can have this id. */
+const ACTIONS = 'actions';
+
 /** One tab: what it is called in code, and what it says. */
 export interface TabDefinition {
-  /** Names the tab, and the slot its panel goes in. Different for every tab. */
+  /** Names the tab, and the slot its panel goes in. Different for every tab, and not `actions`. */
   readonly id: string;
   readonly label: string;
 }
@@ -30,6 +33,13 @@ export const TAB_CHANGE = 'k-tab-change';
  * with `tabs` set to `[{ id: 'legend', label: 'Legend' }, { id: 'data', label: 'Data' }]`.
  * The panels stay in the page while hidden, so what is in them keeps its state.
  *
+ * The row has no padding of its own; give it some with `k-tabs::part(header)`.
+ *
+ * Whatever is in the slot `actions` goes at the far end of the row of tabs, vertically centred in
+ * it: a button that closes the panel, say. The tabs give way to it, cutting their labels short,
+ * rather than push it out of sight. Given a height, the element gives the chosen panel what the
+ * row leaves, as a column: what is in the panel can take that height and scroll in it.
+ *
  * Left and Right move between the tabs (and choose each as they go, wrapping round at the
  * ends), Home and End go to the first and last, and only the chosen tab is in the Tab order,
  * so Tab goes into the row once and out of it once. A person choosing a tab changes
@@ -46,13 +56,30 @@ export class KTabs extends LitElement {
     sharedStyles,
     css`
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .header {
+        align-items: center;
+        display: flex;
+        flex: none;
+        justify-content: space-between;
+        min-width: 0;
       }
 
       .tablist {
         display: flex;
+        flex: 0 1 auto;
         gap: var(--k-space-4);
         min-width: 0;
+      }
+
+      .actions {
+        align-items: center;
+        display: flex;
+        flex: none;
       }
 
       .tab {
@@ -89,6 +116,13 @@ export class KTabs extends LitElement {
         outline-offset: calc(var(--k-focus-width) * -1);
       }
 
+      [role='tabpanel'] {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+      }
+
       [role='tabpanel'][hidden] {
         display: none;
       }
@@ -119,6 +153,11 @@ export class KTabs extends LitElement {
     if (new Set(ids).size !== ids.length) {
       throw new Error(
         `The tabs of a k-tabs must each have a different id, but they are: ${ids.join(', ')}.`,
+      );
+    }
+    if (ids.includes(ACTIONS)) {
+      throw new Error(
+        `No tab of a k-tabs can have the id ${ACTIONS}: it is the slot for its actions.`,
       );
     }
     if (this.label === undefined || this.label.trim() === '') {
@@ -159,31 +198,34 @@ export class KTabs extends LitElement {
   override render() {
     const current = this.current;
     return html`
-      <div class="tablist" role="tablist" aria-label=${this.label ?? ''}>
-        ${this.tabs.map(
-          (tab, index) => html`
-            <button
-              type="button"
-              class="tab"
-              data-truncate
-              role="tab"
-              id=${`tab-${tab.id}`}
-              data-id=${tab.id}
-              title=${tab.label}
-              aria-selected=${tab.id === current ? 'true' : 'false'}
-              aria-controls=${`panel-${tab.id}`}
-              tabindex=${tab.id === current ? '0' : '-1'}
-              @click=${() => {
-                this.choose(tab.id, false);
-              }}
-              @keydown=${(event: KeyboardEvent) => {
-                this.onKeyDown(event, index);
-              }}
-            >
-              ${tab.label}
-            </button>
-          `,
-        )}
+      <div class="header" part="header">
+        <div class="tablist" role="tablist" aria-label=${this.label ?? ''}>
+          ${this.tabs.map(
+            (tab, index) => html`
+              <button
+                type="button"
+                class="tab"
+                data-truncate
+                role="tab"
+                id=${`tab-${tab.id}`}
+                data-id=${tab.id}
+                title=${tab.label}
+                aria-selected=${tab.id === current ? 'true' : 'false'}
+                aria-controls=${`panel-${tab.id}`}
+                tabindex=${tab.id === current ? '0' : '-1'}
+                @click=${() => {
+                  this.choose(tab.id, false);
+                }}
+                @keydown=${(event: KeyboardEvent) => {
+                  this.onKeyDown(event, index);
+                }}
+              >
+                ${tab.label}
+              </button>
+            `,
+          )}
+        </div>
+        <div class="actions"><slot name=${ACTIONS}></slot></div>
       </div>
       ${this.tabs.map(
         (tab) => html`

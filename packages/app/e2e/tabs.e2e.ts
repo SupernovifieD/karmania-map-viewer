@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
+import { assertAligned, assertNoOverflow, assertNoOverlap, boxOf } from './support/layout.js';
 
 /** The tabs of the gallery's side-panel example. */
 function panelTabs(page: Page): Locator {
@@ -259,10 +260,99 @@ test.describe('the tabs', () => {
     expect(outcome.none).toBe('fine');
   });
 
+  test('refuse a tab called actions, which is the slot for the actions', async ({ page }) => {
+    const message = await page.evaluate(async () => {
+      const tabs = document.createElement('k-tabs');
+      tabs.label = 'Reserved';
+      tabs.tabs = [{ id: 'actions', label: 'Actions' }];
+      document.body.append(tabs);
+      try {
+        await tabs.updateComplete;
+        return 'fine';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    });
+    expect(message).toMatch(/can have the id actions/);
+  });
+
   for (const theme of ['light', 'dark']) {
     test(`have no serious accessibility violations (${theme} theme)`, async ({ page }) => {
       await page.goto(`/gallery.html?theme=${theme}`);
       await expectNoSeriousViolations(page, ['karmania-gallery', '[data-section="tabs"]']);
     });
   }
+
+  test.describe('with an action at the end of the row', () => {
+    const demo = (page: Page) => page.locator('#action-tabs');
+    const tabsOf = (page: Page) => demo(page).locator('k-tabs');
+    const header = (page: Page) => tabsOf(page).locator('.header');
+    const tablist = (page: Page) => tabsOf(page).locator('.tablist');
+    const actions = (page: Page) => tabsOf(page).locator('.actions');
+    const action = (page: Page) => tabsOf(page).locator('k-button');
+    const body = (page: Page, id: string) => tabsOf(page).locator(`[slot="${id}"]`);
+
+    test('puts it at the far end of the row, centred on it, clear of the tabs', async ({
+      page,
+    }) => {
+      const row = await boxOf(header(page), 'the row');
+      const button = await boxOf(action(page), 'the action');
+      expect(row.height).toBe(40);
+      // The row has 4 on the left and 8 on the right, as the gallery gives it with `::part`.
+      expect(row.x + row.width - (button.x + button.width)).toBe(8);
+      expect([button.y - row.y, row.y + row.height - (button.y + button.height)]).toEqual([4, 4]);
+      await assertAligned([header(page), tablist(page), actions(page)], 'vertical-centre');
+      await assertNoOverlap(tablist(page), actions(page));
+      expect((await boxOf(tablist(page), 'the tabs')).x - row.x).toBe(4);
+      await expect(demo(page).getByRole('button', { name: 'Collapse panel' })).toHaveCount(1);
+    });
+
+    test('lets the row be styled from outside, through its part', async ({ page }) => {
+      await expect(header(page)).toHaveAttribute('part', 'header');
+      expect(await header(page).evaluate((element) => getComputedStyle(element).paddingRight)).toBe(
+        '8px',
+      );
+    });
+
+    test('gives the chosen panel what is left of the height, and scrolls what is too long', async ({
+      page,
+    }) => {
+      const host = await boxOf(tabsOf(page), 'the tabs');
+      const row = await boxOf(header(page), 'the row');
+      const panel = await boxOf(demo(page).locator('[role="tabpanel"]:not([hidden])'), 'the panel');
+      expect([panel.y, panel.height]).toEqual([row.y + row.height, host.y + host.height - panel.y]);
+      // 24 lines do not fit, so the body scrolls inside itself and nothing else does.
+      const scrolling = await body(page, 'layers').evaluate((element) => ({
+        scrolls: element.scrollHeight > element.clientHeight,
+        height: element.getBoundingClientRect().height,
+      }));
+      expect(scrolling.scrolls).toBe(true);
+      expect(scrolling.height).toBe(panel.height);
+      await assertNoOverflow(demo(page), { window: 'horizontal' });
+
+      // The same for the other panel, once it is chosen.
+      await tabsOf(page).locator('[role="tab"][data-id="table"]').click();
+      const [hostNow, other] = [
+        await boxOf(tabsOf(page), 'the tabs'),
+        await boxOf(body(page, 'table'), 'the other body'),
+      ];
+      // (Choosing a tab scrolled the page, so places are measured from the top of the tabs.)
+      expect([other.y - hostNow.y, other.height]).toEqual([panel.y - host.y, panel.height]);
+    });
+
+    test('lets the tabs give way when the row is crowded, so the action stays whole', async ({
+      page,
+    }) => {
+      const crowded = page.locator('#crowded-action-tabs');
+      const row = await boxOf(crowded.locator('.header'), 'the row');
+      const button = await boxOf(crowded.locator('k-button'), 'the action');
+      expect(row.x + row.width - (button.x + button.width)).toBe(8);
+      await assertNoOverlap(crowded.locator('.tablist'), crowded.locator('.actions'));
+      const cut = await crowded
+        .locator('[role="tab"]')
+        .evaluateAll((tabs) => tabs.map((tab) => tab.scrollWidth > tab.clientWidth));
+      expect(cut).toContain(true);
+      await assertNoOverflow(crowded, { window: 'horizontal' });
+    });
+  });
 });
