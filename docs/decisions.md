@@ -1246,3 +1246,20 @@ was chosen, why.
   padding of its own and exposes itself as `part="header"` so that a page can give it some, as the
   panel will (a part, not a property, since the space is the page's business). The new gallery
   demos have their own tab names so that the existing tests' locators stay unambiguous.
+- Step 7.6 (panel tabs): the panel is a `k-tabs` of Legend and Data in an `aside` called "Side
+  panel" (the tab row is "Panel tabs", so that the two are not announced alike). The header is 40
+  high, and the brief gives it a padding of 0 8 0 16 and also says that left text edges in the
+  panel line up at 16. A tab has 12 px of padding of its own, so with 16 in the header the label
+  would start at 28; the header has 4 at the start instead, which puts the label at 16 (measured
+  from inside the panel's 1 px border), where the body's text will be. The 8 at the end is for the
+  collapse button of 7.7, which is not there yet because it would do nothing. A 1 px divider is
+  drawn under the row, inside it (an inset shadow), since the row and the body are the same color;
+  the brief does not ask for one. The body is the `data-scroll-region`: 16 of padding, scrolling
+  down only (`overflow: hidden auto`). `overflow-x: hidden` still lets a script scroll sideways,
+  and `clip` cannot be combined with `auto`, so the test uses the mouse wheel and checks that
+  there is no scrollbar and that the page does not move, which is what a person can do. The Data
+  body is empty until M9 (9.1 puts its empty state there). The Legend's line wraps in the panel's
+  width with its last word on a line of its own at the default width; balancing the lines would
+  change the empty state's existing screenshots, so it is left. `assertAligned` has a new edge,
+  `text-left`, for where text starts whatever box is around it; the panel test measures the first
+  label with it.

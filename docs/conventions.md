@@ -107,7 +107,8 @@ app's own pages from step 7.1. The helpers are in `packages/app/e2e/support`:
   element itself: what is inside a scroll region must still fit it. `window` is `both` for
   a page that never scrolls, `horizontal` for one that scrolls down.
 - `assertNoOverlap(a, b)`, `assertAdjacent(first, second, axis)` and
-  `assertAligned(elements, edge)` (an edge, a centre, or the text baseline) for how elements sit.
+  `assertAligned(elements, edge)` (an edge, a centre, the text baseline, or where the text starts,
+  `text-left`) for how elements sit.
 - `expectNoSeriousViolations(page, selector)` runs axe; give a path of selectors
   (`['karmania-gallery', '[data-section="tabs"]']`) to look inside a shadow root.
 - `inEveryLayout(page, path, check)` runs a check at 1024x640, 1440x900 and 1920x1080, in
