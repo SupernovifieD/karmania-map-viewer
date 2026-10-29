@@ -36,24 +36,29 @@ function surfaceOf(page: Page): Promise<string> {
   });
 }
 
-/** Keeps the events a field sends: each one's value, in `window.heard`. */
+/** Keeps the events a field sends: each one's value (or whether it is ticked), in `window.heard`. */
 async function listen(page: Page, id: string, name: string): Promise<void> {
   await demo(page, id)
     .locator(name)
     .evaluate(
       (element, event) => {
-        const holder = window as unknown as { heard: string[] };
+        const holder = window as unknown as { heard: unknown[] };
         holder.heard = [];
         element.addEventListener(event, (heard) => {
-          holder.heard.push((heard as CustomEvent<{ value: string }>).detail.value);
+          const detail = (heard as CustomEvent<{ value?: string; checked?: boolean }>).detail;
+          holder.heard.push(detail.value ?? detail.checked);
         });
       },
-      name === 'k-select' ? 'k-select-change' : 'k-input-change',
+      {
+        'k-select': 'k-select-change',
+        'k-input': 'k-input-change',
+        'k-checkbox': 'k-checkbox-change',
+      }[name] ?? '',
     );
 }
 
-const heard = (page: Page): Promise<string[]> =>
-  page.evaluate(() => (window as unknown as { heard: string[] }).heard);
+const heard = (page: Page): Promise<unknown[]> =>
+  page.evaluate(() => (window as unknown as { heard: unknown[] }).heard);
 
 test.describe('the select', () => {
   test.beforeEach(async ({ page }) => {
@@ -390,6 +395,166 @@ test.describe('the text input', () => {
         .evaluate((element) => getComputedStyle(element).color);
       expect(contrastBetween(error, surface)).toBeGreaterThanOrEqual(4.5);
       await expectNoSeriousViolations(page, ['karmania-gallery', '[data-section="fields"]']);
+    });
+  }
+});
+
+const checkbox = (page: Page, id: string, nth = 0): Locator =>
+  demo(page, id).locator('k-checkbox').nth(nth);
+const box = (page: Page, id: string, nth = 0): Locator => checkbox(page, id, nth).locator('input');
+
+test.describe('the checkbox', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/gallery.html');
+  });
+
+  test('is a labelled native checkbox, ticked or not', async ({ page }) => {
+    await expect(demo(page, 'check-off').getByRole('checkbox', { name: 'NA' })).not.toBeChecked();
+    await expect(demo(page, 'check-on').getByRole('checkbox', { name: /N\/A/ })).toBeChecked();
+    expect(
+      await checkbox(page, 'check-on').evaluate(
+        (element) => (element as HTMLElement & { checked: boolean }).checked,
+      ),
+    ).toBe(true);
+  });
+
+  test('has a box of 16, 8 from its label, in a row at least as high as a hit target', async ({
+    page,
+  }) => {
+    const [row, square, text] = [
+      await rect(checkbox(page, 'check-off')),
+      await rect(box(page, 'check-off')),
+      await rect(checkbox(page, 'check-off').locator('.text')),
+    ];
+    expect([square.width, square.height]).toEqual([16, 16]);
+    expect(text.x - (square.x + square.width)).toBe(8);
+    expect(row.height).toBeGreaterThanOrEqual(32);
+    // Single line: the box is in the middle of the row's height.
+    expect(square.y + square.height / 2).toBeCloseTo(row.y + row.height / 2, 0);
+  });
+
+  test('is ticked by pressing its label as well as its box, and says what the person chose', async ({
+    page,
+  }) => {
+    await listen(page, 'check-off', 'k-checkbox');
+    await checkbox(page, 'check-off').locator('.text').click();
+    await expect(box(page, 'check-off')).toBeChecked();
+    expect(
+      await checkbox(page, 'check-off').evaluate(
+        (element) => (element as HTMLElement & { checked: boolean }).checked,
+      ),
+    ).toBe(true);
+    await box(page, 'check-off').click();
+    await expect(box(page, 'check-off')).not.toBeChecked();
+    expect(await page.evaluate(() => (window as unknown as { heard: unknown[] }).heard)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  test('is ticked with the Space key when it has the keyboard', async ({ page }) => {
+    await page.keyboard.press('Shift');
+    await box(page, 'check-off').focus();
+    await page.keyboard.press('Space');
+    await expect(box(page, 'check-off')).toBeChecked();
+    await page.keyboard.press('Space');
+    await expect(box(page, 'check-off')).not.toBeChecked();
+  });
+
+  test('shows the state it is given after a person has changed it', async ({ page }) => {
+    await box(page, 'check-off').click();
+    await checkbox(page, 'check-off').evaluate(async (element) => {
+      const field = element as HTMLElementTagNameMap['k-checkbox'];
+      field.checked = false;
+      await field.updateComplete;
+    });
+    await expect(box(page, 'check-off')).not.toBeChecked();
+  });
+
+  test('draws the tick only when it is ticked', async ({ page }) => {
+    const opacity = (id: string) =>
+      checkbox(page, id)
+        .locator('k-icon')
+        .evaluate((element) => getComputedStyle(element).opacity);
+    expect(await opacity('check-off')).toBe('0');
+    expect(await opacity('check-on')).toBe('1');
+  });
+
+  test('is skipped by Tab and cannot be changed when it is disabled, whether it is ticked or not', async ({
+    page,
+  }) => {
+    await expect(box(page, 'check-disabled', 0)).toBeDisabled();
+    await expect(box(page, 'check-disabled', 1)).toBeDisabled();
+    await checkbox(page, 'check-disabled', 0).locator('.text').click({ force: true });
+    await expect(box(page, 'check-disabled', 0)).not.toBeChecked();
+    await expect(box(page, 'check-disabled', 1)).toBeChecked();
+  });
+
+  test('puts its detail at the end of the row, muted, with the digits in line', async ({
+    page,
+  }) => {
+    const detail = checkbox(page, 'check-on').locator('.detail');
+    await expect(detail).toHaveText('12 times');
+    const [row, tail] = [await rect(checkbox(page, 'check-on')), await rect(detail)];
+    expect(tail.x + tail.width).toBeCloseTo(row.x + row.width, 0);
+    expect(await styleOf(detail, 'font-size', 'font-variant-numeric')).toEqual({
+      'font-size': '13px',
+      'font-variant-numeric': 'tabular-nums',
+    });
+  });
+
+  test('wraps a long label, and breaks a word that does not fit, and nothing overflows', async ({
+    page,
+  }) => {
+    const long = demo(page, 'check-long');
+    await assertNoOverflow(long, { window: 'horizontal' });
+    const text = await rect(checkbox(page, 'check-long').locator('.text'));
+    expect(text.height).toBeGreaterThan(40);
+    const [host, row] = [await rect(long), await rect(checkbox(page, 'check-long'))];
+    expect(row.x + row.width).toBeLessThanOrEqual(host.x + host.width + 0.5);
+  });
+
+  test('shows a focus ring of 2 in the accent colour, 2 away, round the box, for the keyboard', async ({
+    page,
+  }) => {
+    await page.keyboard.press('Shift');
+    await box(page, 'check-on').focus();
+    expect(
+      await styleOf(box(page, 'check-on'), 'outline-width', 'outline-style', 'outline-offset'),
+    ).toEqual({ 'outline-width': '2px', 'outline-style': 'solid', 'outline-offset': '2px' });
+  });
+
+  test('lists one under another with nothing between them but the rows', async ({ page }) => {
+    const [first, second, third] = [
+      await rect(checkbox(page, 'check-list', 0)),
+      await rect(checkbox(page, 'check-list', 1)),
+      await rect(checkbox(page, 'check-list', 2)),
+    ];
+    expect(second.y).toBeCloseTo(first.y + first.height, 0);
+    expect(third.y).toBeCloseTo(second.y + second.height, 0);
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`is readable and has no serious accessibility violations (${theme} theme)`, async ({
+      page,
+    }) => {
+      await page.goto(`/gallery.html?theme=${theme}`);
+      const surface = await surfaceOf(page);
+      const unticked = await styleOf(box(page, 'check-off'), 'border-top-color');
+      expect(contrastBetween(unticked['border-top-color'] ?? '', surface)).toBeGreaterThanOrEqual(
+        3,
+      );
+      const label = await styleOf(checkbox(page, 'check-off').locator('.text'), 'color');
+      expect(contrastBetween(label['color'] ?? '', surface)).toBeGreaterThanOrEqual(4.5);
+      const detail = await styleOf(checkbox(page, 'check-on').locator('.detail'), 'color');
+      expect(contrastBetween(detail['color'] ?? '', surface)).toBeGreaterThanOrEqual(4.5);
+      const ticked = await styleOf(box(page, 'check-on'), 'background-color');
+      const tick = await styleOf(checkbox(page, 'check-on').locator('k-icon'), 'color');
+      expect(
+        contrastBetween(tick['color'] ?? '', ticked['background-color'] ?? ''),
+      ).toBeGreaterThanOrEqual(3);
+      await expectNoSeriousViolations(page, ['karmania-gallery', '#fields-checkbox']);
     });
   }
 });

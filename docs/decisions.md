@@ -1537,3 +1537,13 @@ was chosen, why.
   `selected` of its options, so `k-select`, used for the type of one column and then of another,
   went on showing the first one's choice. It now sets the value of its select after every render, and
   a test gives a select that a person has used a new value and new choices.
+- `k-checkbox` (in `@karmania/ui`, for the Nodata step): a native checkbox, drawn with the tokens (a
+  box of 16, with a tick over it when it is ticked), with its label beside it and a muted `detail`
+  at the end of the row, such as how often a value was found. The whole row, label and all, is what
+  can be pressed, and it is at least as high as a hit target. The label wraps, and a word that does
+  not fit is broken; when the row has too little room for both the label and the detail, the detail
+  goes under the label, to the right. The state is the page's to keep, as for the other fields: a
+  person's change is sent as `k-checkbox-change` and the page sets `checked`, which is shown even
+  after the person has changed the box themselves. Found by the test of the long label: an inline
+  input in a box of 16 made the box's content 5 high over (a line of text under it), and the detail
+  left the label 14 wide.
