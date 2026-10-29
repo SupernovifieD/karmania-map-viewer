@@ -252,9 +252,17 @@ test.describe('collapsing the panel into a rail', () => {
     await page.goto('/');
     expect(await kept(page)).toBeNull();
     await tab(page, 'Data').click();
-    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({ collapsed: false, tab: 'data' });
+    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({
+      collapsed: false,
+      tab: 'data',
+      width: 360,
+    });
     await setCollapsed(page, true);
-    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({ collapsed: true, tab: 'data' });
+    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({
+      collapsed: true,
+      tab: 'data',
+      width: 360,
+    });
 
     await page.reload();
     await expect(rail(page)).toBeVisible();
@@ -268,14 +276,22 @@ test.describe('collapsing the panel into a rail', () => {
     await page.reload();
     await expect(open(page)).toBeVisible();
     await expect(tab(page, 'Legend')).toHaveAttribute('aria-selected', 'true');
-    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({ collapsed: false, tab: 'legend' });
+    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({
+      collapsed: false,
+      tab: 'legend',
+      width: 360,
+    });
   });
 
   test('is kept for each tab chosen with the keyboard as well', async ({ page }) => {
     await page.goto('/');
     await tab(page, 'Legend').focus();
     await page.keyboard.press('ArrowRight');
-    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({ collapsed: false, tab: 'data' });
+    expect(JSON.parse((await kept(page)) ?? 'null')).toEqual({
+      collapsed: false,
+      tab: 'data',
+      width: 360,
+    });
   });
 
   test.describe('when what was kept is not usable', () => {

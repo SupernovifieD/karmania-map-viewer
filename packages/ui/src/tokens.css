@@ -51,6 +51,8 @@
   --k-toolbar-height: 48px;
   --k-panel-width-default: 360px;
   --k-panel-rail-width: 40px;
+  /* The strip along the panel's edge that can be grabbed to resize it. */
+  --k-resize-hit-width: 6px;
 
   /* The width of a control's border. Every variant of a control has one (it may be
      transparent), so they are all the same size. */
