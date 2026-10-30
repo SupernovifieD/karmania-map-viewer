@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
-import { pickFiles } from './support/picker.js';
+import { fixturePath, pickFiles } from './support/picker.js';
 import type { Pick } from './support/picker.js';
 
 /** The parts of the coordinate system step. */
@@ -103,6 +104,32 @@ test.describe('the coordinate system step', () => {
     ]);
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
+  });
+
+  test('keeps what it says in its box when the file it names has 120 characters and nowhere to break', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    const name = 'a_file_name_'.repeat(10).slice(0, 120);
+    await crsOf(
+      page,
+      {
+        name: `${name}.csv`,
+        mimeType: 'text/csv',
+        buffer: readFileSync(fixturePath('points.csv')),
+      },
+      {
+        name: `${name}.prj`,
+        mimeType: 'text/plain',
+        buffer: readFileSync(fixturePath('points.prj')),
+      },
+    );
+    await expect(p.found).toContainText(`${name}.prj`);
+    await expect(p.summary).toContainText(`${name}.prj`);
+    await assertNoOverflow(p.dialog);
+    // The line is as wide as its room, which breaks it, and no wider.
+    const [line, dialog] = [await rect(p.found), await rect(p.dialog)];
+    expect(line.x + line.width).toBeLessThanOrEqual(dialog.x + dialog.width);
   });
 
   test('says that the default of GeoJSON is assumed, since the file names none', async ({

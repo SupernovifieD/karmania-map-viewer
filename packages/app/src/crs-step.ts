@@ -75,6 +75,14 @@ export class KarmaniaCrsStep extends LitElement {
         font-weight: var(--k-weight-medium);
       }
 
+      /* What is said can hold a file name, which has nowhere to break: it breaks anywhere, and the
+         line is as wide as its room and no wider. */
+      .found-text,
+      .summary-text {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
       /* The choice and what goes with it side by side, so that what goes with it appearing moves nothing. */
       .choice {
         display: grid;
