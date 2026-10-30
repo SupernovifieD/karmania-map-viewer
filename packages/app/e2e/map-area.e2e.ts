@@ -109,9 +109,12 @@ test.describe('the map area', () => {
     await expect(part(page, 'k-button')).toHaveCount(0);
     await load(page, 3);
     await expect.poll(() => line(page)).toBe('3 datasets loaded');
+    // The thousands are grouped, as every count in the app is.
+    await load(page, 1234);
+    await expect.poll(() => line(page)).toBe('1,234 datasets loaded');
     // A long count wraps; it does not overflow.
     await load(page, 10_000_000);
-    await expect.poll(() => line(page)).toBe('10000000 datasets loaded');
+    await expect.poll(() => line(page)).toBe('10,000,000 datasets loaded');
     await assertNoOverflow(map(page));
     await load(page, 0);
     await expect(part(page, '.heading')).toHaveText('No data yet');

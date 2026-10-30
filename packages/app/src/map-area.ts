@@ -1,6 +1,7 @@
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
+import { formatCount } from './import-files.js';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';
@@ -172,7 +173,7 @@ export class KarmaniaMapArea extends LitElement {
   }
 
   private loaded() {
-    const count = this.datasets === 1 ? '1 dataset' : `${String(this.datasets)} datasets`;
+    const count = this.datasets === 1 ? '1 dataset' : `${formatCount(this.datasets)} datasets`;
     return html`
       <k-empty-state icon="map" heading="Map rendering arrives in phase 2">
         ${count} loaded
