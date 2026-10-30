@@ -62,6 +62,9 @@ const OVERSCAN = 4;
  */
 const MAX_PAGES = 16;
 
+/** How many of the widest words of a column are measured exactly, to say how wide the column is. */
+const WIDEST_WORDS = 3;
+
 /** How wide a column of values is, and the row numbers' digits, when there is no way to measure. */
 const UNMEASURED_COLUMN_WIDTH = 120;
 const UNMEASURED_DIGIT_WIDTH = 8;
@@ -680,12 +683,17 @@ export class KTable extends LitElement {
       if (measurer === undefined) {
         return UNMEASURED_COLUMN_WIDTH;
       }
-      const words = sample[index] ?? [];
-      const longest = words.reduce(
-        (most, word) => Math.max(most, measurer.width(word, false)),
-        measurer.width(column.name, true),
+      // The words are ranked by working out how wide they are, which is quick; the widest few are then
+      // drawn and measured, which is exact, since working it out can be a pixel or two short and a
+      // pixel is enough to cut the last digit of the word the column was made for.
+      const widest = [...new Set(sample[index] ?? [])]
+        .map((word) => [word, measurer.width(word, false)] as const)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, WIDEST_WORDS)
+        .map(([word]) => word);
+      return columnWidth(
+        Math.max(measurer.widest([column.name], true), measurer.widest(widest, false)),
       );
-      return columnWidth(longest);
     });
     this.layout = {
       rowNumber: rowNumberWidth(this.rowCount, measurer?.digitWidth ?? UNMEASURED_DIGIT_WIDTH),
