@@ -235,11 +235,13 @@ export class KarmaniaGallery extends LitElement {
 
   override render() {
     return html`
-      <h1>Karmania components</h1>
-      <p>From ${PACKAGE_NAME}.</p>
-      ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
-      ${emptyStateSection()} ${fieldsSection()} ${stepsSection()} ${dialogSection()}
-      ${tableSection()}
+      <main>
+        <h1>Karmania components</h1>
+        <p>From ${PACKAGE_NAME}.</p>
+        ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
+        ${emptyStateSection()} ${fieldsSection()} ${stepsSection()} ${dialogSection()}
+        ${tableSection()}
+      </main>
     `;
   }
 }
