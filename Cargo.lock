@@ -78,7 +78,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "libm",
  "serde",
@@ -87,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-io"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "csv",
  "karmania-core",
@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-wasm"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "js-sys",
  "karmania-core",
