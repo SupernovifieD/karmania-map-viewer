@@ -170,14 +170,19 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Vec<Dat
     .collect();
     if datasets.len() > 1 {
         let kinds: Vec<&str> = datasets.iter().map(|d| d.kind().as_str()).collect();
-        findings.add(Finding::new(
-            FindingCode::GeojsonKindsMixed,
-            format!(
-                "The file holds {}, so it was imported as {} datasets, one for each.",
-                join_and(&kinds),
-                datasets.len()
+        findings.add(
+            Finding::new(
+                FindingCode::GeojsonKindsMixed,
+                format!(
+                    "The file holds {}, so it was imported as {} datasets, one for each.",
+                    join_and(&kinds),
+                    datasets.len()
+                ),
+            )
+            .with_hint(
+                "Each kind is its own dataset. Remove the ones you do not need in the Data tab.",
             ),
-        ));
+        );
         // Several datasets from one file need names that tell them apart.
         for dataset in &mut datasets {
             let kind = dataset.kind().as_str();

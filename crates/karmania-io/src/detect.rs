@@ -173,6 +173,9 @@ pub fn detect_format(file_name: Option<&str>, bytes: &[u8]) -> Detection {
                 format.label(),
                 format.label()
             ),
+        )
+        .with_hint(
+            "Nothing needs fixing. Give the file the ending that matches its content to avoid this note.",
         ));
     }
     let suggested_kind = match format {

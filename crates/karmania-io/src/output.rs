@@ -60,9 +60,10 @@ mod tests {
 
     #[test]
     fn a_tally_counts_everything_and_keeps_a_limited_number_of_examples() {
-        let mut tally = Tally::new(Finding::new(FindingCode::CsvRowsSkipped, "Skipped."));
+        let mut tally =
+            Tally::new(Finding::new(FindingCode::CsvRowsSkipped, "Skipped.").with_hint("A hint."));
         assert!(
-            Tally::new(Finding::new(FindingCode::CsvRowsSkipped, "Skipped."))
+            Tally::new(Finding::new(FindingCode::CsvRowsSkipped, "Skipped.").with_hint("A hint."))
                 .into_finding()
                 .is_none()
         );

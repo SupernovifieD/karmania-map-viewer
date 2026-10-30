@@ -127,7 +127,7 @@ fn check_finite_coordinates(dataset: &Dataset, findings: &mut Findings) {
     };
     let mut bad = Finding::new(
         FindingCode::ValuesCoordinatesNotFinite,
-        "Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.",
+        "Some coordinates are not valid numbers (empty, not a number, or infinite), so those positions cannot be placed on a map.",
     )
     .with_hint("Fix or remove those rows.");
     bad.count = 0;

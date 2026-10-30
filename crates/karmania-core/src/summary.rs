@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn the_findings_given_are_attached() {
         let mut findings = Findings::new();
-        findings.add(Finding::new(FindingCode::CsvRowsSkipped, "Skipped."));
+        findings.add(Finding::new(FindingCode::CsvRowsSkipped, "Skipped.").with_hint("A hint."));
         assert_eq!(points().summary(findings).findings.iter().count(), 1);
     }
 

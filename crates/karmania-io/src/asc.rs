@@ -285,10 +285,15 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
     let expected = expected as usize;
     let mut values = vec![0.0f64; expected];
     let mut valid = vec![true; expected];
-    let mut no_data = Tally::new(Finding::new(
-        FindingCode::AscValuesNodata,
-        "Some cells have no data, so they were left empty.",
-    ));
+    let mut no_data = Tally::new(
+        Finding::new(
+            FindingCode::AscValuesNodata,
+            "Some cells have no data, so they were left empty.",
+        )
+        .with_hint(
+            "This is normal for a grid with gaps. If more cells are empty than you expected, check the no-data value.",
+        ),
+    );
     let mut unreadable = Tally::new(
         Finding::new(
             FindingCode::AscValuesUnreadable,

@@ -1939,3 +1939,24 @@ was chosen, why.
   was mended. The import reads the file's bytes again after the preview has read them, which costs about
   0.3 s for the CSV and is left, since it is well inside the limit. Memory in the browser, slower machines
   and other browsers are not measured. The details are in `docs/perf.md`.
+- Step 10.4 (the words of the findings). All 97 codes were read, message, hint and example, for plain
+  language, with the codes a person with a file can meet (those with a wizard step) held to the stricter
+  reading. Eight findings were made with no hint, which the document listed as `none`: the notes that need
+  nothing done (`mesh.vertices.unused`, `asc.values.nodata`, `file.format.mismatch`, `geojson.kinds.mixed`,
+  `geojson.position.extra_values`, `obj.vertex.extra_values`, `obj.faces.triangulated`,
+  `csv.lines.scattered`). They now say so, or say what can be done ("Nothing needs fixing", "Remove the
+  ones you do not need in the Data tab"), since the brief has every finding say what to do. Five wordings
+  were changed for someone who does not know the term: "the delimiter" is "the right separator (comma,
+  semicolon or tab)", "a projected system" is "usually in metres, as in UTM, and not in degrees", "an EPSG
+  code" is "by its EPSG code (a number such as 32640)", "NaN" is "not a number", and "float or int" is "Float
+  or Integer", which are the names the Mapping step shows. What stays is the vocabulary of the file formats
+  themselves (vertex, ring, feature, geometry, EPSG, UTF-8), which a person sees in their own files and the
+  messages explain in their own words. Three things now hold it: `Findings::add` asserts a hint in test and
+  development builds, so a test that emits a finding without one fails (it found the eight above, and three
+  test fixtures that built findings of their own); the document test requires a hint that is not "none", is
+  a sentence of four words or more, and that a message is under 40 words and a hint under 35; and, for the
+  codes a person can meet, none of the words that need explaining (NaN, delimiter, kernel, u32, i32, f64,
+  WKT, projected system) is used. The codes with no wizard step are for datasets that a program builds from
+  arrays and still say "offsets" and "triplet" to a reader who knows what they are. A code that no test
+  emits and that was added without a hint would not be caught by the assertion; the sites were also
+  scanned by hand once for this review (96 places a finding is made), and that scan is not a test.

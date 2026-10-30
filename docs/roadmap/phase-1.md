@@ -429,7 +429,7 @@ Definitions and reprojection can be added later, with the features that need the
 - [x] 10.3 Performance: `scripts/generate-fixtures` (not committed output) for a
   1M-point CSV and a 4M-cell grid. Measure preview, import, validation and long
   tasks; record in `docs/perf.md`. Fix regressions in separate commits.
-- [ ] 10.4 Message review: every finding has a plain-language message and a
+- [x] 10.4 Message review: every finding has a plain-language message and a
   hint; `docs/validation-codes.md` is complete.
 - [ ] 10.5 README: setup, build, test, phase 1 architecture overview, supported
   formats and their conventions.

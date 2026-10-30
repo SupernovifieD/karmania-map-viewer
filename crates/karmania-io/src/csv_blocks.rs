@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn errors_already_held_by_the_caller_do_not_stop_a_good_placement() {
         let mut findings = Findings::new();
-        findings.add(Finding::new(FindingCode::FileEmpty, "Earlier error."));
+        findings.add(Finding::new(FindingCode::FileEmpty, "Earlier error.").with_hint("A hint."));
         let (x, y, z) = ([5.0], [5.0], [5.0]);
         let placed = place_blocks([&x, &y, &z], &[2], [10.0; 3], &mut findings);
         assert!(placed.is_some());

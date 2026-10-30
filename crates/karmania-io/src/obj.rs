@@ -101,10 +101,13 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
         )
         .with_hint("Each vertex line is \"v\" followed by x, y and z."),
     );
-    let mut extra_values = Tally::new(Finding::new(
-        FindingCode::ObjVertexExtraValues,
-        "Some vertices have more than three numbers (a weight or a colour); only the first three were used.",
-    ));
+    let mut extra_values = Tally::new(
+        Finding::new(
+            FindingCode::ObjVertexExtraValues,
+            "Some vertices have more than three numbers (a weight or a colour); only the first three were used.",
+        )
+        .with_hint("Only X, Y and Z are used. Nothing needs fixing."),
+    );
     let mut face_invalid = Tally::new(
         Finding::new(
             FindingCode::ObjFaceInvalid,
@@ -112,10 +115,13 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
         )
         .with_hint("Vertex numbers count from 1, or from the end if negative."),
     );
-    let mut triangulated = Tally::new(Finding::new(
-        FindingCode::ObjFacesTriangulated,
-        "Some faces have more than three corners; they were split into triangles.",
-    ));
+    let mut triangulated = Tally::new(
+        Finding::new(
+            FindingCode::ObjFacesTriangulated,
+            "Some faces have more than three corners; they were split into triangles.",
+        )
+        .with_hint("Nothing needs fixing: a mesh is made of triangles."),
+    );
     let mut unsupported = Tally::new(
         Finding::new(
             FindingCode::ObjRecordsUnsupported,

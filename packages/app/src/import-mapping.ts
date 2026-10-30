@@ -244,7 +244,7 @@ export function mappingProblems(
         problem(
           'mapping.coordinate.not_numeric',
           `The column "${column.source}" is set as ${ROLE_WORDS[column.role]} but its type is ${column.type}; coordinates must be numbers.`,
-          "Set the column's type to float or int, or choose another column.",
+          "Set the column's type to Float or Integer, or choose another column.",
         ),
       );
     }
