@@ -182,6 +182,35 @@ test.describe('the summary of the selected dataset', () => {
     await expect(p.findings).toHaveCount(0);
   });
 
+  test('puts its headings where the page has no level missing above them', async ({ page }) => {
+    const p = parts(page);
+    await setDatasets(page, [crafted({ findings: [WARNING, NOTE] })]);
+    await p.findingsHead.click();
+    await expect(p.findings).toHaveAttribute('open');
+    // Every heading on the page, in the order they are read, wherever in the page they are.
+    const levels = await page.evaluate(() => {
+      const found: number[] = [];
+      const visit = (root: ParentNode): void => {
+        for (const element of root.querySelectorAll('*')) {
+          if (/^H[1-6]$/.test(element.tagName)) {
+            found.push(Number(element.tagName.slice(1)));
+          }
+          if (element.shadowRoot) {
+            visit(element.shadowRoot);
+          }
+        }
+      };
+      visit(document);
+      return found;
+    });
+    expect(levels.length).toBeGreaterThan(2);
+    // The first is a top one, and none is more than a level below the one before it.
+    expect(levels[0]).toBe(1);
+    levels.slice(1).forEach((level, index) => {
+      expect(level - (levels[index] ?? 0), `heading ${String(index + 2)}`).toBeLessThanOrEqual(1);
+    });
+  });
+
   test('has the warnings and notes in a list that is shut until it is opened, grouped, with their detail', async ({
     page,
   }) => {
@@ -192,10 +221,10 @@ test.describe('the summary of the selected dataset', () => {
     await expect(p.findings).not.toHaveAttribute('open');
     await p.findingsHead.click();
     await expect(p.findings).toHaveAttribute('open');
-    await expect(p.summary.locator('.group[data-severity="warning"] h4')).toHaveText(
+    await expect(p.summary.locator('.group[data-severity="warning"] h2')).toHaveText(
       'Warnings (1)',
     );
-    await expect(p.summary.locator('.group[data-severity="info"] h4')).toHaveText('Notes (1)');
+    await expect(p.summary.locator('.group[data-severity="info"] h2')).toHaveText('Notes (1)');
     const warning = p.summary.locator('.group[data-severity="warning"] li');
     await expect(warning).toContainText('Some points are repeated at exactly the same position.');
     await expect(warning).toContainText('Remove the repeated points if they are mistakes.');
