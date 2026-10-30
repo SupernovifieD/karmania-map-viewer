@@ -1,6 +1,7 @@
 /**
  * Every state of every component in the gallery, each with what to do to the page to put it in
- * that state. The screenshot tests photograph them (`gallery.visual.ts`).
+ * that state. The screenshot tests photograph them (`gallery.visual.ts`) and the accessibility pass
+ * checks them (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
 import { reveal } from '../support/screenshots.js';

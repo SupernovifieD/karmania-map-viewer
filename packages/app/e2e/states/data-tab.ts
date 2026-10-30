@@ -2,7 +2,8 @@
  * The app with the Data tab open, in each of the states that look different (nothing loaded, one
  * dataset, so many that the list scrolls, names too long for their rows, a dataset with warnings, the
  * keyboard in the table), each with what to do to the page to put it in that state. The screenshot
- * tests photograph them (`data-tab.visual.ts`).
+ * tests photograph them (`data-tab.visual.ts`) and the accessibility pass checks them
+ * (`axe-states.axe.ts`).
  */
 import { readFileSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';

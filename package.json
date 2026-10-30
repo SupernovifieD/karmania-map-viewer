@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:e2e": "pnpm -r --if-present run test:e2e",
+    "test:axe": "pnpm --filter @karmania/app test:axe",
     "test:visual": "scripts/visual-tests",
     "test:visual:update": "scripts/visual-tests --update"
   },
