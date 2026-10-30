@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   CELL_PADDING,
   columnWidth,
-  isCut,
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
   rowNumberWidth,
@@ -58,15 +57,6 @@ describe('how wide some text is', () => {
     expect(textWidth('12345', 8, counted)).toBe(40);
     expect(calls).toBe(0);
     expect(textWidth('', 8, counted)).toBe(0);
-  });
-});
-
-describe('whether text is cut', () => {
-  it('is, when it is wider than the column less its padding', () => {
-    expect(isCut(104, 120)).toBe(false);
-    expect(isCut(104.1, 120)).toBe(true);
-    expect(isCut(105, 120)).toBe(true);
-    expect(isCut(0, 72)).toBe(false);
   });
 });
 

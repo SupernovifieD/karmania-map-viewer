@@ -5,16 +5,9 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
-import {
-  columnWidth,
-  isCut,
-  rowNumberWidth,
-  SAMPLE_ROWS,
-  scrollLeftToReveal,
-} from './table-columns.js';
+import { columnWidth, rowNumberWidth, SAMPLE_ROWS, scrollLeftToReveal } from './table-columns.js';
 import { formatCell, isNull, isNumeric } from './table-format.js';
 import { createMeasurer, loadFonts } from './table-measure.js';
-import type { Measurer } from './table-measure.js';
 import {
   maxTop,
   pageRows,
@@ -331,8 +324,6 @@ export class KTable extends LitElement {
   private retrying = false;
   /** The first rows, when they came before there was room to measure them in, and are to be laid out when there is. */
   private waitingForRoom: { rows: TableRows; generation: number } | undefined;
-  /** Measures words as the table sets them, once the columns have been laid out. */
-  private measurer: Measurer | undefined;
   private rowHeight = 28;
   private headerHeight = 32;
   private observer: ResizeObserver | undefined;
@@ -378,7 +369,6 @@ export class KTable extends LitElement {
       this.retrying = false;
       this.columns = [];
       this.layout = undefined;
-      this.measurer = undefined;
       this.scrolled = 0;
       this.fine = 0;
       this.activeRow = 0;
@@ -418,6 +408,7 @@ export class KTable extends LitElement {
     }
     this.askForPages();
     this.forgetFarPages();
+    this.titleCutWords();
     if (this.retrying && !this.hasProblem()) {
       this.retrying = false;
       this.viewport?.focus();
@@ -678,7 +669,6 @@ export class KTable extends LitElement {
       return;
     }
     const measurer = createMeasurer(viewport, heavy);
-    this.measurer = measurer;
     const widths = rows.columns.map((column, index) => {
       if (measurer === undefined) {
         return UNMEASURED_COLUMN_WIDTH;
@@ -713,13 +703,24 @@ export class KTable extends LitElement {
     return { text: formatCell(values, at), isNull: isNull(values, at) };
   }
 
-  /** The words in full, for a cell that cuts them off, and nothing for one that does not. */
-  private fullText(text: string, width: number, header: boolean): string | undefined {
-    const measurer = this.measurer;
-    return measurer !== undefined && isCut(measurer.width(text, header), width) ? text : undefined;
+  /**
+   * Gives the words in full, as a title, to the cells that cut them off, and takes the title from those
+   * that do not. It is decided by what the page drew, not by working out how wide the words would be: a
+   * word that fits in the column has no tooltip, and one that is cut off has, whatever the fonts.
+   */
+  private titleCutWords(): void {
+    for (const cell of this.renderRoot.querySelectorAll<HTMLElement>('.cell[data-truncate]')) {
+      if (cell.scrollWidth > cell.clientWidth) {
+        if (cell.title !== cell.textContent) {
+          cell.title = cell.textContent;
+        }
+      } else if (cell.hasAttribute('title')) {
+        cell.removeAttribute('title');
+      }
+    }
   }
 
-  private renderRow(row: number, widths: readonly number[]) {
+  private renderRow(row: number) {
     return html`
       <div class="row" role="row" aria-rowindex=${row + 2}>
         <div class="cell number" role="rowheader">${row + 1}</div>
@@ -736,7 +737,6 @@ export class KTable extends LitElement {
             role="gridcell"
             data-truncate
             aria-colindex=${index + 2}
-            title=${ifDefined(this.fullText(cell.text, widths[index] ?? 0, false))}
             .textContent=${cell.text}
           ></div>`;
         })}
@@ -767,7 +767,6 @@ export class KTable extends LitElement {
                 role="columnheader"
                 data-truncate
                 aria-colindex=${index + 2}
-                title=${ifDefined(this.fullText(column.name, layout.widths[index] ?? 0, true))}
                 .textContent=${column.name}
               ></div>`,
           )}
@@ -776,7 +775,7 @@ export class KTable extends LitElement {
           ${repeat(
             rows,
             (row) => row,
-            (row) => this.renderRow(row, layout.widths),
+            (row) => this.renderRow(row),
           )}
         </div>
       </div>

@@ -511,6 +511,87 @@ test.describe('the table', () => {
       expect(cut.cut, JSON.stringify(cut.widths)).toBe(0);
     });
 
+    for (const wrong of [3, -3]) {
+      test(`give a title to the words that are cut off and to no others, though what is worked out of their widths is ${String(Math.abs(wrong))} ${wrong > 0 ? 'too much' : 'too little'}`, async ({
+        page,
+      }) => {
+        const found = await page.evaluate(async (delta) => {
+          // Fonts that the working out of widths is wrong for, as it is on some machines.
+          const original: (this: CanvasRenderingContext2D, text: string) => TextMetrics =
+            Reflect.get(CanvasRenderingContext2D.prototype, 'measureText');
+          CanvasRenderingContext2D.prototype.measureText = function (
+            this: CanvasRenderingContext2D,
+            text: string,
+          ) {
+            return { width: original.call(this, text).width + delta } as TextMetrics;
+          };
+          const holder = document.createElement('div');
+          holder.style.cssText = 'height: 400px; width: 700px;';
+          const table = document.createElement('k-table') as HTMLElement & {
+            rowCount: number;
+            fetch: (start: number, count: number) => Promise<unknown>;
+            updateComplete: Promise<boolean>;
+          };
+          table.rowCount = 600;
+          // Short words in the first rows, which the widths come from, and long ones after them.
+          table.fetch = (start, count) =>
+            Promise.resolve({
+              start,
+              count,
+              columns: [
+                {
+                  name: 'words',
+                  values: Array.from({ length: count }, (_, at) =>
+                    start + at < 200
+                      ? `word ${String(start + at)}`
+                      : `a much longer word than any before it, number ${String(start + at)}`,
+                  ),
+                  nulls: new Uint8Array(count),
+                },
+                {
+                  name: 'figures',
+                  values: Float64Array.from(
+                    { length: count },
+                    (_, at) => -123.456789012345 - (start + at) * 1e-6,
+                  ),
+                  nulls: new Uint8Array(count),
+                },
+              ],
+            });
+          holder.append(table);
+          document.body.append(holder);
+          await table.updateComplete;
+          const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300));
+          await settle();
+          const viewport = table.shadowRoot?.querySelector('.viewport');
+          viewport?.scrollTo(0, 28 * 300);
+          await settle();
+          const cells = [...(table.shadowRoot?.querySelectorAll('.cell[data-truncate]') ?? [])];
+          const result = {
+            cells: cells.length,
+            cutWithoutTitle: cells.filter(
+              (cell) => cell.scrollWidth > cell.clientWidth && !cell.hasAttribute('title'),
+            ).length,
+            titledButFits: cells.filter(
+              (cell) => cell.scrollWidth <= cell.clientWidth && cell.hasAttribute('title'),
+            ).length,
+            titled: cells.filter((cell) => cell.hasAttribute('title')).length,
+            wrongTitle: cells.filter(
+              (cell) =>
+                cell.hasAttribute('title') && cell.getAttribute('title') !== cell.textContent,
+            ).length,
+          };
+          Reflect.set(CanvasRenderingContext2D.prototype, 'measureText', original);
+          holder.remove();
+          return result;
+        }, wrong);
+        expect(found.cells).toBeGreaterThan(10);
+        // The long words are there to be cut, and are, and say what they are.
+        expect(found.titled).toBeGreaterThan(5);
+        expect(found).toMatchObject({ cutWithoutTitle: 0, titledButFits: 0, wrongTitle: 0 });
+      });
+    }
+
     test('wait to be measured until there is room, when the rows come while the table is hidden', async ({
       page,
     }) => {
