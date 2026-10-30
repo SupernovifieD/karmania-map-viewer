@@ -468,6 +468,55 @@ test.describe('the table', () => {
       expect(later).toBeLessThan(120);
     });
 
+    test('wait to be measured until there is room, when the rows come while the table is hidden', async ({
+      page,
+    }) => {
+      const found = await page.evaluate(async () => {
+        const holder = document.createElement('div');
+        holder.style.cssText = 'display: none; height: 300px; width: 600px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+          updateComplete: Promise<boolean>;
+        };
+        table.rowCount = 10_000_000;
+        table.fetch = (start, count) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'description',
+                values: Array.from(
+                  { length: count },
+                  () => 'A description that is a good deal wider than the least a column is',
+                ),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+        holder.append(table);
+        document.body.append(holder);
+        await table.updateComplete;
+        const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300));
+        await settle();
+        const root = table.shadowRoot;
+        // While it is hidden the rows have come, and nothing can be said about how wide they are.
+        const whileHidden = root?.querySelector('.header') === null;
+        holder.style.display = 'block';
+        await settle();
+        const sizer = root?.querySelector('.sizer');
+        const columns = sizer ? getComputedStyle(sizer).getPropertyValue('--columns') : '';
+        holder.remove();
+        return { whileHidden, columns };
+      });
+      expect(found.whileHidden).toBe(true);
+      const widths = found.columns.split(' ').map((width) => Number.parseFloat(width));
+      // Eight digits for the last row and the room round them; and a column as wide as its words, not as the least.
+      expect(widths[0]).toBeGreaterThan(60);
+      expect(widths[1]).toBeGreaterThan(200);
+    });
+
     test('mark the words they cut as cut on purpose, so that an ellipsis is not taken for an overflow', async ({
       page,
     }) => {
