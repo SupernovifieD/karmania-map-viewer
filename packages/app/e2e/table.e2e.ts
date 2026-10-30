@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
+import { assertNoOverflow } from './support/layout.js';
 
 const ROW = 28;
 const HEADER = 32;
@@ -465,6 +466,22 @@ test.describe('the table', () => {
       expect(amount).toBeLessThan(320);
       // Short for the first 200 rows, which are all that is looked at.
       expect(later).toBeLessThan(120);
+    });
+
+    test('mark the words they cut as cut on purpose, so that an ellipsis is not taken for an overflow', async ({
+      page,
+    }) => {
+      const p = parts(page, 'table-clamped');
+      await expect(p.rows.first()).toBeVisible();
+      // Cells that are cut, in the body and in the header, which is what the layout check looks at.
+      expect(await isCut(p.rows.first().locator('[role="gridcell"]').nth(1))).toBe(true);
+      expect(await isCut(p.headings.nth(3))).toBe(true);
+      const unmarked = await p.demo
+        .locator('.rows [role="gridcell"], .header [role="columnheader"]:not(.number)')
+        .evaluateAll((all) => all.filter((cell) => !cell.hasAttribute('data-truncate')).length);
+      expect(unmarked).toBe(0);
+      // The gallery scrolls down, so only across is held to the window.
+      await assertNoOverflow(p.demo, { window: 'horizontal' });
     });
 
     test('end words that do not fit in an ellipsis, and say them in full in the title', async ({
