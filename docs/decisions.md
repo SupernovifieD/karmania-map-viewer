@@ -1971,3 +1971,11 @@ was chosen, why.
   sizes, not every one. The commands in it were tried: the app and the gallery open from
   `pnpm --filter @karmania/app dev` without a console error. `docs/conventions.md` now says
   that every code has a hint, as the finding check of step 10.4 requires.
+- Step 10.6 (the final report). It is given to the owner in the chat and adds no document. One thing in
+  it is not settled: the CI run of `d09a012`, a change of the README alone, failed in a table test
+  (`table.e2e.ts`, "are each in its own place, one under the other"), where two neighbouring rows
+  were read at the same height. The run before it passed, so have all the runs of the same code
+  since, and the test passed 60 times out of 60 here with eight at once and 40 out of 40 with every
+  core kept busy. The failed run kept nothing to look at, and the cause was not found. It is
+  recorded as an unexplained failure that has not come back, not as fixed; if it does, the first
+  thing to do is to keep the test results of a failed CI run.
