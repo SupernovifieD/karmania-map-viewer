@@ -128,7 +128,7 @@ export class KarmaniaDatasetSummary extends LitElement {
         padding: 0 var(--k-space-16) var(--k-space-12);
       }
 
-      .findings h4 {
+      .findings h2 {
         font-size: var(--k-font-size-secondary);
         font-weight: var(--k-weight-medium);
         line-height: var(--k-line-height-secondary);
@@ -227,7 +227,7 @@ export class KarmaniaDatasetSummary extends LitElement {
             warnings === 0
               ? nothing
               : html`<section class="group" data-severity="warning">
-                  <h4>Warnings (${String(warnings)})</h4>
+                  <h2>Warnings (${String(warnings)})</h2>
                   <karmania-findings .findings=${groups.warnings}></karmania-findings>
                 </section>`
           }
@@ -235,7 +235,7 @@ export class KarmaniaDatasetSummary extends LitElement {
             notes === 0
               ? nothing
               : html`<section class="group" data-severity="info">
-                  <h4>Notes (${String(notes)})</h4>
+                  <h2>Notes (${String(notes)})</h2>
                   <karmania-findings .findings=${groups.notes}></karmania-findings>
                 </section>`
           }
