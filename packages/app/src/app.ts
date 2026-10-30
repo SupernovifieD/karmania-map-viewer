@@ -1,7 +1,7 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
-import { css, html, LitElement, nothing } from 'lit';
+import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -22,7 +22,6 @@ import {
   savePanelState,
 } from './panel-state.js';
 import type { PanelState } from './panel-state.js';
-import './resize-handle.js';
 import type { ResizeRequest } from './resize-handle.js';
 
 /**
@@ -88,16 +87,6 @@ export class KarmaniaApp extends LitElement {
 
       .workspace[data-collapsed] {
         grid-template-columns: minmax(0, 1fr) var(--k-panel-rail-width);
-      }
-
-      /* Over the edge of the panel, a strip centred on it, the whole height of the workspace. */
-      karmania-resize-handle {
-        bottom: 0;
-        position: absolute;
-        right: calc(var(--k-panel-width) - var(--k-resize-hit-width) / 2);
-        top: 0;
-        width: var(--k-resize-hit-width);
-        z-index: var(--k-z-sticky);
       }
     `,
   ];
@@ -252,19 +241,12 @@ export class KarmaniaApp extends LitElement {
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
-        ${
-          this.panel.collapsed
-            ? nothing
-            : html`<karmania-resize-handle
-                .value=${width}
-                .min=${limits.min}
-                .max=${limits.max}
-                .reset=${PANEL_WIDTH.default}
-                @karmania-resize=${this.onResize}
-              ></karmania-resize-handle>`
-        }
         <karmania-panel
           .collapsed=${this.panel.collapsed}
+          .width=${width}
+          .min=${limits.min}
+          .max=${limits.max}
+          .reset=${PANEL_WIDTH.default}
           .tab=${this.panel.tab}
           .datasets=${this.datasets}
           .selected=${this.selected}
@@ -273,6 +255,7 @@ export class KarmaniaApp extends LitElement {
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}
+          @karmania-resize=${this.onResize}
         ></karmania-panel>
       </div>
       <input
