@@ -1899,3 +1899,26 @@ was chosen, why.
   page's `h1` (`39eb933`). axe checks what a machine can; reading order, what a screen reader says
   and whether the words are the right words are not checked by it, and were not tried with a
   screen reader.
+- Step 10.2 (the long and the unexpected). The four inputs of section 7.3 (a dataset name of 120
+  characters, a column name of 60, 10 million as a count, a negative coordinate with 12 decimals) were put
+  in everywhere they are shown, at the smallest window and a usual one: the dataset list, the summary
+  with both of its lists open, the warnings, the question before a dataset is removed, the map area, the
+  table (with a real file through the wizard and the engine, and with crafted datasets for the
+  10 million), and every step of the wizard, with a real file and with an engine that previews one of 10
+  million rows (`e2e/long-content.e2e.ts`). Seven of the places are photographed
+  (`e2e/states/long-content.ts`) and are in the accessibility pass, and were looked at in both themes at
+  the smallest, usual and largest window. The name is tried both with no place to break it (the worst)
+  and with spaces. Where a name or a column is cut, the whole is in a `title`; in text that wraps, a name
+  that cannot break does so anywhere. The pass found six things, each mended in its own commit, each with
+  a test that fails without it: the coordinate system step ran past the dialog when the file it named had
+  a long name (`1a80023`), the map area said `10000000 datasets loaded` where every other count groups its
+  thousands, and an earlier test had pinned that (`b86f848`), the table's cut words were not marked as cut
+  on purpose, so the layout check took them for overflow (`b6d6455`), a table that first has rows while
+  it is hidden (in a tab not shown) measured nothing and kept every column at its least, with the row
+  numbers 17 wide (`e2f155f`), the width worked out for a column was a pixel or two short for numbers with
+  many digits, which cut the last digit of the word the column was made for, and now the widest three
+  words of a column are measured exactly in the page (`a2901a0`), and a dialog's heading row was a second
+  banner landmark beside the toolbar, which the wizard's photographs had hidden by hiding the app behind it,
+  so the accessibility pass now shows the whole page (`128501e`). A row count of 10 million is crafted
+  (a summary that says so, a preview that says so), not a file of 10 million rows; the table is tried with
+  2,000,000 and 50,000,000 made-up rows and a real file of 400,000.
