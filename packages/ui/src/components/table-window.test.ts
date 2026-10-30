@@ -152,14 +152,23 @@ describe('rows that are too many to scroll as they are', () => {
     // 2,000 rows in a box of 20,000 pixels: a pixel of scrolling is 2.8 pixels of rows, as in the
     // table above, and every pixel of it is tried.
     const dense = { ...base, rowCount: 2_000, maxScrollHeight: 20_000 };
+    // An `expect` costs far more than the comparison it makes, and there are 20,000 pixels to try, so
+    // the pixels that go wrong are collected and said once, at the end.
+    const wrong: string[] = [];
     let before = topOf(dense, 0);
     for (let scrollTop = 1; scrollTop <= maxScroll(dense); scrollTop += 1) {
       const row = topOf(dense, scrollTop);
-      expect(row).toBeGreaterThanOrEqual(before);
-      // 2.8 pixels is less than one row: no row is gone past unseen.
-      expect(row - before).toBeLessThanOrEqual(1);
+      if (row < before) {
+        wrong.push(
+          `at ${String(scrollTop)} went back, from row ${String(before)} to ${String(row)}`,
+        );
+      } else if (row - before > 1) {
+        // 2.8 pixels is less than one row: no row is gone past unseen.
+        wrong.push(`at ${String(scrollTop)} skipped, from row ${String(before)} to ${String(row)}`);
+      }
       before = row;
     }
+    expect(wrong.slice(0, 5)).toEqual([]);
     expect(before).toBe(2_000 - 10);
   });
 
