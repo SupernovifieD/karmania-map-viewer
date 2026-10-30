@@ -711,6 +711,7 @@ export class KTable extends LitElement {
               active: row === this.activeRow && index === this.activeColumn,
             })}
             role="gridcell"
+            data-truncate
             aria-colindex=${index + 2}
             title=${ifDefined(this.fullText(cell.text, widths[index] ?? 0, false))}
             .textContent=${cell.text}
@@ -741,6 +742,7 @@ export class KTable extends LitElement {
               html`<div
                 class="cell head ${isNumeric(column.values) ? 'numeric' : ''}"
                 role="columnheader"
+                data-truncate
                 aria-colindex=${index + 2}
                 title=${ifDefined(this.fullText(column.name, layout.widths[index] ?? 0, true))}
                 .textContent=${column.name}
