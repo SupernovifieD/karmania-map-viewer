@@ -326,6 +326,8 @@ export class KTable extends LitElement {
   private layoutStarted = false;
   /** Whether a person asked to try again, and the keyboard has to be found a place when that is done. */
   private retrying = false;
+  /** The first rows, when they came before there was room to measure them in, and are to be laid out when there is. */
+  private waitingForRoom: { rows: TableRows; generation: number } | undefined;
   /** Measures words as the table sets them, once the columns have been laid out. */
   private measurer: Measurer | undefined;
   private rowHeight = 28;
@@ -369,6 +371,7 @@ export class KTable extends LitElement {
       this.asked.clear();
       this.failedPages.clear();
       this.layoutStarted = false;
+      this.waitingForRoom = undefined;
       this.retrying = false;
       this.columns = [];
       this.layout = undefined;
@@ -388,6 +391,13 @@ export class KTable extends LitElement {
     }
     const measure = (): void => {
       this.bodyHeight = Math.max(0, viewport.clientHeight - this.headerHeight);
+      // Rows that came while there was no room (the table was in something hidden) are laid out
+      // now that there is.
+      const waiting = this.waitingForRoom;
+      if (waiting !== undefined && viewport.clientWidth > 0) {
+        this.waitingForRoom = undefined;
+        void this.layOut(waiting.rows, waiting.generation);
+      }
     };
     measure();
     this.observer = new ResizeObserver(measure);
@@ -657,6 +667,11 @@ export class KTable extends LitElement {
       // The words are measured in whatever font there is.
     }
     if (generation !== this.generation) {
+      return;
+    }
+    // A table that is not shown has nothing to measure with: no word has a width. It waits for room.
+    if (viewport.clientWidth === 0) {
+      this.waitingForRoom = { rows, generation };
       return;
     }
     const measurer = createMeasurer(viewport, heavy);
