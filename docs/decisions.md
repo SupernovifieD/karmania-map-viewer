@@ -1960,3 +1960,14 @@ was chosen, why.
   arrays and still say "offsets" and "triplet" to a reader who knows what they are. A code that no test
   emits and that was added without a hint would not be caught by the assertion; the sites were also
   scanned by hand once for this review (96 places a finding is made), and that scan is not a test.
+- Step 10.5 (the README). It is written for someone who has not seen the project: what it is and where
+  it stands (Phase 1 built, nothing drawn yet), what works today, the supported formats and the
+  rules that hold for all of them, how to set up, run and test it, and how it is built. It makes no
+  comparison with any other project (asked for by the owner). Each statement of what the readers do
+  was checked against the roadmap, the code or the tests, and three that were not quite right were
+  corrected before it was committed: the core does know one coordinate system (EPSG:4326, for
+  which it checks that the coordinates fit longitudes and latitudes), the unoptimised kernel is too slow
+  for the browser tests that import very large files, and the screenshot tests are at three window
+  sizes, not every one. The commands in it were tried: the app and the gallery open from
+  `pnpm --filter @karmania/app dev` without a console error. `docs/conventions.md` now says
+  that every code has a hint, as the finding check of step 10.4 requires.

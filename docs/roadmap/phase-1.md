@@ -431,6 +431,6 @@ Definitions and reprojection can be added later, with the features that need the
   tasks; record in `docs/perf.md`. Fix regressions in separate commits.
 - [x] 10.4 Message review: every finding has a plain-language message and a
   hint; `docs/validation-codes.md` is complete.
-- [ ] 10.5 README: setup, build, test, phase 1 architecture overview, supported
+- [x] 10.5 README: setup, build, test, phase 1 architecture overview, supported
   formats and their conventions.
 - [ ] 10.6 Final report (section 10).

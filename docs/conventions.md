@@ -49,7 +49,8 @@ A finding code names one kind of problem, for example `crs.missing` or
 - Codes are stable. Once a code is released, do not rename it or change its
   meaning; add a new code instead. Never reuse a retired code.
 - One code has one severity (`error`, `warning` or `info`), one message
-  template and, where the user can act, one hint.
+  template and one hint. A hint always says what the person can do, even when
+  that is "nothing needs fixing"; a finding made without one fails the tests.
 - Every code used in the source is listed in `docs/validation-codes.md` with
   its severity, message template, hint and an example. A test fails if one is
   missing.
