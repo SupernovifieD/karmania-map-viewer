@@ -73,6 +73,20 @@ test.describe('the panel resize handle', () => {
     });
   });
 
+  test('is in the side panel, which is a landmark, so that screen readers find it there', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const parent = await host(page).evaluate((element) => ({
+      tag: element.parentElement?.tagName,
+      name: element.parentElement?.getAttribute('aria-label'),
+    }));
+    expect(parent).toEqual({ tag: 'ASIDE', name: 'Side panel' });
+    // Folded away, the panel has no edge to take hold of, and so no handle.
+    await panel(page).getByRole('button', { name: 'Collapse panel' }).click();
+    await expect(host(page)).toHaveCount(0);
+  });
+
   test('is a separator that can be focused, called Resize panel, with the width as its value', async ({
     page,
   }) => {

@@ -1,12 +1,13 @@
 import type { Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import type { TabChange } from '@karmania/ui';
-import { css, html, LitElement } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
 import type { RowSource } from './datasets.js';
 import { PANEL_TABS } from './panel-tabs.js';
 import type { PanelTab } from './panel-tabs.js';
+import './resize-handle.js';
 
 /** What a person asked of the panel: to fold it away or open it, or to choose a tab. */
 export interface PanelChange {
@@ -38,6 +39,10 @@ export class KarmaniaPanel extends LitElement {
     datasets: { attribute: false },
     selected: { attribute: false },
     rows: { attribute: false },
+    width: { type: Number },
+    min: { type: Number },
+    max: { type: Number },
+    reset: { type: Number },
   };
 
   static override styles = [
@@ -54,6 +59,17 @@ export class KarmaniaPanel extends LitElement {
       aside {
         height: 100%;
         position: relative;
+      }
+
+      /* Over the edge of the panel, a strip centred on it, the whole height of the panel. The panel's
+         own line is outside the aside, so the strip starts that far further out. */
+      karmania-resize-handle {
+        bottom: 0;
+        left: calc(var(--k-resize-hit-width) / -2 - var(--k-border-width));
+        position: absolute;
+        top: 0;
+        width: var(--k-resize-hit-width);
+        z-index: var(--k-z-sticky);
       }
 
       .open {
@@ -120,6 +136,11 @@ export class KarmaniaPanel extends LitElement {
   declare selected: number | undefined;
   /** Gets the rows of a dataset, for the table of the Data tab. */
   declare rows: RowSource | undefined;
+  /** How wide the panel is, and the least and most it can be, and the width it goes back to. */
+  declare width: number;
+  declare min: number;
+  declare max: number;
+  declare reset: number;
 
   private pendingFocus: FocusTarget | undefined;
 
@@ -130,6 +151,10 @@ export class KarmaniaPanel extends LitElement {
     this.datasets = [];
     this.selected = undefined;
     this.rows = undefined;
+    this.width = 0;
+    this.min = 0;
+    this.max = 0;
+    this.reset = 0;
     this.pendingFocus = undefined;
   }
 
@@ -182,6 +207,16 @@ export class KarmaniaPanel extends LitElement {
   override render() {
     return html`
       <aside aria-label="Side panel">
+        ${
+          this.collapsed
+            ? nothing
+            : html`<karmania-resize-handle
+                .value=${this.width}
+                .min=${this.min}
+                .max=${this.max}
+                .reset=${this.reset}
+              ></karmania-resize-handle>`
+        }
         <div class="open" ?hidden=${this.collapsed}>
           <k-tabs
             label="Panel tabs"
