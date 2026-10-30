@@ -468,6 +468,49 @@ test.describe('the table', () => {
       expect(later).toBeLessThan(120);
     });
 
+    test('do not cut a word they were measured from, even a number of 15 digits with its signs and its point', async ({
+      page,
+    }) => {
+      const cut = await page.evaluate(async () => {
+        const holder = document.createElement('div');
+        holder.style.cssText = 'height: 400px; width: 700px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+          updateComplete: Promise<boolean>;
+        };
+        table.rowCount = 200;
+        table.fetch = (start, count) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: ['x', 'y', 'z'].map((name) => ({
+              name,
+              values: Float64Array.from(
+                { length: count },
+                (_, at) => -123.456789012345 - (start + at) * 1e-6,
+              ),
+              nulls: new Uint8Array(count),
+            })),
+          });
+        holder.append(table);
+        document.body.append(holder);
+        await table.updateComplete;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const cells = [...(table.shadowRoot?.querySelectorAll('.rows [role="gridcell"]') ?? [])];
+        const cutOnes = cells.filter((cell) => cell.scrollWidth > cell.clientWidth);
+        const result = {
+          cells: cells.length,
+          cut: cutOnes.length,
+          widths: cutOnes.slice(0, 2).map((cell) => [cell.scrollWidth, cell.clientWidth]),
+        };
+        holder.remove();
+        return result;
+      });
+      expect(cut.cells).toBeGreaterThan(20);
+      expect(cut.cut, JSON.stringify(cut.widths)).toBe(0);
+    });
+
     test('wait to be measured until there is room, when the rows come while the table is hidden', async ({
       page,
     }) => {

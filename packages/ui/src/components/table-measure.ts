@@ -4,6 +4,11 @@ import { textWidth } from './table-columns.js';
 export interface Measurer {
   /** How wide `text` is in a cell, or in a header, which is in a heavier weight. */
   readonly width: (text: string, header: boolean) => number;
+  /**
+   * How wide the widest of `texts` is, drawn as they are in the page and not worked out: exact, and
+   * slower, so it is for the few words that decide how wide a column is.
+   */
+  readonly widest: (texts: readonly string[], header: boolean) => number;
   /** How wide a digit is, in a cell. */
   readonly digitWidth: number;
 }
@@ -69,6 +74,18 @@ export function createMeasurer(parent: HTMLElement, heavy: number): Measurer | u
   };
   return {
     digitWidth: digits.regular,
+    widest: (texts, header) => {
+      const probe = document.createElement('span');
+      probe.style.cssText = `position: absolute; visibility: hidden; white-space: pre; font-weight: ${header ? String(heavy) : getComputedStyle(parent).fontWeight}`;
+      parent.append(probe);
+      let widest = 0;
+      for (const text of texts) {
+        probe.textContent = text;
+        widest = Math.max(widest, probe.getBoundingClientRect().width);
+      }
+      probe.remove();
+      return widest;
+    },
     width: (text, header) => {
       const memory = header ? remembered.heavy : remembered.regular;
       const known = memory.get(text);
