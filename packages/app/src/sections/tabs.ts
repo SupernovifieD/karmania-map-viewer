@@ -53,7 +53,14 @@ export function tabsSection() {
       <div class="tabs-demo with-action tall-tabs" id="action-tabs">
         <k-tabs label="Panel with an action" .tabs=${ACTION_TABS} selected="layers">
           ${collapse()}
-          <div slot="layers" class="scroll-body" data-scroll-region>
+          <div
+            slot="layers"
+            class="scroll-body"
+            data-scroll-region
+            role="region"
+            aria-label="Layers"
+            tabindex="0"
+          >
             ${LINES.map((line) => html`<p>${line}</p>`)}
           </div>
           <div slot="table" class="scroll-body" data-scroll-region>
