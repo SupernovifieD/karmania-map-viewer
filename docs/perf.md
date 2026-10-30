@@ -10,7 +10,7 @@ rustc 1.99.1, release build.
 ## Validating one million points (step 2.22)
 
 The brief's target is import plus validation of a 1,000,000-row CSV in under 5 s.
-This entry covers validation alone; import is measured in step 10.3.
+This entry covers validation alone; reading and importing files are measured in the entries below.
 
 What was validated: 1,000,000 points with X, Y and Z and five numeric attribute
 columns, in EPSG:32640. The coordinates are pseudo-random inside one UTM zone from
@@ -55,7 +55,7 @@ takes 5 s or more.
 
 The brief's target is import plus validation of a 1,000,000-row CSV in under 5 s.
 Together with the validation entry above, the first row is that measurement for
-native code; WebAssembly (milestone M4) will be slower and is measured in step
+native code; WebAssembly is slower and is measured in the entries for steps 4.14 and
 10.3.
 
 What was read: generated files from a fixed seed (building them is not timed), in
@@ -109,8 +109,8 @@ takes 5 s or more.
 The brief's targets are a preview in under 1 s and an import with validation in under
 5 s for a 1,000,000-row CSV. This is the first measurement of both inside WebAssembly,
 by loading the release module in Node (V8, the same engine as Chrome) on the machine
-named at the top. The final measurement in a browser, inside a worker with the wizard,
-is step 10.3.
+named at the top. The measurement in a browser, inside a worker with the wizard, is the
+next entry.
 
 What was read: a 45.4 MB CSV of 1,000,000 rows with X, Y, Z and five attributes,
 generated from a fixed seed; the import runs in steps of 50,000 rows.
@@ -140,3 +140,64 @@ KARMANIA_TIMING=1 pnpm --filter @karmania/engine exec vitest run kernel-timing -
 ```
 
 The test fails if the preview takes 1 s or more or the import 5 s or more.
+
+## The large files in a browser (step 10.3)
+
+The same two targets, and what a person would feel, measured in the real app: Chromium
+(headless, from Playwright 1.64.1) running the built page, the engine in its worker, the release
+WebAssembly module, and the wizard taking the files through every step. Machine as above (8 GB),
+Node 24.22.1.
+
+What was read: two files from `scripts/generate-fixtures` (made from a fixed seed, not committed):
+
+- `points-1m.csv`, 45.4 MB: 1,000,000 points with X, Y, Z and five attributes;
+- `grid-4m.asc`, 18.0 MB: an ESRI ASCII grid of 2,000 x 2,000 cells, 4,000,000 in all, with a
+  gap in the data at every 97th.
+
+Each was taken through the wizard in six runs (in two sessions), each in a page of its own. Times are
+the page's own clock, from the moment something is asked of the app to the moment the page shows it,
+as the range over the six runs:
+
+| | CSV, 1,000,000 points | ASCII grid, 4,000,000 cells | Limit |
+| --- | --- | --- | --- |
+| Preview: the files handed to the app until the file step shows what they are | 210 to 325 ms | 84 to 194 ms | 1 s |
+| Import with validation: from going on to the Review step until it says what it made | 1,704 to 1,801 ms | 413 to 520 ms | 5 s |
+| Load: from Load until the Data tab's table has its first rows | 94 to 117 ms | 78 to 97 ms | |
+| Scroll: from asking for the end of the table until its last row is drawn, with its values | 24 to 36 ms | 21 to 39 ms | |
+
+So the preview uses about a third of its second at the most, and the import about a third of
+its five seconds. The files are in the page before any time is taken, as they are once a person
+has chosen them; the time to read them from a disk is the browser's.
+
+Where an import of the CSV spends its time, from the bar's label sampled at every frame: reading
+the file into memory 290 to 390 ms, reading the values 880 to 980 ms, checking the data 420 to
+450 ms. The grid is mostly reading the file (330 to 460 ms); its values are read and checked in
+about 25 ms, a stage so short that the bar is often not seen in it. The import reads the file's
+bytes again after the preview has read them once; keeping them would save the first of these, about
+a third of a second for the CSV. That is not done: it is well inside the limit.
+
+Long tasks (the browser's name for a task that holds the main thread for more than 50 ms, which is
+what the brief limits) were watched throughout, and the watch was tried first with a deliberate
+block of 150 ms. Across the import, the load and the scroll, in all twelve runs, there were none.
+In the twelve previews there was one, of 51 ms, in the first page of a fresh browser; six more fresh
+pages with the browser's attribution of long frames showed none. The engine works in a worker, so
+what is left on the main thread is the page's own drawing, which is small: the table draws about 20
+rows, whatever there are. The test holds the import, the load and the scroll to the 50 ms, and the
+preview to 100.
+
+Not measured: memory in the browser (Chromium gives only a coarse figure for the page's heap, which
+says nothing of the worker's WebAssembly memory; the process memory of the native and Node entries
+above is the nearest), slower machines, Firefox and Safari, files at the 134,217,728-element limit,
+a CSV of more than a million rows, and GeoJSON of this size (which the entry for step 3.24 says
+would not fit).
+
+To repeat (it needs a quiet machine and takes under a minute; it is not part of `pnpm test:e2e`):
+
+```
+pnpm perf
+```
+
+which writes the files if they are not there, runs the app in a browser and prints what it
+measured, and fails if a preview takes 1 s or more, an import 5 s or more, or the import, load or
+scroll holds the main thread for more than 50 ms. The numbers are also in
+`packages/app/test-results/performance.json`.

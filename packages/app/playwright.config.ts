@@ -5,12 +5,16 @@ import { defineConfig, devices } from '@playwright/test';
  * The screenshot tests (`*.visual.ts`) only exist when `PW_VISUAL_WS` says where a browser in the
  * official Playwright Docker image is listening, which `scripts/visual-tests` arranges: pixels
  * must come from the same browser on every machine to be compared. The accessibility pass
- * (`*.axe.ts`) only exists when `KARMANIA_AXE` is set, which `pnpm test:axe` does.
+ * (`*.axe.ts`) only exists when `KARMANIA_AXE` is set, which `pnpm test:axe` does, and the timings
+ * of the large files (`*.perf.ts`) when `KARMANIA_PERF` is, which `pnpm perf` does.
  */
 const visualBrowser = process.env['PW_VISUAL_WS'];
 // The accessibility pass over every state takes minutes, so it is a project of its own that exists
 // only when `pnpm test:axe` asks for it.
 const withAxe = process.env['KARMANIA_AXE'] !== undefined;
+// The timings of the large files need a quiet machine and the files of `scripts/generate-fixtures`, so
+// they are a project of their own too, that exists only when `pnpm perf` asks for it.
+const withPerf = process.env['KARMANIA_PERF'] !== undefined;
 // How that browser reaches this machine's web server.
 const visualHost = process.env['PW_VISUAL_HOST'] ?? 'host.docker.internal';
 
@@ -31,6 +35,15 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4174' },
   projects: [
     { name: 'chromium', testIgnore: '**/*.visual.ts', use: { ...devices['Desktop Chrome'] } },
+    ...(withPerf
+      ? [
+          {
+            name: 'performance',
+            testMatch: '**/*.perf.ts',
+            use: { ...devices['Desktop Chrome'] },
+          },
+        ]
+      : []),
     ...(withAxe
       ? [
           {

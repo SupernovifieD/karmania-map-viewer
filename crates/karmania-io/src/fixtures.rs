@@ -48,6 +48,9 @@ mod tests {
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
             .filter(|n| !n.starts_with('.'))
+            // The large files of `scripts/generate-fixtures` go here. They are not committed, and
+            // are there only on a machine that has run it.
+            .filter(|n| n != "generated")
             .collect();
         found.sort();
         let mut listed: Vec<String> = ALL.iter().map(|s| (*s).to_string()).collect();

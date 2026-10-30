@@ -1922,3 +1922,20 @@ was chosen, why.
   so the accessibility pass now shows the whole page (`128501e`). A row count of 10 million is crafted
   (a summary that says so, a preview that says so), not a file of 10 million rows; the table is tried with
   2,000,000 and 50,000,000 made-up rows and a real file of 400,000.
+- Step 10.3 (performance). `scripts/generate-fixtures` writes a 1,000,000-point CSV (45.4 MB) and a
+  4,000,000-cell ASCII grid (18.0 MB) into `fixtures/generated/`, which is not committed, from a fixed seed
+  (the points are the same file as the kernel's timing tests read). `pnpm perf` takes them through the real
+  wizard in a real browser, three times each in pages of their own, and measures the preview, the import
+  (and, from the bar's label at each frame, its stages), the load, the first rows of the table and a scroll
+  to its end, and the long tasks on the main thread (`e2e/performance.perf.ts`, a project of its own that
+  exists only when asked for, like the accessibility pass). The first versions of the measurement
+  were wrong in three ways that were caught by checking the instrument: it reported no long tasks because
+  the browser does not count a task that the developer tools run (so the self-check starts its block from
+  a timer, as the page's work is), the scroll waited for rows that were already drawn (it now waits for the
+  last row, with its values), and the heap figure was the same for both files (it is coarse, so it is
+  dropped). Everything is well inside the brief: a preview in at most 0.33 s of its 1 s, an import with
+  validation in at most 1.8 s of its 5 s, no main-thread task over 50 ms in the import, the load or the
+  scroll, and one of 51 ms in one of twelve previews, in a cold browser. No regression was found, so none
+  was mended. The import reads the file's bytes again after the preview has read them, which costs about
+  0.3 s for the CSV and is left, since it is well inside the limit. Memory in the browser, slower machines
+  and other browsers are not measured. The details are in `docs/perf.md`.
