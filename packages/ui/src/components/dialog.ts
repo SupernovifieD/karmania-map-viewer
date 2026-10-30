@@ -309,7 +309,7 @@ export class KDialog extends LitElement {
   override render() {
     return html`
       <dialog aria-labelledby="title" tabindex="-1" @close=${this.onNativeClose}>
-        <header>
+        <header role="none">
           <h2 id="title" data-truncate>${this.heading}</h2>
           <k-tooltip text="Close" class="close">
             <k-button

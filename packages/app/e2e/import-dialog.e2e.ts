@@ -1,3 +1,4 @@
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
@@ -262,6 +263,18 @@ test.describe('the import dialog', () => {
     expect(dialog.x + dialog.width).toBeLessThanOrEqual(1024 - 24);
     expect(dialog.y + dialog.height).toBeLessThanOrEqual(640 - 24);
     await assertNoOverflow(parts(page).dialog);
+  });
+
+  test('is not a second banner landmark beside the toolbar, with the page behind it still there', async ({
+    page,
+  }) => {
+    await open(page);
+    // The heading row of a dialog is not what the page is headed by: the toolbar is the one banner.
+    const results = await new AxeBuilder({ page })
+      .withRules(['landmark-no-duplicate-banner', 'landmark-unique'])
+      .analyze();
+    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+    await expect(parts(page).host.locator('dialog header')).toHaveAttribute('role', 'none');
   });
 
   for (const theme of ['light', 'dark'] as const) {
