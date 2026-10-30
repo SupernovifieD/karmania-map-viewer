@@ -1979,3 +1979,7 @@ was chosen, why.
   core kept busy. The failed run kept nothing to look at, and the cause was not found. It is
   recorded as an unexplained failure that has not come back, not as fixed; if it does, the first
   thing to do is to keep the test results of a failed CI run.
+- Releases (0.1.0, asked for by the owner). The version is set in the manifests, the Rust workspace and the
+  three packages with `Cargo.lock`, in a commit of its own. The notes of a release are its entry in
+  `CHANGELOG.md`, and the release on GitHub is made from that entry, copied from the file, so the two are
+  never different. The tag is made on the commit that holds the entry, once CI has passed on it.
