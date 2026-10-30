@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Writes the large files that the performance measurements read, into fixtures/generated/, which
+# is not committed:
+#
+#   points-1m.csv   1,000,000 points with X, Y, Z and five attributes (about 45 MB)
+#   grid-4m.asc     an ESRI ASCII grid of 2,000 x 2,000 cells, 4,000,000 in all (about 18 MB)
+#   *.prj           the projection of each, EPSG:32640, so that the wizard has nothing to ask
+#
+# They are made from a fixed seed, so every run writes the same files. A file that is there is
+# left alone; pass --force to write them again.
+#
+#   scripts/generate-fixtures [--force]
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec node "$root/scripts/generate-fixtures.mjs" "$@"
