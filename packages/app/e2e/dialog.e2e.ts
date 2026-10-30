@@ -189,6 +189,130 @@ test.describe('the dialog', () => {
     expect(await page.evaluate(() => window.scrollY)).toBe(pageScroll);
   });
 
+  test.describe('its body, when it scrolls', () => {
+    /** Makes a dialog in the page with `body` in it, opens it, and says what its body is to the keyboard. */
+    async function bodyOf(
+      page: Page,
+      body: string,
+    ): Promise<{ tabindex: string | null; role: string | null; name: string | null }> {
+      await page.evaluate((html) => {
+        document.querySelector('#made')?.remove();
+        const dialog = document.createElement('k-dialog') as HTMLElement & { open: boolean };
+        dialog.id = 'made';
+        dialog.setAttribute('heading', 'A made dialog');
+        dialog.innerHTML = `${html}<k-button slot="footer-end" variant="primary">Load</k-button>`;
+        document.body.append(dialog);
+        dialog.open = true;
+      }, body);
+      const dialog = page.locator('#made dialog');
+      await expect(dialog).toBeVisible();
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => {
+              requestAnimationFrame(resolve);
+            }),
+          ),
+      );
+      return page.locator('#made .body').evaluate((element) => ({
+        tabindex: element.getAttribute('tabindex'),
+        role: element.getAttribute('role'),
+        name: element.getAttribute('aria-labelledby'),
+      }));
+    }
+
+    const TALL = Array.from(
+      { length: 60 },
+      (_, index) => `<p>Line ${String(index + 1)} of a long text.</p>`,
+    ).join('');
+
+    test.beforeEach(async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto('/gallery.html');
+    });
+
+    test('is a stop for the keyboard, with the dialog name, when it holds only text', async ({
+      page,
+    }) => {
+      const p = parts(page, 'dialog-long');
+      await p.trigger.click();
+      await expect(p.body).toHaveAttribute('tabindex', '0');
+      await expect(p.body).toHaveAttribute('role', 'region');
+      await expect(p.body).toHaveAccessibleName(/^A title that is a good deal longer/);
+      // Tab goes from the close button to it, and the arrow keys scroll it.
+      await page.keyboard.press('Shift');
+      await p.close.locator('button').focus();
+      await page.keyboard.press('Tab');
+      await expect(p.body).toBeFocused();
+      await page.keyboard.press('PageDown');
+      await expect.poll(() => p.body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+      // The ring is drawn inside the body: the dialog clips what is outside it.
+      const ring = await p.body.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [style.outlineStyle, style.outlineWidth, style.outlineOffset];
+      });
+      expect(ring).toEqual(['solid', '2px', '-2px']);
+      await page.keyboard.press('Tab');
+      await expect(p.start.locator('button')).toBeFocused();
+    });
+
+    test('is left as it is when it holds a control, though it scrolls', async ({ page }) => {
+      const found = await bodyOf(page, `<k-button>A control</k-button>${TALL}`);
+      expect(found).toEqual({ tabindex: null, role: null, name: null });
+    });
+
+    test('is left as it is when the control is in an element that has a tree of its own', async ({
+      page,
+    }) => {
+      await page.evaluate(() => {
+        if (!customElements.get('x-holder')) {
+          customElements.define(
+            'x-holder',
+            class extends HTMLElement {
+              constructor() {
+                super();
+                this.attachShadow({ mode: 'open' }).innerHTML = '<input aria-label="Inside">';
+              }
+            },
+          );
+        }
+      });
+      const found = await bodyOf(page, `<x-holder></x-holder>${TALL}`);
+      expect(found).toEqual({ tabindex: null, role: null, name: null });
+    });
+
+    test('is not a stop for the keyboard because of the controls in the footer', async ({
+      page,
+    }) => {
+      // The footer has a button (the one `bodyOf` makes), and the body has only text: the body is the stop.
+      const found = await bodyOf(page, TALL);
+      expect(found).toEqual({ tabindex: '0', role: 'region', name: 'title' });
+    });
+
+    test('is left as it is when it holds only text and does not scroll', async ({ page }) => {
+      const found = await bodyOf(page, '<p>Not much.</p>');
+      expect(found).toEqual({ tabindex: null, role: null, name: null });
+    });
+
+    test('becomes a stop when what is in it grows past its room, and stops being one when it shrinks', async ({
+      page,
+    }) => {
+      await bodyOf(page, '<p>Not much.</p>');
+      const body = page.locator('#made .body');
+      await expect(body).not.toHaveAttribute('tabindex', /.*/);
+      await page.locator('#made').evaluate((dialog, html) => {
+        dialog.insertAdjacentHTML('afterbegin', html);
+      }, TALL);
+      await expect(body).toHaveAttribute('tabindex', '0');
+      await page.evaluate(() => {
+        for (const paragraph of document.querySelectorAll('#made > p:nth-child(n+3)')) {
+          paragraph.remove();
+        }
+      });
+      await expect(body).not.toHaveAttribute('tabindex', /.*/);
+    });
+  });
+
   test('keeps a long title to one line with an ellipsis, and the close button in place', async ({
     page,
   }) => {

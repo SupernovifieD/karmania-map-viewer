@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import type { PropertyValues } from 'lit';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
@@ -7,6 +8,29 @@ import './tooltip.js';
 
 /** The name of the event a dialog sends when a person closes it, with Esc or its close button. */
 export const DIALOG_CLOSE = 'k-dialog-close';
+
+/** What the keyboard can be put on: the controls a person would Tab to. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Whether `element`, or anything in it, can have the keyboard, looking inside the elements that have
+ * a tree of their own as well (the controls of a form are often in one).
+ */
+function holdsFocusable(element: Element): boolean {
+  if (element.matches(FOCUSABLE)) {
+    return true;
+  }
+  const roots: ParentNode[] =
+    element.shadowRoot === null ? [element] : [element, element.shadowRoot];
+  return roots.some(
+    (root) =>
+      root.querySelector(FOCUSABLE) !== null ||
+      [...root.querySelectorAll('*')].some(
+        (inner) => inner.shadowRoot !== null && holdsFocusable(inner),
+      ),
+  );
+}
 
 /**
  * A modal dialog, centred in the window over a dimmed page:
@@ -31,7 +55,9 @@ export const DIALOG_CLOSE = 'k-dialog-close';
  * itself, which a screen reader announces by name, and the first Tab goes to its first control. It is open while `open` is set. When a person
  * closes it (Esc, or the close button), it sets `open` to false and sends `k-dialog-close`;
  * closing it by setting `open` sends nothing. Clicking outside it does not close it: what a
- * dialog holds is often work that would be lost. A dialog is as tall as what is in it, up to its
+ * dialog holds is often work that would be lost. A body that scrolls and has nothing in it that the
+ * keyboard can be put on (text only) is a stop for the keyboard itself, with the dialog's name, so
+ * that it can be scrolled without a pointer; one that has controls in it is left as it is. A dialog is as tall as what is in it, up to its
  * limit; with `fill` it is as tall as it can be whatever is in it, which suits one whose content
  * changes (a wizard), since its buttons then stay where they are.
  */
@@ -41,6 +67,7 @@ export class KDialog extends LitElement {
     open: { type: Boolean, reflect: true },
     fill: { type: Boolean, reflect: true },
     hasSteps: { state: true },
+    scrollsAlone: { state: true },
   };
 
   static override styles = [
@@ -84,6 +111,11 @@ export class KDialog extends LitElement {
 
       dialog::backdrop {
         background: color-mix(in srgb, var(--k-scrim) 40%, transparent);
+      }
+
+      /* The ring is drawn inside: the dialog clips what is outside it. */
+      .body:focus-visible {
+        outline-offset: calc(var(--k-focus-width) * -1);
       }
 
       header {
@@ -171,6 +203,10 @@ export class KDialog extends LitElement {
   declare fill: boolean;
   /** Whether anything is in the `steps` slot. */
   declare private hasSteps: boolean;
+  /** Whether the body scrolls and has nothing in it for the keyboard, so that it is a stop itself. */
+  declare private scrollsAlone: boolean;
+  private bodyObserver: ResizeObserver | undefined;
+  private bodyCheck = 0;
 
   constructor() {
     super();
@@ -178,10 +214,53 @@ export class KDialog extends LitElement {
     this.open = false;
     this.fill = false;
     this.hasSteps = false;
+    this.scrollsAlone = false;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.bodyObserver?.disconnect();
+    this.bodyObserver = undefined;
+    cancelAnimationFrame(this.bodyCheck);
+  }
+
+  /** Looks again, at the next frame, at whether the body scrolls with nothing in it for the keyboard. */
+  private readonly checkBody = (): void => {
+    cancelAnimationFrame(this.bodyCheck);
+    this.bodyCheck = requestAnimationFrame(() => {
+      const body = this.renderRoot.querySelector<HTMLElement>('.body');
+      if (body === null) {
+        return;
+      }
+      const scrolls = body.scrollHeight > body.clientHeight + 1;
+      // Only what is in the body counts: the controls in the footer are no help to someone who is
+      // reading it.
+      const inBody = body.querySelector('slot')?.assignedElements({ flatten: true }) ?? [];
+      this.scrollsAlone = scrolls && !inBody.some(holdsFocusable);
+    });
+  };
+
+  /** Watches the body, and what is in it, for a change in size, since either decides whether it scrolls. */
+  private watchBody(): void {
+    const body = this.renderRoot.querySelector<HTMLElement>('.body');
+    if (body === null) {
+      return;
+    }
+    this.bodyObserver ??= new ResizeObserver(this.checkBody);
+    this.bodyObserver.disconnect();
+    this.bodyObserver.observe(body);
+    for (const element of this.children) {
+      this.bodyObserver.observe(element);
+    }
+    this.checkBody();
   }
 
   private get dialog(): HTMLDialogElement | null {
     return this.renderRoot.querySelector('dialog');
+  }
+
+  protected override firstUpdated(): void {
+    this.watchBody();
   }
 
   protected override updated(changed: PropertyValues<this>): void {
@@ -218,6 +297,10 @@ export class KDialog extends LitElement {
     this.dialog?.close();
   };
 
+  private readonly onBodyChange = (): void => {
+    this.watchBody();
+  };
+
   private readonly onStepsChange = (event: Event): void => {
     const slot = event.target as HTMLSlotElement;
     this.hasSteps = slot.assignedNodes().length > 0;
@@ -240,7 +323,15 @@ export class KDialog extends LitElement {
         <div class="steps ${this.hasSteps ? 'filled' : ''}">
           <slot name="steps" @slotchange=${this.onStepsChange}></slot>
         </div>
-        <div class="body" data-scroll-region><slot></slot></div>
+        <div
+          class="body"
+          data-scroll-region
+          role=${ifDefined(this.scrollsAlone ? 'region' : undefined)}
+          aria-labelledby=${ifDefined(this.scrollsAlone ? 'title' : undefined)}
+          tabindex=${ifDefined(this.scrollsAlone ? '0' : undefined)}
+        >
+          <slot @slotchange=${this.onBodyChange}></slot>
+        </div>
         <footer>
           <slot name="footer-start"></slot>
           <div class="note"><slot name="footer-note"></slot></div>
