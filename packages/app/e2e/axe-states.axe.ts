@@ -16,6 +16,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { PATH as DATA_TAB_PATH, SHOTS as DATA_TAB } from './states/data-tab.js';
 import { PATH as GALLERY_PATH, SHOTS as GALLERY } from './states/gallery.js';
+import { PATH as LONG_PATH, SHOTS as LONG } from './states/long-content.js';
 import { PATH as SHELL_PATH, SHOTS as SHELL } from './states/shell.js';
 import { PATH as WIZARD_PATH, SHOTS as WIZARD } from './states/wizard.js';
 import { THEMES, VIEWPORTS } from './support/layouts.js';
@@ -111,6 +112,7 @@ const APP: readonly (readonly [string, string, readonly Shot[]])[] = [
   ['shell', SHELL_PATH, SHELL],
   ['wizard', WIZARD_PATH, WIZARD],
   ['data tab', DATA_TAB_PATH, DATA_TAB],
+  ['long content', LONG_PATH, LONG],
 ];
 
 for (const [group, path, shots] of APP) {
@@ -126,6 +128,11 @@ for (const [group, path, shots] of APP) {
           await page.goto(`${path}?theme=${theme}`);
           await page.evaluate(() => document.fonts.ready);
           await shot.show(page);
+          // A state may hide the app behind a dialog so that its photograph is of the dialog alone.
+          // A person has the whole page, with the app still in it, and so does axe.
+          await page.locator('karmania-app').evaluate((element) => {
+            element.style.visibility = '';
+          });
           found.push(
             ...(await check(page, {
               state: shot.name,
