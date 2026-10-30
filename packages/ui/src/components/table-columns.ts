@@ -47,11 +47,6 @@ export function textWidth(
   return digits * digitWidth + (rest.length === 0 ? 0 : measure(rest));
 }
 
-/** Whether text that is `width` wide does not fit in a column that is `columnWidth` wide. */
-export function isCut(width: number, column: number): boolean {
-  return Math.ceil(width) > column - CELL_PADDING;
-}
-
 /**
  * How far to scroll sideways for a column to be in view, `scrollLeft` being how far it is. The
  * row numbers stay at the left, `stuck` wide, and cover what is scrolled under them, so the column has
