@@ -423,7 +423,7 @@ Definitions and reprojection can be added later, with the features that need the
 
 ## M10: Hardening
 
-- [ ] 10.1 axe pass across every state; fix each issue in its own commit.
+- [x] 10.1 axe pass across every state; fix each issue in its own commit.
 - [ ] 10.2 Long-content pass: the inputs from section 7.3 in every component;
   fix each issue in its own commit.
 - [ ] 10.3 Performance: `scripts/generate-fixtures` (not committed output) for a

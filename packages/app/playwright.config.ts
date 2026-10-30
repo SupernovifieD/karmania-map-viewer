@@ -1,12 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Two kinds of test. The ordinary ones (`*.e2e.ts`) run in the browser Playwright installed.
+ * Three kinds of test. The ordinary ones (`*.e2e.ts`) run in the browser Playwright installed.
  * The screenshot tests (`*.visual.ts`) only exist when `PW_VISUAL_WS` says where a browser in the
  * official Playwright Docker image is listening, which `scripts/visual-tests` arranges: pixels
- * must come from the same browser on every machine to be compared.
+ * must come from the same browser on every machine to be compared. The accessibility pass
+ * (`*.axe.ts`) only exists when `KARMANIA_AXE` is set, which `pnpm test:axe` does.
  */
 const visualBrowser = process.env['PW_VISUAL_WS'];
+// The accessibility pass over every state takes minutes, so it is a project of its own that exists
+// only when `pnpm test:axe` asks for it.
+const withAxe = process.env['KARMANIA_AXE'] !== undefined;
 // How that browser reaches this machine's web server.
 const visualHost = process.env['PW_VISUAL_HOST'] ?? 'host.docker.internal';
 
@@ -27,6 +31,15 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4174' },
   projects: [
     { name: 'chromium', testIgnore: '**/*.visual.ts', use: { ...devices['Desktop Chrome'] } },
+    ...(withAxe
+      ? [
+          {
+            name: 'accessibility',
+            testMatch: '**/*.axe.ts',
+            use: { ...devices['Desktop Chrome'] },
+          },
+        ]
+      : []),
     ...(visualBrowser === undefined
       ? []
       : [

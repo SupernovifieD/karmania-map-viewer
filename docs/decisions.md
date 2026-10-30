@@ -1879,3 +1879,23 @@ was chosen, why.
   a summary and the two lists under it leave the table less than its minimum, so the panel scrolls
   and the table is partly below the fold: that is the minimum at work, not a fault. Nothing in the
   six states is left that is believed wrong.
+
+## M10: hardening
+
+- Step 10.1 (axe over every state). The states that are photographed are shared by the screenshot
+  tests and an accessibility pass (`e2e/states/`, `e2e/axe-states.axe.ts`), so that "every state" is one
+  list: 89 states, each in both themes, and the app's at the smallest window too, where the panel and the
+  dialog scroll. Nothing is let through: a violation of any impact fails, and says the rule, where, the
+  theme and the window. A state of the gallery is checked in its own section, since the whole page
+  takes ten seconds and a section one, and the page as a whole is checked once in each theme. It is a
+  Playwright project of its own, run by `pnpm test:axe` and in a CI job of its own beside the others,
+  not in `pnpm test:e2e`, because it takes five minutes. The first pass found five things, each mended
+  in its own commit and each with a test that fails without it: the gallery page had no main
+  landmark and its content was outside any (`20f00fe`), its scrolling demo panel held only text and
+  could not be reached by keyboard (`af70d3f`), a dialog body that scrolls and holds only text
+  could not be scrolled by keyboard and is now a stop, named after the dialog, only when it needs to
+  be (`aa85163`), the panel's resize handle sat between the map and the panel outside any landmark and is
+  now inside the side panel (`d155442`), and the warnings in the Data tab's summary were `h4` under the
+  page's `h1` (`39eb933`). axe checks what a machine can; reading order, what a screen reader says
+  and whether the words are the right words are not checked by it, and were not tried with a
+  screen reader.

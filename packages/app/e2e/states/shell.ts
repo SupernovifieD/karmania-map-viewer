@@ -1,7 +1,8 @@
 /**
  * The states of the whole app that look different (the panel open, folded away, a file being
  * dragged over, and so on), each with what to do to the page to put it in that state. The
- * screenshot tests photograph them (`shell.visual.ts`).
+ * screenshot tests photograph them (`shell.visual.ts`) and the accessibility pass checks them
+ * (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
 import type { Shot } from '../support/screenshots.js';

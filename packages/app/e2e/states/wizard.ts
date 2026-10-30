@@ -1,7 +1,8 @@
 /**
  * The import wizard in each of its steps, and in the states that look different (an error, a
  * warning, nothing found, a failure), each with what to do to the page to put it in that state. The
- * screenshot tests photograph them (`wizard.visual.ts`).
+ * screenshot tests photograph them (`wizard.visual.ts`) and the accessibility pass checks them
+ * (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
 import { pickFiles } from '../support/picker.js';
