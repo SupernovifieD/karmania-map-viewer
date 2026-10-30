@@ -196,7 +196,7 @@ fn check_roles(mapping: &ImportMapping, findings: &mut Findings) {
                             t.as_str()
                         ),
                     )
-                    .with_hint("Set the column's type to float or int, or choose another column.")
+                    .with_hint("Set the column's type to Float or Integer, or choose another column.")
                     .at(Location::default().with_column(&column.source)),
                 );
             }

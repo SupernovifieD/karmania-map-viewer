@@ -134,10 +134,13 @@ impl Coords {
                 )
                 .with_hint("Give every position an elevation, or none."),
             ),
-            extra: Tally::new(Finding::new(
-                FindingCode::GeojsonPositionExtraValues,
-                "Some positions have more than three values (such as a measure); only the first three were used.",
-            )),
+            extra: Tally::new(
+                Finding::new(
+                    FindingCode::GeojsonPositionExtraValues,
+                    "Some positions have more than three values (such as a measure); only the first three were used.",
+                )
+                .with_hint("Only X, Y and elevation are used. Nothing needs fixing."),
+            ),
         }
     }
 

@@ -488,6 +488,9 @@ impl<'a> CsvImport<'a> {
                         Finding::new(
                             FindingCode::CsvLinesScattered,
                             "The rows of some lines are not next to each other in the file; they were gathered by line identifier.",
+                        )
+                        .with_hint(
+                            "Nothing needs fixing. Sort the file by line identifier if you want the rows in order.",
                         ),
                     ),
                     missing_id: Tally::new(
@@ -540,7 +543,9 @@ impl<'a> CsvImport<'a> {
                         header.len()
                     ),
                 )
-                .with_hint("Check the delimiter, and the file for stray line breaks and quotes."),
+                .with_hint(
+                    "Check that the right separator (comma, semicolon or tab) was chosen, and look in the file for stray line breaks and quotation marks.",
+                ),
             ),
             skipped: Tally::new(
                 Finding::new(

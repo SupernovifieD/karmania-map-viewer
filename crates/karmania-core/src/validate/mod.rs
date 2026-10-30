@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn a_report_is_loadable_only_without_errors() {
         let mut errors = Findings::new();
-        errors.add(Finding::new(FindingCode::DatasetTooLarge, "m"));
+        errors.add(Finding::new(FindingCode::DatasetTooLarge, "m").with_hint("A hint."));
         let bad = ValidationReport {
             groups: vec![group("structure", Findings::new()), group("values", errors)],
         };

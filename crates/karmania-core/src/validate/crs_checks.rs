@@ -77,7 +77,7 @@ fn check_geographic_range(dataset: &Dataset, findings: &mut Findings) {
             "Some coordinates are not valid longitudes and latitudes: X runs from {min_x} to {max_x} and Y from {min_y} to {max_y}, but longitude must be between -180 and 360 and latitude between -90 and 90."
         ),
     )
-    .with_hint("Check the coordinate system. Values this large usually belong to a projected system such as UTM.");
+    .with_hint("Check the coordinate system. Values this large are usually in metres, as in UTM, and not in degrees.");
     // A grid or a block model has no positions to count; it is judged by its extent
     // alone, as one occurrence.
     if let Some(positions) = dataset.geometry.positions() {
@@ -108,7 +108,7 @@ fn check_present(dataset: &Dataset, findings: &mut Findings) {
                 FindingCode::CrsMissing,
                 "The coordinate reference system is missing, so the positions have no meaning on the Earth.",
             )
-            .with_hint("Choose an EPSG code, or choose a local grid and its units."),
+            .with_hint("Choose a coordinate system by its EPSG code (a number such as 32640), or choose a local grid and its units."),
         );
     }
 }
@@ -134,7 +134,9 @@ mod tests {
         assert_eq!(one.severity, crate::findings::Severity::Error);
         assert_eq!(
             one.hint.as_deref(),
-            Some("Choose an EPSG code, or choose a local grid and its units.")
+            Some(
+                "Choose a coordinate system by its EPSG code (a number such as 32640), or choose a local grid and its units."
+            )
         );
     }
 

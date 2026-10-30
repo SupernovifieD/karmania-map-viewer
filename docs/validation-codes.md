@@ -4,9 +4,15 @@ Every finding code, with its severity, the wizard step that can fix it, its
 message template, its hint and an example. Codes are stable: never rename one or
 change its meaning; add a new code instead. Sections are sorted by code.
 
-A unit test in `karmania-core` fails if a registered code is missing here, if its
-severity or step disagrees with the registry, or if this file lists a code that
-is not registered. In message templates, `{name}` marks a value filled in at
+Every finding says what the person can do about it, as a hint: even a note that needs
+nothing done says so. A test fails if a finding is made without one. The codes whose
+step is `none` are for datasets that a program builds from arrays; a person importing a
+file meets the others. A unit test in `karmania-core` fails if a registered code is
+missing here, if its severity or step disagrees with the registry, if its hint is
+missing, says "none", or is not a sentence of some length, if a message or a hint is too
+long, or (for the codes a person with a file can meet) uses a word a reader should not
+have to know (NaN, delimiter, and the like), or if this file lists a code that is not
+registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
 ## `asc.header.invalid`
@@ -38,7 +44,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: nodata
 - Message: Some cells have no data, so they were left empty.
-- Hint: none
+- Hint: This is normal for a grid with gaps. If more cells are empty than you expected, check the no-data value.
 - Example: Some cells have no data, so they were left empty.
 
 ## `asc.values.unreadable`
@@ -86,7 +92,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: crs
 - Message: Some coordinates are not valid longitudes and latitudes: X runs from {min_x} to {max_x} and Y from {min_y} to {max_y}, but longitude must be between -180 and 360 and latitude between -90 and 90.
-- Hint: Check the coordinate system. Values this large usually belong to a projected system such as UTM.
+- Hint: Check the coordinate system. Values this large are usually in metres, as in UTM, and not in degrees.
 - Example: Some coordinates are not valid longitudes and latitudes: X runs from 500000 to 510000 and Y from 2800000 to 2810000, but longitude must be between -180 and 360 and latitude between -90 and 90.
 
 ## `crs.missing`
@@ -94,7 +100,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: error
 - Step: crs
 - Message: The coordinate reference system is missing, so the positions have no meaning on the Earth.
-- Hint: Choose an EPSG code, or choose a local grid and its units.
+- Hint: Choose a coordinate system by its EPSG code (a number such as 32640), or choose a local grid and its units.
 - Example: The coordinate reference system is missing, so the positions have no meaning on the Earth.
 
 ## `csv.blocks.duplicate`
@@ -150,7 +156,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: The rows of some lines are not next to each other in the file; they were gathered by line identifier.
-- Hint: none
+- Hint: Nothing needs fixing. Sort the file by line identifier if you want the rows in order.
 - Example: The rows of some lines are not next to each other in the file; they were gathered by line identifier.
 
 ## `csv.rows.ragged`
@@ -158,7 +164,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: file
 - Message: Some rows have a different number of values from the header ({count}); missing values were left empty and extra ones ignored.
-- Hint: Check the delimiter, and the file for stray line breaks and quotes.
+- Hint: Check that the right separator (comma, semicolon or tab) was chosen, and look in the file for stray line breaks and quotation marks.
 - Example: Some rows have a different number of values from the header (6); missing values were left empty and extra ones ignored.
 
 ## `csv.rows.skipped`
@@ -262,7 +268,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: file
 - Message: The file name ends in .{extension}, but the content looks like {format}, so it was treated as {format}.
-- Hint: none
+- Hint: Nothing needs fixing. Give the file the ending that matches its content to avoid this note.
 - Example: The file name ends in .csv, but the content looks like an ESRI ASCII grid, so it was treated as an ESRI ASCII grid.
 
 ## `file.format.unrecognized`
@@ -342,7 +348,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: The file holds {kinds}, so it was imported as {n} datasets, one for each.
-- Hint: none
+- Hint: Each kind is its own dataset. Remove the ones you do not need in the Data tab.
 - Example: The file holds points, lines and polygons, so it was imported as 3 datasets, one for each.
 
 ## `geojson.position.extra_values`
@@ -350,7 +356,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: Some positions have more than three values (such as a measure); only the first three were used.
-- Hint: none
+- Hint: Only X, Y and elevation are used. Nothing needs fixing.
 - Example: Some positions have more than three values (such as a measure); only the first three were used.
 
 ## `geojson.property.as_text`
@@ -510,7 +516,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: error
 - Step: mapping
 - Message: The column "{name}" is set as {X, Y or Z} but its type is {type}; coordinates must be numbers.
-- Hint: Set the column's type to float or int, or choose another column.
+- Hint: Set the column's type to Float or Integer, or choose another column.
 - Example: The column "E" is set as X (easting or longitude) but its type is text; coordinates must be numbers.
 
 ## `mapping.kind.unsupported`
@@ -582,7 +588,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: Some vertices are not used by any triangle.
-- Hint: none
+- Hint: They do no harm. Remove them if you do not need them.
 - Example: Some vertices are not used by any triangle.
 
 ## `obj.face.invalid`
@@ -598,7 +604,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: Some faces have more than three corners; they were split into triangles.
-- Hint: none
+- Hint: Nothing needs fixing: a mesh is made of triangles.
 - Example: Some faces have more than three corners; they were split into triangles.
 
 ## `obj.mesh.empty`
@@ -622,7 +628,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: info
 - Step: none
 - Message: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
-- Hint: none
+- Hint: Only X, Y and Z are used. Nothing needs fixing.
 - Example: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
 
 ## `obj.vertex.invalid`
@@ -765,9 +771,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
+- Message: Some coordinates are not valid numbers (empty, not a number, or infinite), so those positions cannot be placed on a map.
 - Hint: Fix or remove those rows.
-- Example: Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.
+- Example: Some coordinates are not valid numbers (empty, not a number, or infinite), so those positions cannot be placed on a map.
 
 ## `values.coordinates.very_large`
 

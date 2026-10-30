@@ -32,7 +32,7 @@
           "code": "crs.missing",
           "severity": "error",
           "message": "The coordinate reference system is missing, so the positions have no meaning on the Earth.",
-          "hint": "Choose an EPSG code, or choose a local grid and its units.",
+          "hint": "Choose a coordinate system by its EPSG code (a number such as 32640), or choose a local grid and its units.",
           "count": 1,
           "examples": [],
           "step": "crs"

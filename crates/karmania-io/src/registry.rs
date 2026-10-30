@@ -168,7 +168,7 @@ mod tests {
 
     fn context(message: &str) -> Findings {
         let mut findings = Findings::new();
-        findings.add(Finding::new(FindingCode::CsvRowsSkipped, message));
+        findings.add(Finding::new(FindingCode::CsvRowsSkipped, message).with_hint("A hint."));
         findings
     }
 
@@ -248,7 +248,7 @@ mod tests {
     fn an_error_in_the_context_blocks_even_a_valid_dataset() {
         let mut registry = Registry::new();
         let mut findings = Findings::new();
-        findings.add(Finding::new(FindingCode::FileEmpty, "Nothing in it."));
+        findings.add(Finding::new(FindingCode::FileEmpty, "Nothing in it.").with_hint("A hint."));
         let result = registry.load(vec![good("A")], findings);
         assert!(matches!(result, LoadResult::Blocked { .. }));
         assert!(registry.is_empty());

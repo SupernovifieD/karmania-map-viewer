@@ -40,6 +40,7 @@
           "code": "mesh.vertices.unused",
           "severity": "info",
           "message": "Some vertices are not used by any triangle.",
+          "hint": "They do no harm. Remove them if you do not need them.",
           "count": 1,
           "examples": [
             {

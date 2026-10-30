@@ -169,7 +169,8 @@ fn check_mesh_triangles(dataset: &Dataset, findings: &mut Findings) {
     let mut unused = Finding::new(
         FindingCode::MeshVerticesUnused,
         "Some vertices are not used by any triangle.",
-    );
+    )
+    .with_hint("They do no harm. Remove them if you do not need them.");
     unused.count = 0;
     for vertex in 0..vertices {
         let is_used = used

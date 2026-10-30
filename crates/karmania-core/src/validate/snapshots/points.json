@@ -19,7 +19,7 @@
         {
           "code": "values.coordinates.not_finite",
           "severity": "error",
-          "message": "Some coordinates are not valid numbers (empty, NaN or infinite), so those positions cannot be placed on a map.",
+          "message": "Some coordinates are not valid numbers (empty, not a number, or infinite), so those positions cannot be placed on a map.",
           "hint": "Fix or remove those rows.",
           "count": 1,
           "examples": [
@@ -74,7 +74,7 @@
           "code": "crs.geographic.out_of_range",
           "severity": "warning",
           "message": "Some coordinates are not valid longitudes and latitudes: X runs from 10 to 200000000 and Y from 1 to 95, but longitude must be between -180 and 360 and latitude between -90 and 90.",
-          "hint": "Check the coordinate system. Values this large usually belong to a projected system such as UTM.",
+          "hint": "Check the coordinate system. Values this large are usually in metres, as in UTM, and not in degrees.",
           "count": 2,
           "examples": [
             {

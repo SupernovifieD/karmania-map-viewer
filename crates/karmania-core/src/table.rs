@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn every_problem_is_reported_and_earlier_findings_are_kept() {
         let mut findings = Findings::new();
-        findings.add(Finding::new(FindingCode::DatasetTooLarge, "earlier"));
+        findings.add(Finding::new(FindingCode::DatasetTooLarge, "earlier").with_hint("A hint."));
         let columns = vec![floats("a", 2), floats("a", 3), floats("", 2)];
         assert!(Table::from_columns(columns, &mut findings).is_none());
         let codes: Vec<_> = findings.iter().map(|f| f.code.as_str()).collect();

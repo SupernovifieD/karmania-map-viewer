@@ -347,6 +347,57 @@ mod tests {
         }
     }
 
+    /// Words a person importing a file should not have to know, which have plainer ones.
+    const NOT_PLAIN: [&str; 8] = [
+        "NaN",
+        "delimiter",
+        "kernel",
+        "u32",
+        "i32",
+        "f64",
+        "WKT",
+        "projected system",
+    ];
+
+    #[test]
+    fn every_hint_is_a_sentence_and_every_text_is_plain_and_short() {
+        for entry in parse_docs(DOCS) {
+            let name = &entry.code;
+            // A hint is never left out: a note that needs nothing done says that.
+            assert!(
+                !entry.hint.eq_ignore_ascii_case("none"),
+                "{name}: the hint says none"
+            );
+            assert!(
+                entry.hint.split_whitespace().count() >= 4,
+                "{name}: the hint is too short to say anything: {}",
+                entry.hint
+            );
+            assert!(
+                entry.hint.ends_with('.') || entry.hint.ends_with(')'),
+                "{name}: the hint is not a sentence: {}",
+                entry.hint
+            );
+            let words = |text: &str| text.split_whitespace().count();
+            assert!(
+                words(&entry.message) <= 40,
+                "{name}: the message is too long"
+            );
+            assert!(words(&entry.hint) <= 35, "{name}: the hint is too long");
+            // The codes with no wizard step are for datasets that a program builds, and say `NaN` to
+            // someone who knows what it is: the others are met by a person with a file.
+            let for_a_person = entry.step != "none";
+            for text in [&entry.message, &entry.hint, &entry.example] {
+                for word in NOT_PLAIN.iter().filter(|_| for_a_person) {
+                    assert!(
+                        !text.contains(word),
+                        "{name}: uses \"{word}\", which a reader should not have to know: {text}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn the_docs_list_no_code_that_is_not_registered_and_are_sorted() {
         let docs = parse_docs(DOCS);

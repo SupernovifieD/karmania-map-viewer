@@ -219,7 +219,25 @@ impl Findings {
     /// Adds a finding, merging it into an earlier one with the same code and
     /// message. A count of 0 is treated as 1. When merged, a missing hint is
     /// filled in from the new finding.
-    pub fn add(&mut self, mut finding: Finding) {
+    pub fn add(&mut self, finding: Finding) {
+        // Every finding tells the person what they can do about it, whatever its severity: a test that
+        // makes one without a hint fails, so no code is added or changed without one.
+        debug_assert!(
+            finding.hint.is_some(),
+            "the finding {} has no hint",
+            finding.code.as_str()
+        );
+        self.insert(finding);
+    }
+
+    /// Adds a finding as [`Findings::add`] does, without asking for a hint: for the tests of how
+    /// findings merge, which are about the rest of a finding.
+    #[cfg(test)]
+    fn add_without_asking_for_a_hint(&mut self, finding: Finding) {
+        self.insert(finding);
+    }
+
+    fn insert(&mut self, mut finding: Finding) {
         finding.count = finding.count.max(1);
         let key = (finding.code, finding.message.clone());
         let Some(&at) = self.index.get(&key) else {
@@ -244,7 +262,7 @@ impl Findings {
     /// Adds every finding of `other`, in its order, merging repeats.
     pub fn extend(&mut self, other: Findings) {
         for finding in other.items {
-            self.add(finding);
+            self.insert(finding);
         }
     }
 
@@ -412,7 +430,7 @@ mod tests {
     fn repeats_merge_into_one_finding_with_a_count() {
         let mut all = Findings::new();
         for row in [4, 9, 11] {
-            all.add(at_row(EMPTY, "Empty name.", row));
+            all.add_without_asking_for_a_hint(at_row(EMPTY, "Empty name.", row));
         }
         assert_eq!(all.len(), 1);
         let f = &all.as_slice()[0];
@@ -425,7 +443,7 @@ mod tests {
     fn examples_stay_capped_across_merges() {
         let mut all = Findings::new();
         for row in 0..50 {
-            all.add(at_row(EMPTY, "Empty name.", row));
+            all.add_without_asking_for_a_hint(at_row(EMPTY, "Empty name.", row));
         }
         let f = &all.as_slice()[0];
         assert_eq!(f.count, 50);
@@ -436,10 +454,10 @@ mod tests {
     #[test]
     fn different_code_or_message_stays_separate_in_first_seen_order() {
         let mut all = Findings::new();
-        all.add(at_row(DUPLICATE, "Same.", 0));
-        all.add(at_row(EMPTY, "Same.", 1));
-        all.add(at_row(DUPLICATE, "Other message.", 2));
-        all.add(at_row(DUPLICATE, "Same.", 3));
+        all.add_without_asking_for_a_hint(at_row(DUPLICATE, "Same.", 0));
+        all.add_without_asking_for_a_hint(at_row(EMPTY, "Same.", 1));
+        all.add_without_asking_for_a_hint(at_row(DUPLICATE, "Other message.", 2));
+        all.add_without_asking_for_a_hint(at_row(DUPLICATE, "Same.", 3));
         let order: Vec<_> = all
             .iter()
             .map(|f| (f.code.as_str(), f.message.as_str(), f.count))
@@ -457,9 +475,9 @@ mod tests {
     #[test]
     fn merging_fills_a_missing_hint_but_keeps_an_existing_one() {
         let mut all = Findings::new();
-        all.add(Finding::new(EMPTY, "m"));
-        all.add(Finding::new(EMPTY, "m").with_hint("First hint."));
-        all.add(Finding::new(EMPTY, "m").with_hint("Second hint."));
+        all.add_without_asking_for_a_hint(Finding::new(EMPTY, "m"));
+        all.add_without_asking_for_a_hint(Finding::new(EMPTY, "m").with_hint("First hint."));
+        all.add_without_asking_for_a_hint(Finding::new(EMPTY, "m").with_hint("Second hint."));
         assert_eq!(all.len(), 1);
         assert_eq!(all.as_slice()[0].hint.as_deref(), Some("First hint."));
         assert!(all.has_errors());
@@ -470,12 +488,12 @@ mod tests {
         let mut all = Findings::new();
         let mut zero = Finding::new(EMPTY, "m");
         zero.count = 0;
-        all.add(zero);
+        all.add_without_asking_for_a_hint(zero);
         assert_eq!(all.as_slice()[0].count, 1);
         let mut huge = Finding::new(EMPTY, "m");
         huge.count = u64::MAX;
-        all.add(huge);
-        all.add(Finding::new(EMPTY, "m"));
+        all.add_without_asking_for_a_hint(huge);
+        all.add_without_asking_for_a_hint(Finding::new(EMPTY, "m"));
         assert_eq!(all.as_slice()[0].count, u64::MAX);
     }
 
@@ -484,17 +502,17 @@ mod tests {
         let mut f = Finding::new(EMPTY, "m");
         f.examples = vec![Location::default(); 40];
         let mut all = Findings::new();
-        all.add(f);
+        all.add_without_asking_for_a_hint(f);
         assert_eq!(all.as_slice()[0].examples.len(), MAX_EXAMPLES);
     }
 
     #[test]
     fn extend_merges_another_collection_in_order() {
         let mut a = Findings::new();
-        a.add(at_row(EMPTY, "m", 0));
+        a.add_without_asking_for_a_hint(at_row(EMPTY, "m", 0));
         let mut b = Findings::new();
-        b.add(at_row(EMPTY, "m", 7));
-        b.add(at_row(TOO_LARGE, "n", 8));
+        b.add_without_asking_for_a_hint(at_row(EMPTY, "m", 7));
+        b.add_without_asking_for_a_hint(at_row(TOO_LARGE, "n", 8));
         a.extend(b);
         let summary: Vec<_> = a.iter().map(|f| (f.code.as_str(), f.count)).collect();
         assert_eq!(
@@ -508,7 +526,7 @@ mod tests {
     fn a_collection_serializes_as_a_json_array() {
         let mut all = Findings::new();
         assert_eq!(serde_json::to_string(&all).unwrap(), "[]");
-        all.add(Finding::new(TOO_LARGE, "m"));
+        all.add_without_asking_for_a_hint(Finding::new(TOO_LARGE, "m"));
         assert_eq!(
             serde_json::to_string(&all).unwrap(),
             r#"[{"code":"dataset.too_large","severity":"error","message":"m","count":1,"examples":[]}]"#
