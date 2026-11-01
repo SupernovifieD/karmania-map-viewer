@@ -2014,12 +2014,19 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   not in `docs/dependencies.md`, which lists what the code and the tools need, not the workflow's
   actions. Checked here: with `CI=1` a failing test leaves `playwright-report/` and a `trace.zip`, and
   a passing one leaves no trace, for the ordinary project and for the `visual` project that drives
-  the browser in Docker; without `CI` neither is made (temporary tests, removed). Not checked: the
-  upload step itself, which only runs in a failed CI run and so cannot be seen to work before one
-  happens. The engine's configuration has the same two lines and was not run with a failing test.
+  the browser in Docker; without `CI` neither is made (temporary tests, removed). The upload
+  step itself could not be seen to work before a CI run failed; the next one did fail (step 11.F1) and
+  uploaded `playwright-typescript` (2.7 MB: the report, the trace and the page snapshot of the failed
+  test), so the step works for the `typescript` job. The step of the `accessibility` job has the same
+  form and has not yet run. The engine's configuration has the same two lines and was not run with a
+  failing test. The cost in CI time, from one run each: the browser steps took 126 s (end-to-end), 125 s
+  (screenshots) and 172 s (axe) in the run before tracing, and 246 to 285 s, 241 s and 204 to 313 s in
+  the runs with it, which is 1.2 to 2.3 times as long; but a step without a browser (`build:wasm`) took
+  20 to 23 s before and 21 to 32 s after, so the runners were slower too, and how much of it is the
+  traces cannot be told from one run each.
 - Step 11.5 (WebGL2 in the tests). No Chromium flag is needed, so none is set. Playwright 1.64.1 starts
-  Chromium with `--enable-unsafe-swiftshader` itself (in `playwright-core`, on the headless launch path
-  and, for the other path, on macOS), which is all that software WebGL needs. Checked with no flag
+  Chromium with `--enable-unsafe-swiftshader` itself (in `playwright-core`: the standard Chromium launch
+  always adds it, only the launch over WebDriver BiDi adds it on macOS alone), which is all that software WebGL needs. Checked with no flag
   added: a WebGL2 context in the local Playwright Chromium (156.0.8078.4) and in the browser of the
   `mcr.microsoft.com/playwright:v1.64.1-noble` image, both reporting ANGLE on SwiftShader (Vulkan), with
   a largest texture and a largest renderbuffer of 8192, and `WEBGL_lose_context` there for the tests
@@ -2037,10 +2044,14 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   bytes in every run and on both systems. The visual test pins that number, and that the driver is
   SwiftShader. That is one flat triangle, so it says nothing yet about shading, blending, derivatives
   or multisampling: the render golden images (16.16) are where stability has to be shown again, and a
-  difference there is a stop, as the brief says. Two things are not settled by this step: whether the
-  runner's own Chromium gives WebGL2 in CI (the first CI run of this commit shows it), and the real
-  GPU that the timings of section 9.6 call for, since headless Chromium here is always the software
-  driver; the first `pnpm perf` of rendering (16.G) needs a project of its own with a GPU backend.
+  difference there is a stop, as the brief says. Whether the runner's own Chromium
+  gives WebGL2 in CI is settled: the CI run of `1bd5bbe` passed `webgl.e2e.ts` on the runner and
+  `webgl.visual.ts` in Docker with the pinned picture. One thing is not settled by this step, the real
+  GPU that the timings of section 9.6 call for. The default headless browser here is the software
+  driver, but `channel: 'chromium'` (the new headless mode) uses this Mac's GPU (ANGLE on Metal, Intel
+  Iris Plus, a largest texture of 16384) and drew the same picture (`185ca885`), so a run on a GPU
+  needs a project that sets that channel, not another browser; the first `pnpm perf` of rendering
+  (16.G) decides.
 - Step 11.F1 (gate fix: a CI failure of the keyboard test of the table). The CI run of `c32cd05` (the
   step 11.4 commit; the runs before and after it passed) failed in `pnpm test:e2e`, in `table.e2e.ts`,
   "its keyboard", "does not scroll the page, and leaves the keys that are not its own alone", where
@@ -2076,3 +2087,13 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   they passed and the app's did not, is in the artifact, and so is the report of the end-to-end step
   when the screenshot step could not start (Docker). Not run: a failing job to see this; the order of
   the steps was checked by reading the file and by Prettier, and by the next CI run passing.
+- Step 11.F3 (gate fix: the M11 entries). The review of the gate found three statements to correct,
+  corrected above in place: where Playwright adds the SwiftShader flag and which headless browser can
+  use the GPU (step 11.5), and that the upload step is seen to work (step 11.4). It also found three
+  things that are recorded here and left as they are, since history is not rewritten. Two commits are
+  over the guideline of about 150 changed lines: `e4407ed` has 330 (the copied step list of phase 2,
+  one concern, as step 0.1 of phase 1) and `1bd5bbe` has 185 lines of code, 210 with the notes (the
+  smoke test with its support file, its two test files and the comment in the configuration), which
+  could have been two commits, the support with the ordinary test and then the Docker test, and was
+  not. And the subject of `029d420` has the scope `conventions`, which is no scope; it should have
+  been `docs`.

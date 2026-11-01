@@ -39,7 +39,7 @@ or releasing, and whenever the brief says to stop.
   for the browser's own scrolling to end before it reads the cell the keyboard is on.
 - [x] 11.F2 Gate fix: `pnpm format:check` runs before the browser tests, so the artifacts of a
   failed CI job are always those of failed browser tests.
-- [ ] 11.F3 Gate fix: the M11 entries of `docs/decisions.md` corrected and completed (where
+- [x] 11.F3 Gate fix: the M11 entries of `docs/decisions.md` corrected and completed (where
   Playwright adds the SwiftShader flag, which Chromium uses the GPU, sizes of commits, what the
   failed run showed about the upload and the time of tracing).
 - [ ] 11.G Gate.
