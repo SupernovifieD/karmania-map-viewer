@@ -37,6 +37,11 @@ export default defineConfig({
   // machine (decision 10.6). On a developer's machine nothing is added to the list.
   reporter: inCi ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: { baseURL: 'http://localhost:4174', trace: inCi ? 'retain-on-failure' : 'off' },
+  // No Chromium flags are set for WebGL2 (decision 11.5): Playwright starts Chromium with
+  // `--enable-unsafe-swiftshader` itself, and that is all the software driver needs, for the ordinary
+  // and accessibility projects and for the browser in Docker. Adding `args` to the `visual` project
+  // would do nothing: the Playwright server in the image drops the arguments a client sends. The
+  // two files `webgl.e2e.ts` and `webgl.visual.ts` fail if WebGL2 stops working in either browser.
   projects: [
     { name: 'chromium', testIgnore: '**/*.visual.ts', use: { ...devices['Desktop Chrome'] } },
     ...(withPerf
