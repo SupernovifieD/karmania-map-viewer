@@ -2066,3 +2066,13 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   test failed with the keyboard on `cell-1-0` (the file was put back). Not shown: that the Linux
   browser of CI scrolls by the same page at Alt+ArrowDown; the failing line and message in CI are the
   same as here, and the trace of that run was not opened.
+- Step 11.F2 (gate fix: what the upload of a failed job can hold). In the `typescript` job
+  `pnpm format:check` ran after the browser tests and before the upload step, which runs when any step
+  failed: a formatting failure after green browser tests would have uploaded the reports of passing
+  tests under the name of failed ones (the HTML reporter writes `index.html` for a passing run too, as
+  the reviewer of the gate saw with a one-test run). The check now runs before the browser steps, so a
+  browser step is the only one that can fail after a report exists. Two lesser cases remain and the
+  comment in the workflow says so instead of promising more: the report of the engine's tests, when
+  they passed and the app's did not, is in the artifact, and so is the report of the end-to-end step
+  when the screenshot step could not start (Docker). Not run: a failing job to see this; the order of
+  the steps was checked by reading the file and by Prettier, and by the next CI run passing.

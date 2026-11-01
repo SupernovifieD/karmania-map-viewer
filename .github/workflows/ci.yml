@@ -51,6 +51,9 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r test
       - run: pnpm -r --if-present build
+      # Before the browser tests, so that nothing but them can fail after they have passed and send
+      # the reports of passing tests as the results of failed ones.
+      - run: pnpm format:check
       # The browser tests run the engine's real worker in Chromium.
       - name: Install the browser for the end-to-end tests
         run: pnpm --filter @karmania/engine exec playwright install --with-deps chromium
@@ -58,10 +61,11 @@ jobs:
       # The screenshot tests use the browser in the official Playwright Docker image, so the pixels
       # are the same as on a developer's machine. The script starts the container and stops it.
       - run: pnpm test:visual
-      - run: pnpm format:check
       # What a failed browser test leaves behind: the HTML report with the traces, and for a screenshot
       # test the expected, actual and diff pictures. Nothing is kept when the job passes. A step that
-      # fails stops the ones after it, so what is here is from the run that failed.
+      # fails stops the ones after it, so these are the files of the step that failed; they can also
+      # include the report of a package whose tests passed in that step (the engine's, when the app's
+      # failed), or of an earlier step when the next one could not start (Docker).
       - name: Keep the results of the failed browser tests
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
