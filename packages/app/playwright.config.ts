@@ -15,6 +15,7 @@ const withAxe = process.env['KARMANIA_AXE'] !== undefined;
 // The timings of the large files need a quiet machine and the files of `scripts/generate-fixtures`, so
 // they are a project of their own too, that exists only when `pnpm perf` asks for it.
 const withPerf = process.env['KARMANIA_PERF'] !== undefined;
+const inCi = process.env['CI'] !== undefined;
 // How that browser reaches this machine's web server.
 const visualHost = process.env['PW_VISUAL_HOST'] ?? 'host.docker.internal';
 
@@ -31,8 +32,11 @@ export default defineConfig({
   },
   timeout: 60_000,
   forbidOnly: process.env['CI'] !== undefined,
-  reporter: [['list']],
-  use: { baseURL: 'http://localhost:4174' },
+  // In CI a failed run leaves a report and the traces of the tests that failed, which the workflow
+  // uploads; a trace is the only way to look into a failure that does not come back on a developer's
+  // machine (decision 10.6). On a developer's machine nothing is added to the list.
+  reporter: inCi ? [['list'], ['html', { open: 'never' }]] : [['list']],
+  use: { baseURL: 'http://localhost:4174', trace: inCi ? 'retain-on-failure' : 'off' },
   projects: [
     { name: 'chromium', testIgnore: '**/*.visual.ts', use: { ...devices['Desktop Chrome'] } },
     ...(withPerf

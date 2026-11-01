@@ -2001,3 +2001,19 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   The finding areas were never a list in the conventions but one sentence, and they still are.
   The lists of crates and packages in the same file are not extended here: each new crate and
   package adds its own name in the step that creates it.
+- Step 11.4 (what a failed CI run keeps; closes the open item of step 10.6). In CI (`CI` set) both
+  Playwright configs add the HTML report to the list reporter and record a trace of every test that
+  fails (`retain-on-failure`; a passing test leaves none). Locally nothing changes: the list reporter
+  and no trace. The workflow's `typescript` and `accessibility` jobs end with a step that runs only
+  when the job failed and uploads the two packages' `playwright-report/` and `test-results/` (the
+  report with the traces, and for a screenshot test the expected, actual and diff pictures) as the
+  artifacts `playwright-typescript` and `playwright-accessibility`, kept for 7 days, with no error when
+  there is nothing to upload. A step that fails stops those after it, so the files are those of the
+  run that failed, not of an earlier one that passed. The action is `actions/upload-artifact` v7.0.2
+  (the latest release, MIT, by GitHub), pinned to its commit like the other actions; like them it is
+  not in `docs/dependencies.md`, which lists what the code and the tools need, not the workflow's
+  actions. Checked here: with `CI=1` a failing test leaves `playwright-report/` and a `trace.zip`, and
+  a passing one leaves no trace, for the ordinary project and for the `visual` project that drives
+  the browser in Docker; without `CI` neither is made (temporary tests, removed). Not checked: the
+  upload step itself, which only runs in a failed CI run and so cannot be seen to work before one
+  happens. The engine's configuration has the same two lines and was not run with a failing test.

@@ -59,6 +59,21 @@ jobs:
       # are the same as on a developer's machine. The script starts the container and stops it.
       - run: pnpm test:visual
       - run: pnpm format:check
+      # What a failed browser test leaves behind: the HTML report with the traces, and for a screenshot
+      # test the expected, actual and diff pictures. Nothing is kept when the job passes. A step that
+      # fails stops the ones after it, so what is here is from the run that failed.
+      - name: Keep the results of the failed browser tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-typescript
+          path: |
+            packages/app/playwright-report/
+            packages/app/test-results/
+            packages/engine/playwright-report/
+            packages/engine/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # axe over every state the screenshot tests photograph, in both themes: it takes minutes, so it
   # runs beside the other jobs and not in them.
@@ -86,3 +101,13 @@ jobs:
       - name: Install the browser
         run: pnpm --filter @karmania/engine exec playwright install --with-deps chromium
       - run: pnpm test:axe
+      - name: Keep the results of the failed accessibility tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-accessibility
+          path: |
+            packages/app/playwright-report/
+            packages/app/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

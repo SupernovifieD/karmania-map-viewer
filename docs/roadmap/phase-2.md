@@ -29,7 +29,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 11.3 `docs/conventions.md`: the roadmap is the current phase's file; new
   scopes (crs, prep, scene, render, viewer); new finding areas (display,
   contours, classes).
-- [ ] 11.4 CI keeps the Playwright report and traces of failed runs as artifacts
+- [x] 11.4 CI keeps the Playwright report and traces of failed runs as artifacts
   for 7 days (closes the open item of decision 10.6).
 - [ ] 11.5 WebGL2 in tests: the Chromium flags that make WebGL2 work in the e2e
   browser, the Docker visual runs, the axe runs and CI, in the Playwright
