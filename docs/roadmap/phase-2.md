@@ -44,7 +44,7 @@ or releasing, and whenever the brief says to stop.
   failed run showed about the upload and the time of tracing).
 - [x] 11.F4 Gate fix, from the second review: statements of the M11 entries that said more than
   was shown, and one long line of `docs/conventions.md`.
-- [ ] 11.G Gate.
+- [x] 11.G Gate.
 
 ## M12: Coordinate systems (karmania-crs)
 
