@@ -2017,3 +2017,27 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   the browser in Docker; without `CI` neither is made (temporary tests, removed). Not checked: the
   upload step itself, which only runs in a failed CI run and so cannot be seen to work before one
   happens. The engine's configuration has the same two lines and was not run with a failing test.
+- Step 11.5 (WebGL2 in the tests). No Chromium flag is needed, so none is set. Playwright 1.64.1 starts
+  Chromium with `--enable-unsafe-swiftshader` itself (in `playwright-core`, on the headless launch path
+  and, for the other path, on macOS), which is all that software WebGL needs. Checked with no flag
+  added: a WebGL2 context in the local Playwright Chromium (156.0.8078.4) and in the browser of the
+  `mcr.microsoft.com/playwright:v1.64.1-noble` image, both reporting ANGLE on SwiftShader (Vulkan), with
+  a largest texture and a largest renderbuffer of 8192, and `WEBGL_lose_context` there for the tests
+  of a lost context (16.4). Flags could not have been set for the Docker browser from the
+  configuration anyway: the Playwright server in the image keeps a client's `args` only when it is
+  started in unsafe mode, and `scripts/visual-tests` does not. The accessibility project and the CI
+  jobs use the same Chromium and configuration as the ordinary tests, so they have no check of
+  their own. The smoke test is `webgl.e2e.ts` (ordinary project, so also CI's end-to-end step) and
+  `webgl.visual.ts` (the Docker browser), both with `expectTriangle` of `e2e/support/webgl.ts`: one
+  triangle, without anti-aliasing, on a 64 x 64 canvas; the pixel inside and a pixel outside must be
+  exactly the colours drawn, the context must be loseable, and a second canvas must give the same
+  bytes. That the check can fail was seen by starting Chromium with `--disable-3d-apis`. Stability, the
+  question of section 10.8 of the brief: the same picture (FNV-1a `185ca885`) came out of 10 new
+  browsers on this Mac and 10 new browsers in the Docker image, so the software driver gave the same
+  bytes in every run and on both systems. The visual test pins that number, and that the driver is
+  SwiftShader. That is one flat triangle, so it says nothing yet about shading, blending, derivatives
+  or multisampling: the render golden images (16.16) are where stability has to be shown again, and a
+  difference there is a stop, as the brief says. Two things are not settled by this step: whether the
+  runner's own Chromium gives WebGL2 in CI (the first CI run of this commit shows it), and the real
+  GPU that the timings of section 9.6 call for, since headless Chromium here is always the software
+  driver; the first `pnpm perf` of rendering (16.G) needs a project of its own with a GPU backend.

@@ -31,7 +31,7 @@ or releasing, and whenever the brief says to stop.
   contours, classes).
 - [x] 11.4 CI keeps the Playwright report and traces of failed runs as artifacts
   for 7 days (closes the open item of decision 10.6).
-- [ ] 11.5 WebGL2 in tests: the Chromium flags that make WebGL2 work in the e2e
+- [x] 11.5 WebGL2 in tests: the Chromium flags that make WebGL2 work in the e2e
   browser, the Docker visual runs, the axe runs and CI, in the Playwright
   configs; a smoke test that draws one triangle and reads back its pixel. Record
   the flags.
