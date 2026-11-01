@@ -2041,3 +2041,28 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   runner's own Chromium gives WebGL2 in CI (the first CI run of this commit shows it), and the real
   GPU that the timings of section 9.6 call for, since headless Chromium here is always the software
   driver; the first `pnpm perf` of rendering (16.G) needs a project of its own with a GPU backend.
+- Step 11.F1 (gate fix: a CI failure of the keyboard test of the table). The CI run of `c32cd05` (the
+  step 11.4 commit; the runs before and after it passed) failed in `pnpm test:e2e`, in `table.e2e.ts`,
+  "its keyboard", "does not scroll the page, and leaves the keys that are not its own alone", where
+  the cell the keyboard is on was read as `null`. This is the case step 11.4 was made for: the job
+  uploaded the artifact `playwright-typescript` (2.7 MB, kept until 2026-11-08) with the report, the
+  trace and the page snapshot of the failed test, so the upload step is seen to work (the 11.4
+  entry said it was not). It is not the unexplained failure of step 10.6, which was another test, and
+  that one stays unexplained. The cause, found by reproducing it here: the test presses
+  Alt+ArrowDown, which the table leaves to the browser, and the browser scrolls the focused table by
+  a page (pressing the keys one at a time, the table's `scrollTop` went up by about 250 pixels at each
+  Alt+ArrowDown and by nothing at the other keys), with an animation. The first cell is then outside
+  the drawn rows, and the table names a cell only while it is drawn, so the test read `null` unless
+  it read before the animation had moved past the row. A race in the test, not a fault of the table:
+  the cell the keyboard is on has not moved, as the neighbouring test (the cell is named again when
+  scrolled back to) shows. Alone, the test failed once of 1 without `CI`, 80 of 80 with `CI=1` on 8
+  workers, and 38 of 40 on 8 workers without `CI`; it passed in the whole suite, in the runs here and
+  twice of three in CI, which is what a race gives. It was not the HTML reporter or the traces of step
+  11.4 (it failed the same without them). The fix is in the test: after the keys it waits for the
+  scrolling to end (ten frames in the same place), goes back to the top, and then checks that the
+  first cell is named and where it is. After it the same runs passed 1 of 1, 80 of 80 and 40 of 40, and
+  all 13 tests of "its keyboard" five times over passed (65 of 65). That the changed test still
+  catches a fault was shown by taking the Alt guard out of the table's key handler for one run: the
+  test failed with the keyboard on `cell-1-0` (the file was put back). Not shown: that the Linux
+  browser of CI scrolls by the same page at Alt+ArrowDown; the failing line and message in CI are the
+  same as here, and the trace of that run was not opened.

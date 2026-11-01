@@ -1459,6 +1459,29 @@ test.describe('the table', () => {
       await page.keyboard.press('Alt+ArrowDown');
       await page.keyboard.press('a');
       await page.keyboard.press('Escape');
+      // Left alone by the table, Alt+ArrowDown is the browser's, and it scrolls the table by a page,
+      // with an animation: the first cell is then out of the drawn rows, and the table names a cell
+      // only while it is drawn. The cell the keyboard is on has not moved: let the scrolling end,
+      // go back to the top, and it is named again, which is what the keys above had to leave.
+      await p.viewport.evaluate(
+        (element) =>
+          new Promise<void>((resolve) => {
+            let last = element.scrollTop;
+            let still = 0;
+            const frame = (): void => {
+              still = element.scrollTop === last ? still + 1 : 0;
+              last = element.scrollTop;
+              if (still >= 10) {
+                element.scrollTo(0, 0);
+                resolve();
+              } else {
+                requestAnimationFrame(frame);
+              }
+            };
+            requestAnimationFrame(frame);
+          }),
+      );
+      await expect(p.viewport).toHaveAttribute('aria-activedescendant', 'cell-0-0');
       expect(await where(p.viewport)).toMatchObject({ row: 0, column: 0 });
     });
 
