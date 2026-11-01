@@ -1983,3 +1983,129 @@ was chosen, why.
   three packages with `Cargo.lock`, in a commit of its own. The notes of a release are its entry in
   `CHANGELOG.md`, and the release on GitHub is made from that entry, copied from the file, so the two are
   never different. The tag is made on the commit that holds the entry, once CI has passed on it.
+
+## Phase 2
+
+Step numbers continue from phase 1 (M11 onwards), so an entry "Step 11.3" never meets one of
+phase 1. The plan is `docs/roadmap/phase-2.md`.
+
+## M11: groundwork
+
+- Step 11.3 (conventions). The roadmap is now "the roadmap file of the current phase" in
+  `docs/conventions.md`, where it named `phase-1.md`. The five scopes of the phase 2 brief (`crs`,
+  `prep`, `scene`, `render`, `viewer`) and the three finding areas (`display`, `contours`,
+  `classes`) are added. Two things are added that the brief does not name, because the
+  conventions were behind the repository: the scopes `readme`, `roadmap`, `changelog` and
+  `release`, which the history has used since phase 1, and the area `lattice`, which
+  `docs/validation-codes.md` has used since the lattice checks of phase 1 (`c8ea186`). Nothing is renamed and no code changes.
+  The finding areas were never a list in the conventions but one sentence, and they still are.
+  The lists of crates and packages in the same file are not extended here: each new crate and
+  package adds its own name in the step that creates it.
+- Step 11.4 (what a failed CI run keeps; closes the open item of step 10.6). In CI (`CI` set) both
+  Playwright configs add the HTML report to the list reporter and record a trace of every test that
+  fails (`retain-on-failure`; a passing test leaves none). Locally nothing changes: the list reporter
+  and no trace. The workflow's `typescript` and `accessibility` jobs end with a step that runs only
+  when the job failed and uploads the two packages' `playwright-report/` and `test-results/` (the
+  report with the traces, and for a screenshot test the expected, actual and diff pictures) as the
+  artifacts `playwright-typescript` and `playwright-accessibility`, kept for 7 days, with no error when
+  there is nothing to upload. A step that fails stops those after it, so the files are those of the
+  run that failed, not of an earlier one that passed. The action is `actions/upload-artifact` v7.0.2
+  (the latest release, MIT, by GitHub), pinned to its commit like the other actions; like them it is
+  not in `docs/dependencies.md`, which lists what the code and the tools need, not the workflow's
+  actions. Checked here: with `CI=1` a failing test leaves `playwright-report/` and a `trace.zip`, and
+  a passing one leaves no trace, for the ordinary project and for the `visual` project that drives
+  the browser in Docker; without `CI` neither is made (temporary tests, removed). The upload
+  step itself could not be seen to work before a CI run failed; the next one did fail (step 11.F1) and
+  uploaded `playwright-typescript` (2.7 MB: the report, the trace and the page snapshot of the failed
+  test), so the step works for the `typescript` job. The step of the `accessibility` job has the same
+  form and has not yet run. The engine's configuration has the same two lines and was not run with a
+  failing test. The cost in CI time, from one run each: the browser steps took 126 s (end-to-end), 125 s
+  (screenshots) and 172 s (axe) in the run before tracing, and 246 to 285 s, 241 s and 204 to 313 s in
+  the runs with it, which is 1.2 to 2.3 times as long; but a step without a browser (`build:wasm`) took
+  20 to 23 s before and 21 to 32 s after, so the runners were slower too, and how much of it is the
+  traces cannot be told from one run each.
+- Step 11.5 (WebGL2 in the tests). No Chromium flag is needed, so none is set. Playwright 1.64.1 starts
+  Chromium with `--enable-unsafe-swiftshader` itself (in `playwright-core`: the standard Chromium launch
+  always adds it, only the launch over WebDriver BiDi adds it on macOS alone), which is all that software WebGL needs. Checked with no flag
+  added: a WebGL2 context in the local Playwright Chromium (156.0.8078.4) and in the browser of the
+  `mcr.microsoft.com/playwright:v1.64.1-noble` image, both reporting ANGLE on SwiftShader (Vulkan), with
+  a largest texture and a largest renderbuffer of 8192, and `WEBGL_lose_context` there for the tests
+  of a lost context (16.4). Flags could not have been set for the Docker browser from the
+  configuration anyway: the Playwright server in the image keeps a client's `args` only when it is
+  started in unsafe mode, and `scripts/visual-tests` does not. The accessibility project and the CI
+  jobs use the same Chromium and configuration as the ordinary tests, so they have no check of
+  their own. The smoke test is `webgl.e2e.ts` (ordinary project, so also CI's end-to-end step) and
+  `webgl.visual.ts` (the Docker browser), both with `expectTriangle` of `e2e/support/webgl.ts`: one
+  triangle, without anti-aliasing, on a 64 x 64 canvas; the pixel inside and a pixel outside must be
+  exactly the colours drawn, the context must be loseable, and a second canvas must give the same
+  bytes. That the check can fail was seen by starting Chromium with `--disable-3d-apis`. Stability, the
+  question of section 10.8 of the brief: the same picture (FNV-1a `185ca885`) came out of 10 new
+  browsers on this Mac and 10 new browsers in the Docker image, so the software driver gave the same
+  bytes in every run and on both systems. The visual test pins that number, and that the driver is
+  SwiftShader. That is one flat triangle, so it says nothing yet about shading, blending, derivatives
+  or multisampling: the render golden images (16.16) are where stability has to be shown again, and a
+  difference there is a stop, as the brief says. Whether the runner's own Chromium
+  gives WebGL2 in CI is settled: the CI run of `1bd5bbe` passed `webgl.e2e.ts` on the runner and
+  `webgl.visual.ts` in Docker with the pinned picture. One thing is not settled by this step, the real
+  GPU that the timings of section 9.6 call for. The default headless browser here is the software
+  driver, but `channel: 'chromium'` (the new headless mode) uses this Mac's GPU (ANGLE on Metal, Intel
+  Iris Plus, a largest texture of 16384) and drew the same picture (`185ca885`), so a run on a GPU
+  needs a project that sets that channel, not another browser; the first `pnpm perf` of rendering
+  (16.G) decides.
+- Step 11.F1 (gate fix: a CI failure of the keyboard test of the table). The CI run of `c32cd05` (the
+  step 11.4 commit; the runs before and after it passed) failed in `pnpm test:e2e`, in `table.e2e.ts`,
+  "its keyboard", "does not scroll the page, and leaves the keys that are not its own alone", where
+  the cell the keyboard is on was read as `null`. This is the case step 11.4 was made for: the job
+  uploaded the artifact `playwright-typescript` (2.7 MB, kept until 2026-11-08) with the report, the
+  trace and the page snapshot of the failed test, so the upload step is seen to work (the 11.4
+  entry said it was not). It is not the unexplained failure of step 10.6, which was another test, and
+  that one stays unexplained. The cause, found by reproducing it here: the test presses
+  Alt+ArrowDown, which the table leaves to the browser, and the browser scrolls the focused table by
+  a page (pressing the keys one at a time, the table's `scrollTop` went up by about 250 pixels at each
+  Alt+ArrowDown and by nothing at the other keys), with an animation. The first cell is then outside
+  the drawn rows, and the table names a cell only while it is drawn, so the test read `null` unless
+  it read before the animation had moved past the row. A race in the test, not a fault of the table:
+  the cell the keyboard is on has not moved, as the neighbouring test (the cell is named again when
+  scrolled back to) shows. Alone, the test failed once of 1 without `CI`, 80 of 80 with `CI=1` on 8
+  workers, and 38 of 40 on 8 workers without `CI`; it passed in the whole suite, in the runs here and
+  in the CI runs before and after the failed one, which is what a race gives. It was not the HTML reporter or the traces of step
+  11.4 (it failed the same without them). The fix is in the test: after the keys it waits for the
+  scrolling to end (ten frames in the same place), goes back to the top, and then checks that the
+  first cell is named and where it is. After it the same runs passed 1 of 1, 80 of 80 and 40 of 40, and
+  all 13 tests of "its keyboard" five times over passed (65 of 65). That the changed test still
+  catches a fault was shown by taking the Alt guard out of the table's key handler for one run: the
+  test failed with the keyboard on `cell-1-0` (the file was put back). The browser of CI
+  does the same: the trace of the failed run (opened afterwards) has the table's `scrollTop` at 10,
+  33, 69, 114 and 231 in its last snapshots, a scroll that is animated, as here, and at 252 and then
+  2,799,746 in snapshots taken earlier in the test, which fits a page down and then the end of the
+  table; the name of the cell in those snapshots was not read. One thing the change gives up: going
+  back to the top hides a table that would scroll itself at `a` or Escape, which the old read
+  caught by accident (it returned `null`). No test looked for that on purpose, and none does now.
+- Step 11.F2 (gate fix: what the upload of a failed job can hold). In the `typescript` job
+  `pnpm format:check` ran after the browser tests and before the upload step, which runs when any step
+  failed: a formatting failure after green browser tests would have uploaded the reports of passing
+  tests under the name of failed ones (the HTML reporter writes `index.html` for a passing run too, as
+  the reviewer of the gate saw with a one-test run). The check now runs before the browser steps, so a
+  browser step is the only one that can fail after a report exists. Two lesser cases remain and the
+  comment in the workflow says so instead of promising more: the report of the engine's tests, when
+  they passed and the app's did not, is in the artifact, and so is the report of the end-to-end step
+  when the screenshot step could not start (Docker). Not run: a failing job to see this. The order of
+  the steps was checked by reading the file; that the reordered job passes is shown by the CI run of
+  the head of the milestone (the runs of the commits before it were cancelled by the newer pushes),
+  not by this entry.
+- Step 11.F3 (gate fix: the M11 entries). The review of the gate found three statements to correct,
+  corrected above in place: where Playwright adds the SwiftShader flag and which headless browser can
+  use the GPU (step 11.5), and that the upload step is seen to work (step 11.4). It also found three
+  things that are recorded here and left as they are, since history is not rewritten. Two commits are
+  over the guideline of about 150 changed lines: `e4407ed` has 330 (the copied step list of phase 2,
+  one concern, as step 0.1 of phase 1) and `1bd5bbe` has 185 lines of code, 210 with the notes (the
+  smoke test with its support file, its two test files and the comment in the configuration), which
+  could have been two commits, the support with the ordinary test and then the Docker test, and was
+  not. And the subjects of `029d420` and of `9666131` (the commit of this entry) have the scopes
+  `conventions` and `decisions`, which are no scopes; both should have been `docs`.
+- Step 11.F4 (gate fix: the second review of the gate). It found no fault in the fixes, and these
+  statements to correct, now corrected above: what the step 11.F2 entry said showed that the reordered
+  job passes (no run had passed on it yet), that step 11.F1 was seen in CI only by its message (the
+  trace shows the same scrolling), and that the test had passed "twice of three" runs in CI (it has
+  been in CI since phase 1). It also noted the scope of `9666131`, recorded in step 11.F3. The
+  lines of `docs/conventions.md` that the step 11.3 wrapped long are wrapped like the rest.

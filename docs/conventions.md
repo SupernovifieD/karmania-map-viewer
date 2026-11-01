@@ -1,7 +1,8 @@
 # Conventions
 
-Rules for anyone changing this repository. The step plan is in
-`docs/roadmap/phase-1.md`; decisions made along the way are in
+Rules for anyone changing this repository. The step plan is the roadmap file of the
+current phase (`docs/roadmap/phase-2.md` now; phase 1 is in
+`docs/roadmap/phase-1.md`); decisions made along the way are in
 `docs/decisions.md`; dependencies are in `docs/dependencies.md`. Working rules
 for AI assistants are in `AGENTS.md`.
 
@@ -44,8 +45,11 @@ A finding code names one kind of problem, for example `crs.missing` or
 - Lowercase, dot-separated: `<area>.<subject>[.<problem>]`. Each segment is
   lowercase ASCII letters, digits or underscores. The area is a shape (`points`,
   `lines`, `polygons`, `mesh`, `grid`, `blocks`), `dataset`, `table`, `values`,
-  `crs`, `file`, `mapping`, or a file format that has findings of its own (`csv`,
-  `geojson`, `asc` for ESRI ASCII grids, `obj`, `prj`).
+  `lattice`, `crs`, `file`, `mapping`, one of the areas of drawing (`display` for
+  whether and how a dataset can be drawn in the map's coordinate system,
+  `contours`, `classes` for classifying values into colours), or a file format
+  that has findings of its own (`csv`, `geojson`, `asc` for ESRI ASCII grids,
+  `obj`, `prj`).
 - Codes are stable. Once a code is released, do not rename it or change its
   meaning; add a new code instead. Never reuse a retired code.
 - One code has one severity (`error`, `warning` or `info`), one message
@@ -67,13 +71,15 @@ A finding code names one kind of problem, for example `crs.missing` or
   lockfiles, generated snapshots, fixtures and screenshots do not count. If a
   step is bigger, split it into sub-steps (for example 4.5a, 4.5b) in the
   roadmap.
-- Tick the step in `docs/roadmap/phase-1.md` in the same commit that completes
-  it.
+- Tick the step in the roadmap file of the current phase (`docs/roadmap/phase-2.md`)
+  in the same commit that completes it.
 - Format: `type(scope): description` (Conventional Commits), imperative mood,
   then a body that names the step and says what was verified.
 - Types: `feat`, `fix`, `test`, `docs`, `chore`, `ci`, `refactor`, `style`,
   `perf`, and `build` for build-system changes.
-- Scopes: `core`, `io`, `wasm`, `engine`, `ui`, `app`, `repo`, `ci`, `docs`.
+- Scopes: `core`, `io`, `wasm`, `crs`, `prep`, `engine`, `scene`, `render`, `viewer`,
+  `ui`, `app`, `repo`, `ci`, `docs`, and for the files of that name `readme`, `roadmap`,
+  `changelog` and `release`.
 - No unrelated changes in a commit. If you notice something else worth fixing,
   add it as a new step at the end of the current milestone in the roadmap.
 - Never commit secrets, credentials, personal data, generated output (`pkg/`,
