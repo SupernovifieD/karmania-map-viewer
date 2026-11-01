@@ -86,6 +86,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "karmania-crs"
+version = "0.1.0"
+dependencies = [
+ "karmania-core",
+]
+
+[[package]]
 name = "karmania-io"
 version = "0.1.0"
 dependencies = [
