@@ -26,7 +26,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 11.1 Create `dev` from main and push it. No commit.
 - [x] 11.2 `docs/roadmap/phase-2.md` with this step list. Then open the draft
   pull request.
-- [ ] 11.3 `docs/conventions.md`: the roadmap is the current phase's file; new
+- [x] 11.3 `docs/conventions.md`: the roadmap is the current phase's file; new
   scopes (crs, prep, scene, render, viewer); new finding areas (display,
   contours, classes).
 - [ ] 11.4 CI keeps the Playwright report and traces of failed runs as artifacts

@@ -1983,3 +1983,21 @@ was chosen, why.
   three packages with `Cargo.lock`, in a commit of its own. The notes of a release are its entry in
   `CHANGELOG.md`, and the release on GitHub is made from that entry, copied from the file, so the two are
   never different. The tag is made on the commit that holds the entry, once CI has passed on it.
+
+## Phase 2
+
+Step numbers continue from phase 1 (M11 onwards), so an entry "Step 11.3" never meets one of
+phase 1. The plan is `docs/roadmap/phase-2.md`.
+
+## M11: groundwork
+
+- Step 11.3 (conventions). The roadmap is now "the roadmap file of the current phase" in
+  `docs/conventions.md`, where it named `phase-1.md`. The five scopes of the phase 2 brief (`crs`,
+  `prep`, `scene`, `render`, `viewer`) and the three finding areas (`display`, `contours`,
+  `classes`) are added. Two things are added that the brief does not name, because the
+  conventions were behind the repository: the scopes `readme`, `roadmap`, `changelog` and
+  `release`, which the history has used since phase 1, and the area `lattice`, which
+  `docs/validation-codes.md` has used since the lattice checks of phase 1 (`c8ea186`). Nothing is renamed and no code changes.
+  The finding areas were never a list in the conventions but one sentence, and they still are.
+  The lists of crates and packages in the same file are not extended here: each new crate and
+  package adds its own name in the step that creates it.
