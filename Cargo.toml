@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/karmania-core", "crates/karmania-io", "crates/karmania-wasm"]
+members = [
+  "crates/karmania-core",
+  "crates/karmania-crs",
+  "crates/karmania-io",
+  "crates/karmania-wasm",
+]
 
 [workspace.package]
 version = "0.1.0"

@@ -48,7 +48,7 @@ or releasing, and whenever the brief says to stop.
 
 ## M12: Coordinate systems (karmania-crs)
 
-- [ ] 12.1 Crate karmania-crs (depends on core), forbid unsafe, one test.
+- [x] 12.1 Crate karmania-crs (depends on core), forbid unsafe, one test.
 - [ ] 12.2 Add crs-definitions (dependency-only; licence policy and EPSG terms as
   section 4 of the brief says).
 - [ ] 12.3 `lookup(code) -> CrsInfo`. Tests: 4326, 32640, 2229 (US survey feet),

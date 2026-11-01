@@ -2109,3 +2109,12 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   trace shows the same scrolling), and that the test had passed "twice of three" runs in CI (it has
   been in CI since phase 1). It also noted the scope of `9666131`, recorded in step 11.F3. The
   lines of `docs/conventions.md` that the step 11.3 wrapped long are wrapped like the rest.
+
+## M12: coordinate systems
+
+- Step 12.1 (the crate). `karmania-crs` depends on `karmania-core` only, forbids unsafe code and
+  has the workspace lints, like the other crates, with one test that it builds against the core's
+  CRS types. It is a member of the workspace but not yet in `[workspace.dependencies]`: the crates
+  that use it (the WebAssembly bindings from 12.12, `karmania-prep` from 13.1) add it there. The
+  list of crates in `docs/conventions.md` names it, and `Cargo.lock` gains its entry (the crate has
+  no dependency that was not already in the lock file).
