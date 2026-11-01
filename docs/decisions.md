@@ -2068,15 +2068,19 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   the cell the keyboard is on has not moved, as the neighbouring test (the cell is named again when
   scrolled back to) shows. Alone, the test failed once of 1 without `CI`, 80 of 80 with `CI=1` on 8
   workers, and 38 of 40 on 8 workers without `CI`; it passed in the whole suite, in the runs here and
-  twice of three in CI, which is what a race gives. It was not the HTML reporter or the traces of step
+  in the CI runs before and after the failed one, which is what a race gives. It was not the HTML reporter or the traces of step
   11.4 (it failed the same without them). The fix is in the test: after the keys it waits for the
   scrolling to end (ten frames in the same place), goes back to the top, and then checks that the
   first cell is named and where it is. After it the same runs passed 1 of 1, 80 of 80 and 40 of 40, and
   all 13 tests of "its keyboard" five times over passed (65 of 65). That the changed test still
   catches a fault was shown by taking the Alt guard out of the table's key handler for one run: the
-  test failed with the keyboard on `cell-1-0` (the file was put back). Not shown: that the Linux
-  browser of CI scrolls by the same page at Alt+ArrowDown; the failing line and message in CI are the
-  same as here, and the trace of that run was not opened.
+  test failed with the keyboard on `cell-1-0` (the file was put back). The browser of CI
+  does the same: the trace of the failed run (opened afterwards) has the table's `scrollTop` at 10,
+  33, 69, 114 and 231 in its last snapshots, a scroll that is animated, as here, and at 252 and then
+  2,799,746 in snapshots taken earlier in the test, which fits a page down and then the end of the
+  table; the name of the cell in those snapshots was not read. One thing the change gives up: going
+  back to the top hides a table that would scroll itself at `a` or Escape, which the old read
+  caught by accident (it returned `null`). No test looked for that on purpose, and none does now.
 - Step 11.F2 (gate fix: what the upload of a failed job can hold). In the `typescript` job
   `pnpm format:check` ran after the browser tests and before the upload step, which runs when any step
   failed: a formatting failure after green browser tests would have uploaded the reports of passing
@@ -2085,8 +2089,10 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   browser step is the only one that can fail after a report exists. Two lesser cases remain and the
   comment in the workflow says so instead of promising more: the report of the engine's tests, when
   they passed and the app's did not, is in the artifact, and so is the report of the end-to-end step
-  when the screenshot step could not start (Docker). Not run: a failing job to see this; the order of
-  the steps was checked by reading the file and by Prettier, and by the next CI run passing.
+  when the screenshot step could not start (Docker). Not run: a failing job to see this. The order of
+  the steps was checked by reading the file; that the reordered job passes is shown by the CI run of
+  the head of the milestone (the runs of the commits before it were cancelled by the newer pushes),
+  not by this entry.
 - Step 11.F3 (gate fix: the M11 entries). The review of the gate found three statements to correct,
   corrected above in place: where Playwright adds the SwiftShader flag and which headless browser can
   use the GPU (step 11.5), and that the upload step is seen to work (step 11.4). It also found three
@@ -2095,5 +2101,11 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   one concern, as step 0.1 of phase 1) and `1bd5bbe` has 185 lines of code, 210 with the notes (the
   smoke test with its support file, its two test files and the comment in the configuration), which
   could have been two commits, the support with the ordinary test and then the Docker test, and was
-  not. And the subject of `029d420` has the scope `conventions`, which is no scope; it should have
-  been `docs`.
+  not. And the subjects of `029d420` and of `9666131` (the commit of this entry) have the scopes
+  `conventions` and `decisions`, which are no scopes; both should have been `docs`.
+- Step 11.F4 (gate fix: the second review of the gate). It found no fault in the fixes, and these
+  statements to correct, now corrected above: what the step 11.F2 entry said showed that the reordered
+  job passes (no run had passed on it yet), that step 11.F1 was seen in CI only by its message (the
+  trace shows the same scrolling), and that the test had passed "twice of three" runs in CI (it has
+  been in CI since phase 1). It also noted the scope of `9666131`, recorded in step 11.F3. The
+  lines of `docs/conventions.md` that the step 11.3 wrapped long are wrapped like the rest.

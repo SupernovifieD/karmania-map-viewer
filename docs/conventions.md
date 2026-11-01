@@ -1,7 +1,8 @@
 # Conventions
 
 Rules for anyone changing this repository. The step plan is the roadmap file of the
-current phase (`docs/roadmap/phase-2.md` now; phase 1 is in `docs/roadmap/phase-1.md`); decisions made along the way are in
+current phase (`docs/roadmap/phase-2.md` now; phase 1 is in
+`docs/roadmap/phase-1.md`); decisions made along the way are in
 `docs/decisions.md`; dependencies are in `docs/dependencies.md`. Working rules
 for AI assistants are in `AGENTS.md`.
 
