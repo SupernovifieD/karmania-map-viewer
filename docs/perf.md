@@ -219,13 +219,18 @@ bytes larger than the same file measured this way; at these sizes that does not 
 | Step 12.11b, before the definitions are linked in | 632,213 | 253,200 | not measured | not measured |
 | Step 12.11c, with the definitions and `proj4rs` | 5,762,604 | 742,732 | not measured | not measured |
 | Step 12.12, with `crsInfo` and `searchCrs` | 5,774,943 | 757,177 | 46,642 | 8,425 |
+| After M12 (step 12.F4, the wizard and the summary done) | 5,774,943 | 757,177 | 48,430 | 8,831 |
 
 Against the rule: the definitions and the reprojection added 489,532 bytes gzipped (step 12.11c), the
 two exports 14,445 more, and the changes to the core of steps 12.9 to 12.11b 458, so the module has
 grown by 504,435 bytes gzipped since the start of the phase, which is under the 1 MB at which the brief
 says to stop. The raw module is 5.8 MB, which is what
-a browser compiles. The app's own JavaScript has not changed in size, apart from the worker, which grew by 2.8 KB
-(469 bytes gzipped) to carry the two new calls: no user interface changed in M12 up to this step.
+a browser compiles. Up to step 12.12 the app's own JavaScript had not changed in size, apart from the worker, which
+grew by 2.8 KB (469 bytes gzipped) to carry the two new calls. The wizard's search and the summary's
+name (steps 12.14 and 12.15) then grew `index` and `theme` together from 46,642 to 48,430 bytes
+gzipped (1,788 more, 25,320 and 23,110) and the worker to 8,831; the module did not change. Over the
+phase so far the app's JavaScript has grown by 1,752 bytes gzipped (46,678 to 48,430) and the worker by
+875 (7,956 to 8,831).
 
 What the larger module costs when it starts, measured in Node's V8 (so only an indication of a
 browser's), compiling the module with `new WebAssembly.Module` and `WebAssembly.compile`, median of 9

@@ -2616,4 +2616,14 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   table of the codes and their constants searched by binary search, so that no giant function is called
   (a generated file in the repository, checked against `from_code` by a test); or give the Node of the
   tests a V8 flag, which hides it in CI and fixes nothing for anyone else; or merge as it is.
+- Step 12.F4 (stale words). The README still said that phase 1 does not know what a code means and that
+  EPSG:4326 is the one exception; it now says what the coordinate system is today (what a code means,
+  the wizard's search, the name in the summary, the check for a geographic system, the warning for an
+  unknown code, and that conversion exists but nothing on the screen uses it). Two comments in `codes.rs`
+  said "In EPSG:4326" of checks that are made for every geographic system. `docs/perf.md` said that no user
+  interface changed in M12, and had the app's sizes of step 12.12: the sizes after M12 are measured (the
+  module is the same bytes, the app's `index` and `theme` are 1,788 bytes gzipped larger and the worker
+  406, which `docs/perf.md` now says), and the module's size in the decisions (742,737 and 489,537) is
+  the table's (742,732 and 489,532); the 5 bytes are most likely the file name that `gzip -9 -c` writes
+  (not checked).
 
