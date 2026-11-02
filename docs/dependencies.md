@@ -11,6 +11,10 @@ The project license is Apache-2.0 (see `LICENSE`). Allowed for dependencies:
 - BlueOak-1.0.0, a permissive license, accepted at step 0.12.
 - Unicode-3.0, a permissive license for Unicode data and code, accepted at
   step 1.19 (it covers `unicode-ident`, which `serde_derive` needs).
+- CC0-1.0, a public-domain dedication, accepted at step 12.2 for `crs-definitions`
+  (section 2.1 of the phase 2 brief). It was accepted once before at step 2.16 and left
+  the policy when the crate was removed at step 3.25b. The label covers the crate, not
+  necessarily the data in it: see the EPSG terms below the Rust crates table.
 - MPL-2.0, accepted at step 0.12 for dev-only build tools that are never shipped
   as part of Karmania. It is compatible with Apache-2.0: MPL's copyleft applies
   per file to MPL-licensed code, so using an unmodified MPL tool at build time
@@ -60,6 +64,7 @@ BSD-3-Clause or ISC, except:
 | serde-wasm-bindgen (`karmania-wasm`) | 0.6.5 | MIT | Turns Rust values into plain JavaScript values at the WebAssembly boundary. Brings `js-sys` (MIT OR Apache-2.0) and, through it, `futures-util` and its small dependencies (`futures-core`, `futures-task`, `pin-project-lite`, `slab`; all MIT OR Apache-2.0 or MIT). | step 4.3b |
 | js-sys (`karmania-wasm`) | 0.3.106 | MIT OR Apache-2.0 | Reads JavaScript arrays and typed arrays passed to the module. | step 4.3b |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
+| crs-definitions (`karmania-crs`) | 0.6.0 | CC0-1.0 | The EPSG definitions: a `u16` EPSG code to a WKT string (name, kind and units are read from it) and a PROJ string (for reprojection). Default features `proj4` (for the reprojection) and `wkt` (for the lookup), both needed. `no_std`, no dependencies of its own, builds for `wasm32-unknown-unknown`. About 4.9 MB of source tables, so the WebAssembly module will grow; the size is measured at step 12.12 against the 1 MB (gzipped) rule of the brief. Released 2026-09-16; its GitHub repository was archived on 2026-06-13 and moved to tangled.org/rwell.org/crs-definitions, where 0.6.0 was released. Used under the EPSG terms below. | step 12.2 |
 
 Rust transitive tree at step 4.3b (30 crates in the resolved graph, checked with
 `cargo metadata`, the same for host and `wasm32-unknown-unknown`): all MIT,
@@ -74,9 +79,33 @@ by the dev dependency `csv`), or Unicode-3.0 with MIT or Apache-2.0
 Removed at step 3.25a and 3.25b, by the owner's decision that this repository is
 the core and does not interpret coordinate systems: `proj4rs` (MIT OR Apache-2.0,
 reprojection, with the crates it brought along) and `crs-definitions` (CC0-1.0,
-the EPSG definitions, 4.8 MB of source text). If definitions are added again later,
-note that they derive from the EPSG registry maintained by IOGP, whose own terms of
-use apply; check them before redistributing the definitions on their own.
+the EPSG definitions, 4.8 MB of source text). `crs-definitions` came back at step
+12.2, in the new `karmania-crs` crate (the core still knows no definitions);
+`proj4rs` comes back at step 12.5.
+
+The EPSG terms (step 12.2). `crs-definitions` is licensed CC0-1.0, but its tables are
+generated, by the crate's own `scripts/regenerate.py`, from the `spatial_ref_sys` table
+of PostGIS, which derives from the EPSG Dataset maintained by IOGP. A CC0 label on the
+crate does not change the terms of the EPSG data in it. The terms, as read from copies
+on third-party sites (epsg.org itself answered the request with 403, so this project
+has not read the live text, which should be read): the data may be used, copied and
+distributed; it is published at no charge and "Distribution for profit is forbidden";
+it may be included in a commercial package if the commerciality is based on value added
+by the provider; "Ownership of the EPSG Dataset by IOGP must be acknowledged in any
+publication or transmission" of it; anyone it is given to must be told that the terms
+apply; data may be changed only as a short table in the terms allows (a unit
+conversion, for example), and data changed otherwise must not be attributed to EPSG; it
+is provided as is, without warranty. Apache SIS does not bundle the dataset because it
+holds these terms incompatible with the Apache licence. The owner decided at step 12.2
+to bundle the definitions in the kernel with notices, and accepted that the kernel's
+build is therefore not purely Apache-2.0: Karmania's own code stays Apache-2.0, and the
+EPSG data in it is under IOGP's terms. No written confirmation was asked of IOGP. What
+that commits the project to: the acknowledgement and the terms in
+`THIRD_PARTY_NOTICES.md` (step 23.5) and `docs/embedding.md` (step 23.6), which go with
+every build that holds the data; the same notice in the README (step 24.5) and in the
+crate documentation of `karmania-crs` (step 12.3); no change to the values beyond what
+the terms permit (reading the name, kind and unit out of the WKT is not a change); and
+never attributing to EPSG anything the kernel computes itself.
 
 Build tools (not part of the Rust build or of the shipped code; installed on the
 developer's machine and in CI):
