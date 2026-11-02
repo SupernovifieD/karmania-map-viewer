@@ -221,6 +221,7 @@ bytes larger than the same file measured this way; at these sizes that does not 
 | Step 12.12, with `crsInfo` and `searchCrs` | 5,774,943 | 757,177 | 46,642 | 8,425 |
 | After M12 (step 12.F4, the wizard and the summary done) | 5,774,943 | 757,177 | 48,430 | 8,831 |
 | Step 12.F7, the definitions as a table | 5,451,076 | 647,422 | 48,461 | 8,830 |
+| Head of M12 (step 12.F14) | 5,451,087 | 647,419 | 48,678 | 8,831 |
 
 Step 12.F7 held the definitions as a table of the crate's constants, found by binary search, and not as
 its one match of 6,184 arms, so that Node does not abort (see `docs/decisions.md`): the module is 323,867
@@ -238,9 +239,12 @@ gzipped (step 12.11c), the two exports 14,445 more, and the changes to the core 
 step 12.12 and is 5.45 MB (5,451,076 bytes) after step 12.F7; that is what a browser compiles. Up to step 12.12 the app's own JavaScript had not changed in size, apart from the worker, which
 grew by 2.8 KB (469 bytes gzipped) to carry the two new calls. The wizard's search and the summary's
 name (steps 12.14 and 12.15) then grew `index` and `theme` together from 46,642 to 48,430 bytes
-gzipped (1,788 more, 25,320 and 23,110) and the worker to 8,831; the module did not change. Over the
-phase so far the app's JavaScript has grown by 1,752 bytes gzipped (46,678 to 48,430) and the worker by
-875 (7,956 to 8,831).
+gzipped (1,788 more, 25,320 and 23,110) and the worker to 8,831; the module did not change. At the head
+of the milestone (the last row of the table: `index` 25,568 and `theme` 23,110 gzipped) the app's JavaScript
+has grown by 2,000 bytes gzipped since the start of the phase (46,678 to 48,678), of which 217 came after
+the 48,461 of step 12.F7, from the changes of steps 12.F8 and 12.F13 to the CRS step, and the worker by
+875 (7,956 to 8,831); the module, with the check of grads of 12.F12, is 11 bytes larger raw and 3 smaller
+gzipped than at 12.F7.
 
 What the larger module costs when it starts, measured in Node's V8 (so only an indication of a
 browser's), compiling the module with `new WebAssembly.Module` and `WebAssembly.compile`, median of 9

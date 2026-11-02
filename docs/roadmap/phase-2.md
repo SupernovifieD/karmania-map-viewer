@@ -146,6 +146,8 @@ or releasing, and whenever the brief says to stop.
   cut to one, so that nothing moves and the unit is not hidden (third review).
   Screenshots updated and reviewed.
 - [x] 12.F14 `scripts/generate-crs-table` formats only the table it writes (third review).
+- [x] 12.F15 Documents corrected: the perf figures at the head of the milestone, the
+  wording about epsg.org, the 12.F9 and 12.F10 records (third review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

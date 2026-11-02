@@ -2706,14 +2706,15 @@ minors and four nits. Each is a sub-step, or recorded.
   (the first step of `pnpm check` and of the Rust job of CI) fail, and nothing said so. The script now ends
   with `cargo fmt -p karmania-crs`, and running it changes nothing in the repository (tried: `git diff
   --exit-code` clean, where before it showed the whole file changed). The Rust job of CI runs it and fails on
-  a difference, which is the test of this step: it fails with the script as it was. That step has not run on
-  GitHub yet; it is to be read in the run of this commit.
+  a difference, which is the test of this step: it fails with the script as it was. That step ran on GitHub in run
+  41407204647 (on `7d70ae0`) and passed: it logged "Wrote ... 6184 definitions from crs-definitions 0.6.0"
+  and `git diff --exit-code` was clean (read in the third review and here).
 - Step 12.F10 (the notices, again). The second review said that `https://epsg.org/terms-of-use.html`
   answered it with HTTP 200 and the text of the terms, revised 8 April 2016, and that the summary in
   `THIRD_PARTY_NOTICES.md` matches it, with one omission: an advisory about the essential elements of
-  IOGP Guidance Note 7-1, Annex A. **This was not verified here.** A request for the page with the tools of
-  this session (the fetch tool, and an earlier one with a browser's User-Agent, which the session's rules
-  refused as a way round a block) got 403, and no other way of getting it was tried. So the terms are still
+  IOGP Guidance Note 7-1, Annex A. **This was not verified here.** The fetch tool of this session got 403 for the page. A second try, with a
+  browser's User-Agent, was refused by the session's rules as a way round a block, and so did not go out (it
+  got no answer, 403 or other); no other way of getting the page was tried. So the terms are still
   not read at the source by this work, the caveat in the notices file stays, and the report of the review
   is a second-hand statement about a first-hand reading that nothing here has confirmed. For the owner: the
   page is public, and it is worth reading it once in a browser against `THIRD_PARTY_NOTICES.md` and
@@ -2762,4 +2763,13 @@ minors and four nits. Each is a sub-step, or recorded.
   one; in the repository the run leaves `git diff --exit-code` clean. The Rust job of CI runs the script,
   and that step passed on GitHub in run 41407204647 (on `7d70ae0`, with the `cargo fmt -p` form): it is to be
   read again for this form in the run of this commit.
+- Step 12.F15 (words, after the third review). `docs/perf.md` had a sentence about the growth of the app's
+  JavaScript (48,430 bytes) that contradicted the last row of its own table (48,461), and neither was the
+  head, since steps 12.F8 and 12.F13 changed the built files and 12.F12 the module: a row for the head of
+  the milestone is added (module 5,451,087 bytes raw and 647,419 gzipped, `index` and `theme` 48,678, worker
+  8,831, all measured with `gzip -9 < file | wc -c` after the check of step 12.F14) and the sentence gives
+  those. `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md` said in two ways that epsg.org "did not answer"
+  and "answered with 403"; both now say that it refused the requests of this project's tools with HTTP 403.
+  The record of step 12.F10 read as if the refused request had also got 403, and that of 12.F9 still said
+  that the CI step had not run: it ran, and passed. Documentation only.
 
