@@ -51,14 +51,14 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.1 Crate karmania-crs (depends on core), forbid unsafe, one test.
 - [x] 12.2 Add crs-definitions (dependency-only; licence policy and EPSG terms as
   section 4 of the brief says).
-- [ ] 12.3 `lookup(code) -> CrsInfo`. Tests: 4326, 32640, 2229 (US survey feet),
+- [x] 12.3 `lookup(code) -> CrsInfo`. Tests: 4326, 32640, 2229 (US survey feet),
   27700, a geocentric code (other), an unknown code. Split to stay under the
   commit size guideline:
   - [x] 12.3a The WKT reader (the parser of phase 1's `epsg.rs`).
   - [x] 12.3b WKT queries: the name, a keyword's node, the part that places data.
   - [x] 12.3c The `CrsInfo` contract types: `CrsKind`, `AxisUnits`, `CrsInfo`.
   - [x] 12.3d `describe`: name, kind and units read from a WKT definition.
-  - [ ] 12.3e `lookup(code)`; the IOGP acknowledgement in the crate documentation; the
+  - [x] 12.3e `lookup(code)`; the IOGP acknowledgement in the crate documentation; the
     tests of the brief.
 - [ ] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
   Tests.

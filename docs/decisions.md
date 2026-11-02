@@ -2171,3 +2171,19 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   contract says, so a projected system in them is described but cannot be scaled. A geocentric
   system is `other` with metres. The 224 lines (82 of code, the rest tests on hand-written
   definitions of each case) are over the guideline; the function and its cases were not cut apart.
+- Step 12.3e (`lookup`). `lookup(code)` gives the `CrsInfo` of an EPSG code, or `None` for a code
+  that is not in the definitions or is above 65535, which they cannot hold. The tests are those the
+  brief names (4326, 32640, 2229 in US survey feet, 27700, geocentric 4978 and 3822, 3993 which has no
+  definition, an unknown code) and more (a compound, a bound and a newer-style definition, 4269), and
+  a sweep of the whole registry: every entry is described, degrees belong to geographic systems only,
+  metres are given exactly for metres and feet, and the counts are pinned to this version of
+  `crs-definitions`: 754 geographic in degrees and 9 in other angle units, 4157 projected in metres,
+  155 in feet, 873 in US survey feet and 32 in other length units (so those 32 can be described but
+  not scaled), 196 geocentric and similar in metres and 8 with no definition. If the crate is
+  updated, or the reading of units changes, that test fails and the entries that moved are to be
+  looked at before the numbers are changed. The crate documentation now carries the
+  acknowledgement of IOGP's ownership and the pointer to the terms that the decision of step 12.2
+  committed it to, without a paraphrase of the terms, which this project has only read second-hand.
+  The definitions are those of PostGIS (`crs-definitions` says it pulls them from `crs-csv`), not
+  of the current EPSG registry, so the accuracy tests of step 12.8 compare reprojection with an
+  independent source and not with them.
