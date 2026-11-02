@@ -10,7 +10,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod info;
 pub mod wkt;
+
+pub use info::{AxisUnits, CrsInfo, CrsKind};
 
 #[cfg(test)]
 mod tests {
