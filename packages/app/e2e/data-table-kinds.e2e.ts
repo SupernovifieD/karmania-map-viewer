@@ -109,6 +109,9 @@ const KINDS: readonly Kind[] = [
 test.describe('the columns of the Data tab table', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    // The table draws the rows that fit and no more, and takes the room the summary leaves it. The
+    // window is tall enough for every row of the largest of the samples, however much the summary says.
+    await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto('/');
   });
 

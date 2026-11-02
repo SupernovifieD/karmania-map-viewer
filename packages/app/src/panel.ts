@@ -4,7 +4,7 @@ import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
-import type { RowSource } from './datasets.js';
+import type { CrsLookup, RowSource } from './datasets.js';
 import { PANEL_TABS } from './panel-tabs.js';
 import type { PanelTab } from './panel-tabs.js';
 import './resize-handle.js';
@@ -39,6 +39,7 @@ export class KarmaniaPanel extends LitElement {
     datasets: { attribute: false },
     selected: { attribute: false },
     rows: { attribute: false },
+    crsInfo: { attribute: false },
     width: { type: Number },
     min: { type: Number },
     max: { type: Number },
@@ -136,6 +137,8 @@ export class KarmaniaPanel extends LitElement {
   declare selected: number | undefined;
   /** Gets the rows of a dataset, for the table of the Data tab. */
   declare rows: RowSource | undefined;
+  /** Says what an EPSG code means, for the Data tab. */
+  declare crsInfo: CrsLookup | undefined;
   /** How wide the panel is, and the least and most it can be, and the width it goes back to. */
   declare width: number;
   declare min: number;
@@ -151,6 +154,7 @@ export class KarmaniaPanel extends LitElement {
     this.datasets = [];
     this.selected = undefined;
     this.rows = undefined;
+    this.crsInfo = undefined;
     this.width = 0;
     this.min = 0;
     this.max = 0;
@@ -243,6 +247,7 @@ export class KarmaniaPanel extends LitElement {
                 .datasets=${this.datasets}
                 .selected=${this.selected}
                 .rows=${this.rows}
+                .crsInfo=${this.crsInfo}
               ></karmania-data-tab>
             </div>
           </k-tabs>
