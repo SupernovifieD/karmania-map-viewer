@@ -94,7 +94,7 @@ The EPSG terms (step 12.2). `crs-definitions` is licensed CC0-1.0, but its table
 generated, by the crate's own `scripts/regenerate.py`, from the `spatial_ref_sys` table
 of PostGIS, which derives from the EPSG Dataset maintained by IOGP. A CC0 label on the
 crate does not change the terms of the EPSG data in it. The terms, as read from copies
-on third-party sites (epsg.org itself answered the request with 403, so this project
+on third-party sites (epsg.org itself refused the requests of this project's tools with HTTP 403, so this project
 has not read the live text, which should be read): the data may be used, copied and
 distributed; it is published at no charge and "Distribution for profit is forbidden";
 it may be included in a commercial package if the commerciality is based on value added

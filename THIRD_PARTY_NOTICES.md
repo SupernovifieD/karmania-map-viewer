@@ -19,8 +19,8 @@ is acknowledged.** The EPSG Dataset is published by IOGP at <https://epsg.org>, 
 use (<https://epsg.org/terms-of-use.html>) apply to the definitions in this build, and to anyone
 who is given them: **you are told here that they do.** Read them before you redistribute a build.
 
-As they were read (from copies on other sites, since `epsg.org` itself did not answer this
-project's request, so they were not read at the source and should be): the data may be used,
+As they were read (from copies on other sites, since `epsg.org` itself refused this project's
+tools with HTTP 403, so they were not read at the source and should be): the data may be used,
 copied and distributed; it is published at no charge and distribution for profit is forbidden,
 though it may be part of a commercial package where the commerciality rests on value added by the
 provider; ownership by IOGP must be acknowledged in any publication or transmission of it; the
