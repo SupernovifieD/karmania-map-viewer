@@ -88,7 +88,7 @@ export function crsBlocker(draft: CrsDraft, detected: DetectedCrs | undefined): 
   }
   if (draft.mode === 'epsg') {
     return parseEpsg(draft.epsg) === undefined
-      ? 'Enter the EPSG code of the coordinate system.'
+      ? 'Enter an EPSG code, or choose one of the matches.'
       : undefined;
   }
   if (draft.mode === 'detected' && detected === undefined) {
