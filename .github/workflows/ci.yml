@@ -26,11 +26,12 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
-      # The table of EPSG definitions is generated; regenerating it must change nothing.
+      # The table of EPSG definitions is generated; regenerating it must change nothing, in that file
+      # or in any other (the whole tree is compared, so that a script that touched something else fails).
       - name: The generated table of definitions is up to date
         run: |
           scripts/generate-crs-table
-          git diff --exit-code -- crates/karmania-crs/src/registry/table.rs
+          git diff --exit-code
 
   typescript:
     name: TypeScript

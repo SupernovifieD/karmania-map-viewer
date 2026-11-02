@@ -2821,4 +2821,11 @@ about the change of step 12.F13.
   mode (`wizard-crs-missing`, `-code-invalid`, `-search`, `-search-many`, `-search-none`), 30 PNGs, changed
   by the mark only; `-search-chosen` and the others did not change. Three were looked at (`-missing` 1024 x 640
   light, `-search-none` 1440 x 900 dark, `-code-invalid` 1920 x 1080 light); the other 27 were not opened.
+- Step 12.F19 (the CI step looked at one file). The step of the Rust job that runs `scripts/generate-crs-table`
+  compared only `table.rs`, so a script that changed another file (which the one of step 12.F9 did) would have
+  passed it; the fourth review pointed out that step 12.F14 had no test that fails without it. The step now
+  runs `git diff --exit-code` over the whole tree after the script (the checkout is clean at that point:
+  `cargo test --locked` does not change a tracked file). The test of 12.F14 is that step: with the script of
+  12.F9 and a badly formatted line in another file (the copy of 12.F14) it would have failed, and with the
+  script of 12.F14 it passes. The step can only be run on GitHub, so that is where it is to be read, in the run of this commit.
 
