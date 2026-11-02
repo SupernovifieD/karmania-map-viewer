@@ -1,4 +1,12 @@
-import type { CrsRef, CrsSource, DetectedCrs, Units } from '@karmania/engine';
+import type {
+  CrsInfo,
+  CrsKind,
+  CrsRef,
+  CrsSource,
+  CrsUnits,
+  DetectedCrs,
+  Units,
+} from '@karmania/engine';
 
 /** How the coordinate system is to be chosen: the one that was found, a code, or a local grid. */
 export type CrsMode = 'detected' | 'epsg' | 'local';
@@ -103,11 +111,55 @@ export function describeSource(source: CrsSource, sidecar: string | undefined): 
   }
 }
 
-/** What the step says has been chosen: where it came from, or that nothing has been. */
+/** What each kind of system is, in the middle of a sentence. */
+const KIND_WORDS: Readonly<Record<CrsKind, string>> = {
+  geographic: 'longitude and latitude',
+  projected: 'projected',
+  other: 'another kind',
+};
+
+/** What each unit of the axes of a system is called, in the middle of a sentence. */
+const AXIS_UNIT_WORDS: Readonly<Record<CrsUnits, string>> = {
+  m: 'metres',
+  ft: 'feet',
+  us_ft: 'US survey feet',
+  degree: 'degrees',
+  other: 'other units',
+};
+
+/** What a system is, in a few words: `projected, in metres`. */
+export function describeKind(info: CrsInfo): string {
+  return `${KIND_WORDS[info.kind]}, in ${AXIS_UNIT_WORDS[info.units]}`;
+}
+
+/** A system by name, and what it is: `WGS 84 / UTM zone 40N (projected, in metres)`. */
+export function describeInfo(info: CrsInfo): string {
+  return `${info.name} (${describeKind(info)})`;
+}
+
+/**
+ * A coordinate system in words, with its name when the definitions have one. `info` is what the
+ * definitions say of an EPSG code: the system, `null` if the code is not in them, `undefined` if they
+ * have not been asked (or the system is a local grid, which they know nothing of).
+ */
+export function describeNamed(crs: CrsRef, info: CrsInfo | null | undefined): string {
+  if (crs.kind === 'local' || info === undefined) {
+    return describeCrs(crs);
+  }
+  return info === null
+    ? `${describeCrs(crs)}, which is not one of the coordinate systems Karmania knows`
+    : `${describeCrs(crs)}, ${describeInfo(info)}`;
+}
+
+/**
+ * What the step says has been chosen: where it came from, or that nothing has been. `info` is what the
+ * definitions say of the code, as for `describeNamed`.
+ */
 export function summarizeCrs(
   draft: CrsDraft,
   detected: DetectedCrs | undefined,
   sidecar: string | undefined,
+  info?: CrsInfo | null,
 ): string {
   const chosen = crsOf(draft, detected);
   if (chosen === null) {
@@ -117,9 +169,9 @@ export function summarizeCrs(
     case 'detected':
       return detected === undefined
         ? ''
-        : `${describeCrs(chosen)}, from ${describeSource(detected.source, sidecar)}.`;
+        : `${describeNamed(chosen, info)}, from ${describeSource(detected.source, sidecar)}.`;
     case 'epsg':
-      return `${describeCrs(chosen)}, as you entered it.`;
+      return `${describeNamed(chosen, info)}, as you entered it.`;
     default:
       return `${describeCrs(chosen)}: the coordinates are not tied to a place on the Earth, only to each other.`;
   }

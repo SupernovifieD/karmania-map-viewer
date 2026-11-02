@@ -1,10 +1,13 @@
-import type { DetectedCrs } from '@karmania/engine';
+import type { CrsInfo, DetectedCrs } from '@karmania/engine';
 import { describe, expect, it } from 'vitest';
 import {
   crsBlocker,
   crsDraftFor,
   crsOf,
   describeCrs,
+  describeInfo,
+  describeKind,
+  describeNamed,
   describeSource,
   epsgError,
   parseEpsg,
@@ -142,6 +145,69 @@ describe('writing a coordinate system for people', () => {
     );
     expect(summarizeCrs({ ...base, mode: undefined }, undefined, undefined)).toBe(
       'No coordinate system is chosen yet.',
+    );
+  });
+});
+
+describe('writing what the definitions say of a code', () => {
+  const utm: CrsInfo = {
+    code: 32640,
+    name: 'WGS 84 / UTM zone 40N',
+    kind: 'projected',
+    units: 'm',
+    metresPerUnit: 1,
+  };
+  const wgs84: CrsInfo = { code: 4326, name: 'WGS 84', kind: 'geographic', units: 'degree' };
+
+  it('says what a system is in words a person uses', () => {
+    expect(describeKind(utm)).toBe('projected, in metres');
+    expect(describeKind(wgs84)).toBe('longitude and latitude, in degrees');
+    expect(describeKind({ ...utm, units: 'us_ft', metresPerUnit: 1200 / 3937 })).toBe(
+      'projected, in US survey feet',
+    );
+    expect(describeKind({ ...utm, units: 'ft', metresPerUnit: 0.3048 })).toBe('projected, in feet');
+    expect(describeKind({ code: 3993, name: 'EPSG:3993', kind: 'other', units: 'other' })).toBe(
+      'another kind, in other units',
+    );
+  });
+
+  it('gives a system by its name, and what it is', () => {
+    expect(describeInfo(utm)).toBe('WGS 84 / UTM zone 40N (projected, in metres)');
+    expect(describeInfo(wgs84)).toBe('WGS 84 (longitude and latitude, in degrees)');
+  });
+
+  it('gives a code with its name when it has one, and says so when it is not known', () => {
+    const code = { kind: 'epsg', code: 32640 } as const;
+    expect(describeNamed(code, utm)).toBe(
+      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+    );
+    expect(describeNamed(code, null)).toBe(
+      'EPSG 32640, which is not one of the coordinate systems Karmania knows',
+    );
+    // Not asked yet, or a local grid, which the definitions know nothing of.
+    expect(describeNamed(code, undefined)).toBe('EPSG 32640');
+    expect(describeNamed({ kind: 'local', units: 'm' }, utm)).toBe('a local grid, in metres');
+  });
+
+  it('puts the name into what the step says is chosen, and leaves the rest as it was', () => {
+    const draft = { mode: 'detected' as const, epsg: '', units: 'm' as const };
+    expect(summarizeCrs(draft, fromPrj, 'points.prj', utm)).toBe(
+      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+    );
+    expect(summarizeCrs({ ...draft, mode: 'epsg', epsg: '32640' }, undefined, undefined, utm)).toBe(
+      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
+    );
+    expect(
+      summarizeCrs({ ...draft, mode: 'epsg', epsg: '99999' }, undefined, undefined, null),
+    ).toBe(
+      'EPSG 99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
+    );
+    // With nothing known of the code the sentence is the one of phase 1.
+    expect(summarizeCrs(draft, fromPrj, 'points.prj')).toBe(
+      'EPSG 32640, from the .prj file points.prj.',
+    );
+    expect(summarizeCrs({ ...draft, mode: 'local', units: 'ft' }, undefined, undefined, utm)).toBe(
+      'a local grid, in feet: the coordinates are not tied to a place on the Earth, only to each other.',
     );
   });
 });
