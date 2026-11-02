@@ -119,6 +119,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Draw it with other local grids, or give the data a coordinate system by its EPSG code.
 - Example: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
 
+## `crs.transform.not_finite`
+
+- Severity: warning
+- Step: none
+- Message: Some positions are outside the area where the new coordinate system can place them, so they could not be converted.
+- Hint: Check the coordinate system of the data, or choose another coordinate system for the map.
+- Example: Some positions are outside the area where the new coordinate system can place them, so they could not be converted.
+
 ## `crs.transform.unsupported`
 
 - Severity: error
