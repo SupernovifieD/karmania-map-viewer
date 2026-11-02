@@ -20,6 +20,7 @@ mod values;
 
 use serde::Serialize;
 
+use crate::crs::{CrsKinds, Wgs84Only};
 use crate::dataset::Dataset;
 use crate::findings::{Finding, Findings};
 
@@ -58,24 +59,38 @@ impl ValidationReport {
     }
 }
 
-type Check = fn(&Dataset, &mut Findings);
+type Check = fn(&Dataset, &dyn CrsKinds, &mut Findings);
 
 /// The check groups in the order they run.
 const GROUPS: [(&str, Check); 3] = [
-    ("structure", structure::check),
-    ("values", values::check),
+    ("structure", |dataset, _, findings| {
+        structure::check(dataset, findings)
+    }),
+    ("values", |dataset, _, findings| {
+        values::check(dataset, findings)
+    }),
     ("crs", crs_checks::check),
 ];
 
 /// Validates `dataset` and returns the report. Deterministic: the same dataset
 /// always gives the same findings in the same order.
+///
+/// The core alone knows one longitude and latitude system, EPSG:4326 ([`Wgs84Only`]); use
+/// [`validate_with`] to give it more.
 #[must_use]
 pub fn validate(dataset: &Dataset) -> ValidationReport {
+    validate_with(dataset, &Wgs84Only)
+}
+
+/// Like [`validate`], with `kinds` telling it which EPSG codes are longitude and latitude
+/// systems, so that the coordinates of every such system are checked.
+#[must_use]
+pub fn validate_with(dataset: &Dataset, kinds: &dyn CrsKinds) -> ValidationReport {
     let groups = GROUPS
         .iter()
         .map(|&(name, check)| {
             let mut findings = Findings::new();
-            check(dataset, &mut findings);
+            check(dataset, kinds, &mut findings);
             CheckGroup { name, findings }
         })
         .collect();
@@ -105,6 +120,38 @@ mod tests {
         let report = validate(&points_dataset());
         let names: Vec<_> = report.groups().iter().map(|g| g.name).collect();
         assert_eq!(names, ["structure", "values", "crs"]);
+    }
+
+    #[test]
+    fn validating_with_what_the_core_knows_is_validating() {
+        let d = points_dataset();
+        assert_eq!(validate_with(&d, &Wgs84Only), validate(&d));
+    }
+
+    #[test]
+    fn validating_with_more_kinds_checks_more_systems() {
+        struct Nad83;
+        impl CrsKinds for Nad83 {
+            fn geography(&self, code: u32) -> crate::crs::CrsGeography {
+                if code == 4269 {
+                    crate::crs::CrsGeography::Geographic
+                } else {
+                    crate::crs::CrsGeography::Unknown
+                }
+            }
+        }
+        let p =
+            Positions::from_xyz(&[500_000.0], &[2_800_000.0], None, &mut Findings::new()).unwrap();
+        let mut d = Dataset::new(DatasetId(1), "p", None, Geometry::Points(p), Table::empty());
+        d.crs = Some(crate::crs::CrsRef::Epsg { code: 4269 });
+        let codes = |report: &ValidationReport| -> Vec<&'static str> {
+            report.findings().map(|f| f.code.as_str()).collect()
+        };
+        assert!(codes(&validate(&d)).is_empty());
+        assert_eq!(
+            codes(&validate_with(&d, &Nad83)),
+            ["crs.geographic.out_of_range"]
+        );
     }
 
     #[test]
