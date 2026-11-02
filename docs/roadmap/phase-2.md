@@ -119,6 +119,8 @@ or releasing, and whenever the brief says to stop.
   Screenshots updated and reviewed.
 - [x] 12.F1 The transformer refuses a geographic system whose units are not
   degrees (found at the gate: EPSG:4807 and eight others were read as degrees).
+- [x] 12.F2 `THIRD_PARTY_NOTICES.md` begun, with the EPSG acknowledgement and terms
+  (found at the gate: the engine's types pointed at a file that did not exist).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

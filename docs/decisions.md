@@ -2582,3 +2582,14 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   The registry sweep of 12.6c has a fifth group: 5,737 can be used and 447 are refused (238 datum files,
   196 geocentric, 9 not degrees, 2 projection, 2 no definition), with the nine codes pinned. The new test
   failed before the change (tried: the transformer was built for 4807).
+- Step 12.F2 (the notices). The data of the EPSG definitions is in the WebAssembly kernel since step 12.12,
+  and the owner's decision of step 12.2 was to bundle it "with notices", but the file the notices were
+  to be in (`THIRD_PARTY_NOTICES.md`, step 23.5) did not exist, and the types of the engine point at it.
+  Nothing is distributed yet (there is no deploy or release workflow, and no package is published), so
+  nobody has been given the data without the notice; the notice is made now so that none can be. The
+  file is begun with the EPSG section only: the acknowledgement of IOGP, the statement that its terms
+  apply to anyone given the definitions, the terms as they were read (said again to be second-hand),
+  what Karmania does with the data and that it attributes nothing of its own to EPSG, and that the
+  kernel's build is therefore not purely Apache-2.0. Step 23.5 stays, and completes it for the libraries,
+  the font, the icons and the colour data. The terms have still not been read at the source.
+
