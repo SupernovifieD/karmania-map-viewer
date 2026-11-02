@@ -2428,3 +2428,15 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   the envelope check asks `'result' in data`. Six tests, run on the real kernel (one with a kernel that lies), and the
   two exhaustive protocol tests extended. They fail when the code is not validated and when the
   kernel's answer is not checked (each tried, file restored). The engine's own methods are 12.13c.
+- Step 12.13c (the engine's methods). `Engine` gains `crsInfo(code)` (a `CrsInfo` or `undefined`) and
+  `searchCrs(query, limit)` (a list), as section 11.1 of the brief has them; `limit` is required, not
+  defaulted, as the brief writes it. Both wait for the worker as the other methods do, reject with
+  `EngineDisposedError` once the engine is disposed, and reject with `EngineError` for what the worker
+  refuses (step 12.13b), with the engine still usable afterwards. The test of phase 1 that said the
+  engine has "no search of coordinate systems" (it pins decision 3.25c) is changed on purpose, since this
+  phase brings it back: it now lists the two methods and their types. Tests: five over the in-process
+  channel and the real kernel (the answers, the search, the misuse, the disposed engine, and what a real
+  load makes of UTM-looking points under three codes: nothing under 32640, `crs.code.unknown` under
+  99999 and `crs.geographic.out_of_range` under 4269, which is step 12.11 seen through an engine), and
+  one with the real Web Worker in Chromium, which runs the same scenario in the page and in Node and
+  requires the two reports to be equal. Engine unit tests are at 297, its browser tests at 13.

@@ -6,7 +6,8 @@
  */
 import type { Engine, ImportPhase } from '../src/api.js';
 import { mappingFrom } from '../src/test-support/mapping.js';
-import type { CrsRef, Kind } from '../src/types.js';
+import { points } from '../src/builders.js';
+import type { CrsInfo, CrsRef, Kind } from '../src/types.js';
 
 /** Gets a sample file by name. */
 export type LoadFile = (name: string) => Promise<File>;
@@ -153,4 +154,56 @@ export async function runFixture(
     });
   }
   return { ...report, status: 'loaded', datasets, blockedBy: [] };
+}
+
+/** What the EPSG definitions said through an engine, as plain data. */
+export interface CrsReport {
+  readonly utm40: CrsInfo | undefined;
+  readonly unknown: CrsInfo | undefined;
+  /** The codes of a search for a name, and of one for a code. */
+  readonly byName: readonly number[];
+  readonly byCode: readonly number[];
+  /** The name and message of the error for a code that is not a whole number. */
+  readonly misuse: string;
+  /** The codes of the findings a load of UTM-looking points came to, for each EPSG code. */
+  readonly loaded: Readonly<Record<string, readonly string[]>>;
+}
+
+/** Asks about EPSG codes, and loads points under three of them, and reports what came back. */
+export async function runCrs(engine: Engine): Promise<CrsReport> {
+  const [utm40, unknown, byName, byCode] = await Promise.all([
+    engine.crsInfo(32640),
+    engine.crsInfo(99_999),
+    engine.searchCrs('WGS 84 / UTM zone 40', 5),
+    engine.searchCrs('EPSG:4326', 5),
+  ]);
+  let misuse = 'no error';
+  try {
+    await engine.crsInfo(-1);
+  } catch (error) {
+    misuse = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  }
+  const loaded: Record<string, string[]> = {};
+  for (const code of [32640, 99_999, 4269]) {
+    const result = await engine.load(
+      points({
+        name: `EPSG:${String(code)}`,
+        x: [500_000, 500_010],
+        y: [2_700_000, 2_700_010],
+        crs: { kind: 'epsg', code },
+      }),
+    );
+    loaded[String(code)] =
+      result.status === 'loaded'
+        ? (result.summaries[0]?.findings ?? []).map((finding) => finding.code)
+        : result.findings.map((finding) => `blocked: ${finding.code}`);
+  }
+  return {
+    utm40,
+    unknown,
+    byName: byName.map((found) => found.code),
+    byCode: byCode.map((found) => found.code),
+    misuse,
+    loaded,
+  };
 }
