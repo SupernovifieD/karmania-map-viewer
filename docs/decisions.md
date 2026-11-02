@@ -2811,3 +2811,14 @@ about the change of step 12.F13.
   `-search-none` light: the box ends 36 px over the footer at 1024 x 640 and the half row shows as a scroll
   cue; the other 29 were not opened. **Not verified**: real scroll bars of Windows or Linux (the measure
   of the body is what is tested, not a bar).
+- Step 12.F18 (the mark). The check mark was shown beside "No coordinate system is chosen yet." in the "EPSG
+  code" mode (nothing typed, a name not yet picked, a number that is not a code): the step used the alert
+  mark only when no mode was chosen. It is phase 1's behaviour, found by the fourth review, and it matters
+  more now that the mode has a box of matches under the sentence. The mark follows `crsOf(...) === null`,
+  the test the sentence itself uses, so the two cannot disagree. A phase-1 test pinned the mark for "no
+  mode" and for the local grid, and still passes unchanged; the new test goes through the EPSG mode (nothing
+  typed, a name, a pick, "0", a code) and failed before. Baselines: the five states with nothing chosen in the
+  mode (`wizard-crs-missing`, `-code-invalid`, `-search`, `-search-many`, `-search-none`), 30 PNGs, changed
+  by the mark only; `-search-chosen` and the others did not change. Three were looked at (`-missing` 1024 x 640
+  light, `-search-none` 1440 x 900 dark, `-code-invalid` 1920 x 1080 light); the other 27 were not opened.
+

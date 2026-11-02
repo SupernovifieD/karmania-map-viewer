@@ -580,6 +580,29 @@ test.describe('the coordinate system step', () => {
     await expect(p.summaryIcon).toHaveAttribute('name', 'check');
   });
 
+  test('has the mark of nothing chosen in the EPSG mode until a code is typed or a match is picked', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'circle-alert');
+    // A name is not a code: nothing is chosen, and the mark says so, until a match is picked.
+    await p.codeInput.fill('WGS 84 / UTM zone 40');
+    await expect(p.rows).toHaveCount(2);
+    await expect(p.summaryIcon).toHaveAttribute('name', 'circle-alert');
+    await p.rows.first().click();
+    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'check');
+    // A number that is not a code is no choice either.
+    await p.codeInput.fill('0');
+    await expect(p.summary).toContainText('No coordinate system is chosen yet.');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'circle-alert');
+    await p.codeInput.fill('32640');
+    await expect(p.summaryIcon).toHaveAttribute('name', 'check');
+  });
+
   test('tells screen readers when the choice changes, in a status region', async ({ page }) => {
     const p = parts(page);
     await crsOf(page, 'points.csv');

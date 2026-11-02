@@ -153,6 +153,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.F17 The CRS step no longer makes the dialog scroll at 1024 x 640 (the box shows
   3.5 rows), and its "Chosen:" line is not cut in a narrow window (fourth review).
   Screenshots updated and reviewed.
+- [x] 12.F18 The CRS step shows the mark of "nothing chosen" in the EPSG mode until a code
+  is typed or a match picked (fourth review). Screenshots updated and reviewed.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
