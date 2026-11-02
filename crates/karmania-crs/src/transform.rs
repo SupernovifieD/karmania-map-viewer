@@ -148,7 +148,7 @@ impl Projection {
 fn build(code: u32) -> Result<Proj, Finding> {
     let definition = u16::try_from(code)
         .ok()
-        .and_then(crs_definitions::from_code)
+        .and_then(crate::registry::get)
         .ok_or_else(|| code_unknown(code))?;
     if definition.proj4.is_empty() {
         return Err(unsupported(code, "it has no definition"));

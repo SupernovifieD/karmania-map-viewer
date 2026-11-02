@@ -24,10 +24,8 @@ pub fn search(query: &str, limit: usize) -> Vec<CrsInfo> {
     let needle = query.to_lowercase();
     let mut starting = Vec::new();
     let mut containing = Vec::new();
-    for code in 0..=u16::MAX {
-        let Some(definition) = crs_definitions::from_code(code) else {
-            continue;
-        };
+    for definition in crate::registry::all() {
+        let code = definition.code;
         if exact
             .as_ref()
             .is_some_and(|(found, _)| *found == u32::from(code))
@@ -268,10 +266,8 @@ mod tests {
     #[test]
     fn the_quick_name_is_the_name_describe_gives_for_every_definition() {
         let mut slow = 0;
-        for code in 0..=u16::MAX {
-            let Some(definition) = crs_definitions::from_code(code) else {
-                continue;
-            };
+        for definition in crate::registry::all() {
+            let code = definition.code;
             let described = describe(u32::from(code), definition.wkt).name;
             assert_eq!(
                 name_of(u32::from(code), definition.wkt),

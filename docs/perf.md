@@ -220,6 +220,15 @@ bytes larger than the same file measured this way; at these sizes that does not 
 | Step 12.11c, with the definitions and `proj4rs` | 5,762,604 | 742,732 | not measured | not measured |
 | Step 12.12, with `crsInfo` and `searchCrs` | 5,774,943 | 757,177 | 46,642 | 8,425 |
 | After M12 (step 12.F4, the wizard and the summary done) | 5,774,943 | 757,177 | 48,430 | 8,831 |
+| Step 12.F7, the definitions as a table | 5,451,076 | 647,422 | 48,461 | 8,830 |
+
+Step 12.F7 held the definitions as a table of the crate's constants, found by binary search, and not as
+its one match of 6,184 arms, so that Node does not abort (see `docs/decisions.md`): the module is 323,867
+bytes smaller raw and 109,755 smaller gzipped than at step 12.12, so that it has grown by 394,680 bytes
+gzipped since the start of the phase (the figures below are those of step 12.12, before that). No JavaScript of the
+app was changed by it: its `index` and `theme` are 31 bytes gzipped larger than at step 12.F4, which are
+the wording of step 12.F5. A search in Node takes a median of 1.75 ms (50 searches, maximum
+8.9 ms) and one `crsInfo` 0.007 ms, and compiling the module takes the same 2.0 ms and 3.8 ms as before.
 
 Against the rule: the definitions and the reprojection added 489,532 bytes gzipped (step 12.11c), the
 two exports 14,445 more, and the changes to the core of steps 12.9 to 12.11b 458, so the module has

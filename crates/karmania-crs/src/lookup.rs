@@ -7,7 +7,7 @@ use crate::info::{CrsInfo, describe};
 /// below it).
 #[must_use]
 pub fn lookup(code: u32) -> Option<CrsInfo> {
-    let definition = crs_definitions::from_code(u16::try_from(code).ok()?)?;
+    let definition = crate::registry::get(u16::try_from(code).ok()?)?;
     Some(describe(code, definition.wkt))
 }
 

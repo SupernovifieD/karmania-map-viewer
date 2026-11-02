@@ -129,6 +129,9 @@ or releasing, and whenever the brief says to stop.
   code that was picked from the matches of a name. Screenshots updated and reviewed.
 - [x] 12.F6 The search test of "a code that is also part of names" uses one that is
   (2000), not 84, which is not a code.
+- [x] 12.F7 The definitions are held as a table, not as the one giant match of
+  `crs-definitions`, which made Node 24 abort after a few dozen lookups
+  (found at the gate).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

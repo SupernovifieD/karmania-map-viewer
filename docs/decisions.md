@@ -2519,7 +2519,7 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   moves, the dark theme reads, the first of the two problems the pictures showed (a note over two lines in
   the footer, and no sign that rows were hidden) was fixed and the pictures retaken. axe finds nothing in
   any of the nine CRS states in either theme.
-- Risk found at step 12.14d, not fixed (**understated: corrected at the M12 gate, see step 12.F3**): V8's optimizing WebAssembly compiler runs out of memory on the
+- Risk found at step 12.14d, not fixed (**understated: corrected at the M12 gate, see step 12.F3, and removed at step 12.F7**): V8's optimizing WebAssembly compiler runs out of memory on the
   definitions table. `crs_definitions::from_code`, a match of 6,184 arms, is one very large function, and
   once it has been called often enough (a loop over 65,536 codes, or about 100 searches) Node 24's V8
   (13.6) tries to optimise it in the background and dies with "Fatal process out of memory: Zone", always,
@@ -2658,4 +2658,26 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   on tests, that the `karmania-wasm` unit tests go through `core_kernel()` and not `Kernel::new()`, so that
   only the engine's tests would catch a regression there, is left as it is: nothing in the wasm crate
   builds a kernel any other way.
+- Step 12.F7 (the definitions as data; the owner chose this remedy at the gate). The giant function is
+  `crs_definitions::from_code`, which nothing in the kernel calls any more. The constants the crate
+  already has, one for each definition (`EPSG_4326`, ...), are listed in a table in the order of their
+  codes, `crates/karmania-crs/src/registry/table.rs` (6,184 entries, 95 KB, generated and tracked on
+  purpose, with a header that says so), made by `scripts/generate-crs-table` from the crate's own source;
+  `registry::get` finds a code in it by binary search and `registry::all` goes through it, and `lookup`,
+  `search` and the transformer use those. The same crate and the same data as before, so the EPSG terms and
+  the values are as they were. A search used to try 65,536 codes with `from_code` and now goes through
+  the 6,184 definitions. **Tests**: that the table is what `from_code` says for every code from 0 to 65,535
+  and has 6,184 entries (it is the one place `from_code` is still called, and what fails if the crate is
+  updated and the table is not made again), that it is in order without a repeat, and, in the engine, that
+  a Node process which loads the built module and makes 3,000 lookups and 20 searches stays up for three
+  seconds after them (`kernel-node-stays-up.test.ts`): **with the module of before the change it fails**,
+  with the `Fatal process out of memory: Zone` trace, after 18 seconds (tried: the old module put in
+  place, the test run, the new module put back, its checksum looked at), and with the new module it passes
+  in 4.4 seconds. **Measured with the new module in Node 24.22.1**, one process for each number: 100, 1,000,
+  30,000 and 65,535 `crsInfo` calls, no abort (they aborted from about 100 before); 1, 5, 150 and 1,000
+  searches, none (one aborted before); the engine's end-to-end run in Node and Chromium, 13 passed in 11.7
+  seconds with no trace (the CI run with the trace took 25.0). **Size**: the module is 5,451,076 bytes raw
+  (323,867 fewer) and 647,422 gzipped (109,755 fewer), and a search takes a median of 1.75 ms in Node. What
+  it does not show: that CI is free of the trace (to be read in the run of this commit), and Firefox and
+  Safari, which were not tried before and are not now.
 
