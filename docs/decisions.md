@@ -2159,3 +2159,15 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   unit is no longer a name and a factor but one of the five values of the contract, with the
   metres of a unit taken from `karmania_core::Units`, so a foot is the same foot as the one of a
   local grid; there is no `metresPerUnit` for other units, as the brief says.
+- Step 12.3d (`describe`). Reads the name, the kind and the unit of a definition from its WKT, for
+  the horizontal part of compound and bound systems. Reused from `epsg.rs` before step 3.25b: the
+  reading of the kind from the keyword of the horizontal part, of the unit from the direct `UNIT`
+  child (or, for the newer geographic style, an `ANGLEUNIT` further in), the fall back to
+  `EPSG:<code>` and the kind `other`. New: a unit is named by its factor, not by its name, within
+  1e-12 of a known value, which is far inside the 6e-7 m between the international and the US survey
+  foot (a test pins that the two are not taken for each other, nor 0.3048000001 for a foot); a
+  degree is a geographic factor of pi/180, and any other angle (grad, radian) is `other`; the other
+  length units of the registry (Clarke's foot, links, chains) are `other` with no metres, as the
+  contract says, so a projected system in them is described but cannot be scaled. A geocentric
+  system is `other` with metres. The 224 lines (82 of code, the rest tests on hand-written
+  definitions of each case) are over the guideline; the function and its cases were not cut apart.
