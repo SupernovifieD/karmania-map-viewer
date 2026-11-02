@@ -132,6 +132,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.F7 The definitions are held as a table, not as the one giant match of
   `crs-definitions`, which made Node 24 abort after a few dozen lookups
   (found at the gate).
+- [x] 12.F8 The "Chosen:" line of the CRS step is one line, cut, with the whole in its
+  title, when matches are under it: a long name no longer moves the box (second review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

@@ -2681,3 +2681,19 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   it does not show: that CI is free of the trace (to be read in the run of this commit), and Firefox and
   Safari, which were not tried before and are not now.
 
+## M12 gate, second round
+
+The second independent review (a fresh subagent, on the head `ffae13c`) found no blocker or major, three
+minors and four nits. Each is a sub-step, or recorded.
+
+- Step 12.F8 (a long name moved the box). The "Chosen:" line wraps, and a long name of a system made it two
+  lines, so that the box of the matches under it moved by a line when the name was chosen: 45% of the
+  definitions would wrap (the review's measure, at 1024 x 640), which is against what decision 12.14c says
+  of nothing moving. In the "EPSG code" mode, the only one with the matches under it, the line is now one
+  line, cut with an ellipsis, with the whole in its title (the status that is read out has it whole as
+  before). The other modes wrap as they did, since nothing is under them and their sentences are
+  explanations, not names (the first try cut them all and so cut "only to each other" of the local grid,
+  which the picture of `wizard-crs-local` showed). The new test failed before the change (the box was at 345
+  and moved to 365). No baseline changed: every wizard and CRS picture is as it was (26 passed, none
+  retaken).
+
