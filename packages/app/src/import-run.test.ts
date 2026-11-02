@@ -87,7 +87,7 @@ describe('the mapping the kernel is given', () => {
     const geojson: Preview = { fileName: 'a.geojson', format: 'geojson', findings: [] };
     const made = { group: { file: new File([''], 'a.geojson'), sidecars: [] }, preview: geojson };
     const mapping = buildMapping(
-      { ...draftFor(made), crs: { mode: 'local', epsg: '', units: 'ft' } },
+      { ...draftFor(made), crs: { mode: 'local', epsg: '', query: '', units: 'ft' } },
       made,
     );
     expect(mapping.kind).toBe('points');

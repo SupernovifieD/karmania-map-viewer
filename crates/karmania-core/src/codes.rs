@@ -164,12 +164,22 @@ finding_codes! {
     MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
     /// The mapping names a column that is not in the file.
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
+    /// The EPSG code is not one of the coordinate systems Karmania knows.
+    CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
-    /// In EPSG:4326, X fits latitude and Y does not, so the two look swapped.
+    /// In a geographic system, X fits latitude and Y does not, so the two look swapped.
     CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
-    /// In EPSG:4326, some coordinates are not valid longitudes and latitudes.
+    /// In a geographic system, some coordinates are not valid longitudes and latitudes.
     CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
+    /// A local grid has no known place on the Earth, so it cannot be converted to or from an EPSG system.
+    CrsTransformLocalGrid => "crs.transform.local_grid", Error, None;
+    /// An EPSG code that is not in the coordinate systems Karmania knows cannot be converted to or from.
+    CrsTransformCodeUnknown => "crs.transform.code_unknown", Error, None;
+    /// An EPSG system that is known cannot be used to convert positions, and the reason.
+    CrsTransformUnsupported => "crs.transform.unsupported", Error, None;
+    /// Some positions could not be converted to the other coordinate system.
+    CrsTransformNotFinite => "crs.transform.not_finite", Warning, None;
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The per-vertex table does not have one row per vertex.

@@ -20,6 +20,10 @@ export interface KernelApi {
 export interface KernelModule {
   readonly version: () => string;
   readonly preview: (fileName: string, bytes: Uint8Array, sidecars: unknown) => unknown;
+  /** What an EPSG code means, or `undefined` if it is not in the definitions. */
+  readonly crsInfo: (code: number) => unknown;
+  /** The EPSG definitions whose code or name matches the query, at most `limit` and never over 50. */
+  readonly searchCrs: (query: string, limit: number) => unknown;
   readonly createKernel: () => KernelApi;
 }
 
@@ -30,6 +34,8 @@ export type LoadKernelModule = (options: { readonly wasmUrl?: string }) => Promi
 export interface GeneratedBindings {
   readonly version: () => string;
   readonly preview: (fileName: string, bytes: Uint8Array, sidecars: unknown) => unknown;
+  readonly crsInfo: (code: number) => unknown;
+  readonly searchCrs: (query: string, limit: number) => unknown;
   readonly Kernel: new () => KernelApi;
 }
 
@@ -38,6 +44,8 @@ export function kernelModuleOf(generated: GeneratedBindings): KernelModule {
   return {
     version: () => generated.version(),
     preview: (fileName, bytes, sidecars) => generated.preview(fileName, bytes, sidecars),
+    crsInfo: (code) => generated.crsInfo(code),
+    searchCrs: (query, limit) => generated.searchCrs(query, limit),
     createKernel: () => new generated.Kernel(),
   };
 }

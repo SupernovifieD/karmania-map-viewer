@@ -66,7 +66,7 @@ fn one_million_points() {
     for (name, check) in GROUPS {
         let start = Instant::now();
         let mut findings = Findings::new();
-        check(&dataset, &mut findings);
+        check(&dataset, &crate::crs::Wgs84Only, &mut findings);
         println!(
             "TIMING group {name:9} {:>8.1} ms  ({} findings)",
             start.elapsed().as_secs_f64() * 1e3,

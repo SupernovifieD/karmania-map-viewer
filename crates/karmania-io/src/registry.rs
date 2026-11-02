@@ -7,7 +7,10 @@
 
 use std::collections::BTreeMap;
 
-use karmania_core::{Dataset, DatasetId, Findings, Severity, Summary, ValidationReport, validate};
+use karmania_core::{
+    CrsKinds, Dataset, DatasetId, Findings, Severity, Summary, ValidationReport, Wgs84Only,
+    validate_with,
+};
 use serde::Serialize;
 
 /// What loading datasets came to. In JSON: `{ "status": "loaded", "summaries": [...] }`
@@ -56,12 +59,25 @@ impl Registry {
 
     /// Validates `datasets`, which came from one source, and loads them if none has
     /// an error. `context` holds the findings about how they were made (a file's
-    /// reading problems, for example); it is attached to every dataset loaded.
+    /// reading problems, for example); it is attached to every dataset loaded. The
+    /// core alone knows which EPSG codes are longitude and latitude (EPSG:4326 only);
+    /// use [`Registry::load_with`] to say more.
     pub fn load(&mut self, datasets: Vec<Dataset>, context: Findings) -> LoadResult {
+        self.load_with(datasets, context, &Wgs84Only)
+    }
+
+    /// Like [`Registry::load`], with `kinds` telling validation which EPSG codes are
+    /// longitude and latitude systems.
+    pub fn load_with(
+        &mut self,
+        datasets: Vec<Dataset>,
+        context: Findings,
+        kinds: &dyn CrsKinds,
+    ) -> LoadResult {
         let validated = datasets
             .into_iter()
             .map(|dataset| {
-                let report = validate(&dataset);
+                let report = validate_with(&dataset, kinds);
                 (dataset, report)
             })
             .collect();

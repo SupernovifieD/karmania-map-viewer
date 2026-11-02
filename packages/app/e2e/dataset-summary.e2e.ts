@@ -63,6 +63,20 @@ async function setDatasets(
   await page.locator('karmania-panel k-tabs [role="tab"]').filter({ hasText: 'Data' }).click();
 }
 
+/**
+ * Crafted datasets have no engine behind them, so the app is given one that only says what a code
+ * means, with `answer` (the source of a function of the code). It is the app that is given it, not the
+ * summary: the app hands its own lookup down again each time it draws.
+ */
+function answerCodesWith(page: Page, answer: string): Promise<void> {
+  return page.locator('karmania-app').evaluate((element, source) => {
+    (element as unknown as { engine: unknown }).engine = {
+      crsInfo: (0, eval)(source) as (code: number) => Promise<unknown>,
+      dispose: () => undefined,
+    };
+  }, answer);
+}
+
 const WARNING = {
   code: 'values.points.duplicate',
   severity: 'warning',
@@ -92,7 +106,11 @@ test.describe('the summary of the selected dataset', () => {
     await importAndLoad(page, 'points.csv', 'points.prj');
     await expect(p.fact('Kind')).toHaveText('Points');
     await expect(p.fact('Size')).toHaveText('8 points');
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 32640');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG 32640, WGS 84 / UTM zone 40N, metres');
+    await expect(p.fact('Coordinates')).toHaveAttribute(
+      'title',
+      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+    );
     await expect(p.fact('Heights')).toHaveText('Yes (Z)');
     await expect(p.fact('X')).toHaveText('500010.5 to 500185.5');
     await expect(p.fact('Y')).toHaveText('2765020.25 to 2765205.25');
@@ -118,6 +136,97 @@ test.describe('the summary of the selected dataset', () => {
     await expect(p.fact('Size')).toHaveText('6 triangles');
     await expect(p.fact('Vertices')).toHaveText('5');
     await expect(p.fact('Kind')).toHaveText('Mesh');
+  });
+
+  test('gives the name and unit of a code the definitions know, says so for one they do not, and leaves a local grid alone', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    // With no engine to ask, the code is shown as it is.
+    await setDatasets(page, [crafted({ crs: { kind: 'epsg', code: 4326 } })]);
+    await expect(p.fact('Coordinates')).toHaveText('EPSG 4326');
+    await answerCodesWith(
+      page,
+      "async (code) => ({ code, name: 'WGS 84', kind: 'geographic', units: 'degree' })",
+    );
+    await setDatasets(page, [crafted({ id: 2, crs: { kind: 'epsg', code: 4326 } })]);
+    await expect(p.fact('Coordinates')).toHaveText('EPSG 4326, WGS 84, degrees');
+    await expect(p.fact('Coordinates')).toHaveAttribute(
+      'title',
+      'EPSG 4326, WGS 84 (longitude and latitude, in degrees)',
+    );
+    await answerCodesWith(page, 'async () => undefined');
+    await setDatasets(page, [crafted({ id: 3, crs: { kind: 'epsg', code: 99999 } })]);
+    await expect(p.fact('Coordinates')).toHaveText('EPSG 99999, not one Karmania knows');
+    await setDatasets(page, [crafted({ id: 4, crs: { kind: 'local', units: 'ft' } })]);
+    await expect(p.fact('Coordinates')).toHaveText('Local grid, feet');
+  });
+
+  test('still shows the rest of the summary, and the code as it is, when what says what a code means fails', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    // One that throws before it gives a promise, and one that rejects. Each dataset has a size of its
+    // own, so that a summary that was not drawn again would show.
+    for (const [id, answer] of [
+      [1, "() => { throw new Error('This is not a function of the engine.'); }"],
+      [2, "() => Promise.reject(new Error('The module did not start.'))"],
+    ] as const) {
+      await answerCodesWith(page, answer);
+      await setDatasets(page, [
+        crafted({ id, elementCount: id * 100, crs: { kind: 'epsg', code: 32640 } }),
+      ]);
+      await expect(p.fact('Size')).toHaveText(`${String(id * 100)} points`);
+      await expect(p.fact('Coordinates')).toHaveText('EPSG 32640');
+    }
+  });
+
+  test('keeps to two lines, with the whole of a long name in its title, when the name is long', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await answerCodesWith(
+      page,
+      `(code) =>
+        Promise.resolve({
+          code,
+          name: 'NAD83(2011) / WISCRS Calumet, Fond du Lac, Outagamie and Winnebago (ftUS)',
+          kind: 'projected',
+          units: 'us_ft',
+          metresPerUnit: 1200 / 3937,
+        })`,
+    );
+    await setDatasets(page, [crafted({ crs: { kind: 'epsg', code: 7594 } })]);
+    await expect(p.fact('Coordinates')).toContainText('WISCRS Calumet');
+    const line = (await rect(p.fact('Kind'))).height;
+    const box = await rect(p.fact('Coordinates'));
+    // Two lines of the summary's text, cut with an ellipsis after them, not a third.
+    expect(box.height).toBeCloseTo(2 * line, 0);
+    expect(
+      await p
+        .fact('Coordinates')
+        .evaluate((element) => element.scrollHeight > element.clientHeight),
+    ).toBe(true);
+    await expect(p.fact('Coordinates')).toHaveAttribute('title', /\(ftUS\)/);
+    await assertNoOverflow(p.panel);
+  });
+
+  test('shows the whole of a name of the usual length, over two lines if it needs them', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await answerCodesWith(
+      page,
+      `(code) => Promise.resolve({ code, name: 'WGS 84 / UTM zone 40N', kind: 'projected', units: 'm' })`,
+    );
+    await setDatasets(page, [crafted({ crs: { kind: 'epsg', code: 32640 } })]);
+    await expect(p.fact('Coordinates')).toHaveText('EPSG 32640, WGS 84 / UTM zone 40N, metres');
+    // Nothing is cut: what is said is what is there.
+    expect(
+      await p
+        .fact('Coordinates')
+        .evaluate((element) => element.scrollHeight <= element.clientHeight),
+    ).toBe(true);
   });
 
   test('leaves out the Z of a dataset with no heights, and says so', async ({ page }) => {

@@ -145,6 +145,18 @@ export function createEngineOnPort(
       return registry.summaries();
     },
 
+    crsInfo: async (code) => {
+      assertUsable();
+      await started;
+      return client.request('crsInfo', { code });
+    },
+
+    searchCrs: async (query, limit) => {
+      assertUsable();
+      await started;
+      return client.request('searchCrs', { query, limit });
+    },
+
     rows: async (id, start, count) => {
       assertUsable();
       await started;

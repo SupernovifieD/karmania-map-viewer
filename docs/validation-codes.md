@@ -79,6 +79,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `crs.code.unknown`
+
+- Severity: warning
+- Step: crs
+- Message: EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
+- Hint: Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads.
+- Example: EPSG:99999 is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
+
 ## `crs.geographic.axes_swapped`
 
 - Severity: warning
@@ -102,6 +110,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: The coordinate reference system is missing, so the positions have no meaning on the Earth.
 - Hint: Choose a coordinate system by its EPSG code (a number such as 32640), or choose a local grid and its units.
 - Example: The coordinate reference system is missing, so the positions have no meaning on the Earth.
+
+## `crs.transform.code_unknown`
+
+- Severity: error
+- Step: none
+- Message: EPSG:{code} is not one of the coordinate systems Karmania knows, so positions cannot be converted to or from it.
+- Hint: Check the code of the data, or choose another coordinate system for the map.
+- Example: EPSG:99999 is not one of the coordinate systems Karmania knows, so positions cannot be converted to or from it.
+
+## `crs.transform.local_grid`
+
+- Severity: error
+- Step: none
+- Message: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:{code}.
+- Hint: Draw it with other local grids, or give the data a coordinate system by its EPSG code.
+- Example: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+
+## `crs.transform.not_finite`
+
+- Severity: warning
+- Step: none
+- Message: Some positions are outside the area where the new coordinate system can place them, so they could not be converted.
+- Hint: Check the coordinate system of the data, or choose another coordinate system for the map.
+- Example: Some positions are outside the area where the new coordinate system can place them, so they could not be converted.
+
+## `crs.transform.unsupported`
+
+- Severity: error
+- Step: none
+- Message: Positions cannot be converted to or from EPSG:{code}: {reason}.
+- Hint: Choose another coordinate system for the map; the positions of the data are kept as they are.
+- Example: Positions cannot be converted to or from EPSG:2085: it needs files for shifting between datums, which are not available.
 
 ## `csv.blocks.duplicate`
 

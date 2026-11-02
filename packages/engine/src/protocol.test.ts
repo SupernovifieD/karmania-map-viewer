@@ -4,12 +4,15 @@ import { assertNever } from './exhaustive.js';
 import type { DatasetInput } from './inputs.js';
 import { parseFromWorker, parseToWorker, REQUEST_TYPES } from './protocol.js';
 import type { FromWorker, RequestMessage, RequestType, Requests, ToWorker } from './protocol.js';
+import type { CrsInfo } from './types.js';
 
 describe('the types of messages', () => {
   it('list every request, and every request has a result', () => {
     expectTypeOf<(typeof REQUEST_TYPES)[number]>().toEqualTypeOf<RequestType>();
     expectTypeOf<RequestMessage['type']>().toEqualTypeOf<RequestType>();
     expectTypeOf<Requests['rows']['result']>().toHaveProperty('columns');
+    expectTypeOf<Requests['crsInfo']['result']>().toEqualTypeOf<CrsInfo | undefined>();
+    expectTypeOf<Requests['searchCrs']['result']>().toEqualTypeOf<readonly CrsInfo[]>();
   });
 
   it('are exhaustive in both directions', () => {
@@ -17,6 +20,8 @@ describe('the types of messages', () => {
       switch (message.type) {
         case 'init':
         case 'preview':
+        case 'crsInfo':
+        case 'searchCrs':
         case 'import':
         case 'load':
         case 'rows':
@@ -48,6 +53,8 @@ describe('what the worker accepts', () => {
   const envelopes: Record<RequestType, unknown> = {
     init: {},
     preview: { groups: [] },
+    crsInfo: { code: 4326 },
+    searchCrs: { query: 'utm', limit: 10 },
     import: { file: new Blob([]), mapping: {} },
     load: { input: {} },
     rows: { dataset: 1, start: 0, count: 10 },

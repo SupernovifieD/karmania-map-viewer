@@ -1,7 +1,11 @@
-import type { Engine, Summary } from '@karmania/engine';
+import type { CrsInfo, Engine, Summary } from '@karmania/engine';
+import { describeInfo, describeUnits } from './import-crs.js';
 
 /** Gets rows of a loaded dataset, as the engine's `rows` does. */
 export type RowSource = Engine['rows'];
+
+/** Says what an EPSG code means, as the engine's `crsInfo` does. */
+export type CrsLookup = Engine['crsInfo'];
 
 /** How many of a dataset's findings are warnings. (Errors would have stopped it loading; notes are not warned of.) */
 export function warningCount(summary: Summary): number {
@@ -40,6 +44,31 @@ export function crsLabel(crs: Summary['crs']): string {
   }
   const units = { m: 'metres', ft: 'feet', us_ft: 'US survey feet' }[crs.units];
   return `Local grid, ${units}`;
+}
+
+/**
+ * The coordinate system of a dataset with its name and unit, for the summary: `EPSG 32640, WGS 84 / UTM zone
+ * 40N, metres`. `info` is what the definitions say of the code: the system, `null` if the code is not in
+ * them, `undefined` if nobody has asked, or if the system is a local grid, which they know nothing of; then
+ * it is `crsLabel`.
+ */
+export function crsLabelNamed(crs: Summary['crs'], info: CrsInfo | null | undefined): string {
+  if (crs?.kind !== 'epsg' || info === undefined) {
+    return crsLabel(crs);
+  }
+  return info === null
+    ? `EPSG ${String(crs.code)}, not one Karmania knows`
+    : `EPSG ${String(crs.code)}, ${info.name}, ${describeUnits(info.units)}`;
+}
+
+/** What the tooltip of that label says: the same, with what kind of system it is. */
+export function crsTitleNamed(crs: Summary['crs'], info: CrsInfo | null | undefined): string {
+  if (crs?.kind !== 'epsg' || info === undefined) {
+    return crsLabel(crs);
+  }
+  return info === null
+    ? `EPSG ${String(crs.code)} is not one of the coordinate systems Karmania knows`
+    : `EPSG ${String(crs.code)}, ${describeInfo(info)}`;
 }
 
 /** The most decimals a coordinate is shown with; the whole of it is in the title. */

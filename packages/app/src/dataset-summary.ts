@@ -1,7 +1,8 @@
-import type { Summary } from '@karmania/engine';
+import type { CrsInfo, Summary } from '@karmania/engine';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import { crsLabel, describeWarnings, extentRows } from './datasets.js';
+import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './datasets.js';
+import type { CrsLookup } from './datasets.js';
 import './findings.js';
 import { groupFindings } from './import-run.js';
 import { describeSize, formatCount, KIND_NAMES } from './import-files.js';
@@ -9,14 +10,16 @@ import { TYPE_NAMES } from './import-mapping.js';
 
 /**
  * What a person wants to know about the dataset that is selected, in the Data tab: what kind it is
- * and how much there is of it, the coordinate system (the code as given, or a local grid with its
- * units), whether it has heights, the box round it, and, to be opened, its columns and the warnings
+ * and how much there is of it, the coordinate system (the code with its name and unit, from the
+ * definitions the engine has, or a local grid with its units), whether it has heights, the box round it, and, to be opened, its columns and the warnings
  * and notes the import left about it. The two lists are closed to begin with: they can be long, and
  * the table under them is what the tab is for.
  */
 export class KarmaniaDatasetSummary extends LitElement {
   static override properties = {
     summary: { attribute: false },
+    crsInfo: { attribute: false },
+    names: { state: true },
   };
 
   static override styles = [
@@ -50,6 +53,16 @@ export class KarmaniaDatasetSummary extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      /* The coordinate system is named in words: it takes two lines, and the title has the whole of it. */
+      dd.system {
+        -webkit-box-orient: vertical;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow-wrap: anywhere;
+        white-space: normal;
       }
 
       details {
@@ -147,14 +160,45 @@ export class KarmaniaDatasetSummary extends LitElement {
 
   /** The dataset to describe. */
   declare summary: Summary | undefined;
+  /** What says what an EPSG code means; without it the code is shown as it is. */
+  declare crsInfo: CrsLookup | undefined;
+  /** What it said of the codes it was asked about: the system, or `null` for a code that is not in the definitions. */
+  declare names: ReadonlyMap<number, CrsInfo | null>;
+  /** The codes it has been asked about, so that none is asked twice. */
+  private readonly asked = new Set<number>();
 
   constructor() {
     super();
     this.summary = undefined;
+    this.crsInfo = undefined;
+    this.names = new Map();
+  }
+
+  protected override willUpdate(): void {
+    const crs = this.summary?.crs;
+    const lookUp = this.crsInfo;
+    if (crs?.kind !== 'epsg' || lookUp === undefined || this.asked.has(crs.code)) {
+      return;
+    }
+    this.asked.add(crs.code);
+    void this.ask(lookUp, crs.code);
+  }
+
+  /** Asks what a code means, and keeps the answer for the next time the summary is drawn. */
+  private async ask(lookUp: CrsLookup, code: number): Promise<void> {
+    try {
+      const info = await lookUp(code);
+      this.names = new Map(this.names).set(code, info ?? null);
+    } catch {
+      // If it cannot say, or throws, the code is shown as it is, and is asked about again when the
+      // summary is next made. Nothing else of the summary is lost for it.
+      this.asked.delete(code);
+    }
   }
 
   private facts(dataset: Summary) {
     const extent = extentRows(dataset);
+    const named = dataset.crs?.kind === 'epsg' ? this.names.get(dataset.crs.code) : undefined;
     return html`
       <dl>
         <dt>Kind</dt>
@@ -168,7 +212,9 @@ export class KarmaniaDatasetSummary extends LitElement {
                 <dd>${formatCount(dataset.vertexCount)}</dd>`
         }
         <dt>Coordinates</dt>
-        <dd title=${crsLabel(dataset.crs)}>${crsLabel(dataset.crs)}</dd>
+        <dd class="system" data-truncate title=${crsTitleNamed(dataset.crs, named)}>
+          ${crsLabelNamed(dataset.crs, named)}
+        </dd>
         <dt>Heights</dt>
         <dd>${dataset.hasZ ? 'Yes (Z)' : 'No'}</dd>
         ${extent.map(

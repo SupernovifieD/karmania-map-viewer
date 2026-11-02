@@ -473,6 +473,7 @@ export class KarmaniaImportDialog extends LitElement {
         <karmania-crs-step
           .entry=${this.current}
           .draft=${this.draft}
+          .engine=${this.engine}
           @karmania-draft-change=${this.onDraftChange}
         ></karmania-crs-step>
       </div>`;

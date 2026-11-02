@@ -95,6 +95,14 @@ export async function setDatasets(
             ],
           });
         },
+        // What the definitions say of the code the datasets have, as the real engine does.
+        crsInfo: (code: number) =>
+          Promise.resolve({
+            code,
+            name: 'WGS 84 / UTM zone 40N',
+            kind: 'projected',
+            units: 'm',
+          }),
         datasets: () => [],
         remove: () => Promise.resolve(),
         dispose: () => undefined,
