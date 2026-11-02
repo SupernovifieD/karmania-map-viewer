@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
+import { textsOf } from './support/wizard.js';
 import { fixturePath, pickFiles } from './support/picker.js';
 import type { Pick } from './support/picker.js';
 
@@ -20,6 +21,12 @@ function parts(page: Page) {
     select: step.locator('.choice k-select').first().locator('select'),
     code: step.locator('.choice k-input'),
     codeInput: step.locator('.choice k-input input'),
+    box: step.locator('.matches'),
+    hint: step.locator('.matches-note'),
+    rows: step.locator('.match'),
+    names: step.locator('.match-name'),
+    details: step.locator('.match-detail'),
+    radios: step.locator('.match input'),
     units: step.locator('.choice k-select').nth(1),
     unitsSelect: step.locator('.choice k-select').nth(1).locator('select'),
     summary: step.locator('.summary-text'),
@@ -193,11 +200,16 @@ test.describe('the coordinate system step', () => {
     await p.select.selectOption('epsg');
     await expect(p.codeInput).toBeVisible();
     await expect(p.next.locator('button')).toBeDisabled();
-    await expect(p.note).toHaveText('Enter the EPSG code of the coordinate system.');
+    await expect(p.note).toHaveText('Enter an EPSG code, or choose one of the matches.');
     await p.codeInput.fill('32640');
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
-    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '32640', query: '', units: 'm' });
+    expect(await draftCrs(page)).toEqual({
+      mode: 'epsg',
+      epsg: '32640',
+      query: '32640',
+      units: 'm',
+    });
     // What the code stands for is said, from the engine's definitions of the EPSG codes.
     await expect(p.summary).toHaveText(
       'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
@@ -321,7 +333,179 @@ test.describe('the coordinate system step', () => {
     // The data can still be loaded under it: the review says what that means.
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
-    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '99999', query: '', units: 'm' });
+    expect(await draftCrs(page)).toEqual({
+      mode: 'epsg',
+      epsg: '99999',
+      query: '99999',
+      units: 'm',
+    });
+  });
+
+  test('shows the systems that match a name, with their code, kind and unit, and chooses the one that is picked', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await expect(p.hint).toContainText('Type a code, or part of a name');
+    await p.codeInput.fill('WGS 84 / UTM zone 40');
+    await expect(p.rows).toHaveCount(2);
+    // Under the box, which keeps that line free, how many there are.
+    await expect(p.code.locator('.help')).toHaveText('2 matches.');
+    expect(await textsOf(p.names)).toEqual(['WGS 84 / UTM zone 40N', 'WGS 84 / UTM zone 40S']);
+    expect(await textsOf(p.details)).toEqual([
+      'EPSG 32640 · projected, in metres',
+      'EPSG 32740 · projected, in metres',
+    ]);
+    // A name is not a code: nothing is chosen until one is picked.
+    await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
+    await expect(p.next.locator('button')).toBeDisabled();
+    await p.rows.nth(1).click();
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 32740, WGS 84 / UTM zone 40S (projected, in metres), as you entered it.',
+    );
+    await expect(p.next.locator('button')).toBeEnabled();
+    expect(await draftCrs(page)).toEqual({
+      mode: 'epsg',
+      epsg: '32740',
+      query: 'WGS 84 / UTM zone 40',
+      units: 'm',
+    });
+    // The matches stay as they were, with the one that was picked marked.
+    await expect(p.rows).toHaveCount(2);
+    await expect(p.radios.nth(1)).toBeChecked();
+    await expect(p.radios.nth(0)).not.toBeChecked();
+    await expect(p.rows.nth(1)).toHaveAttribute('data-selected', '');
+  });
+
+  test('puts the system whose code is typed first, and has it chosen', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('4326');
+    await expect(p.names.first()).toHaveText('WGS 84');
+    await expect(p.details.first()).toHaveText('EPSG 4326 · longitude and latitude, in degrees');
+    await expect(p.radios.first()).toBeChecked();
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 4326, WGS 84 (longitude and latitude, in degrees), as you entered it.',
+    );
+  });
+
+  test('shows twenty matches at most, which scroll in their box', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('a');
+    await expect(p.rows).toHaveCount(20);
+    await expect(p.code.locator('.help')).toHaveText(
+      'The first 20 matches; type more to narrow them.',
+    );
+    const room = await p.box.evaluate((box) => [box.clientHeight, box.scrollHeight]);
+    expect(room[1]).toBeGreaterThan(room[0] ?? 0);
+  });
+
+  test('says what to do when nothing is typed, and when nothing matches', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await expect(p.hint).toHaveText(
+      'Type a code, or part of a name such as UTM zone 40, to see the coordinate systems that match.',
+    );
+    await p.codeInput.fill('zzzzqq');
+    await expect(p.hint).toHaveText('No coordinate system matches zzzzqq.');
+    await expect(p.rows).toHaveCount(0);
+    await expect(p.next.locator('button')).toBeDisabled();
+    await p.codeInput.fill('');
+    await expect(p.hint).toContainText('Type a code');
+  });
+
+  test('moves nothing when matches come and go', async ({ page }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    const place = async () => {
+      const [summary, box] = await Promise.all([rect(p.summary), rect(p.box)]);
+      return [summary.y, box.y, box.height, box.width];
+    };
+    const empty = await place();
+    await p.codeInput.fill('WGS 84 / UTM zone 40');
+    await expect(p.rows).toHaveCount(2);
+    expect(await place()).toEqual(empty);
+    await p.codeInput.fill('a');
+    await expect(p.rows).toHaveCount(20);
+    expect(await place()).toEqual(empty);
+    await p.codeInput.fill('zzzzqq');
+    await expect(p.hint).toContainText('No coordinate system matches');
+    expect(await place()).toEqual(empty);
+  });
+
+  test('is used from the keyboard alone: type, Tab to the matches, and the arrows choose', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.focus();
+    await page.keyboard.type('WGS 84 / UTM zone 40');
+    await expect(p.rows).toHaveCount(2);
+    await page.keyboard.press('Tab');
+    await expect(p.radios.first()).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(p.radios.nth(1)).toBeFocused();
+    await expect(p.radios.nth(1)).toBeChecked();
+    await expect(p.summary).toContainText('EPSG 32740');
+    await page.keyboard.press('ArrowUp');
+    await expect(p.summary).toContainText('EPSG 32640');
+  });
+
+  test('keeps a code that was chosen while another is looked for, and searches again for each change', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('32640');
+    await expect(p.summary).toContainText('EPSG 32640');
+    await p.codeInput.fill('OSGB 1936 / British National Grid');
+    await expect(p.names.first()).toContainText('British National Grid');
+    // Still the one chosen, though it is not among the matches now.
+    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.radios.first()).not.toBeChecked();
+    await p.rows.filter({ hasText: 'EPSG 27700' }).click();
+    await expect(p.summary).toContainText('EPSG 27700');
+    // Emptying the box takes the choice away, as a code that is not there.
+    await p.codeInput.fill('');
+    await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
+  });
+
+  test('cuts a name that is too long for its row with an ellipsis, and has the whole of it in its title', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('WISCRS Calumet');
+    await expect(p.rows.first()).toBeVisible();
+    const cut = await p.rows.evaluateAll((rows) =>
+      rows
+        .map((row) => {
+          const name = row.querySelector('.match-name');
+          return name === null
+            ? undefined
+            : {
+                cut: name.scrollWidth > name.clientWidth,
+                title: row.getAttribute('title'),
+                text: name.textContent,
+              };
+        })
+        .filter((row) => row?.cut === true),
+    );
+    expect(cut.length).toBeGreaterThan(0);
+    for (const row of cut) {
+      expect(row?.title).toBe(row?.text);
+    }
+    await assertNoOverflow(p.dialog);
   });
 
   test('says when nothing is chosen, with a different mark from when something is', async ({
@@ -374,7 +558,12 @@ test.describe('the coordinate system step', () => {
     await page.setViewportSize({ width: 1024, height: 640 });
     await crsOf(page, 'points.csv');
     await p.select.selectOption('epsg');
-    await p.codeInput.fill('3264x');
+    await p.codeInput.fill('utm zone 40');
+    await expect(p.rows.first()).toBeVisible();
+    await assertNoOverflow(p.dialog);
+    // Twenty matches scroll inside their box, and the dialog still has nothing overflowing.
+    await p.codeInput.fill('a');
+    await expect(p.rows).toHaveCount(20);
     await assertNoOverflow(p.dialog);
   });
 
@@ -385,7 +574,9 @@ test.describe('the coordinate system step', () => {
       await page.goto(`/?theme=${theme}`);
       await crsOf(page, 'points.csv');
       await p(page).select.selectOption('epsg');
-      await p(page).codeInput.fill('3264x');
+      await p(page).codeInput.fill('utm zone 40');
+      await expect(p(page).rows.first()).toBeVisible();
+      await p(page).radios.first().check();
       await expectNoSeriousViolations(page);
     });
   }

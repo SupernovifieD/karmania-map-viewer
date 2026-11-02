@@ -2491,3 +2491,45 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   showing the error; its six pictures were looked at (1024 x 640 light, 1920 x 1080 dark and the others
   retaken) with the checklist of section 10.7: the message is one line, the line below it does not move, and
   both themes read.
+- Step 12.14d (the search). In the wizard's CRS step the field for the code is now "EPSG code or name" and
+  searches as a person types, asking `engine.searchCrs(text, 20)` and keeping only the latest answer. Under
+  the "Chosen:" line a box of a fixed height (four rows of the list-row token, so that matches coming and
+  going moves nothing, with its own scroll) holds the matches as native radio buttons, one line each: the
+  name (cut with an ellipsis, the whole in its `title`), and on the right the code, what kind of system it is
+  and its unit. The chosen one has the accent bar at its left edge, as the list of datasets does, and
+  the arrow keys move and choose as radio buttons do, with no widget of our own. Picking sets the code and
+  leaves the box, the text and the matches alone. The box says what to do when nothing is typed, when
+  nothing matches (the text is quoted back) and if the search failed. How many there are is said on the
+  line the field keeps under it (which was empty): "2 matches.", or "The first 20 matches; type more to
+  narrow them." when the list is as long as it can be. The note that stops a person reads "Enter an EPSG
+  code, or choose one of the matches." (a longer first wording took two lines of the footer). The box
+  goes below the "Chosen:" line, so nothing that was on the screen moves when it appears; the layout
+  where it fills the free room and the summary is pinned to the bottom was rejected because it would
+  have moved the line in every state, and the pictures of all of them with it. A property of the step called `matches`
+  clashed with `Element.matches`, which the compiler found. The stub engine and the state of an invalid
+  code: `crs-missing` is now the empty box, and `crs-code-invalid` keeps the error. Tests: eight new ones in
+  the end-to-end file (names with their code, kind and unit and the pick; a typed code first and chosen;
+  at most twenty, scrolling; the notes for nothing typed and nothing found; **nothing moves** as matches come
+  and go, by position of the summary and size of the box; keyboard alone, the arrows choosing; a chosen code
+  kept while another is looked for; a long name cut with its whole in its title), four existing ones updated
+  (the note, the draft with its `query`, overflow and axe now with matches showing). Pictures: five new states
+  (`crs-code-invalid`, `crs-search`, `crs-search-chosen`, `crs-search-many`, `crs-search-none`) and
+  `crs-missing`, 36 baselines, all looked at with the checklist of section 10.7 at 1024 x 640 in both
+  themes and at larger sizes: the rows line up, the chosen row is marked, nothing clips, overlaps, scrolls or
+  moves, the dark theme reads, the first of the two problems the pictures showed (a note over two lines in
+  the footer, and no sign that rows were hidden) was fixed and the pictures retaken. axe finds nothing in
+  any of the nine CRS states in either theme.
+- Risk found at step 12.14d, not fixed: V8's optimizing WebAssembly compiler runs out of memory on the
+  definitions table. `crs_definitions::from_code`, a match of 6,184 arms, is one very large function, and
+  once it has been called often enough (a loop over 65,536 codes, or about 100 searches) Node 24's V8
+  (13.6) tries to optimise it in the background and dies with "Fatal process out of memory: Zone", always,
+  and a little after the work is done. Not seen in Chromium 156, the supported browser: three tries of 200,
+  1,000 and 3,000 searches, then 15 to 30 seconds' wait, none crashed and the page answered. With
+  `--liftoff-only` (no optimizing tier) Node does not crash either. What is not known: Firefox and Safari
+  (not tested, as phase 1 decided); whether another version of Chromium behaves as 156 does; and whether the
+  tests under Node can be hit by it (CI passed three times with the sweeps over all 65,536 codes, on Ubuntu
+  and Node 24.22.1, and so did every local run, but a crash comes after the work is done and could be
+  missed). What would remove it: not calling that function in a loop, by holding the definitions as data
+  (a table of codes and names made at build time, with `from_code` called once for a chosen code) and not
+  as a match; it costs a build step and some size, and is the owner's decision. Until then a search calls it
+  65,536 times, as the 2.5 ms of step 12.4 says.

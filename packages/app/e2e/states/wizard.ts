@@ -97,6 +97,14 @@ function edit(page: Page, change: string): Promise<void> {
   }, change);
 }
 
+/** Has the CRS step search for a name, with a code chosen as well if one is given, as a person's typing would. */
+function search(page: Page, query: string, epsg: string): Promise<void> {
+  return edit(
+    page,
+    `({ ...draft, crs: { ...draft.crs, mode: 'epsg', query: ${JSON.stringify(query)}, epsg: ${JSON.stringify(epsg)} } })`,
+  );
+}
+
 const shot = (name: string, show: (page: Page) => Promise<unknown>): Shot => ({
   name: `wizard-${name}`,
   padding: 16,
@@ -142,7 +150,34 @@ export const SHOTS: Shot[] = [
   shot('crs-found', (page) => at(page, 'crs', 'points.csv', 'points.prj')),
   shot('crs-missing', async (page) => {
     await at(page, 'crs', 'points.csv');
-    await edit(page, "({ ...draft, crs: { ...draft.crs, mode: 'epsg', epsg: '0' } })");
+    await edit(page, "({ ...draft, crs: { ...draft.crs, mode: 'epsg' } })");
+  }),
+  shot('crs-code-invalid', async (page) => {
+    await at(page, 'crs', 'points.csv');
+    await edit(page, "({ ...draft, crs: { ...draft.crs, mode: 'epsg', epsg: '0', query: '0' } })");
+  }),
+  shot('crs-search', async (page) => {
+    await at(page, 'crs', 'points.csv');
+    await search(page, 'WGS 84 / UTM zone 40', '');
+    await page.locator('karmania-crs-step .match').nth(1).waitFor();
+  }),
+  shot('crs-search-chosen', async (page) => {
+    await at(page, 'crs', 'points.csv');
+    await search(page, 'WGS 84 / UTM zone 40', '32740');
+    await page.locator('karmania-crs-step .match[data-selected]').waitFor();
+  }),
+  shot('crs-search-many', async (page) => {
+    await at(page, 'crs', 'points.csv');
+    await search(page, 'WISCRS', '');
+    await page.locator('karmania-crs-step .match').nth(19).waitFor();
+  }),
+  shot('crs-search-none', async (page) => {
+    await at(page, 'crs', 'points.csv');
+    await search(page, 'zzzzqq', '');
+    await page
+      .locator('karmania-crs-step .matches-note')
+      .getByText('No coordinate system matches')
+      .waitFor();
   }),
   shot('crs-local', async (page) => {
     await at(page, 'crs', 'points.csv');

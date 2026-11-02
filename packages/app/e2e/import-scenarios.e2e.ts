@@ -427,7 +427,7 @@ test.describe('importing', () => {
     // An EPSG code, but none given yet, and then one that is not a code.
     await choice.selectOption('epsg');
     await expect(w.next.locator('button')).toBeDisabled();
-    await expect(w.note).toHaveText('Enter the EPSG code of the coordinate system.');
+    await expect(w.note).toHaveText('Enter an EPSG code, or choose one of the matches.');
     await crs.locator('k-input input').fill('0');
     await expect(crs.locator('k-input .error')).toHaveText(
       'An EPSG code is 1 to 999999, such as 32640.',

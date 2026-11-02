@@ -117,10 +117,10 @@ describe('what keeps a person from going on', () => {
       'Choose a coordinate system: an EPSG code, or a local grid.',
     );
     expect(crsBlocker({ ...base, mode: 'epsg' }, undefined)).toBe(
-      'Enter the EPSG code of the coordinate system.',
+      'Enter an EPSG code, or choose one of the matches.',
     );
     expect(crsBlocker({ ...base, mode: 'epsg', epsg: '3x' }, undefined)).toBe(
-      'Enter the EPSG code of the coordinate system.',
+      'Enter an EPSG code, or choose one of the matches.',
     );
   });
 
