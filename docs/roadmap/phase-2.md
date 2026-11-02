@@ -164,6 +164,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.F22 The focus ring of a match reached by the arrows is never clipped by the edge of
   its box (fifth review).
 - [x] 12.F23 The CI step that regenerates the table also fails on a file that is new (fifth review).
+- [x] 12.F24 The record of what the fifth review's re-run leaves open at 1024 x 640 is
+  corrected: a projection file with no EPSG code, three-line "Found" lines (docs only).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

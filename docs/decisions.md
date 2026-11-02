@@ -2860,12 +2860,25 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   and removes the half row that the review found arbitrary at the larger windows (164 px of empty body under
   it at 1440 x 900) and that clipped the focus ring (step 12.F22); the cue of "there is more" is the count
   line under the field ("The first 20 matches; type more to narrow them.") and the scroll bar when there is
-  one; the hidden bars of the headless browser show none. **Left as it is**: a "Found" line of three lines
-  (a name of 80 characters or more) or findings under it (an unreadable `.prj`) still make the body scroll at
-  that window, 28 and 64 px by the review: the body is a scroll region by design, nothing is lost, and the
-  shift of a bar that takes room is the dialog's (a `scrollbar-gutter: stable` on the body of `k-dialog`
-  would remove it for every dialog, but reserves the bar's room in all of them on the platforms that have
-  bars that take room, so it is the owner's). **Baselines**: the 36 of the six states in the "EPSG code"
+  one; the hidden bars of the headless browser show none. **Left as it is** (corrected by the re-run of the fifth review on `4943249`): the body still
+  scrolls at 1024 x 640 when the "Found" line has three lines (a `.prj` with a name of 77 characters or more:
+  8 px) and when a projection file names no EPSG code, such as `fixtures/esri.prj` (a readable ESRI-style
+  file, not an unreadable one as this record first said): nothing is found, the person is left in the "EPSG
+  code" mode with a finding under the "Found" line, and the body spills by 44 px (64 before 12.F21), the
+  fields shift by 7.5 px when the bar that takes room appears, and the box is cut off by the footer until
+  the body is scrolled. Nothing is lost, the body is a scroll region by design, 1280 x 720 and larger do not
+  spill, and it is not worse than before; what would remove the shift is a `scrollbar-gutter: stable` on
+  the body of `k-dialog`, which reserves the bar's room in every dialog on the platforms that have bars that
+  take room, so it is the owner's; the alternative is a box that gives up height when there is a finding,
+  which would need the step to be laid out so that it can shrink inside the body, and was not tried. Also the owner's: with
+  overlay scroll bars (the macOS trackpad default) three exact rows give no cue that 17 more matches
+  exist, and only the count line says so (the half row of steps 12.F13 to 12.F20 was that cue, and clipped
+  its ring, and was arbitrary where there is room). The re-run measured, in Chromium with bars of 15 px,
+  at 1024 x 640 in both themes: 0 px of spill and no shift for `points.csv`, with or without `points.prj`,
+  in every mode; for a `.prj` with a name of 7 to 72 characters (`boreholes_collars` included), for
+  `mixed.geojson`, and for a CSV with a name of 120 characters; 8 px for 73 to 116 characters, 44 px for
+  `esri.prj`; none at 1280 x 720 and 1366 x 768. The focus ring was clipped on 0 of the 38 steps of the walk
+  (12 before). The gap under the box is 56 px with a one-line "Found" line (36 before).. **Baselines**: the 36 of the six states in the "EPSG code"
   mode, at every size, from three rows and a half to three; **every one was looked at**, as six contact
   sheets of the six variants of a state (half size: layout, marks, clipping, overlap, the footer clear of
   the box, the same at three sizes and in both themes; the fine detail of a pixel is not judged at half
