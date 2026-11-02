@@ -2650,4 +2650,12 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   commit 0dfacd7 did not tick the roadmap (the tick came with 99cb762, which completed 12.15); pushed
   commits are not rewritten. (8) The message of `crs.code.unknown` says that the data "can only be drawn
   on a map that uses the same code", which is the rule of M13 that nothing draws yet.
+- Step 12.F6 (a test that did not test what it said). `a_code_is_followed_by_the_names_that_start_with_and_then_contain_it`
+  of `search.rs` used "84" as the number that is a code and also part of names, but 84 is not in the
+  definitions, so the combination of an exact code followed by names was never tried there (the ranking is
+  covered by the other tests). It uses 2000 (a code, and in the names of the SIRGAS 2000 systems) and checks
+  that the code is first and that every other result has the number in its name. The review's other note
+  on tests, that the `karmania-wasm` unit tests go through `core_kernel()` and not `Kernel::new()`, so that
+  only the engine's tests would catch a regression there, is left as it is: nothing in the wasm crate
+  builds a kernel any other way.
 

@@ -127,6 +127,8 @@ or releasing, and whenever the brief says to stop.
   M12 in `docs/perf.md`, two comments in `codes.rs`, a sum in the decisions.
 - [x] 12.F5 The CRS step says "from the matches", not "as you entered it", of a
   code that was picked from the matches of a name. Screenshots updated and reviewed.
+- [x] 12.F6 The search test of "a code that is also part of names" uses one that is
+  (2000), not 84, which is not a code.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
