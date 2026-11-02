@@ -58,8 +58,11 @@ async function crsOf(page: Page, ...picks: Pick[]): Promise<void> {
 const draftCrs = (page: Page) =>
   parts(page).host.evaluate(
     (element) =>
-      (element as unknown as { draft: { crs: { mode: string | undefined; epsg: string } } }).draft
-        .crs,
+      (
+        element as unknown as {
+          draft: { crs: { mode: string | undefined; epsg: string; query: string } };
+        }
+      ).draft.crs,
   );
 
 const optionsOf = (select: Locator): Promise<string[]> =>
@@ -194,25 +197,31 @@ test.describe('the coordinate system step', () => {
     await p.codeInput.fill('32640');
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
-    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '32640', units: 'm' });
+    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '32640', query: '', units: 'm' });
     // What the code stands for is said, from the engine's definitions of the EPSG codes.
     await expect(p.summary).toHaveText(
       'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
     );
   });
 
-  test('says what is wrong with a code that is not a whole number, and does not go on', async ({
+  test('says what is wrong with digits that are not a code, and does not go on', async ({
     page,
   }) => {
     const p = parts(page);
     await crsOf(page, 'points.csv');
     await p.select.selectOption('epsg');
-    for (const text of ['32640x', 'EPSG:32640', '3264.5', '0', '1234567']) {
+    for (const text of ['0', '000', '1234567']) {
       await p.codeInput.fill(text);
       await expect(p.code.locator('.error'), text).toHaveText(
-        'An EPSG code is a whole number, such as 32640.',
+        'An EPSG code is 1 to 999999, such as 32640.',
       );
       await expect(p.codeInput, text).toHaveAttribute('aria-invalid', 'true');
+      await expect(p.next.locator('button'), text).toBeDisabled();
+    }
+    // Text that is not digits is not wrong, since a name is a thing to search for, but it is no code.
+    for (const text of ['32640x', 'EPSG:32640', '3264.5']) {
+      await p.codeInput.fill(text);
+      await expect(p.code.locator('.error'), text).toHaveCount(0);
       await expect(p.next.locator('button'), text).toBeDisabled();
     }
     // An empty field is only missing, not wrong.
@@ -312,7 +321,7 @@ test.describe('the coordinate system step', () => {
     // The data can still be loaded under it: the review says what that means.
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
-    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '99999', units: 'm' });
+    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '99999', query: '', units: 'm' });
   });
 
   test('says when nothing is chosen, with a different mark from when something is', async ({

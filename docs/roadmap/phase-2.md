@@ -111,7 +111,9 @@ or releasing, and whenever the brief says to stop.
     summary of what is chosen with the name in it (no change to the screen).
   - [x] 12.14b The step asks the engine for the name of the found and of the
     chosen code, and shows it. Screenshots updated and reviewed.
-  - [ ] 12.14c The field becomes "EPSG code or name", with up to 20 matches
+  - [x] 12.14c The draft keeps what is in the search box apart from the code,
+    and a name typed is no error (no change to the screen).
+  - [ ] 12.14d The field becomes "EPSG code or name", with up to 20 matches
     under it (name, code, kind and units). Screenshots updated and reviewed.
 - [ ] 12.15 Dataset summary: CRS shows code, name and units (extends 9.3).
   Screenshots updated and reviewed.

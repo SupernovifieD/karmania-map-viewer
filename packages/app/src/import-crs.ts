@@ -15,15 +15,17 @@ export type CrsMode = 'detected' | 'epsg' | 'local';
 export interface CrsDraft {
   /** How it is chosen; `undefined` until a person has chosen, when nothing was found to start from. */
   readonly mode: CrsMode | undefined;
-  /** The EPSG code, as typed. */
+  /** The EPSG code, as typed or chosen from the matches. */
   readonly epsg: string;
+  /** What is in the search box: a code, or part of a name. It is not the code: a name has none. */
+  readonly query: string;
   /** The units of a local grid. */
   readonly units: Units;
 }
 
 /** The draft for a file: the coordinate system that was found, if any, and metres for a local grid. */
 export function crsDraftFor(detected: DetectedCrs | undefined): CrsDraft {
-  return { mode: detected === undefined ? undefined : 'detected', epsg: '', units: 'm' };
+  return { mode: detected === undefined ? undefined : 'detected', epsg: '', query: '', units: 'm' };
 }
 
 /** The most digits an EPSG code has. */
@@ -39,11 +41,28 @@ export function parseEpsg(text: string): number | undefined {
   return code > 0 ? code : undefined;
 }
 
-/** What is wrong with a code that was typed, in words; `undefined` for none, or for nothing typed yet. */
+/**
+ * What is wrong with what was typed in the search box, in words; `undefined` for nothing wrong, or for
+ * nothing typed yet. Only a number can be wrong: digits that are not a code (0, or more than six).
+ * Anything else is a name to search for, which is not an error.
+ */
 export function epsgError(text: string): string | undefined {
-  return text.trim() !== '' && parseEpsg(text) === undefined
-    ? 'An EPSG code is a whole number, such as 32640.'
+  return /^\d+$/.test(text.trim()) && parseEpsg(text) === undefined
+    ? 'An EPSG code is 1 to 999999, such as 32640.'
     : undefined;
+}
+
+/**
+ * The code, as the draft keeps it, once the search box holds `text`. Digits typed are a code typed, which
+ * is chosen as it is typed; a name is not a code, so it leaves the code as it was (a code that was chosen
+ * stays chosen while a person looks for another); and an empty box has no code.
+ */
+export function epsgAfterTyping(text: string, previous: string): string {
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    return '';
+  }
+  return /^\d+$/.test(trimmed) ? trimmed : previous;
 }
 
 /** The coordinate system the import is given: what a person chose, or `null` if nothing usable is. */

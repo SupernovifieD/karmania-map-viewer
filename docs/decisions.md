@@ -2476,3 +2476,18 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   the edges line up and the dark theme reads. One limit, not a fault of the picture: the name comes a
   frame after the first paint, so in a narrow window with a long file name the sentence can gain a line
   once; the lookup is not started earlier, because the step is not made before the fourth step.
+- Step 12.14c (the draft and its words). The search box and the code are different things once a name can
+  be typed, so the draft keeps `query` (what is in the box) beside `epsg` (the code, as typed or chosen).
+  `epsgAfterTyping` says what the code becomes as the box changes: digits typed are a code typed and are
+  chosen as they are typed, as in phase 1; a name leaves the code as it was, so a code that was chosen stays
+  chosen while a person looks for another; an empty box has none. A name is not an error, so `epsgError`
+  complains only of digits that are not a code (0, or more than six), in words that say the range ("An EPSG code is 1 to
+  999999, such as 32640", short enough for the one line the field keeps for it: a first, longer wording wrapped
+  and moved the line below it, which showed in the picture). Changed on purpose, and the commit says it: the test of the
+  error for a code that is not a whole number, and one scenario that typed "WGS84" to get that error (it
+  types "0" now, which is still not a code). The wording of the note that stops a person ("Enter the EPSG
+  code of the coordinate system.") is left for step 12.14d, which adds the matches it will point to. One
+  photographed state changes: `crs-missing` typed `WGS84`, which is no error now, so it types `0` and keeps
+  showing the error; its six pictures were looked at (1024 x 640 light, 1920 x 1080 dark and the others
+  retaken) with the checklist of section 10.7: the message is one line, the line below it does not move, and
+  both themes read.
