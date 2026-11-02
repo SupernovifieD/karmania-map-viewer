@@ -2118,3 +2118,22 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   that use it (the WebAssembly bindings from 12.12, `karmania-prep` from 13.1) add it there. The
   list of crates in `docs/conventions.md` names it, and `Cargo.lock` gains its entry (the crate has
   no dependency that was not already in the lock file).
+- Step 12.2 (the EPSG definitions, and their terms). `crs-definitions` 0.6.0 is added to
+  `karmania-crs` with its default features (`proj4`, `wkt`), which the lookup (`wkt`) and the
+  reprojection (`proj4`) will use. Checked: CC0-1.0 in its manifest; no dependencies of its own (the lock file
+  gains one entry); not yanked, the newest version on crates.io (2026-09-16), so it is maintained
+  although its GitHub repository was archived on 2026-06-13, since it moved to tangled.org and
+  0.6.0 was released there; builds for `wasm32-unknown-unknown` (a release build of the crate);
+  its own script says the tables are generated from the `spatial_ref_sys` table of PostGIS. The
+  brief says to stop and ask if the EPSG terms are unclear, and they are: they ask for the owner
+  of the data to be acknowledged and the terms passed on, forbid distribution for profit, and
+  Apache SIS holds them incompatible with the Apache licence. The owner chose to bundle the
+  definitions in the kernel with notices (the other choices offered were a separate definitions
+  module loaded at runtime, which would have kept the Apache-2.0 kernel free of the data, and a
+  pause until the live terms were read), and accepted that the kernel's build is then not purely
+  Apache-2.0. CC0-1.0 is added to the licence policy, as the brief says. The terms and what the
+  decision commits the project to are in `docs/dependencies.md`. Limits of what was checked: the
+  live terms on epsg.org were not read (the site refused the request), only third-party copies
+  of them, one of them a quotation by Apache SIS; no one asked IOGP; nothing here is legal advice.
+  The size of the kernel with the definitions is not yet measured (step 12.12 does it, against the
+  rule of 1 MB gzipped); the crate is not yet used, so the module has not grown.

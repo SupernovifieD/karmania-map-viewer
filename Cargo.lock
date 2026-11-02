@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "crs-definitions"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed764c927c2a19ec1cb85deb88e93560872c04653b0e9e63fbdf6a8edf968bcb"
+
+[[package]]
 name = "csv"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,6 +95,7 @@ dependencies = [
 name = "karmania-crs"
 version = "0.1.0"
 dependencies = [
+ "crs-definitions",
  "karmania-core",
 ]
 
