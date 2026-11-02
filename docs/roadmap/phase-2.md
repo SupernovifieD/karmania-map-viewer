@@ -145,6 +145,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.F13 The "Chosen:" line of the CRS step has room for two lines instead of being
   cut to one, so that nothing moves and the unit is not hidden (third review).
   Screenshots updated and reviewed.
+- [x] 12.F14 `scripts/generate-crs-table` formats only the table it writes (third review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

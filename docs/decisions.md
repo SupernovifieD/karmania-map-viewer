@@ -2754,4 +2754,12 @@ minors and four nits. Each is a sub-step, or recorded.
   of them were looked at against the checklist of section 10.7 (`-search-chosen` and
   `-code-invalid` at 1024 x 640 light, `-missing` at 1024 x 640 dark, `-search-many` at 1440 x 900 light); the
   other 32 were not opened.
+- Step 12.F14 (only the one file). The script of step 12.F9 ended with `cargo fmt -p karmania-crs`, which
+  formats the whole crate: in a copy, with a badly formatted line put in another file, it reformatted that
+  too, so "it writes only the one file" was not true. It now runs `rustfmt` on the table alone, with the
+  edition of the workspace. Tried in a copy of the crates and scripts: with a badly formatted line in
+  `lookup.rs`, two runs of the script left that file as it was, and the table is byte-for-byte the committed
+  one; in the repository the run leaves `git diff --exit-code` clean. The Rust job of CI runs the script,
+  and that step passed on GitHub in run 41407204647 (on `7d70ae0`, with the `cargo fmt -p` form): it is to be
+  read again for this form in the run of this commit.
 
