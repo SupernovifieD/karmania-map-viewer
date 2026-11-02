@@ -201,3 +201,43 @@ which writes the files if they are not there, runs the app in a browser and prin
 measured, and fails if a preview takes 1 s or more, an import 5 s or more, or the import, load or
 scroll holds the main thread for more than 50 ms. The numbers are also in
 `packages/app/test-results/performance.json`.
+
+## The size of the build (phase 2)
+
+The Phase 2 brief asks for the gzipped size of the WebAssembly module and of the app's JavaScript at
+the start of the phase, after M12, after M16 and at the end, and says to stop and propose options if
+adding the EPSG definitions grows the gzipped kernel by more than 1 MB.
+
+How it is measured: `pnpm build:wasm` and then `pnpm --filter @karmania/app build`, and for each file
+`wc -c < file` (raw) and `gzip -9 < file | wc -c` (gzipped). The survey of step 11.0 used
+`gzip -9 -c file`, which writes the file's name into the header, so its gzipped numbers are about 20
+bytes larger than the same file measured this way; at these sizes that does not matter.
+
+| When | WebAssembly raw | WebAssembly gzipped | App `index` + `theme` gzipped | Worker gzipped |
+| --- | ---: | ---: | ---: | ---: |
+| Start of phase 2 (step 11.0, `main` at `0bbdf04`) | 630,782 | 252,742 | 46,678 | 7,956 |
+| Step 12.11b, before the definitions are linked in | 632,213 | 253,200 | not measured | not measured |
+| Step 12.11c, with the definitions and `proj4rs` | 5,762,604 | 742,732 | not measured | not measured |
+| Step 12.12, with `crsInfo` and `searchCrs` | 5,774,943 | 757,177 | 46,642 | 8,425 |
+
+Against the rule: the definitions and the reprojection added 489,532 bytes gzipped (step 12.11c), the
+two exports 14,445 more, and the changes to the core of steps 12.9 to 12.11b 458, so the module has
+grown by 504,435 bytes gzipped since the start of the phase, which is under the 1 MB at which the brief
+says to stop. The raw module is 5.8 MB, which is what
+a browser compiles. The app's own JavaScript has not changed in size, apart from the worker, which grew by 2.8 KB
+(469 bytes gzipped) to carry the two new calls: no user interface changed in M12 up to this step.
+
+What the larger module costs when it starts, measured in Node's V8 (so only an indication of a
+browser's), compiling the module with `new WebAssembly.Module` and `WebAssembly.compile`, median of 9
+runs: 632,213 bytes took 0.3 ms and 2.0 ms; 5,762,604 bytes took 1.8 ms and 5.0 ms; 5,774,943 bytes took
+1.9 ms and 4.3 ms. Time from loading the page to a ready engine in Chromium is not measured here; the
+browser tests of M11 and M12 did not get slower with it (the end-to-end suite took 5.3 to 7.5 minutes
+before and after).
+
+If the size matters later, two options are open and neither is taken: build the release profile for
+size (`opt-level = "z"`, link-time optimisation), or load the definitions as a separate module, as
+step 12.2 offered.
+
+Searching the registry, natively in a release build: 2.5 ms per query by the name read from the first
+quoted string of each definition, against about 50 ms if every definition were read in full (step
+12.4). The same is not measured in WebAssembly.

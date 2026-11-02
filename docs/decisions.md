@@ -2382,3 +2382,21 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   (5.8 MB), so the time to start the worker will be felt; it is measured with the rest at step 12.12.
   Options if it matters, none taken: build the release profile for size (`opt-level = "z"`, link-time
   optimisation), or load the definitions as a separate module (the choice step 12.2 offered).
+- Step 12.12 (the exports). `karmania-wasm` exports `crsInfo(code)`, which gives the `CrsInfo` of
+  section 11.1 or `undefined` for a code that is not in the definitions, and `searchCrs(query, limit)`,
+  an array of the same objects ranked as step 12.4 says, at most 50. They only translate, like the other
+  exports (the answers are plain objects made with the same conversion, a field left out being absent
+  and not `undefined`). Because the bindings take and give `JsValue`s they cannot be run natively, so
+  the tests are in Node against the real built module (`packages/engine/src/kernel-crs.test.ts`, 12
+  tests): the exact objects for 4326, 32640, 27700, 2229 (the US survey foot with its metres), a
+  geocentric system and one with no definition, `undefined` for five codes that are not there, plain
+  objects that can be cloned, the code first in a search with or without `EPSG:`, the search giving
+  what `crsInfo` gives, the ranking, the limit never over 50, nothing for an empty query, and the same
+  list twice. The comparison is `toStrictEqual`, and two of the tests fail, as intended, when
+  `metresPerUnit` is serialised as `undefined` and not left out (tried, rebuilt and restored). The
+  wrappers of the engine (`KernelModule`, the types and the checks of the contract) are step 12.13's. The
+  build sizes before and after, measured as the brief asks, are in `docs/perf.md`: the exports added
+  12,339 bytes raw and 14,445 gzipped, and the module is 504,435 bytes gzipped above where phase 2
+  began, under the rule's 1 MB. The remark in step 12.11c that the start would "be felt" was a guess;
+  compiling the 5.8 MB module takes under 5 ms in Node's V8 (`docs/perf.md`), and the browser suites did
+  not get slower; the time to a ready engine in Chromium is not measured yet.

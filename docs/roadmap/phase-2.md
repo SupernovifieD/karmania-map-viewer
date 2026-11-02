@@ -93,7 +93,7 @@ or releasing, and whenever the brief says to stop.
     (`crs.code.unknown`), asked only of a `CrsKinds` that has every code.
   - [x] 12.11c The wasm kernel is built with the definitions; tests for 4269 and
     an unknown code.
-- [ ] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
+- [x] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
   gzip) before and after; record in `docs/perf.md`; apply the build-size rule of
   section 4 of the brief.
 - [ ] 12.13 Engine: crsInfo() and searchCrs(), types, unit and real-worker tests.
