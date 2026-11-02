@@ -2519,7 +2519,7 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   moves, the dark theme reads, the first of the two problems the pictures showed (a note over two lines in
   the footer, and no sign that rows were hidden) was fixed and the pictures retaken. axe finds nothing in
   any of the nine CRS states in either theme.
-- Risk found at step 12.14d, not fixed: V8's optimizing WebAssembly compiler runs out of memory on the
+- Risk found at step 12.14d, not fixed (**understated: corrected at the M12 gate, see step 12.F3**): V8's optimizing WebAssembly compiler runs out of memory on the
   definitions table. `crs_definitions::from_code`, a match of 6,184 arms, is one very large function, and
   once it has been called often enough (a loop over 65,536 codes, or about 100 searches) Node 24's V8
   (13.6) tries to optimise it in the background and dies with "Fatal process out of memory: Zone", always,
@@ -2592,4 +2592,28 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   what Karmania does with the data and that it attributes nothing of its own to EPSG, and that the
   kernel's build is therefore not purely Apache-2.0. Step 23.5 stays, and completes it for the libraries,
   the font, the icons and the colour data. The terms have still not been read at the source.
+- Step 12.F3 (the Node abort, as it is). The risk recorded at step 12.14d said that about 100 searches
+  are needed and that CI had passed three times, so that the crash could be missed. Both were wrong, as
+  the independent review and the CI logs show. **What happens**: in the pinned Node (24.22.1, V8 13.6),
+  once `crs_definitions::from_code` (the 6,184-arm match) has been called a few dozen times, V8's
+  optimizing WebAssembly compiler tries to compile that one function in the background and the process
+  dies with `Fatal process out of memory: Zone`. Measured here with the built module, one process for each
+  number: 1 and 20 `crsInfo` calls, no abort; 100, 300, 700, 1,000, 2,000, 6,000, 12,000, 30,000 and 65,535
+  calls, abort; and one `searchCrs` is enough (it makes 65,536 calls). `node --liftoff-only` does not abort.
+  Cutting the number of calls (a list of the 6,184 valid codes, an index kept after the first search)
+  would not avoid it: the threshold is far below that. **What CI shows**: the log of each of the six
+  completed runs since step 12.13 (41379879158, 41382592821, 41384845258, 41388136670, 41392320322 and
+  41393711515, all green; the runs of the 12.13 commits themselves were cancelled by later pushes) has
+  the `Fatal process out of memory: Zone` trace once, in the step `pnpm test:e2e`, just after the 13th
+  engine test (the real-worker scenario of 12.13, which runs the same searches in the Node process of the
+  test and in the browser), and "13 passed" comes about twenty seconds after it (read in run 41392320322);
+  the last run before it (41375576111) has none. The runs are green because the results are written
+  before the process dies, and a run would fail if V8 were quicker. **What is not
+  affected**: Chromium (the supported browser): 1,500 searches queued, the page alive after 20 seconds (the
+  reviewer), and 200 to 3,000 here at step 12.14d. **What this means for a user**: anyone who runs the
+  engine in Node 24 (a test, a script, a server) and looks up or searches EPSG codes gets an abort a moment
+  later. The remedies are the owner's to choose (asked at the gate): hold the definitions as data, a
+  table of the codes and their constants searched by binary search, so that no giant function is called
+  (a generated file in the repository, checked against `from_code` by a test); or give the Node of the
+  tests a V8 flag, which hides it in CI and fixes nothing for anyone else; or merge as it is.
 

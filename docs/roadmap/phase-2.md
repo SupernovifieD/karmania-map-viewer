@@ -121,6 +121,8 @@ or releasing, and whenever the brief says to stop.
   degrees (found at the gate: EPSG:4807 and eight others were read as degrees).
 - [x] 12.F2 `THIRD_PARTY_NOTICES.md` begun, with the EPSG acknowledgement and terms
   (found at the gate: the engine's types pointed at a file that did not exist).
+- [x] 12.F3 The record of the Node 24 abort corrected: one search is enough, and CI
+  prints it in every run since 12.13 (found at the gate). No change to the code.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
