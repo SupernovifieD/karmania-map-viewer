@@ -42,6 +42,8 @@ mkdir -p "$(dirname "$out")"
 } > "$out"
 # Formatted as `cargo fmt --check` (a step of `pnpm check` and of CI) wants it: rustfmt puts several
 # entries on a line, so the file is a sixth the length it is written in.
-cargo fmt -p karmania-crs
+# Only this file is formatted, with the edition of the workspace (rustfmt finds rustfmt.toml itself).
+edition="$(sed -n 's/^edition *= *"\([0-9]*\)".*/\1/p' Cargo.toml | head -1)"
+rustfmt --edition "$edition" "$out"
 count="$(grep -o 'EPSG_[A-Za-z0-9_]*' "$out" | wc -l | tr -d ' ')"
 echo "Wrote $out: $count definitions from crs-definitions $version."
