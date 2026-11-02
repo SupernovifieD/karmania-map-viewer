@@ -117,7 +117,8 @@ export class KarmaniaCrsStep extends LitElement {
          and one that scrolls when there are more rows than fit. It shows three rows: with the room that the
          line above it keeps for two lines, and a line of the "found" text above that when a file name or a
          GeoJSON default makes it wrap, more would make the dialog of the smallest window (1024 x 640)
-         scroll. The room round the rows keeps the focus ring of a row from being cut. */
+         scroll. The room round the rows keeps the focus ring of a row from being cut, and the scroll
+         padding keeps one that the keyboard has reached from being cut at the edge of the box. */
       .matches {
         border: var(--k-border-width) solid var(--k-border-strong);
         border-radius: var(--k-radius-md);
@@ -125,6 +126,7 @@ export class KarmaniaCrsStep extends LitElement {
         height: calc(var(--k-list-row-height) * 3 + var(--k-space-8) + var(--k-border-width) * 2);
         overflow: hidden auto;
         padding: var(--k-space-4) 0;
+        scroll-padding: var(--k-space-8) 0;
       }
 
       .matches-note {

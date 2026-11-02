@@ -519,6 +519,49 @@ test.describe('the coordinate system step', () => {
     await expect(p.summary).toContainText('EPSG 32640');
   });
 
+  test('keeps the focus ring of a match whole in its box as the arrows go through all twenty, up and down', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('a');
+    await expect(p.rows).toHaveCount(20);
+    await p.radios.first().focus();
+    /** How far the ring of the focused match is from each edge of the room inside the box, in px. */
+    const margins = () =>
+      page.evaluate(() => {
+        const root = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-import-dialog')
+          ?.shadowRoot?.querySelector('karmania-crs-step')?.shadowRoot;
+        const box = root?.querySelector('.matches');
+        const input = root?.querySelector<HTMLElement>('.match input:focus-visible');
+        if (!box || !input) {
+          return undefined;
+        }
+        const style = getComputedStyle(input);
+        const ring = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+        const inside = box.getBoundingClientRect();
+        const at = input.getBoundingClientRect();
+        return {
+          above: at.top - ring - (inside.top + box.clientTop),
+          below: inside.top + box.clientTop + box.clientHeight - (at.bottom + ring),
+        };
+      });
+    for (const key of [
+      ...Array<string>(19).fill('ArrowDown'),
+      ...Array<string>(19).fill('ArrowUp'),
+    ]) {
+      await page.keyboard.press(key);
+      const seen = await margins();
+      expect(seen, `after ${key}`).toBeDefined();
+      expect(seen?.above, `above the ring after ${key}`).toBeGreaterThanOrEqual(0);
+      expect(seen?.below, `under the ring after ${key}`).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   test('keeps a code that was chosen while another is looked for, and searches again for each change', async ({
     page,
   }) => {
