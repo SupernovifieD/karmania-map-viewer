@@ -2146,3 +2146,7 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   and its tests rewritten (the nesting test now also reads text exactly at the limit, and the
   spaces-and-line-breaks case is covered). At 197 lines, about 110 of them the old parser as it was,
   it is over the guideline of about 150 changed lines; a parser is one piece and was not cut further.
+- Step 12.3b (the WKT queries): `first_text` (the first quoted string, which in a definition is the
+  name), `find_keyword` and `horizontal_part` (the geographic, projected or geocentric part that
+  places 2D data, reached through compound and bound systems), reused from `epsg.rs` as they were,
+  public like the reader, with doc comments and a new test on hand-written definitions.

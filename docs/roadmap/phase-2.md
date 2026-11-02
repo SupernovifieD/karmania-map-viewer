@@ -55,7 +55,7 @@ or releasing, and whenever the brief says to stop.
   27700, a geocentric code (other), an unknown code. Split to stay under the
   commit size guideline:
   - [x] 12.3a The WKT reader (the parser of phase 1's `epsg.rs`).
-  - [ ] 12.3b WKT queries: the name, a keyword's node, the part that places data.
+  - [x] 12.3b WKT queries: the name, a keyword's node, the part that places data.
   - [ ] 12.3c `CrsInfo`, units and `lookup`; the IOGP acknowledgement in the crate
     documentation.
 - [ ] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
