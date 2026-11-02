@@ -6,6 +6,7 @@ import type { DraftChange } from './file-step.js';
 import type { CrsInfo, Engine, Units } from '@karmania/engine';
 import './findings.js';
 import {
+  crsOf,
   describeCrs,
   describeKind,
   describeNamed,
@@ -370,6 +371,9 @@ export class KarmaniaCrsStep extends LitElement {
         ? nameOf(found?.crs.kind === 'epsg' ? found.crs.code : undefined)
         : nameOf(chosenCode);
     const chosen = summarizeCrs(draft.crs, found, sidecar, summaryInfo);
+    // The same test as the sentence's: a mode with nothing usable in it (no code typed, a name not yet
+    // picked) is no choice, whatever the mode.
+    const unchosen = crsOf(draft.crs, found) === null;
     return html`
       <p>Say which coordinate system the coordinates in the file are in.</p>
       <p class="found">
@@ -433,7 +437,7 @@ export class KarmaniaCrsStep extends LitElement {
         }
       </div>
       <p class="summary" role="status">
-        <k-icon name=${draft.crs.mode === undefined ? 'circle-alert' : 'check'} size="16"></k-icon>
+        <k-icon name=${unchosen ? 'circle-alert' : 'check'} size="16"></k-icon>
         <span class="summary-text" ?data-two-lines=${draft.crs.mode === 'epsg'}
           ><strong>Chosen:</strong> ${chosen}</span
         >
