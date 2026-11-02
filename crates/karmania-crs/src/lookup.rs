@@ -24,8 +24,9 @@ mod tests {
 
     #[test]
     fn the_longest_name_is_what_the_two_lines_of_the_import_wizard_were_measured_for() {
-        // The "Chosen:" line of the coordinate system step keeps room for two lines and the review of step
-        // 12.F17 measured that every system fits: the widest sentence needs 536 px of 646. It is the
+        // The "Chosen:" line of the coordinate system step keeps room for two lines and the reviews of steps
+        // 12.F17 and 12.F21 measured that every system fits: all do at 646 px and at 631, and the widest
+        // sentence, EPSG:8206, is about 1,010 px on one line. It is the
         // length of the name that decides, so if a new version of the definitions has a longer one this
         // fails: look at the line in the wizard (step 12.F17 in docs/decisions.md) before changing it.
         let mut longest = (0, 0);

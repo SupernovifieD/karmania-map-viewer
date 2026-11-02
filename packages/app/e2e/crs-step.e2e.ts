@@ -651,28 +651,50 @@ test.describe('the coordinate system step', () => {
     await assertNoOverflow(p.dialog);
   });
 
-  test('has room for every state of the EPSG mode at the smallest window, so that the dialog does not scroll', async ({
-    page,
-  }) => {
-    const p = parts(page);
-    await page.setViewportSize({ width: 1024, height: 640 });
-    await crsOf(page, 'points.csv');
-    await p.select.selectOption('epsg');
-    // The body of the dialog is a scroll region, which `assertNoOverflow` leaves alone, and a scroll bar
-    // that takes room (not the hidden ones of the headless browser) would move what is in it.
-    const body = p.host.locator('div.body[data-scroll-region]');
-    const spill = () => body.evaluate((element) => element.scrollHeight - element.clientHeight);
-    expect(await spill(), 'nothing typed').toBeLessThanOrEqual(0);
-    for (const text of ['utm zone 40', 'a', '0', 'zzzzqq', '99999', '32640', 'WISCRS Calumet']) {
-      await p.codeInput.fill(text);
-      await expect(p.rows.first().or(p.hint)).toBeVisible();
-      expect(await spill(), `"${text}" typed`).toBeLessThanOrEqual(0);
-    }
-    // And with a long name chosen, which fills the two lines of its room.
-    await p.rows.first().click();
-    await expect(p.summary).toContainText('from the matches');
-    expect(await spill(), 'a long name chosen').toBeLessThanOrEqual(0);
+  // What the "Found" line says wraps to two lines for a file beside which there is a projection file with a name
+  // of seven characters or more, and for a GeoJSON that names no coordinate system, and takes a line of room.
+  const csvAs = (name: string): Pick => ({
+    name,
+    mimeType: 'text/csv',
+    buffer: readFileSync(fixturePath('points.csv')),
   });
+  const prjAs = (name: string): Pick => ({
+    name,
+    mimeType: 'text/plain',
+    buffer: readFileSync(fixturePath('points.prj')),
+  });
+  const FOUND: [string, Pick[]][] = [
+    ['a file with nothing found beside it', [csvAs('points.csv')]],
+    [
+      'a file with a projection file of a long name',
+      [csvAs('boreholes_collars.csv'), prjAs('boreholes_collars.prj')],
+    ],
+    ['a GeoJSON file that names no coordinate system', ['mixed.geojson']],
+  ];
+  for (const [what, files] of FOUND) {
+    test(`has room for every state of the EPSG mode at the smallest window, so that the dialog does not scroll (${what})`, async ({
+      page,
+    }) => {
+      const p = parts(page);
+      await page.setViewportSize({ width: 1024, height: 640 });
+      await crsOf(page, ...files);
+      await p.select.selectOption('epsg');
+      // The body of the dialog is a scroll region, which `assertNoOverflow` leaves alone, and a scroll bar
+      // that takes room (not the hidden ones of the headless browser) would move what is in it.
+      const body = p.host.locator('div.body[data-scroll-region]');
+      const spill = () => body.evaluate((element) => element.scrollHeight - element.clientHeight);
+      expect(await spill(), 'nothing typed').toBeLessThanOrEqual(0);
+      for (const text of ['utm zone 40', 'a', '0', 'zzzzqq', '99999', '32640', 'WISCRS Calumet']) {
+        await p.codeInput.fill(text);
+        await expect(p.rows.first().or(p.hint)).toBeVisible();
+        expect(await spill(), `"${text}" typed`).toBeLessThanOrEqual(0);
+      }
+      // And with a long name chosen, which fills the two lines of its room.
+      await p.rows.first().click();
+      await expect(p.summary).toContainText('from the matches');
+      expect(await spill(), 'a long name chosen').toBeLessThanOrEqual(0);
+    });
+  }
 
   for (const theme of ['light', 'dark']) {
     test(`is readable and has no serious accessibility violations (${theme} theme)`, async ({
