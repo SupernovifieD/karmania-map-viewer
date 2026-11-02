@@ -2744,7 +2744,9 @@ minors and four nits. Each is a sub-step, or recorded.
   "EPSG code" mode now has room for two lines (`min-height: 2lh`) and is clamped to two, so the box under it
   still does not move (the line is two lines high whatever it says) and the name, the unit and the source
   are shown; the title is gone, since the status that is read out has the whole text. The cost is a free
-  line between the sentence and the matches when it says one line, which the pictures show as an even gap.
+  line between the sentence and the matches when it says one line, so that the gap under a one-line sentence
+  is larger than the one over it (17 px over and 36 under, the fourth review's measure; the first wording
+  of this record called it an even gap).
   What is not known: whether every one of the 6,184 fits in two lines (the longest names are about 80
   characters in a line of about 95, so they should; a longer text is cut after the second line); it was
   looked at for 7535, 7594 and 4326. The test of 12.F8 was rewritten and failed on the one-line version
@@ -2828,4 +2830,15 @@ about the change of step 12.F13.
   `cargo test --locked` does not change a tracked file). The test of 12.F14 is that step: with the script of
   12.F9 and a badly formatted line in another file (the copy of 12.F14) it would have failed, and with the
   script of 12.F14 it passes. The step can only be run on GitHub, so that is where it is to be read, in the run of this commit.
+- Step 12.F20 (the claim of two lines, guarded). The comment of the style of the "Chosen:" line says that
+  every system fits in two lines, which the fourth review measured and no test guarded. The width of the
+  sentence is decided by the name, so a test in `karmania-crs` (`lookup.rs`) pins the longest name of the
+  registry: 73 characters, EPSG:8206, the same system the review found the widest (536 px of the 646 of the
+  line). If a new version of `crs-definitions` has a longer name the test fails, and the line is to be
+  looked at before the number is changed. It is a guard on the data and was written with a placeholder
+  that failed and showed the 73. **One thing left as it is**: after a code is typed, typing a name keeps
+  that code chosen and the sentence says "from the matches" (the rule of step 12.F5, that the box holds
+  something other than the code), which is wrong for a code that was typed. Telling the two apart needs
+  the draft to record how the code was chosen, a new field, and it is not done; the fourth review rated
+  it a nit.
 

@@ -23,6 +23,21 @@ mod tests {
     }
 
     #[test]
+    fn the_longest_name_is_what_the_two_lines_of_the_import_wizard_were_measured_for() {
+        // The "Chosen:" line of the coordinate system step keeps room for two lines and the review of step
+        // 12.F17 measured that every system fits: the widest sentence needs 536 px of 646. It is the
+        // length of the name that decides, so if a new version of the definitions has a longer one this
+        // fails: look at the line in the wizard (step 12.F17 in docs/decisions.md) before changing it.
+        let mut longest = (0, 0);
+        for code in 0..=u32::from(u16::MAX) {
+            if let Some(info) = lookup(code) {
+                longest = longest.max((info.name.chars().count(), code));
+            }
+        }
+        assert_eq!(longest, (73, 8206));
+    }
+
+    #[test]
     fn wgs_84_is_geographic_in_degrees() {
         let wgs84 = info(4326);
         assert_eq!(wgs84.name, "WGS 84");
