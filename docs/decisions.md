@@ -2276,3 +2276,37 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   were seen to fail when `z` is overwritten (four of them) and when a failed position is not blanked
   (the overflow test), both tried and the file restored. The identity conversion returns at once and
   leaves even non-finite values alone.
+- Step 12.8 (accuracy). `crates/karmania-crs/tests/accuracy.rs`. The brief says to use PROJ or pyproj
+  if they are on the machine; they are not (`proj`, `cs2cs`, `projinfo` and the GDAL tools are missing,
+  and `pyproj` and `osgeo` cannot be imported), and nothing was installed, so the references are published
+  values: the worked examples of the EPSG Guidance Note 7-2, November 2009 (OGP; 120 pages), from the
+  copy in the NetBSD `pkgsrc` distfiles (SHA-256 `816176d0...9a59`, in the test file in full). It is not
+  IOGP's current edition, which was not available to read. Its text was extracted with the PDFKit that
+  comes with macOS (no PDF tool was installed), and each number was read from the extracted text of its
+  page, not typed from memory. Twelve rows, each named in the test with its section and page: nine
+  methods (Transverse Mercator, Lambert Conic Conformal 1SP and 2SP, Mercator variants A and B, the
+  Pseudo-Mercator, Oblique Stereographic, Polar Stereographic variant A and Lambert Azimuthal Equal
+  Area), each tried forward (the printed longitude and latitude to the printed easting and northing)
+  and in reverse (from the printed, rounded easting and northing back to the printed position).
+  **The brief's tolerance of 1 mm cannot be checked against most of these**: a value printed to two
+  decimals can only be checked to 5 mm. So each row has the tolerance its source allows (half of the last
+  printed digit, which is 5 mm; 1 mm for the Dutch RD New row, printed to three decimals, where the
+  result is within 0.4 mm), and two rows have more, with the reason in the test. British National Grid,
+  10 mm: three computations agree to a micrometre on 577274.9838 and 69740.4923 (proj4rs; the series
+  that the note itself prints, evaluated in a separate Python script; and Karney's exact series, written
+  separately for this check; neither script is in the repository), and the printed 577274.99 and
+  69740.50 are 6.2 and 7.7 mm from that, because the example's intermediate values are rounded. Belge
+  Lambert 72, 60 mm: the definitions' standard parallels are 0.00204 arc seconds more than the example's
+  (a later revision of the EPSG parameters), which moves the northing by 46 mm; with the example's own
+  parallels in a PROJ string built by hand the difference was 2.8 mm (tried once, not kept). The
+  brief's tolerances are held where nothing limits them, in the round trips: 11 pairs of systems across
+  their areas, 625 positions each, forward and back: worst 2.7e-11 degrees (the limit is 1e-9) and worst
+  3.0e-6 m (the limit is 1e-3). What these tests do not show: a round trip cannot see an error that the
+  forward and the inverse share, which is what the published rows are for, and the published rows cover
+  nine methods and ten systems, the round trips eleven, not the 5,746 that can be used. **They say nothing about datum shifts.** Every
+  row is within one datum; a conversion between datums uses the 7-parameter shift of the definitions
+  (`towgs84`), which is good to metres, not to millimetres, and no row checks even that. The README
+  of step 24.5 has to say so. A comparison with PROJ, if someone installs it, would be the next step.
+  Seen to fail: with the source and target swapped (three of four tests) and with 6 mm added to every
+  projected northing (three of four, including the 1 mm round trip); both tried, file restored. The file
+  is 314 lines, mostly the table of rows and the reasons, over the size guideline.

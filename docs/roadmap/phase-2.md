@@ -76,7 +76,7 @@ or releasing, and whenever the brief says to stop.
     cannot, over the whole registry, pinned.
 - [x] 12.7 Transform positions in place (f64, z untouched); non-finite results
   counted in a finding with examples.
-- [ ] 12.8 Accuracy tests: reference conversions from an independent source
+- [x] 12.8 Accuracy tests: reference conversions from an independent source
   (PROJ or pyproj if available on the machine, otherwise published values), the
   source named for each row; tolerance 1 mm projected, 1e-9 degrees geographic;
   round trips.
