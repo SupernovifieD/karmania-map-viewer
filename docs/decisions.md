@@ -2261,3 +2261,18 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   of the registry, and 4.0% (242 of 5,988) when the geocentric ones, which are not meant for maps,
   are left out. Step
   13.4 turns them into `display` findings for datasets.
+- Step 12.7 (positions in place). `Transformer::convert_in_place(xyz, findings)` takes interleaved
+  `x y z` values, as `Positions` holds them, converts `x` and `y`, never touches `z`, and leaves a
+  trailing incomplete position as it is. A position whose `x` and `y` were finite and whose result is
+  not becomes `NaN, NaN` (both, even when only one result failed: a unit scale that overflows one
+  axis is the case a test pins) and is counted in one `crs.transform.not_finite` finding (a warning,
+  with no wizard step; registered in the core and documented, its docs example tested against what the
+  code says), with a count and the 0-based vertex indices of the first 20 as examples. A position that
+  was not finite to begin with is left exactly as it was and not counted, since validation reports
+  those and the finding would say "could not be converted" of something that was never a position.
+  The finding is built once at the end from a count, not once per failure, so a million failures do
+  not allocate a million messages; the cap on examples inside the loop is a guard on memory that no
+  result can show (`Findings::add` truncates the examples too), so no test can fail without it. Tests
+  were seen to fail when `z` is overwritten (four of them) and when a failed position is not blanked
+  (the overflow test), both tried and the file restored. The identity conversion returns at once and
+  leaves even non-finite values alone.

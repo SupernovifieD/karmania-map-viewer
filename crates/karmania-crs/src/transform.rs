@@ -1,6 +1,6 @@
 //! Converting positions from one coordinate system to another.
 
-use karmania_core::{CrsRef, Finding, FindingCode};
+use karmania_core::{CrsRef, Finding, FindingCode, Findings, Location};
 use proj4rs::Proj;
 use proj4rs::errors::Error;
 use proj4rs::transform::transform;
@@ -72,6 +72,45 @@ impl Transformer {
         matches!(self.how, How::Identity)
     }
 
+    /// Converts positions in place. `xyz` holds interleaved `x y z` values like
+    /// `karmania_core::Positions`; `x` and `y` are converted and `z` is never touched, and a
+    /// trailing incomplete triple is left as it is.
+    ///
+    /// A position whose `x` and `y` are finite but whose result is not (it is outside the area
+    /// where the new system can place it) becomes `NaN, NaN` and is counted in one
+    /// `crs.transform.not_finite` finding, with the first [`karmania_core::MAX_EXAMPLES`] of them
+    /// as examples (their 0-based vertex index). A position that was not finite to begin with is
+    /// left as it is and not counted: validation reports those.
+    pub fn convert_in_place(&self, xyz: &mut [f64], findings: &mut Findings) {
+        if self.is_identity() {
+            return;
+        }
+        let mut failed = 0_u64;
+        let mut examples = Vec::new();
+        for (index, position) in xyz.as_chunks_mut::<3>().0.iter_mut().enumerate() {
+            let [x, y, _] = position;
+            if !x.is_finite() || !y.is_finite() {
+                continue;
+            }
+            let [cx, cy] = self.convert(*x, *y);
+            if cx.is_finite() && cy.is_finite() {
+                (*x, *y) = (cx, cy);
+            } else {
+                (*x, *y) = (f64::NAN, f64::NAN);
+                failed += 1;
+                if examples.len() < karmania_core::MAX_EXAMPLES {
+                    examples.push(Location::default().with_vertex(index as u64));
+                }
+            }
+        }
+        if failed > 0 {
+            let mut finding = not_finite();
+            finding.count = failed;
+            finding.examples = examples;
+            findings.add(finding);
+        }
+    }
+
     /// Converts one position. `[NaN, NaN]` if it cannot be converted.
     #[must_use]
     pub fn convert(&self, x: f64, y: f64) -> [f64; 2] {
@@ -132,6 +171,14 @@ fn reason(error: &Error) -> &'static str {
         Error::ProjectionNotFound => "its projection is not supported",
         _ => "its definition cannot be used",
     }
+}
+
+fn not_finite() -> Finding {
+    Finding::new(
+        FindingCode::CrsTransformNotFinite,
+        "Some positions are outside the area where the new coordinate system can place them, so they could not be converted.",
+    )
+    .with_hint("Check the coordinate system of the data, or choose another coordinate system for the map.")
 }
 
 fn local_grid(code: u32) -> Finding {
@@ -418,5 +465,149 @@ mod tests {
         assert_eq!(tally["projection"], [8441, 27_200]);
         assert_eq!(tally["no definition"], [22_300, 29_701]);
         assert!(tally["datum files"].contains(&2085) && tally["geocentric"].contains(&4978));
+    }
+
+    fn converted(from: CrsRef, to: CrsRef, xyz: &[f64]) -> (Vec<f64>, Findings) {
+        let mut values = xyz.to_vec();
+        let mut findings = Findings::new();
+        transformer(from, to).convert_in_place(&mut values, &mut findings);
+        (values, findings)
+    }
+
+    #[test]
+    fn in_place_the_same_system_changes_nothing_not_even_a_value_that_is_not_a_number() {
+        let xyz = [1.0, f64::NAN, 3.0, f64::INFINITY, 5.0, 6.0];
+        let (values, findings) = converted(epsg(32640), epsg(32640), &xyz);
+        assert!(findings.is_empty());
+        assert_eq!(values[0], 1.0);
+        assert!(values[1].is_nan() && values[3].is_infinite());
+        assert_eq!((values[2], values[4], values[5]), (3.0, 5.0, 6.0));
+    }
+
+    #[test]
+    fn in_place_local_grids_are_scaled_in_x_and_y_and_z_is_not_touched() {
+        // The last two values are an incomplete position: left as they are.
+        let xyz = [3_048.0, 1_524.0, 12.5, 304.8, 0.0, -7.0, 9.0, 9.0];
+        let (values, findings) = converted(local(Units::Metre), local(Units::Foot), &xyz);
+        assert!(findings.is_empty());
+        let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+        assert!(near(values[0], 10_000.0) && near(values[1], 5_000.0) && values[2] == 12.5);
+        assert!(near(values[3], 1_000.0) && values[4] == 0.0 && values[5] == -7.0);
+        assert_eq!((values[6], values[7]), (9.0, 9.0));
+    }
+
+    #[test]
+    fn in_place_epsg_positions_are_the_ones_convert_gives_and_z_is_not_touched() {
+        let xyz = [57.0, 0.0, 100.0, 57.5, 45.0, -2.5, 54.0, 10.0, 0.0];
+        let (values, findings) = converted(epsg(4326), epsg(32640), &xyz);
+        assert!(findings.is_empty());
+        let one = transformer(epsg(4326), epsg(32640));
+        for (position, original) in values.chunks(3).zip(xyz.chunks(3)) {
+            assert_eq!(
+                [position[0], position[1]],
+                one.convert(original[0], original[1])
+            );
+            assert_eq!(position[2], original[2]);
+        }
+        assert!((values[0] - 500_000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn in_place_positions_that_cannot_be_converted_are_counted_with_where_they_are() {
+        // Positions 1 and 3 are outside what UTM can place; 0, 2 and 4 are fine.
+        let xyz = [
+            57.0, 10.0, 1.0, 57.0, 95.0, 2.0, 58.0, 11.0, 3.0, 1e300, 1e300, 4.0, 59.0, 12.0, 5.0,
+        ];
+        let (values, findings) = converted(epsg(4326), epsg(32640), &xyz);
+        let [finding] = findings.as_slice() else {
+            panic!("{findings:?}")
+        };
+        assert_eq!(finding.code, FindingCode::CrsTransformNotFinite);
+        assert_eq!(finding.count, 2);
+        let vertices: Vec<Option<u64>> = finding.examples.iter().map(|at| at.vertex).collect();
+        assert_eq!(vertices, [Some(1), Some(3)]);
+        for index in [1, 3] {
+            assert!(values[index * 3].is_nan() && values[index * 3 + 1].is_nan());
+            // Their heights are kept, and the others are converted.
+            assert_eq!(values[index * 3 + 2], xyz[index * 3 + 2]);
+        }
+        for index in [0, 2, 4] {
+            assert!(values[index * 3].is_finite() && values[index * 3 + 1].is_finite());
+        }
+    }
+
+    #[test]
+    fn in_place_many_failures_are_one_finding_with_a_count_and_the_first_examples() {
+        let xyz: Vec<f64> = (0..50).flat_map(|_| [57.0, 95.0, 0.0]).collect();
+        let (_, findings) = converted(epsg(4326), epsg(32640), &xyz);
+        let [finding] = findings.as_slice() else {
+            panic!("{findings:?}")
+        };
+        assert_eq!(finding.count, 50);
+        assert_eq!(finding.examples.len(), karmania_core::MAX_EXAMPLES);
+        let first: Vec<u64> = finding.examples.iter().filter_map(|at| at.vertex).collect();
+        assert_eq!(
+            first,
+            (0..karmania_core::MAX_EXAMPLES as u64).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn in_place_a_position_with_one_result_that_is_not_finite_loses_both() {
+        // 1e308 metres is more than the largest number in feet, but its y is fine.
+        let (values, findings) =
+            converted(local(Units::Metre), local(Units::Foot), &[1e308, 1.0, 5.0]);
+        assert!(values[0].is_nan() && values[1].is_nan() && values[2] == 5.0);
+        let [finding] = findings.as_slice() else {
+            panic!("{findings:?}")
+        };
+        assert_eq!(
+            (finding.code, finding.count),
+            (FindingCode::CrsTransformNotFinite, 1)
+        );
+    }
+
+    #[test]
+    fn in_place_a_position_that_was_not_finite_is_left_as_it_is_and_not_counted() {
+        let xyz = [
+            f64::NAN,
+            10.0,
+            1.0,
+            57.0,
+            f64::INFINITY,
+            2.0,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            3.0,
+        ];
+        let (values, findings) = converted(epsg(4326), epsg(32640), &xyz);
+        assert!(findings.is_empty());
+        for (got, wanted) in values.iter().zip(xyz) {
+            assert!(got.to_bits() == wanted.to_bits(), "{got} {wanted}");
+        }
+    }
+
+    #[test]
+    fn in_place_nothing_and_an_incomplete_position_are_no_trouble() {
+        for xyz in [&[][..], &[57.0][..], &[57.0, 10.0][..]] {
+            let (values, findings) = converted(epsg(4326), epsg(32640), xyz);
+            assert_eq!(values, xyz);
+            assert!(findings.is_empty());
+        }
+    }
+
+    #[test]
+    fn the_docs_example_of_the_not_finite_finding_is_what_the_conversion_says() {
+        let (_, findings) = converted(epsg(4326), epsg(32640), &[57.0, 95.0, 0.0]);
+        let [finding] = findings.as_slice() else {
+            panic!("{findings:?}")
+        };
+        let section = DOCS
+            .split("\n## `")
+            .find(|section| section.starts_with("crs.transform.not_finite"))
+            .expect("the code is in the docs");
+        assert!(section.contains(&format!("- Example: {}", finding.message)));
+        let hint = finding.hint.as_deref().unwrap_or_default();
+        assert!(section.contains(&format!("- Hint: {hint}")));
     }
 }

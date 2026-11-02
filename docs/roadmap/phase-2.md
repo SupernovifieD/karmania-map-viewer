@@ -74,7 +74,7 @@ or releasing, and whenever the brief says to stop.
     definitions that cannot be used give findings.
   - [x] 12.6c Which definitions of the registry can be used and why the others
     cannot, over the whole registry, pinned.
-- [ ] 12.7 Transform positions in place (f64, z untouched); non-finite results
+- [x] 12.7 Transform positions in place (f64, z untouched); non-finite results
   counted in a finding with examples.
 - [ ] 12.8 Accuracy tests: reference conversions from an independent source
   (PROJ or pyproj if available on the machine, otherwise published values), the
