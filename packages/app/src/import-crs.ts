@@ -194,8 +194,13 @@ export function summarizeCrs(
       return detected === undefined
         ? ''
         : `${describeNamed(chosen, info)}, from ${describeSource(detected.source, sidecar)}.`;
-    case 'epsg':
-      return `${describeNamed(chosen, info)}, as you entered it.`;
+    case 'epsg': {
+      // The text in the box is the code when a code was typed; when a name was typed and a match picked,
+      // the code is not what was entered.
+      const query = draft.query.trim();
+      const picked = query !== '' && query !== draft.epsg.trim();
+      return `${describeNamed(chosen, info)}, ${picked ? 'from the matches' : 'as you entered it'}.`;
+    }
     default:
       return `${describeCrs(chosen)}: the coordinates are not tied to a place on the Earth, only to each other.`;
   }
