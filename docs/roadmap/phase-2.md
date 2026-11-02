@@ -161,6 +161,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.F21 The CRS step does not make the dialog scroll at 1024 x 640 when the "Found" line wraps
   either (a long projection file name, a GeoJSON with no crs): the box shows 3 rows (fifth review).
   Screenshots updated and reviewed.
+- [x] 12.F22 The focus ring of a match reached by the arrows is never clipped by the edge of
+  its box (fifth review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

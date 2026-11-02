@@ -2877,4 +2877,16 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   Karmania knows, as you entered it" has the check mark because the data loads with a warning
   (`crsOf` is not `null`), which the review called a contradiction of the sentence; it is by design and
   left. The half row at the larger windows is gone with 12.F21.
+- Step 12.F22 (the ring at the edge). Minor. With the box at three rows and a half the arrow keys
+  scrolled the box by only the part of the row that was hidden, and Chromium put the radio flush with the
+  edge of the box, so that its ring (the 2 px of outline and the 2 px of offset) was cut by 4 px on 12 of the
+  38 steps of a walk through the twenty matches (10 with four rows). The box has `scroll-padding` of a space of
+  8 px at its top and bottom, so a row that the keyboard reaches is scrolled in with room for the ring. The
+  test walks down and up through all twenty matches at 1024 x 640 and checks, after each key, that the ring of
+  the focused radio is inside the room of the box. **What was tried**: at three rows and a half, without the
+  padding, the test fails (the ring is cut by 4 px under the box); at three rows and a half, with it, it
+  passes; at three rows (the box of step 12.F21) the margins never go below 12 px even without it, because
+  the rows then fit the box in whole, so the padding is not needed for the test to pass at this height and
+  is kept so that it cannot come back if the height of the box or of a row changes. The test does not fail
+  without the padding at three rows, which is said here so that it is not read as more.
 
