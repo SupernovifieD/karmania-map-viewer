@@ -22,6 +22,12 @@ impl CrsKinds for Definitions {
             None => CrsGeography::Unknown,
         }
     }
+
+    /// The definitions are the whole registry, as far as it goes: a code that is not in them is
+    /// one that validation says it does not know.
+    fn knows_every_code(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
@@ -49,6 +55,11 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    #[test]
+    fn the_definitions_say_they_have_every_code() {
+        assert!(Definitions.knows_every_code());
     }
 
     #[test]
@@ -104,11 +115,16 @@ mod tests {
             codes(&validate_with(&nad83, &Definitions)),
             ["crs.geographic.out_of_range"]
         );
-        // The same numbers in UTM, or in a code that is not known, are not range-checked.
-        for code in [32640, 99_999] {
-            let d = points(code, 500_000.0, 2_800_000.0);
-            assert!(codes(&validate_with(&d, &Definitions)).is_empty(), "{code}");
-        }
+        // The same numbers in UTM are not range-checked, and say nothing.
+        let utm = points(32640, 500_000.0, 2_800_000.0);
+        assert!(codes(&validate_with(&utm, &Definitions)).is_empty());
+        // Under a code that is not in the definitions they are not range-checked either, but the
+        // code is a warning, and the data still loads. The core alone says nothing of it.
+        let unknown = points(99_999, 500_000.0, 2_800_000.0);
+        let report = validate_with(&unknown, &Definitions);
+        assert_eq!(codes(&report), ["crs.code.unknown"]);
+        assert!(report.is_loadable());
+        assert!(codes(&validate(&unknown)).is_empty());
         // EPSG:4326 is still checked.
         let wgs84 = points(4326, 500_000.0, 2_800_000.0);
         assert_eq!(

@@ -83,6 +83,13 @@ pub enum CrsGeography {
 pub trait CrsKinds {
     /// Whether the EPSG `code` is a longitude and latitude system.
     fn geography(&self, code: u32) -> CrsGeography;
+
+    /// Whether this has the whole registry, so that [`CrsGeography::Unknown`] means that there is
+    /// no such code, and validation says so. Without it, `Unknown` only means "not known to me",
+    /// which is no fault of the dataset, so nothing is said. The default is `false`.
+    fn knows_every_code(&self) -> bool {
+        false
+    }
 }
 
 /// The answers the core gives without definitions: EPSG:4326 (WGS 84) is longitude and latitude
@@ -178,5 +185,7 @@ mod tests {
             assert_eq!(Wgs84Only.geography(code), CrsGeography::Unknown, "{code}");
         }
         assert_eq!(Wgs84Only::WGS_84, 4326);
+        // It has not the whole registry, so an unknown code is not a fault of the dataset.
+        assert!(!Wgs84Only.knows_every_code());
     }
 }
