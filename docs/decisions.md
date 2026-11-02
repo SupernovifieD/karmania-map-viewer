@@ -2736,4 +2736,22 @@ minors and four nits. Each is a sub-step, or recorded.
   EPSG:4807, and the sweep, whose count of `Geographic` codes is 754, the systems in degrees, and no longer
   the 763 of step 12.3, the other nine being the ones in grads). The checks are still those of degrees:
   converting from grads to check them as grads is not done, since nothing needs it.
+- Step 12.F13 (two lines, not one cut). The third review pointed out that the one line of step 12.F8 hides
+  the unit and where the code came from for about 43% of the systems (it laid out all 6,184 at the width of
+  the line, 646 px), that the system "7535" and its (ftUS) sibling differ only in the part that is cut,
+  and that the whole is then in a title that a keyboard or a touch cannot reach. The "Chosen:" line of the
+  "EPSG code" mode now has room for two lines (`min-height: 2lh`) and is clamped to two, so the box under it
+  still does not move (the line is two lines high whatever it says) and the name, the unit and the source
+  are shown; the title is gone, since the status that is read out has the whole text. The cost is a free
+  line between the sentence and the matches when it says one line, which the pictures show as an even gap.
+  What is not known: whether every one of the 6,184 fits in two lines (the longest names are about 80
+  characters in a line of about 95, so they should; a longer text is cut after the second line); it was
+  looked at for 7535, 7594 and 4326. The test of 12.F8 was rewritten and failed on the one-line version
+  (the line was 20 px high and two lines of room are 40); it checks that the box and the line do not move,
+  that the long name uses both lines and is not cut, and that a short name leaves the box where it is.
+  Baselines: the six states in the "EPSG code" mode (`wizard-crs-missing`, `-code-invalid`, `-search`,
+  `-search-chosen`, `-search-many`, `-search-none`), 36 PNGs, each changed by the one free line; four
+  of them were looked at against the checklist of section 10.7 (`-search-chosen` and
+  `-code-invalid` at 1024 x 640 light, `-missing` at 1024 x 640 dark, `-search-many` at 1440 x 900 light); the
+  other 32 were not opened.
 

@@ -142,6 +142,9 @@ or releasing, and whenever the brief says to stop.
   start-up and search figures (second review).
 - [x] 12.F12 The nine geographic systems in grads are not range-checked as degrees by
   validation (second review; 12.F1 did the transformer).
+- [x] 12.F13 The "Chosen:" line of the CRS step has room for two lines instead of being
+  cut to one, so that nothing moves and the unit is not hidden (third review).
+  Screenshots updated and reviewed.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

@@ -439,7 +439,7 @@ test.describe('the coordinate system step', () => {
     expect(await place()).toEqual(empty);
   });
 
-  test('moves nothing when a system with a long name is chosen: the line says it on one line, cut, with the whole in its title', async ({
+  test('moves nothing when a system with a long name is chosen: the line has room for two lines, and says all of it', async ({
     page,
   }) => {
     const p = parts(page);
@@ -449,23 +449,36 @@ test.describe('the coordinate system step', () => {
     await p.codeInput.fill('WISCRS Calumet');
     await expect(p.rows.first()).toBeVisible();
     const before = await rect(p.box);
-    const line = (await rect(p.summary)).height;
+    const room = (await rect(p.summary)).height;
     await p.rows.first().click();
-    const name = (await p.names.first().textContent()) ?? '';
     await expect(p.summary).toContainText('from the matches');
-    // The box is where it was, and the line is one line as before, cut and not wrapped.
+    // The box is where it was and the line has the height it had: two lines of room, whatever is said.
     expect((await rect(p.box)).y).toBe(before.y);
-    expect((await rect(p.summary)).height).toBe(line);
-    expect(await p.summary.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
-      true,
+    expect((await rect(p.summary)).height).toBe(room);
+    const lineHeight = await p.summary.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).lineHeight),
     );
-    // The whole of what is said is in its title, and in the status that is read out.
-    const title = await p.summary.getAttribute('title');
-    expect(title).toContain(name);
-    expect(title).toMatch(/^Chosen: EPSG \d+, .*, from the matches\.$/);
-    await expect(p.summary).toHaveText(
-      new RegExp(`^Chosen: EPSG \\d+, ${name.replace(/[()/.]/g, '\\$&')}`),
-    );
+    expect(room).toBeCloseTo(2 * lineHeight, 0);
+    // The name is long enough to need both lines, and nothing is cut: the unit and where the code came
+    // from, at the end, are there.
+    const shown = await p.summary.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+      return {
+        lines: lines.size,
+        cut:
+          element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth,
+      };
+    });
+    expect(shown).toEqual({ lines: 2, cut: false });
+    await expect(p.summary).toContainText('Winnebago');
+    await expect(p.summary).toHaveText(/, from the matches\.$/);
+    // A short name leaves the box where it is too.
+    await p.codeInput.fill('4326');
+    await expect(p.names.first()).toHaveText('WGS 84');
+    expect((await rect(p.box)).y).toBe(before.y);
+    expect((await rect(p.summary)).height).toBe(room);
     await assertNoOverflow(p.dialog);
   });
 

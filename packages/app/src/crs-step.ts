@@ -102,13 +102,17 @@ export class KarmaniaCrsStep extends LitElement {
         overflow-wrap: anywhere;
       }
 
-      /* With the matches of a name under it, what is chosen is one line however long the name of the
-         system is, cut with an ellipsis and with the whole in its title, so that the box under it does
-         not move when a long name is chosen. */
-      .summary-text[data-truncate] {
+      /* With the matches of a name under it, what is chosen has room for two lines whatever it says, so
+         that the box under it does not move when a long name is chosen: the name, the unit and where the
+         code came from all fit in two (about 650 px wide) for the systems of the registry, and a longer
+         text is cut after the second line. */
+      .summary-text[data-two-lines] {
+        -webkit-box-orient: vertical;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        min-height: 2lh;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
 
       /* What matches the search box: a box of a fixed height, so that matches coming and going moves nothing,
@@ -432,10 +436,7 @@ export class KarmaniaCrsStep extends LitElement {
       </div>
       <p class="summary" role="status">
         <k-icon name=${draft.crs.mode === undefined ? 'circle-alert' : 'check'} size="16"></k-icon>
-        <span
-          class="summary-text"
-          ?data-truncate=${draft.crs.mode === 'epsg'}
-          title=${draft.crs.mode === 'epsg' ? `Chosen: ${chosen}` : nothing}
+        <span class="summary-text" ?data-two-lines=${draft.crs.mode === 'epsg'}
           ><strong>Chosen:</strong> ${chosen}</span
         >
       </p>
