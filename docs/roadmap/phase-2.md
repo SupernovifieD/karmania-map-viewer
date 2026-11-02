@@ -138,6 +138,8 @@ or releasing, and whenever the brief says to stop.
   checks that regenerating it changes nothing (second review).
 - [x] 12.F10 The record of the notices corrected: the builds do not carry the file yet,
   and the terms still have not been read at the source (second review).
+- [x] 12.F11 `docs/perf.md` read again after 12.F7: the rule paragraph, the raw size, the
+  start-up and search figures (second review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

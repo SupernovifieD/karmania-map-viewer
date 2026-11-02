@@ -2720,4 +2720,11 @@ minors and four nits. Each is a sub-step, or recorded.
   `docs/dependencies.md`, including that advisory. What was corrected without that: the file says that it is
   not yet in the builds, and the sentence of 12.F2 that said the notice was made "so that none can" be
   given the data without it.
+- Step 12.F11 (the perf notes after the table). `docs/perf.md` still said, after step 12.F7, that the module
+  was 5.8 MB raw and had grown by 504,435 bytes, that the search time "is not measured in WebAssembly" while
+  the paragraph above it gave one, and that compiling took "the same" time as before when the 12.12 line has
+  other figures. The rule paragraph now says that it is the state of step 12.12 and gives the later one, the
+  raw size is 5,451,076 bytes, the compile times of the new module (2.0 ms and 3.8 ms) are in the list with
+  the others, and the search time in WebAssembly in Node (a median of 1.75 ms; the review got 1.89 ms) is
+  where the sentence said it was not measured. Documentation only.
 

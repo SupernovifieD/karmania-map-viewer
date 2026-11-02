@@ -228,13 +228,14 @@ bytes smaller raw and 109,755 smaller gzipped than at step 12.12, so that it has
 gzipped since the start of the phase (the figures below are those of step 12.12, before that). No JavaScript of the
 app was changed by it: its `index` and `theme` are 31 bytes gzipped larger than at step 12.F4, which are
 the wording of step 12.F5. A search in Node takes a median of 1.75 ms (50 searches, maximum
-8.9 ms) and one `crsInfo` 0.007 ms, and compiling the module takes the same 2.0 ms and 3.8 ms as before.
+8.9 ms) and one `crsInfo` 0.007 ms, and compiling the module takes about as long as before (2.0 ms and
+3.8 ms, see below).
 
-Against the rule: the definitions and the reprojection added 489,532 bytes gzipped (step 12.11c), the
-two exports 14,445 more, and the changes to the core of steps 12.9 to 12.11b 458, so the module has
-grown by 504,435 bytes gzipped since the start of the phase, which is under the 1 MB at which the brief
-says to stop. The raw module is 5.8 MB, which is what
-a browser compiles. Up to step 12.12 the app's own JavaScript had not changed in size, apart from the worker, which
+Against the rule, as it stood at step 12.12: the definitions and the reprojection added 489,532 bytes
+gzipped (step 12.11c), the two exports 14,445 more, and the changes to the core of steps 12.9 to 12.11b
+458, so the module had grown by 504,435 bytes gzipped since the start of the phase (394,680 after step
+12.F7, as above), which is under the 1 MB at which the brief says to stop. The raw module was 5.8 MB at
+step 12.12 and is 5.45 MB (5,451,076 bytes) after step 12.F7; that is what a browser compiles. Up to step 12.12 the app's own JavaScript had not changed in size, apart from the worker, which
 grew by 2.8 KB (469 bytes gzipped) to carry the two new calls. The wizard's search and the summary's
 name (steps 12.14 and 12.15) then grew `index` and `theme` together from 46,642 to 48,430 bytes
 gzipped (1,788 more, 25,320 and 23,110) and the worker to 8,831; the module did not change. Over the
@@ -244,7 +245,7 @@ phase so far the app's JavaScript has grown by 1,752 bytes gzipped (46,678 to 48
 What the larger module costs when it starts, measured in Node's V8 (so only an indication of a
 browser's), compiling the module with `new WebAssembly.Module` and `WebAssembly.compile`, median of 9
 runs: 632,213 bytes took 0.3 ms and 2.0 ms; 5,762,604 bytes took 1.8 ms and 5.0 ms; 5,774,943 bytes took
-1.9 ms and 4.3 ms. Time from loading the page to a ready engine in Chromium is not measured here; the
+1.9 ms and 4.3 ms; 5,451,076 bytes (step 12.F7) took 2.0 ms and 3.8 ms. Time from loading the page to a ready engine in Chromium is not measured here; the
 browser tests of M11 and M12 did not get slower with it (the end-to-end suite took 5.3 to 7.5 minutes
 before and after).
 
@@ -254,4 +255,6 @@ step 12.2 offered.
 
 Searching the registry, natively in a release build: 2.5 ms per query by the name read from the first
 quoted string of each definition, against about 50 ms if every definition were read in full (step
-12.4). The same is not measured in WebAssembly.
+12.4). In WebAssembly in Node (step 12.F7, the definitions as a table, going through 6,184 definitions
+and not trying 65,536 codes): a median of 1.75 ms per search over 50 searches; in a browser it is not
+measured here.
