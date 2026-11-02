@@ -439,6 +439,36 @@ test.describe('the coordinate system step', () => {
     expect(await place()).toEqual(empty);
   });
 
+  test('moves nothing when a system with a long name is chosen: the line says it on one line, cut, with the whole in its title', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('WISCRS Calumet');
+    await expect(p.rows.first()).toBeVisible();
+    const before = await rect(p.box);
+    const line = (await rect(p.summary)).height;
+    await p.rows.first().click();
+    const name = (await p.names.first().textContent()) ?? '';
+    await expect(p.summary).toContainText('from the matches');
+    // The box is where it was, and the line is one line as before, cut and not wrapped.
+    expect((await rect(p.box)).y).toBe(before.y);
+    expect((await rect(p.summary)).height).toBe(line);
+    expect(await p.summary.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+      true,
+    );
+    // The whole of what is said is in its title, and in the status that is read out.
+    const title = await p.summary.getAttribute('title');
+    expect(title).toContain(name);
+    expect(title).toMatch(/^Chosen: EPSG \d+, .*, from the matches\.$/);
+    await expect(p.summary).toHaveText(
+      new RegExp(`^Chosen: EPSG \\d+, ${name.replace(/[()/.]/g, '\\$&')}`),
+    );
+    await assertNoOverflow(p.dialog);
+  });
+
   test('is used from the keyboard alone: type, Tab to the matches, and the arrows choose', async ({
     page,
   }) => {

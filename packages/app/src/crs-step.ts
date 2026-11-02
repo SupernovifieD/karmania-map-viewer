@@ -102,6 +102,15 @@ export class KarmaniaCrsStep extends LitElement {
         overflow-wrap: anywhere;
       }
 
+      /* With the matches of a name under it, what is chosen is one line however long the name of the
+         system is, cut with an ellipsis and with the whole in its title, so that the box under it does
+         not move when a long name is chosen. */
+      .summary-text[data-truncate] {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       /* What matches the search box: a box of a fixed height, so that matches coming and going moves nothing,
          and one that scrolls when there are more rows than fit. The room round the rows keeps the focus
          ring of a row from being cut. */
@@ -358,6 +367,7 @@ export class KarmaniaCrsStep extends LitElement {
       draft.crs.mode === 'detected'
         ? nameOf(found?.crs.kind === 'epsg' ? found.crs.code : undefined)
         : nameOf(chosenCode);
+    const chosen = summarizeCrs(draft.crs, found, sidecar, summaryInfo);
     return html`
       <p>Say which coordinate system the coordinates in the file are in.</p>
       <p class="found">
@@ -422,8 +432,11 @@ export class KarmaniaCrsStep extends LitElement {
       </div>
       <p class="summary" role="status">
         <k-icon name=${draft.crs.mode === undefined ? 'circle-alert' : 'check'} size="16"></k-icon>
-        <span class="summary-text"
-          ><strong>Chosen:</strong> ${summarizeCrs(draft.crs, found, sidecar, summaryInfo)}</span
+        <span
+          class="summary-text"
+          ?data-truncate=${draft.crs.mode === 'epsg'}
+          title=${draft.crs.mode === 'epsg' ? `Chosen: ${chosen}` : nothing}
+          ><strong>Chosen:</strong> ${chosen}</span
         >
       </p>
       ${draft.crs.mode === 'epsg' ? this.renderMatches(draft, chosenCode) : nothing}
