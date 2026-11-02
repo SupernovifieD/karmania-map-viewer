@@ -11,7 +11,8 @@
 #   scripts/generate-crs-table     write the table again (run it after changing the version of the crate)
 #
 # The test `registry::tests::the_table_is_what_from_code_says_for_every_code` fails if the table is
-# out of date.
+# out of date, and the Rust job of CI runs this script and fails if the file it writes differs from the
+# one in the repository.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,5 +40,8 @@ mkdir -p "$(dirname "$out")"
     | sort -n -u | awk '{ printf "    %s,\n", $2 }'
   echo "];"
 } > "$out"
-count="$(grep -c '^    EPSG_' "$out")"
+# Formatted as `cargo fmt --check` (a step of `pnpm check` and of CI) wants it: rustfmt puts several
+# entries on a line, so the file is a sixth the length it is written in.
+cargo fmt -p karmania-crs
+count="$(grep -o 'EPSG_[A-Za-z0-9_]*' "$out" | wc -l | tr -d ' ')"
 echo "Wrote $out: $count definitions from crs-definitions $version."

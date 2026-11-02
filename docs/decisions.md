@@ -2661,8 +2661,9 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
 - Step 12.F7 (the definitions as data; the owner chose this remedy at the gate). The giant function is
   `crs_definitions::from_code`, which nothing in the kernel calls any more. The constants the crate
   already has, one for each definition (`EPSG_4326`, ...), are listed in a table in the order of their
-  codes, `crates/karmania-crs/src/registry/table.rs` (6,184 entries, 95 KB, generated and tracked on
-  purpose, with a header that says so), made by `scripts/generate-crs-table` from the crate's own source;
+  codes, `crates/karmania-crs/src/registry/table.rs` (6,184 entries, 72.9 KB as committed (94.5 KB as the
+  script first wrote it, before rustfmt, which `cargo fmt --check` requires: see step 12.F9), generated and
+  tracked on purpose, with a header that says so), made by `scripts/generate-crs-table` from the crate's own source;
   `registry::get` finds a code in it by binary search and `registry::all` goes through it, and `lookup`,
   `search` and the transformer use those. The same crate and the same data as before, so the EPSG terms and
   the values are as they were. A search used to try 65,536 codes with `from_code` and now goes through
@@ -2696,4 +2697,12 @@ minors and four nits. Each is a sub-step, or recorded.
   which the picture of `wizard-crs-local` showed). The new test failed before the change (the box was at 345
   and moved to 365). No baseline changed: every wizard and CRS picture is as it was (26 passed, none
   retaken).
+- Step 12.F9 (the script did not make the file in the repository). Run in a copy by the review, and here,
+  `scripts/generate-crs-table` wrote 6,193 lines and 94,518 bytes, and the committed table is 782 lines and
+  72,874 bytes, the same after rustfmt: so whoever made the table again would have had `cargo fmt --check`
+  (the first step of `pnpm check` and of the Rust job of CI) fail, and nothing said so. The script now ends
+  with `cargo fmt -p karmania-crs`, and running it changes nothing in the repository (tried: `git diff
+  --exit-code` clean, where before it showed the whole file changed). The Rust job of CI runs it and fails on
+  a difference, which is the test of this step: it fails with the script as it was. That step has not run on
+  GitHub yet; it is to be read in the run of this commit.
 

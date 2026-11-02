@@ -134,6 +134,8 @@ or releasing, and whenever the brief says to stop.
   (found at the gate).
 - [x] 12.F8 The "Chosen:" line of the CRS step is one line, cut, with the whole in its
   title, when matches are under it: a long name no longer moves the box (second review).
+- [x] 12.F9 `scripts/generate-crs-table` writes the file `cargo fmt --check` wants, and CI
+  checks that regenerating it changes nothing (second review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
