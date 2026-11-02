@@ -62,7 +62,7 @@ or releasing, and whenever the brief says to stop.
     tests of the brief.
 - [x] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
   Tests.
-- [ ] 12.5 Add proj4rs (dependency-only).
+- [x] 12.5 Add proj4rs (dependency-only).
 - [ ] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
   scaling, EPSG-to-EPSG through proj4rs; local-to-EPSG and unbuildable
   definitions give findings. New codes documented.

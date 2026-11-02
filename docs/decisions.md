@@ -2200,3 +2200,22 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   compare the results with the plain ranking over fully read names for seventeen queries, at two
   limits, and were seen to fail when the groups were swapped and when the exact code was ignored.
   At 289 lines (about 90 of code) the change is over the size guideline; the tests are most of it.
+- Step 12.5 (`proj4rs`). Added to `karmania-crs` as version 0.3.0 with default features off. The brief
+  names 0.2.1, the version of phase 1, and says that about 6% of projected codes cannot be built
+  without a C-backed feature; neither is true of the latest release, which the conventions say to use.
+  Checked: 0.3.0 was released on 2026-10-26 under MIT OR Apache-2.0, not yanked; the geodesic code it
+  needs is `proj4rs-geodesic` 0.2.0, described as a pure Rust port, with no build script and no C or
+  C++ file in the package, so no C-backed feature exists to be left off; a release build for
+  `wasm32-unknown-unknown` succeeds. What it cannot build was measured by trying every definition of
+  `crs-definitions` that has a PROJ string (6182): 5942 build (96.1%), 238 fail with "NAD grid not
+  available" (they name datum-shift grid files that are not shipped) and 2 with "Projection not
+  found"; turning its `aeqd` feature on changed nothing (the source does not use it), so it is left
+  off, like all features. The brief's premise is out of date for this reason; steps 12.6 and 13.4
+  have to say, in findings, why a definition cannot be used, and these are the reasons to expect.
+  The brief asks whether `proj4rs` can use `libm`: it cannot (no feature or dependency for it; a
+  comment in its source says it relies on the platform's maths library), so reprojection results
+  may differ in the last bits between native and WebAssembly builds, and the tests that compare
+  across platforms keep to a tolerance. The lock file gains `proj4rs`, `proj4rs-geodesic`,
+  `thiserror`, `thiserror-impl` and, for `wasm32` only, `console_log`, `log` and `web-sys`, all under
+  licences the policy allows; they are in `docs/dependencies.md`. The size of the kernel with it is
+  measured at step 12.12.

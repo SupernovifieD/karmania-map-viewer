@@ -65,6 +65,7 @@ BSD-3-Clause or ISC, except:
 | js-sys (`karmania-wasm`) | 0.3.106 | MIT OR Apache-2.0 | Reads JavaScript arrays and typed arrays passed to the module. | step 4.3b |
 | libm | 0.2.16 | MIT | Pure-Rust sine and cosine for lattice rotation, so results are bit-identical on every platform. No dependencies of its own. Approved by the owner. | step 1.18 |
 | crs-definitions (`karmania-crs`) | 0.6.0 | CC0-1.0 | The EPSG definitions: a `u16` EPSG code to a WKT string (name, kind and units are read from it) and a PROJ string (for reprojection). Default features `proj4` (for the reprojection) and `wkt` (for the lookup), both needed. `no_std`, no dependencies of its own, builds for `wasm32-unknown-unknown`. About 4.9 MB of source tables, so the WebAssembly module will grow; the size is measured at step 12.12 against the 1 MB (gzipped) rule of the brief. Released 2026-09-16; its GitHub repository was archived on 2026-06-13 and moved to tangled.org/rwell.org/crs-definitions, where 0.6.0 was released. Used under the EPSG terms below. | step 12.2 |
+| proj4rs (`karmania-crs`) | 0.3.0 | MIT OR Apache-2.0 | Pure-Rust port of PROJ: reprojection between the coordinate systems of the definitions (from step 12.6). Default features off (the `aeqd` feature is not used in its source and made no difference to what it can build). 0.3.0 is the latest (2026-10-26); phase 1 used 0.2.1. Brings `proj4rs-geodesic` 0.2.0 (MIT OR Apache-2.0, a pure Rust port of GeographicLib's geodesic code, no build script and no C source) and `thiserror` 2.0.21 with `thiserror-impl` (MIT OR Apache-2.0); on `wasm32-unknown-unknown` it also brings `console_log` 1.1.0 (MIT/Apache-2.0), `log` 0.4.35 and `web-sys` 0.3.106 (MIT OR Apache-2.0), besides `wasm-bindgen` and `js-sys` that the bindings already use. It has no option to use `libm`: it relies on the platform's maths library, so results may differ in the last bits between native and WebAssembly builds. | step 12.5 |
 
 Rust transitive tree at step 4.3b (30 crates in the resolved graph, checked with
 `cargo metadata`, the same for host and `wasm32-unknown-unknown`): all MIT,
@@ -81,7 +82,13 @@ the core and does not interpret coordinate systems: `proj4rs` (MIT OR Apache-2.0
 reprojection, with the crates it brought along) and `crs-definitions` (CC0-1.0,
 the EPSG definitions, 4.8 MB of source text). `crs-definitions` came back at step
 12.2, in the new `karmania-crs` crate (the core still knows no definitions);
-`proj4rs` comes back at step 12.5.
+`proj4rs` came back at step 12.5, in `karmania-crs` too.
+
+What `proj4rs` 0.3.0 can build (measured at step 12.5 with `Proj::from_proj_string` on the PROJ
+string of every definition of `crs-definitions` 0.6.0): 5942 of the 6182 that have one. The
+other 240 are 238 that need datum-shift grid files ("NAD grid not available") and 2 whose projection
+it does not know. No C-backed feature is involved: that was a problem of 0.2.1, which the brief
+still describes as "about 6%".
 
 The EPSG terms (step 12.2). `crs-definitions` is licensed CC0-1.0, but its tables are
 generated, by the crate's own `scripts/regenerate.py`, from the `spatial_ref_sys` table
