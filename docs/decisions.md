@@ -2889,4 +2889,10 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   the rows then fit the box in whole, so the padding is not needed for the test to pass at this height and
   is kept so that it cannot come back if the height of the box or of a row changes. The test does not fail
   without the padding at three rows, which is said here so that it is not read as more.
+- Step 12.F23 (a new file). Nit. `git diff --exit-code` of step 12.F19 does not see a file that is not
+  tracked, which the review showed in a scratch repository (exit 0 with an untracked file), so a script that
+  wrote one would have passed. The step now fails if `git status --porcelain` says anything after the script,
+  and prints it. The tree was clean after the Rust tests here (no lines of `git status --porcelain` after
+  `pnpm check`), so it should not fail by itself on the runner; that is to be read in the run of this commit,
+  as nothing of it can run elsewhere.
 

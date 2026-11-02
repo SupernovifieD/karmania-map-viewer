@@ -163,6 +163,7 @@ or releasing, and whenever the brief says to stop.
   Screenshots updated and reviewed.
 - [x] 12.F22 The focus ring of a match reached by the arrows is never clipped by the edge of
   its box (fifth review).
+- [x] 12.F23 The CI step that regenerates the table also fails on a file that is new (fifth review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
