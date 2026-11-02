@@ -2727,4 +2727,13 @@ minors and four nits. Each is a sub-step, or recorded.
   raw size is 5,451,076 bytes, the compile times of the new module (2.0 ms and 3.8 ms) are in the list with
   the others, and the search time in WebAssembly in Node (a median of 1.75 ms; the review got 1.89 ms) is
   where the sentence said it was not measured. Documentation only.
+- Step 12.F12 (grads in validation). Step 12.F1 refused the nine geographic systems in grads in the
+  transformer, but `Definitions::geography` still called them `Geographic`, which the core documents as
+  "X is longitude and Y is latitude, in degrees", so the checks for degrees were made on values in grads:
+  a latitude of 95 grads (valid, as a grad is 0.9 degree and the pole is at 100) was a warning. They are
+  now `NotGeographic`: no range check and no "unknown code" warning, since the code is known. The other
+  answer, `Unknown`, would have given that warning. Two tests failed before the change (the answer for
+  EPSG:4807, and the sweep, whose count of `Geographic` codes is 754, the systems in degrees, and no longer
+  the 763 of step 12.3, the other nine being the ones in grads). The checks are still those of degrees:
+  converting from grads to check them as grads is not done, since nothing needs it.
 

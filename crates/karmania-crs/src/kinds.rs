@@ -2,22 +2,26 @@
 
 use karmania_core::{CrsGeography, CrsKinds};
 
-use crate::info::CrsKind;
+use crate::info::{AxisUnits, CrsKind};
 use crate::lookup::lookup;
 
 /// The EPSG definitions, as the core's validation wants to ask them: is this code a longitude
 /// and latitude system? Give it to `karmania_core::validate_with`.
 ///
 /// A code that is in the definitions is [`CrsGeography::Geographic`] when it is a geographic
-/// system and [`CrsGeography::NotGeographic`] otherwise (a projected or geocentric system, or one
-/// with no definition); a code that is not in them is [`CrsGeography::Unknown`].
+/// system whose coordinates are in degrees and [`CrsGeography::NotGeographic`] otherwise (a
+/// projected or geocentric system, one with no definition, or a geographic one in grads, whose
+/// values the checks for degrees would judge wrongly); a code that is not in them is
+/// [`CrsGeography::Unknown`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Definitions;
 
 impl CrsKinds for Definitions {
     fn geography(&self, code: u32) -> CrsGeography {
         match lookup(code) {
-            Some(info) if info.kind == CrsKind::Geographic => CrsGeography::Geographic,
+            Some(info) if info.kind == CrsKind::Geographic && info.units == AxisUnits::Degree => {
+                CrsGeography::Geographic
+            }
             Some(_) => CrsGeography::NotGeographic,
             None => CrsGeography::Unknown,
         }
@@ -58,6 +62,21 @@ mod tests {
     }
 
     #[test]
+    fn a_geographic_system_in_grads_is_not_range_checked_as_degrees() {
+        // EPSG:4807 (NTF, Paris) has its latitude in grads, where 95 is a valid value and 95 degrees is not.
+        assert_eq!(Definitions.geography(4807), CrsGeography::NotGeographic);
+        let paris = points(4807, 10.0, 95.0);
+        assert!(codes(&validate_with(&paris, &Definitions)).is_empty());
+        // The same numbers in a system of degrees are not valid: 95 is not a latitude, 10 is, so the
+        // two look swapped.
+        let wgs84 = points(4326, 10.0, 95.0);
+        assert_eq!(
+            codes(&validate_with(&wgs84, &Definitions)),
+            ["crs.geographic.axes_swapped"]
+        );
+    }
+
+    #[test]
     fn the_definitions_say_they_have_every_code() {
         assert!(Definitions.knows_every_code());
     }
@@ -74,7 +93,11 @@ mod tests {
         let mut geographic = 0;
         for code in 0..=u32::from(u16::MAX) {
             let expected = match lookup(code) {
-                Some(info) if info.kind == CrsKind::Geographic => CrsGeography::Geographic,
+                Some(info)
+                    if info.kind == CrsKind::Geographic && info.units == AxisUnits::Degree =>
+                {
+                    CrsGeography::Geographic
+                }
                 Some(_) => CrsGeography::NotGeographic,
                 None => CrsGeography::Unknown,
             };
@@ -82,8 +105,8 @@ mod tests {
             assert_eq!(answer, expected, "{code}");
             geographic += usize::from(answer == CrsGeography::Geographic);
         }
-        // The 754 + 9 geographic systems counted at step 12.3.
-        assert_eq!(geographic, 763);
+        // The 754 geographic systems in degrees of the 763 counted at step 12.3: the other 9 are in grads.
+        assert_eq!(geographic, 754);
     }
 
     fn points(code: u32, x: f64, y: f64) -> Dataset {

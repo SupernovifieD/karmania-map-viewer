@@ -140,6 +140,8 @@ or releasing, and whenever the brief says to stop.
   and the terms still have not been read at the source (second review).
 - [x] 12.F11 `docs/perf.md` read again after 12.F7: the rule paragraph, the raw size, the
   start-up and search figures (second review).
+- [x] 12.F12 The nine geographic systems in grads are not range-checked as degrees by
+  validation (second review; 12.F1 did the transformer).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
