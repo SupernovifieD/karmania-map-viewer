@@ -2233,3 +2233,21 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   cannot be used, with the reason in the message (needs datum-shift grid files; its projection is
   not supported; it is geocentric; or its definition cannot be read), which are the reasons step
   12.5 measured. Whether a dataset is drawn, and the `display` findings that say so, are step 13.4's.
+- Step 12.6b (the transformer). `Transformer::new(from, to)` gives identity for the same system,
+  a scale for two local grids (taken to be the same grid, as the brief says; the finding that says
+  so is step 13.4's), a conversion through `proj4rs` for two EPSG systems, and one of the three
+  findings of step 12.6a otherwise. `convert(x, y)` takes and gives degrees for a geographic system,
+  and converts to and from the radians that `proj4rs` works in inside; heights are outside it, as
+  they are never reprojected. A position that cannot be converted, and any non-finite one, comes
+  back as `[NaN, NaN]`, one rule that step 12.7 turns into a count. The definitions are used through
+  their PROJ strings (a definition with none, or a geocentric one, is `unsupported`), so a
+  system whose WKT is empty can still be used if its PROJ string builds (EPSG:3993 does). The
+  reasons a definition cannot be built are the three of step 12.5, in words for a person. Checked:
+  the point at the central meridian of UTM zone 40 gives an easting of 500000 m to 1.4 nm; a round
+  trip over 4,331 points of the zone comes back to 2.8e-14 degrees; California zone 5 in US survey
+  feet and in metres give the same place to within the 0.0001016 m by which the two definitions'
+  false origins differ (the tolerance is that difference, not slack); latitude 95 and NaN give NaN.
+  The tests were seen to fail with each of the radians-to-degrees, degrees-to-radians and unit-ratio
+  conversions broken (all tried, file restored), and the examples of the docs are tested against what
+  the transformer really says. A test that only counted the elements of the result was deleted
+  because it could not fail. The accuracy against an independent source is step 12.8's.

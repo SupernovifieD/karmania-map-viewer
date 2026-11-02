@@ -69,10 +69,11 @@ or releasing, and whenever the brief says to stop.
   commit size guideline:
   - [x] 12.6a The finding codes `crs.transform.local_grid`, `code_unknown` and
     `unsupported`, in the registry of the core and documented.
-  - [ ] 12.6b The transformer: identity and local-to-local unit scaling;
-    local-to-EPSG and codes that are not known give findings.
-  - [ ] 12.6c EPSG-to-EPSG through proj4rs; definitions that cannot be used give
-    findings.
+  - [x] 12.6b The transformer: identity, local-to-local unit scaling and
+    EPSG-to-EPSG through proj4rs; local-to-EPSG, codes that are not known and
+    definitions that cannot be used give findings.
+  - [ ] 12.6c Which definitions of the registry can be used and why the others
+    cannot, over the whole registry, pinned.
 - [ ] 12.7 Transform positions in place (f64, z untouched); non-finite results
   counted in a finding with examples.
 - [ ] 12.8 Accuracy tests: reference conversions from an independent source
