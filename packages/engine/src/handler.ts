@@ -5,6 +5,8 @@
  * is a few lines that connect it to the worker's scope.
  */
 import {
+  checkedCrsInfo,
+  checkedCrsInfoList,
   checkedImportStatus,
   checkedLoadResult,
   checkedPage,
@@ -33,6 +35,17 @@ export interface WorkerHandler {
 
 /** How many rows an import parses before it lets other messages through. */
 const IMPORT_BUDGET_ROWS = 50_000;
+
+/** The largest whole number the kernel takes for an EPSG code or a limit (an unsigned 32 bit number). */
+const MAX_UINT32 = 4_294_967_295;
+
+/** A request that is misuse: a number that is not a whole number in the range of the kernel's. */
+function requireWholeNumber(value: unknown, what: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > MAX_UINT32) {
+    throw new TypeError(`${what} must be a whole number from 0 to ${String(MAX_UINT32)}.`);
+  }
+  return value;
+}
 
 /** Thrown inside a request to unwind it when the main thread asked for it to stop. */
 class Cancelled extends Error {}
@@ -215,6 +228,32 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
           },
           transfer: [],
         };
+      case 'crsInfo': {
+        const { module } = await ready();
+        const code = requireWholeNumber(message.params.code, 'The EPSG code');
+        const found = module.crsInfo(code);
+        return {
+          reply: {
+            type: 'result',
+            id,
+            request: 'crsInfo',
+            result: found === undefined ? undefined : checkedCrsInfo(found),
+          },
+          transfer: [],
+        };
+      }
+      case 'searchCrs': {
+        const { module } = await ready();
+        const { query, limit } = message.params;
+        if (typeof query !== 'string') {
+          throw new TypeError('The search must be a string.');
+        }
+        const found = module.searchCrs(query, requireWholeNumber(limit, 'The limit'));
+        return {
+          reply: { type: 'result', id, request: 'searchCrs', result: checkedCrsInfoList(found) },
+          transfer: [],
+        };
+      }
       case 'import':
         return {
           reply: {

@@ -6,7 +6,8 @@ import { resultOf, startHandler } from './test-support/handler.js';
 import { fixtureFile, testKernelModule, wrapKernel } from './test-support/kernel.js';
 import { bigPointsCsv, pointsMapping, UTM40 } from './test-support/data.js';
 import { mappingFrom } from './test-support/mapping.js';
-import type { ImportMapping, Kind, LoadResult } from './types.js';
+import { parseFromWorker } from './protocol.js';
+import type { CrsInfo, ImportMapping, Kind, LoadResult } from './types.js';
 
 let nextId = 100;
 const id = (): number => nextId++;
@@ -416,5 +417,114 @@ describe('stopping a request', () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(harness.posted).toHaveLength(before);
+  });
+});
+
+describe('what EPSG codes mean', () => {
+  it('says what a code means, and nothing for a code that is not in the definitions', async () => {
+    const harness = await ready();
+    const known = await harness.settle({ type: 'crsInfo', id: id(), params: { code: 32640 } });
+    expect(resultOf(known, 'crsInfo')).toStrictEqual({
+      code: 32640,
+      name: 'WGS 84 / UTM zone 40N',
+      kind: 'projected',
+      units: 'm',
+      metresPerUnit: 1,
+    });
+    const unknown = await harness.settle({ type: 'crsInfo', id: id(), params: { code: 99_999 } });
+    expect(unknown.message.type).toBe('result');
+    expect(resultOf(unknown, 'crsInfo')).toBeUndefined();
+  });
+
+  it('sends the answer for an unknown code through a structured clone, as a worker does', async () => {
+    const harness = await ready();
+    const reply = await harness.settle({ type: 'crsInfo', id: id(), params: { code: 99_999 } });
+    const received = parseFromWorker(structuredClone(reply.message));
+    expect(received?.type).toBe('result');
+  });
+
+  it('searches by code and by name', async () => {
+    const harness = await ready();
+    const byCode = await harness.settle({
+      type: 'searchCrs',
+      id: id(),
+      params: { query: 'EPSG:4326', limit: 5 },
+    });
+    expect(resultOf(byCode, 'searchCrs')[0]?.code).toBe(4326);
+    const byName = await harness.settle({
+      type: 'searchCrs',
+      id: id(),
+      params: { query: 'WGS 84 / UTM zone 40', limit: 5 },
+    });
+    expect(resultOf(byName, 'searchCrs').map((found) => found.code)).toEqual([32640, 32740]);
+    const none = await harness.settle({
+      type: 'searchCrs',
+      id: id(),
+      params: { query: 'no such system', limit: 5 },
+    });
+    expect(resultOf(none, 'searchCrs')).toEqual([]);
+  });
+
+  it('refuses both before the worker has been initialised', async () => {
+    const harness = startHandler();
+    for (const message of [
+      { type: 'crsInfo', id: id(), params: { code: 4326 } },
+      { type: 'searchCrs', id: id(), params: { query: 'a', limit: 1 } },
+    ] as const) {
+      expect(errorOf(await harness.settle(message)).message).toMatch(/not been initialised/);
+    }
+  });
+
+  it('refuses what is not a whole number, or a string, instead of letting the kernel change it', async () => {
+    const harness = await ready();
+    const bad = [
+      { type: 'crsInfo', params: { code: -1 }, message: /EPSG code must be a whole number/ },
+      { type: 'crsInfo', params: { code: 4326.5 }, message: /EPSG code must be a whole number/ },
+      { type: 'crsInfo', params: { code: Number.NaN }, message: /whole number/ },
+      { type: 'crsInfo', params: { code: 2 ** 32 }, message: /whole number/ },
+      { type: 'crsInfo', params: { code: '4326' }, message: /whole number/ },
+      { type: 'searchCrs', params: { query: 'a', limit: -1 }, message: /limit must be a whole/ },
+      { type: 'searchCrs', params: { query: 'a', limit: 1.5 }, message: /limit must be a whole/ },
+      { type: 'searchCrs', params: { query: 7, limit: 3 }, message: /must be a string/ },
+    ] as const;
+    for (const { type, params, message } of bad) {
+      const reply = await harness.settle({ type, id: id(), params } as never);
+      expect(errorOf(reply).message, JSON.stringify(params)).toMatch(message);
+    }
+  });
+
+  it('does not trust the kernel: an answer that breaks the contract is an error', async () => {
+    const real = testKernelModule();
+    const goodInfo: CrsInfo = {
+      code: 1,
+      name: 'x',
+      kind: 'projected',
+      units: 'm',
+      metresPerUnit: 1,
+    };
+    const lying = (crsInfo: unknown, searchCrs: unknown): KernelModule => ({
+      ...real,
+      crsInfo: () => crsInfo,
+      searchCrs: () => searchCrs,
+    });
+    const asked = async (module: KernelModule, type: 'crsInfo' | 'searchCrs') => {
+      const harness = await ready(() => Promise.resolve(module));
+      return harness.settle(
+        type === 'crsInfo'
+          ? { type, id: id(), params: { code: 1 } }
+          : { type, id: id(), params: { query: 'a', limit: 1 } },
+      );
+    };
+    const wrongKind = lying({ ...goodInfo, kind: 'cartesian' }, []);
+    expect(errorOf(await asked(wrongKind, 'crsInfo')).message).toMatch(/kind/);
+    const noMetres = lying({ code: 1, name: 'x', kind: 'projected', units: 'm' }, []);
+    expect(errorOf(await asked(noMetres, 'crsInfo')).message).toMatch(/metresPerUnit/);
+    const notAList = lying(undefined, { code: 1 });
+    expect(errorOf(await asked(notAList, 'searchCrs')).message).toMatch(/expected an array/);
+    const badEntry = lying(undefined, [goodInfo, { ...goodInfo, extra: true }]);
+    expect(errorOf(await asked(badEntry, 'searchCrs')).message).toMatch(/crsInfos\[1\]/);
+    // And a good answer is let through.
+    const fine = lying(goodInfo, [goodInfo]);
+    expect(resultOf(await asked(fine, 'crsInfo'), 'crsInfo')).toStrictEqual(goodInfo);
   });
 });
