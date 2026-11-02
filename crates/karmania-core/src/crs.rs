@@ -68,8 +68,9 @@ pub enum CrsRef {
 pub enum CrsGeography {
     /// A longitude and latitude system: X is longitude and Y is latitude, in degrees.
     Geographic,
-    /// A system that is known and is not one of longitude and latitude (a projected one, a
-    /// geocentric one, ...).
+    /// A system that is known and is not one of longitude and latitude in degrees: a projected one, a
+    /// geocentric one, ..., or a geographic one whose angles are in another unit (grads), which
+    /// cannot be judged as degrees.
     NotGeographic,
     /// Not known to whoever was asked.
     Unknown,
