@@ -23,11 +23,13 @@
 pub mod info;
 pub mod lookup;
 pub mod search;
+pub mod transform;
 pub mod wkt;
 
 pub use info::{AxisUnits, CrsInfo, CrsKind, describe};
 pub use lookup::lookup;
 pub use search::{MAX_RESULTS, search};
+pub use transform::Transformer;
 
 #[cfg(test)]
 mod tests {
