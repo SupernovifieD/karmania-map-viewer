@@ -142,10 +142,18 @@ mod tests {
     fn a_code_is_followed_by_the_names_that_start_with_and_then_contain_it() {
         // 2229 is a code, and "2229" is also inside no name, so only the code is found.
         assert_eq!(codes(&search("2229", 10)), vec![2229]);
-        // A number that is a code and also part of names: the code is first, the names after it.
-        let found = codes(&search("84", 10));
-        assert_eq!(found, expected(&registry(), "84", 10));
+        // A number that is a code and also part of names (SIRGAS 2000, for one): the code is first, the
+        // names after it.
+        let found = codes(&search("2000", 10));
+        assert_eq!(found, expected(&registry(), "2000", 10));
+        assert_eq!(found[0], 2000);
         assert!(found.len() > 1);
+        assert!(
+            search("2000", 10)[1..]
+                .iter()
+                .all(|info| info.name.contains("2000")),
+            "{found:?}"
+        );
     }
 
     #[test]
