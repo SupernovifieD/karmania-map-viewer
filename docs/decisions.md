@@ -2328,3 +2328,13 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   restored). The warning for a code that is not in the
   definitions is step 12.11's, since it needs the hook to say that a code is missing and not just
   that it is not known.
+- Step 12.10 (`Definitions`). `karmania_crs::Definitions` implements `CrsKinds` from the definitions:
+  a geographic system is `Geographic`, any other that exists is `NotGeographic` (projected, geocentric,
+  or an entry with no definition), and a code that is not in them is `Unknown`. It is given to
+  `validate_with`, and a test shows what that changes: projected-looking numbers labelled EPSG:4269
+  (NAD83) are now a `crs.geographic.out_of_range` warning, where the core alone says nothing, while the
+  same numbers in UTM or under a code that is not known are not range-checked. A test goes over every
+  code of the registry and counts 763 geographic systems, the 754 + 9 of step 12.3; that test computes
+  its expectation the way the code does, so what it can show is the count and the lists of codes of the
+  other tests, which are written out. Seen to fail when projected systems are taken for geographic
+  ones (tried, file restored).

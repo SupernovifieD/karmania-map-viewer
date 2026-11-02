@@ -82,7 +82,7 @@ or releasing, and whenever the brief says to stop.
   round trips.
 - [x] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
   only). No behaviour change: phase 1 snapshots unchanged.
-- [ ] 12.10 karmania-crs implements CrsKinds.
+- [x] 12.10 karmania-crs implements CrsKinds.
 - [ ] 12.11 The wasm kernel passes it to validation on import and load; the "code
   not in the definitions" warning; tests for 4269 (geographic, now
   range-checked) and an unknown code.
