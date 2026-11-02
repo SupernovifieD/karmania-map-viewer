@@ -19,7 +19,9 @@ import type {
 } from './inputs.js';
 import {
   COLUMN_TYPES,
+  CRS_KINDS,
   CRS_SOURCES,
+  CRS_UNITS,
   DELIMITERS,
   FORMATS,
   KINDS,
@@ -32,8 +34,11 @@ import type {
   ColumnMapping,
   ColumnSummary,
   ColumnType,
+  CrsInfo,
+  CrsKind,
   CrsRef,
   CrsSource,
+  CrsUnits,
   Delimiter,
   Finding,
   Format,
@@ -144,6 +149,28 @@ const handled = {
         return assertNever(v);
     }
   },
+  crsKind: (v: CrsKind): string => {
+    switch (v) {
+      case 'geographic':
+      case 'projected':
+      case 'other':
+        return v;
+      default:
+        return assertNever(v);
+    }
+  },
+  crsUnits: (v: CrsUnits): string => {
+    switch (v) {
+      case 'm':
+      case 'ft':
+      case 'us_ft':
+      case 'degree':
+      case 'other':
+        return v;
+      default:
+        return assertNever(v);
+    }
+  },
   phase: (v: Phase): string => {
     switch (v) {
       case 'parsing':
@@ -166,6 +193,8 @@ describe('the unions are exhaustive', () => {
       [COLUMN_TYPES, handled.columnType],
       [ROLES, handled.role],
       [CRS_SOURCES, handled.crsSource],
+      [CRS_KINDS, handled.crsKind],
+      [CRS_UNITS, handled.crsUnits],
       [PHASES, handled.phase],
     ];
     for (const [list, handle] of lists) {
@@ -229,6 +258,10 @@ describe('related unions agree with each other', () => {
   it('uses the same lists wherever a list is repeated', () => {
     expectTypeOf<DatasetInput['kind']>().toEqualTypeOf<Kind>();
     expectTypeOf<ImportMapping['kind']>().toEqualTypeOf<Kind>();
+    // A local grid's unit is one of the units a coordinate system can have.
+    expectTypeOf<Units>().toExtend<CrsUnits>();
+    expectTypeOf<CrsInfo['kind']>().toEqualTypeOf<CrsKind>();
+    expectTypeOf<CrsInfo['units']>().toEqualTypeOf<CrsUnits>();
     expectTypeOf<NonNullable<Preview['suggestedKind']>>().toEqualTypeOf<Kind>();
     expectTypeOf<ColumnMapping['role']>().toEqualTypeOf<Role>();
     expectTypeOf<ColumnMapping['type']>().toEqualTypeOf<ColumnType | undefined>();

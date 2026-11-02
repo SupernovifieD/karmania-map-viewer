@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { Scenarios } from './page/main.js';
-import { FIXTURE_CASES, runFixture } from './scenarios.js';
+import { FIXTURE_CASES, runCrs, runFixture } from './scenarios.js';
 import { fixtureFile } from '../src/test-support/kernel.js';
 import { engineOverChannel } from '../src/test-support/ports.js';
 
@@ -173,5 +173,47 @@ test.describe('what only a real worker can show', () => {
       return scenarios.afterDispose();
     });
     expect(report).toEqual({ datasets: 'EngineDisposedError', rows: 'EngineDisposedError' });
+  });
+});
+
+test.describe('the EPSG definitions, through the real worker', () => {
+  test('answer, search and take part in loading, the same in the browser as in Node', async ({
+    page,
+  }) => {
+    const errors = collectPageErrors(page);
+    await openScenarios(page);
+    const inBrowser = await page.evaluate(async () => {
+      const scenarios: Scenarios | undefined = window.karmaniaTest;
+      if (scenarios === undefined) {
+        throw new Error('The test page did not set up its scenarios.');
+      }
+      return scenarios.crs();
+    });
+
+    expect(inBrowser.utm40).toEqual({
+      code: 32640,
+      name: 'WGS 84 / UTM zone 40N',
+      kind: 'projected',
+      units: 'm',
+      metresPerUnit: 1,
+    });
+    expect(inBrowser.unknown).toBeUndefined();
+    expect(inBrowser.byName).toEqual([32640, 32740]);
+    expect(inBrowser.byCode[0]).toBe(4326);
+    expect(inBrowser.misuse).toMatch(/^EngineError: The EPSG code must be a whole number/);
+    // What loading made of the same UTM-looking points under three codes.
+    expect(inBrowser.loaded).toEqual({
+      '32640': [],
+      '99999': ['crs.code.unknown'],
+      '4269': ['crs.geographic.out_of_range'],
+    });
+
+    const engine = engineOverChannel();
+    try {
+      expect(inBrowser).toEqual(await runCrs(engine));
+    } finally {
+      engine.dispose();
+    }
+    expect(errors).toEqual([]);
   });
 });

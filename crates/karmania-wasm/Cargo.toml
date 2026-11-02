@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 karmania-core.workspace = true
+karmania-crs.workspace = true
 karmania-io.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true

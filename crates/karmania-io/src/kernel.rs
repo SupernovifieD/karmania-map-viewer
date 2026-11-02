@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use karmania_core::{Dataset, Findings};
+use karmania_core::{CrsKinds, Dataset, Findings, Wgs84Only};
 
 use crate::build::{
     BlocksInput, GridInput, LinesInput, MeshInput, PointsInput, PolygonsInput, build_blocks,
@@ -40,22 +40,38 @@ pub enum ImportStatus {
 }
 
 /// The loaded datasets and the imports in progress.
-#[derive(Default)]
 pub struct Kernel {
     registry: Registry,
     imports: BTreeMap<u32, ImportRun>,
     /// The identifier the next import gets. Identifiers are never reused.
     next_import: u32,
+    /// Which EPSG codes validation takes to be longitude and latitude systems.
+    kinds: Box<dyn CrsKinds>,
+}
+
+impl Default for Kernel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Kernel {
-    /// A kernel with nothing loaded.
+    /// A kernel with nothing loaded, which knows EPSG:4326 as a longitude and latitude
+    /// system and no other (the core alone knows no definitions).
     #[must_use]
     pub fn new() -> Self {
+        Self::with_kinds(Box::new(Wgs84Only))
+    }
+
+    /// A kernel with nothing loaded whose validation asks `kinds` which EPSG codes are
+    /// longitude and latitude systems, for what is imported or loaded from arrays.
+    #[must_use]
+    pub fn with_kinds(kinds: Box<dyn CrsKinds>) -> Self {
         Self {
             registry: Registry::new(),
             imports: BTreeMap::new(),
             next_import: 1,
+            kinds,
         }
     }
 
@@ -77,7 +93,7 @@ impl Kernel {
     /// was cancelled).
     pub fn step_import(&mut self, id: u32, budget_rows: usize) -> Option<ImportStatus> {
         let run = self.imports.get_mut(&id)?;
-        match run.step(budget_rows) {
+        match run.step_with(budget_rows, self.kinds.as_ref()) {
             RunStep::Progress(progress) => Some(ImportStatus::Progress {
                 phase: progress.phase,
                 fraction: progress.fraction,
@@ -134,7 +150,9 @@ impl Kernel {
     fn load_built(&mut self, build: impl FnOnce(&mut Findings) -> Option<Dataset>) -> LoadResult {
         let mut findings = Findings::new();
         match build(&mut findings) {
-            Some(dataset) => self.registry.load(vec![dataset], findings),
+            Some(dataset) => self
+                .registry
+                .load_with(vec![dataset], findings, self.kinds.as_ref()),
             None => LoadResult::Blocked { findings },
         }
     }
@@ -422,5 +440,84 @@ mod tests {
             "dataset.coordinates.length_mismatch"
         );
         assert_eq!(kernel.registry().len(), 1);
+    }
+
+    /// A `CrsKinds` that takes EPSG:4269 (NAD83) to be a longitude and latitude system.
+    struct Nad83;
+
+    impl CrsKinds for Nad83 {
+        fn geography(&self, code: u32) -> karmania_core::CrsGeography {
+            if code == 4269 {
+                karmania_core::CrsGeography::Geographic
+            } else {
+                karmania_core::CrsGeography::Unknown
+            }
+        }
+    }
+
+    fn nad83() -> Option<CrsRef> {
+        Some(CrsRef::Epsg { code: 4269 })
+    }
+
+    fn codes_of(result: LoadResult) -> Vec<&'static str> {
+        let LoadResult::Loaded { summaries } = result else {
+            panic!("expected Loaded")
+        };
+        summaries[0]
+            .findings
+            .iter()
+            .map(|f| f.code.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn an_imported_file_is_checked_against_the_kinds_the_kernel_was_given() {
+        let import = |kernel: &mut Kernel| {
+            // The points of the fixture are in the hundreds of thousands: not degrees.
+            let id = kernel.start_import(
+                "points.csv",
+                &fixtures::bytes("points.csv"),
+                mapping(nad83()),
+            );
+            finish(kernel, id, 1_000).1
+        };
+        let alone = codes_of(import(&mut Kernel::new()));
+        assert!(!alone.contains(&"crs.geographic.out_of_range"), "{alone:?}");
+        let told = codes_of(import(&mut Kernel::with_kinds(Box::new(Nad83))));
+        // A warning: the dataset is still loaded.
+        assert!(told.contains(&"crs.geographic.out_of_range"), "{told:?}");
+    }
+
+    #[test]
+    fn points_made_from_arrays_are_checked_against_the_kinds_too() {
+        use crate::build::PointsInput;
+        let input = || PointsInput {
+            name: "Wells".into(),
+            crs: nad83(),
+            x: vec![500_000.0, 500_010.0],
+            y: vec![2_800_000.0, 2_800_010.0],
+            z: None,
+            columns: Vec::new(),
+        };
+        let alone = codes_of(Kernel::new().load_points(input()));
+        assert!(!alone.contains(&"crs.geographic.out_of_range"), "{alone:?}");
+        let told = codes_of(Kernel::with_kinds(Box::new(Nad83)).load_points(input()));
+        assert!(told.contains(&"crs.geographic.out_of_range"), "{told:?}");
+    }
+
+    #[test]
+    fn a_kernel_asks_its_own_kinds_and_not_another_kernels() {
+        let mut told = Kernel::with_kinds(Box::new(Nad83));
+        let mut alone = Kernel::new();
+        let run = |kernel: &mut Kernel| {
+            let id = kernel.start_import(
+                "points.csv",
+                &fixtures::bytes("points.csv"),
+                mapping(nad83()),
+            );
+            codes_of(finish(kernel, id, 1_000).1)
+        };
+        assert!(run(&mut told).contains(&"crs.geographic.out_of_range"));
+        assert!(!run(&mut alone).contains(&"crs.geographic.out_of_range"));
     }
 }

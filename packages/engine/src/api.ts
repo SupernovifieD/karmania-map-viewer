@@ -4,7 +4,7 @@
  */
 import type { DatasetInput } from './inputs.js';
 import { PHASES } from './types.js';
-import type { ImportMapping, LoadResult, Page, Preview, Summary } from './types.js';
+import type { CrsInfo, ImportMapping, LoadResult, Page, Preview, Summary } from './types.js';
 
 /** Where the engine's files are, when they are not where the bundler put them. */
 export interface EngineOptions {
@@ -85,6 +85,22 @@ export interface Engine {
 
   /** The loaded datasets, in the order they were loaded. */
   datasets(): readonly Summary[];
+
+  /**
+   * What an EPSG code means: its name, whether it is a longitude and latitude system, a
+   * projected one or neither, and the unit of its axes. `undefined` if the code is not in the
+   * definitions. The definitions are those of the EPSG Dataset, owned by IOGP. A code that is
+   * not a whole number from 0 to 4,294,967,295 is misuse.
+   */
+  crsInfo(code: number): Promise<CrsInfo | undefined>;
+
+  /**
+   * Searches the EPSG definitions. The system whose code is the query (with or without `EPSG:`)
+   * comes first, then those whose name starts with it, then those whose name contains it, without
+   * regard to case and by code within each group. At most `limit`, and never more than 50. An
+   * empty query finds nothing. A limit that is not a whole number from 0 to 4,294,967,295 is misuse.
+   */
+  searchCrs(query: string, limit: number): Promise<readonly CrsInfo[]>;
 
   /**
    * Rows `start` to `start + count` of a dataset, counting from 0: fewer at the end of the

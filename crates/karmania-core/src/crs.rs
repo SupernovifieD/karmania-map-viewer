@@ -2,9 +2,9 @@
 //!
 //! A dataset names its CRS either by EPSG code or as a local (mine) grid with an
 //! explicit length unit. A missing CRS is an error, reported by validation.
-//! Looking up what an EPSG code means is a separate step, not done here; the one
-//! exception is that validation recognises EPSG:4326 by its code (see
-//! `validate::crs_checks`).
+//! Looking up what an EPSG code means is a separate step, not done here. When validation
+//! needs to know whether a code is a longitude and latitude system it asks a [`CrsKinds`],
+//! which the caller provides; the answers the core gives by itself are [`Wgs84Only`].
 
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +61,57 @@ pub enum CrsRef {
         /// The unit of the grid's coordinates.
         units: Units,
     },
+}
+
+/// What a [`CrsKinds`] says about an EPSG code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrsGeography {
+    /// A longitude and latitude system: X is longitude and Y is latitude, in degrees.
+    Geographic,
+    /// A system that is known and is not one of longitude and latitude in degrees: a projected one, a
+    /// geocentric one, ..., or a geographic one whose angles are in another unit (grads), which
+    /// cannot be judged as degrees.
+    NotGeographic,
+    /// Not known to whoever was asked.
+    Unknown,
+}
+
+/// What the core is told about EPSG codes, because it has no definitions of its own.
+///
+/// Validation asks it whether a code is a longitude and latitude system, to judge whether the
+/// coordinates fit. The core never learns more than that: names, units and projections are the
+/// business of `karmania-crs`, which implements this from the EPSG definitions.
+pub trait CrsKinds {
+    /// Whether the EPSG `code` is a longitude and latitude system.
+    fn geography(&self, code: u32) -> CrsGeography;
+
+    /// Whether this has the whole registry, so that [`CrsGeography::Unknown`] means that there is
+    /// no such code, and validation says so. Without it, `Unknown` only means "not known to me",
+    /// which is no fault of the dataset, so nothing is said. The default is `false`.
+    fn knows_every_code(&self) -> bool {
+        false
+    }
+}
+
+/// The answers the core gives without definitions: EPSG:4326 (WGS 84) is longitude and latitude
+/// and every other code is [`CrsGeography::Unknown`]. This is what `validate` uses, so a dataset
+/// is judged exactly as it was before there was a `CrsKinds`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Wgs84Only;
+
+impl Wgs84Only {
+    /// The one code the core knows by itself.
+    pub const WGS_84: u32 = 4326;
+}
+
+impl CrsKinds for Wgs84Only {
+    fn geography(&self, code: u32) -> CrsGeography {
+        if code == Self::WGS_84 {
+            CrsGeography::Geographic
+        } else {
+            CrsGeography::Unknown
+        }
+    }
 }
 
 #[cfg(test)]
@@ -126,5 +177,16 @@ mod tests {
         let us = Units::UsSurveyFoot.metres_per_unit();
         assert!((us - 0.304_800_609_601_219_2).abs() < 1e-15);
         assert!(us > Units::Foot.metres_per_unit());
+    }
+
+    #[test]
+    fn the_core_alone_knows_only_wgs_84() {
+        assert_eq!(Wgs84Only.geography(4326), CrsGeography::Geographic);
+        for code in [0, 4269, 4258, 32640, 3857, 99_999, u32::MAX] {
+            assert_eq!(Wgs84Only.geography(code), CrsGeography::Unknown, "{code}");
+        }
+        assert_eq!(Wgs84Only::WGS_84, 4326);
+        // It has not the whole registry, so an unknown code is not a fault of the dataset.
+        assert!(!Wgs84Only.knows_every_code());
     }
 }

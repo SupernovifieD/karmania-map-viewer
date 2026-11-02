@@ -2109,3 +2109,803 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   trace shows the same scrolling), and that the test had passed "twice of three" runs in CI (it has
   been in CI since phase 1). It also noted the scope of `9666131`, recorded in step 11.F3. The
   lines of `docs/conventions.md` that the step 11.3 wrapped long are wrapped like the rest.
+
+## M12: coordinate systems
+
+- Step 12.1 (the crate). `karmania-crs` depends on `karmania-core` only, forbids unsafe code and
+  has the workspace lints, like the other crates, with one test that it builds against the core's
+  CRS types. It is a member of the workspace but not yet in `[workspace.dependencies]`: the crates
+  that use it (the WebAssembly bindings from 12.12, `karmania-prep` from 13.1) add it there. The
+  list of crates in `docs/conventions.md` names it, and `Cargo.lock` gains its entry (the crate has
+  no dependency that was not already in the lock file).
+- Step 12.2 (the EPSG definitions, and their terms). `crs-definitions` 0.6.0 is added to
+  `karmania-crs` with its default features (`proj4`, `wkt`), which the lookup (`wkt`) and the
+  reprojection (`proj4`) will use. Checked: CC0-1.0 in its manifest; no dependencies of its own (the lock file
+  gains one entry); not yanked, the newest version on crates.io (2026-09-16), so it is maintained
+  although its GitHub repository was archived on 2026-06-13, since it moved to tangled.org and
+  0.6.0 was released there; builds for `wasm32-unknown-unknown` (a release build of the crate);
+  its own script says the tables are generated from the `spatial_ref_sys` table of PostGIS. The
+  brief says to stop and ask if the EPSG terms are unclear, and they are: they ask for the owner
+  of the data to be acknowledged and the terms passed on, forbid distribution for profit, and
+  Apache SIS holds them incompatible with the Apache licence. The owner chose to bundle the
+  definitions in the kernel with notices (the other choices offered were a separate definitions
+  module loaded at runtime, which would have kept the Apache-2.0 kernel free of the data, and a
+  pause until the live terms were read), and accepted that the kernel's build is then not purely
+  Apache-2.0. CC0-1.0 is added to the licence policy, as the brief says. The terms and what the
+  decision commits the project to are in `docs/dependencies.md`. Limits of what was checked: the
+  live terms on epsg.org were not read (the site refused the request), only third-party copies
+  of them, one of them a quotation by Apache SIS; no one asked IOGP; nothing here is legal advice.
+  The size of the kernel with the definitions is not yet measured (step 12.12 does it, against the
+  rule of 1 MB gzipped); the crate is not yet used, so the module has not grown.
+- Step 12.3 (the lookup) is split into 12.3a, 12.3b and 12.3c to stay near the size guideline.
+  12.3a is the WKT reader, `karmania-crs/src/wkt.rs`. Reused from history, as the brief asks: the
+  parser (`Node`, `Parser`, `parse`, with the limit of 64 levels of nesting and the doubled-quote
+  rule) of `epsg.rs` as it was before step 3.25b (`git show 64d53d0^:crates/karmania-core/src/epsg.rs`),
+  unchanged in what it does. New: the module is public (`pub mod wkt`), because the sub-steps would
+  otherwise leave code that nothing uses yet, which the lint denies, with doc comments on every item
+  and its tests rewritten (the nesting test now also reads text exactly at the limit, and the
+  spaces-and-line-breaks case is covered). At 197 lines, about 110 of them the old parser as it was,
+  it is over the guideline of about 150 changed lines; a parser is one piece and was not cut further.
+- Step 12.3b (the WKT queries): `first_text` (the first quoted string, which in a definition is the
+  name), `find_keyword` and `horizontal_part` (the geographic, projected or geocentric part that
+  places 2D data, reached through compound and bound systems), reused from `epsg.rs` as they were,
+  public like the reader, with doc comments and a new test on hand-written definitions.
+- Step 12.3 is split further, into 12.3a (the reader), 12.3b (its queries), 12.3c (the types),
+  12.3d (`describe`) and 12.3e (`lookup`, with the notice and the tests of the brief), because the
+  types, the reading of units and the registry tests together came to 357 lines. 12.3c: `CrsKind`,
+  `AxisUnits` (`m`, `ft`, `us_ft`, `degree`, `other`) and `CrsInfo` with the JSON shape of section
+  11.1 of the brief (`metresPerUnit` left out for degrees and other units). Reused from
+  `epsg.rs` before step 3.25b: the idea and the names `CrsKind` and its JSON form. Changed: the
+  unit is no longer a name and a factor but one of the five values of the contract, with the
+  metres of a unit taken from `karmania_core::Units`, so a foot is the same foot as the one of a
+  local grid; there is no `metresPerUnit` for other units, as the brief says.
+- Step 12.3d (`describe`). Reads the name, the kind and the unit of a definition from its WKT, for
+  the horizontal part of compound and bound systems. Reused from `epsg.rs` before step 3.25b: the
+  reading of the kind from the keyword of the horizontal part, of the unit from the direct `UNIT`
+  child (or, for the newer geographic style, an `ANGLEUNIT` further in), the fall back to
+  `EPSG:<code>` and the kind `other`. New: a unit is named by its factor, not by its name, within
+  1e-12 of a known value, which is far inside the 6e-7 m between the international and the US survey
+  foot (a test pins that the two are not taken for each other, nor 0.3048000001 for a foot); a
+  degree is a geographic factor of pi/180, and any other angle (grad, radian) is `other`; the other
+  length units of the registry (Clarke's foot, links, chains) are `other` with no metres, as the
+  contract says, so a projected system in them is described but cannot be scaled. A geocentric
+  system is `other` with metres. The 224 lines (82 of code, the rest tests on hand-written
+  definitions of each case) are over the guideline; the function and its cases were not cut apart.
+- Step 12.3e (`lookup`). `lookup(code)` gives the `CrsInfo` of an EPSG code, or `None` for a code
+  that is not in the definitions or is above 65535, which they cannot hold. The tests are those the
+  brief names (4326, 32640, 2229 in US survey feet, 27700, geocentric 4978 and 3822, 3993 which has no
+  definition, an unknown code) and more (a compound, a bound and a newer-style definition, 4269), and
+  a sweep of the whole registry: every entry is described, degrees belong to geographic systems only,
+  metres are given exactly for metres and feet, and the counts are pinned to this version of
+  `crs-definitions`: 754 geographic in degrees and 9 in other angle units, 4157 projected in metres,
+  155 in feet, 873 in US survey feet and 32 in other length units (so those 32 can be described but
+  not scaled), 196 geocentric and similar in metres and 8 with no definition. If the crate is
+  updated, or the reading of units changes, that test fails and the entries that moved are to be
+  looked at before the numbers are changed. The crate documentation now carries the
+  acknowledgement of IOGP's ownership and the pointer to the terms that the decision of step 12.2
+  committed it to, without a paraphrase of the terms, which this project has only read second-hand.
+  The definitions are those of PostGIS (`crs-definitions` says it pulls them from `crs-csv`), not
+  of the current EPSG registry, so the accuracy tests of step 12.8 compare reprojection with an
+  independent source and not with them.
+- Step 12.4 (`search`). Ranked as section 11.1 of the brief says: the system whose code is the
+  query (digits, with or without `EPSG:`), then names that start with it, then names that contain
+  it, compared without regard to case, in order of code inside each group, at most 50 (`MAX_RESULTS`),
+  nothing for an empty query or a limit of 0. Substring matching is as the brief says, so "utm 40"
+  does not find "UTM zone 40N"; a search by words is not part of this step. The entries named
+  `EPSG:<code>` (those with no definition) are found by "epsg:" because they contain it. For speed
+  the names are matched from the first quoted string of each definition, and only the results are
+  read in full: measured natively in a release build, 2.5 ms per query against about 50 ms for
+  reading every definition, and a test pins that the quick name is the one `describe` gives for
+  every entry of the registry (only entries with no definition need the full reading). The tests
+  compare the results with the plain ranking over fully read names for seventeen queries, at two
+  limits, and were seen to fail when the groups were swapped and when the exact code was ignored.
+  At 289 lines (about 90 of code) the change is over the size guideline; the tests are most of it.
+- Step 12.5 (`proj4rs`). Added to `karmania-crs` as version 0.3.0 with default features off. The brief
+  names 0.2.1, the version of phase 1, and says that about 6% of projected codes cannot be built
+  without a C-backed feature; neither is true of the latest release, which the conventions say to use.
+  Checked: 0.3.0 was released on 2026-10-26 under MIT OR Apache-2.0, not yanked; the geodesic code it
+  needs is `proj4rs-geodesic` 0.2.0, described as a pure Rust port, with no build script and no C or
+  C++ file in the package, so no C-backed feature exists to be left off; a release build for
+  `wasm32-unknown-unknown` succeeds. What it cannot build was measured by trying every definition of
+  `crs-definitions` that has a PROJ string (6182): 5942 build (96.1%), 238 fail with "NAD grid not
+  available" (they name datum-shift grid files that are not shipped) and 2 with "Projection not
+  found"; turning its `aeqd` feature on changed nothing (the source does not use it), so it is left
+  off, like all features. The brief's premise is out of date for this reason; steps 12.6 and 13.4
+  have to say, in findings, why a definition cannot be used, and these are the reasons to expect.
+  The brief asks whether `proj4rs` can use `libm`: it cannot (no feature or dependency for it; a
+  comment in its source says it relies on the platform's maths library), so reprojection results
+  may differ in the last bits between native and WebAssembly builds, and the tests that compare
+  across platforms keep to a tolerance. The lock file gains `proj4rs`, `proj4rs-geodesic`,
+  `thiserror`, `thiserror-impl` and, for `wasm32` only, `console_log`, `log` and `web-sys`, all under
+  licences the policy allows; they are in `docs/dependencies.md`. The size of the kernel with it is
+  measured at step 12.12.
+- Step 12.6 is split into 12.6a (the finding codes), 12.6b (the transformer without proj4rs) and
+  12.6c (the transformer through proj4rs). 12.6a registers `crs.transform.local_grid`,
+  `crs.transform.code_unknown` and `crs.transform.unsupported` (all errors, with no wizard step: they
+  are met when drawing, not when importing) and documents them in `docs/validation-codes.md`. They are
+  in the registry of `karmania-core`, because every finding is made with a `FindingCode` and the
+  registry is one enum there; section 5.1 of the brief says the core gains only the CrsKinds hook,
+  and this is a second, smaller addition that the single registry makes necessary (the three codes
+  and, at 12.7, `crs.transform.not_finite`; later steps add the `display`, `contours` and `classes`
+  codes the same way). The names are new: none of the codes retired at steps 3.25a and 3.25b is
+  reused. Three codes and not one per cause: a local grid and an EPSG system cannot be converted
+  (the message names the EPSG code); a code that is not in the definitions; and a known system that
+  cannot be used, with the reason in the message (needs datum-shift grid files; its projection is
+  not supported; it is geocentric; or its definition cannot be read), which are the reasons step
+  12.5 measured. Whether a dataset is drawn, and the `display` findings that say so, are step 13.4's.
+- Step 12.6b (the transformer). `Transformer::new(from, to)` gives identity for the same system,
+  a scale for two local grids (taken to be the same grid, as the brief says; the finding that says
+  so is step 13.4's), a conversion through `proj4rs` for two EPSG systems, and one of the three
+  findings of step 12.6a otherwise. `convert(x, y)` takes and gives degrees for a geographic system,
+  and converts to and from the radians that `proj4rs` works in inside; heights are outside it, as
+  they are never reprojected. A position that cannot be converted, and any non-finite one, comes
+  back as `[NaN, NaN]`, one rule that step 12.7 turns into a count. The definitions are used through
+  their PROJ strings (a definition with none, or a geocentric one, is `unsupported`), so a
+  system whose WKT is empty can still be used if its PROJ string builds (EPSG:3993 does). The
+  reasons a definition cannot be built are the three of step 12.5, in words for a person. Checked:
+  the point at the central meridian of UTM zone 40 gives an easting of 500000 m to 1.4 nm; a round
+  trip over 4,331 points of the zone comes back to 2.8e-14 degrees; California zone 5 in US survey
+  feet and in metres give the same place to within the 0.0001016 m by which the two definitions'
+  false origins differ (the tolerance is that difference, not slack); latitude 95 and NaN give NaN.
+  The tests were seen to fail with each of the radians-to-degrees, degrees-to-radians and unit-ratio
+  conversions broken (all tried, file restored), and the examples of the docs are tested against what
+  the transformer really says. A test that only counted the elements of the result was deleted
+  because it could not fail. The accuracy against an independent source is step 12.8's.
+- Step 12.6c (what can be used). The transformer was tried from EPSG:4326 to every definition of the
+  registry (6,184). 5,746 can be used. 438 are refused, each with `crs.transform.unsupported` and
+  one of four reasons: 238 need datum-shift grid files that are not available, 196 are geocentric
+  (or similar, in metres) and so not map systems, 2 name a projection `proj4rs` does not have
+  (EPSG:8441 and 27200) and 2 have no definition (22300 and 29701). The counts and those four codes
+  are pinned in a test, with the note that if `crs-definitions` or `proj4rs` is updated the codes that
+  moved are to be looked at first, since these are the reasons a person will be shown. That is 7.1%
+  of the registry, and 4.0% (242 of 5,988) when the geocentric ones, which are not meant for maps,
+  are left out. Step
+  13.4 turns them into `display` findings for datasets.
+- Step 12.7 (positions in place). `Transformer::convert_in_place(xyz, findings)` takes interleaved
+  `x y z` values, as `Positions` holds them, converts `x` and `y`, never touches `z`, and leaves a
+  trailing incomplete position as it is. A position whose `x` and `y` were finite and whose result is
+  not becomes `NaN, NaN` (both, even when only one result failed: a unit scale that overflows one
+  axis is the case a test pins) and is counted in one `crs.transform.not_finite` finding (a warning,
+  with no wizard step; registered in the core and documented, its docs example tested against what the
+  code says), with a count and the 0-based vertex indices of the first 20 as examples. A position that
+  was not finite to begin with is left exactly as it was and not counted, since validation reports
+  those and the finding would say "could not be converted" of something that was never a position.
+  The finding is built once at the end from a count, not once per failure, so a million failures do
+  not allocate a million messages; the cap on examples inside the loop is a guard on memory that no
+  result can show (`Findings::add` truncates the examples too), so no test can fail without it. Tests
+  were seen to fail when `z` is overwritten (four of them) and when a failed position is not blanked
+  (the overflow test), both tried and the file restored. The identity conversion returns at once and
+  leaves even non-finite values alone.
+- Step 12.8 (accuracy). `crates/karmania-crs/tests/accuracy.rs`. The brief says to use PROJ or pyproj
+  if they are on the machine; they are not (`proj`, `cs2cs`, `projinfo` and the GDAL tools are missing,
+  and `pyproj` and `osgeo` cannot be imported), and nothing was installed, so the references are published
+  values: the worked examples of the EPSG Guidance Note 7-2, November 2009 (OGP; 120 pages), from the
+  copy in the NetBSD `pkgsrc` distfiles (SHA-256 `816176d0...9a59`, in the test file in full). It is not
+  IOGP's current edition, which was not available to read. Its text was extracted with the PDFKit that
+  comes with macOS (no PDF tool was installed), and each number was read from the extracted text of its
+  page, not typed from memory. Twelve rows, each named in the test with its section and page: nine
+  methods (Transverse Mercator, Lambert Conic Conformal 1SP and 2SP, Mercator variants A and B, the
+  Pseudo-Mercator, Oblique Stereographic, Polar Stereographic variant A and Lambert Azimuthal Equal
+  Area), each tried forward (the printed longitude and latitude to the printed easting and northing)
+  and in reverse (from the printed, rounded easting and northing back to the printed position).
+  **The brief's tolerance of 1 mm cannot be checked against most of these**: a value printed to two
+  decimals can only be checked to 5 mm. So each row has the tolerance its source allows (half of the last
+  printed digit, which is 5 mm; 1 mm for the Dutch RD New row, printed to three decimals, where the
+  result is within 0.4 mm), and two rows have more, with the reason in the test. British National Grid,
+  10 mm: three computations agree to a micrometre on 577274.9838 and 69740.4923 (proj4rs; the series
+  that the note itself prints, evaluated in a separate Python script; and Karney's exact series, written
+  separately for this check; neither script is in the repository), and the printed 577274.99 and
+  69740.50 are 6.2 and 7.7 mm from that, because the example's intermediate values are rounded. Belge
+  Lambert 72, 60 mm: the definitions' standard parallels are 0.00204 arc seconds more than the example's
+  (a later revision of the EPSG parameters), which moves the northing by 46 mm; with the example's own
+  parallels in a PROJ string built by hand the difference was 2.8 mm (tried once, not kept). The
+  brief's tolerances are held where nothing limits them, in the round trips: 11 pairs of systems across
+  their areas, 625 positions each, forward and back: worst 2.7e-11 degrees (the limit is 1e-9) and worst
+  3.0e-6 m (the limit is 1e-3). What these tests do not show: a round trip cannot see an error that the
+  forward and the inverse share, which is what the published rows are for, and the published rows cover
+  nine methods and ten systems, the round trips eleven, not the 5,746 that can be used. **They say nothing about datum shifts.** Every
+  row is within one datum; a conversion between datums uses the 7-parameter shift of the definitions
+  (`towgs84`), which is good to metres, not to millimetres, and no row checks even that. The README
+  of step 24.5 has to say so. A comparison with PROJ, if someone installs it, would be the next step.
+  Seen to fail: with the source and target swapped (three of four tests) and with 6 mm added to every
+  projected northing (three of four, including the 1 mm round trip); both tried, file restored. The file
+  is 314 lines, mostly the table of rows and the reasons, over the size guideline.
+- Step 12.9 (the `CrsKinds` hook). `karmania-core` defines `CrsKinds`, a trait that answers
+  `CrsGeography::{Geographic, NotGeographic, Unknown}` for an EPSG code, and `Wgs84Only`, the answers
+  the core gives alone: 4326 is geographic and every other code is unknown. `validate(dataset)` uses
+  `Wgs84Only`, so a dataset is judged exactly as before, and the new `validate_with(dataset, kinds)`
+  takes any. The range and swapped-axes checks now ask the hook, so they apply to every code it calls
+  geographic and to none of the others, whatever the code (4326 included, if it says not or does not
+  know); this replaces the constant `GEOGRAPHIC_EPSG_CODE` that decision 4.16 said to replace "when
+  EPSG definitions return". A local grid or a missing system never asks. No behaviour changes: every
+  test the core had, with the snapshots of phase 1 among them, passes without being touched (the CRS
+  tests got a two-argument `check` in their own module to call the new three-argument one, and
+  nothing else). Six tests were added: the default answers; a code the hook calls geographic is
+  checked (range and swapped axes) while the core alone says nothing of the same data; one it calls
+  not geographic or does not know is not (4326 too); the hook is asked about an EPSG code and about
+  nothing else; `validate_with` with what the core knows is `validate`; and `validate_with` with more
+  kinds checks more. Four of them fail when the check ignores the hook and tests for 4326 (tried, file
+  restored). The warning for a code that is not in the
+  definitions is step 12.11's, since it needs the hook to say that a code is missing and not just
+  that it is not known.
+- Step 12.10 (`Definitions`). `karmania_crs::Definitions` implements `CrsKinds` from the definitions:
+  a geographic system is `Geographic`, any other that exists is `NotGeographic` (projected, geocentric,
+  or an entry with no definition), and a code that is not in them is `Unknown`. It is given to
+  `validate_with`, and a test shows what that changes: projected-looking numbers labelled EPSG:4269
+  (NAD83) are now a `crs.geographic.out_of_range` warning, where the core alone says nothing, while the
+  same numbers in UTM or under a code that is not known are not range-checked. A test goes over every
+  code of the registry and counts 763 geographic systems, the 754 + 9 of step 12.3; that test computes
+  its expectation the way the code does, so what it can show is the count and the lists of codes of the
+  other tests, which are written out. Seen to fail when projected systems are taken for geographic
+  ones (tried, file restored).
+- Step 12.11 is split into 12.11a (the plumbing in `karmania-io`), 12.11b (the warning) and 12.11c (the
+  kernel is built with the definitions). 12.11a: the `Kernel` holds a boxed `CrsKinds` (`Wgs84Only` unless
+  `Kernel::with_kinds` gives another) and asks it for what it imports (`ImportRun::step_with`, new) and
+  for what it loads from arrays (`Registry::load_with`, new). `karmania-io` does not depend on
+  `karmania-crs`: the caller brings the definitions, which keeps the readers free of them as the brief
+  says ("unchanged, except passing the hook through"). The existing `load` and `step` stay, and mean
+  what they meant, so no caller and no test of phase 1 changed. `Kernel` no longer derives `Default`
+  (a boxed trait object has none); `Default` is written by hand and is `Kernel::new()`. Three tests: a
+  file of projected-looking numbers labelled NAD83 (4269) gets the out-of-range warning from a kernel
+  that was told 4269 is geographic and not from one that was not, the same for points made from
+  arrays, and a kernel asks its own kinds and not another's. They fail when the import ignores the
+  kinds (two of them) and when `load_with` does (one), both tried and the files restored.
+- Step 12.11b (the warning for a code that is not in the definitions). The brief says the warning comes
+  with the hook, but the hook alone cannot give it: the core alone answers `Unknown` for every code but
+  4326, and saying "EPSG:32640 is not one we know" of every UTM dataset would change what phase 1 does
+  and be untrue. So `CrsKinds` gets a provided method `knows_every_code()`, `false` unless an
+  implementation has the whole registry, and only then is `Unknown` a finding. `Definitions` says it
+  has. The code is `crs.code.unknown` (a warning, wizard step `crs`; not `crs.epsg.unknown`, which was
+  retired at step 3.25b): "EPSG:{code} is not one of the coordinate systems Karmania knows, so its
+  positions cannot be checked, and the data can only be drawn on a map that uses the same code", with
+  the hint to check the code or choose another in the coordinate step, and that the data still loads;
+  the second half of the message is what step 9.2 of the brief says of a code that is not in the
+  definitions (drawn only when the map uses the same code). A code that is not known is not
+  range-checked, and the hook is still asked once per EPSG dataset (`check` asks it, and hands the
+  answer to the two checks). Six tests: a warning that does not block, nothing from an implementation
+  without every code (the core alone included), nothing for a known code geographic or not, nothing for
+  a local grid or a missing system (which is `crs.missing`), no range check on an unknown code, and the
+  docs example is what the check says. The test of `Definitions` that expected nothing for 99999 now
+  expects this warning, on purpose. Seen to fail, with the phase 1 snapshots among eight tests, when
+  the warning is made of every `Unknown` whoever answers (tried, file restored). Core is at 247 tests.
+- Step 12.11c (the kernel is built with the definitions). `karmania-wasm` depends on `karmania-crs`
+  (now in the workspace dependencies) and builds its kernel with `Definitions`, in one small function
+  that the native tests can call, since the bindings themselves take `JsValue`s and cannot run without a
+  JavaScript engine; the bindings still hold no logic. Native tests through that function: points from
+  arrays and a file imported from bytes, with UTM-looking numbers, are an out-of-range warning when
+  labelled EPSG:4269 (which the core alone does not know), a `crs.code.unknown` warning when labelled
+  99999 (the data is loaded), and nothing when labelled 32640; they fail, three of them, when the kernel
+  is built without the definitions (tried, file restored). **The build-size rule**: the module grew
+  from 632,213 to 5,762,604 bytes raw (5.1 MB, the 4.8 MB of tables of phase 1's estimate and
+  `proj4rs`) and from 253,200 to 742,737 bytes gzipped (`gzip -9`): 489,537 bytes, under the 1 MB at
+  which the brief says to stop, so the rule is not triggered. The raw size is what a browser compiles
+  (5.8 MB), so the time to start the worker will be felt; it is measured with the rest at step 12.12.
+  Options if it matters, none taken: build the release profile for size (`opt-level = "z"`, link-time
+  optimisation), or load the definitions as a separate module (the choice step 12.2 offered).
+- Step 12.12 (the exports). `karmania-wasm` exports `crsInfo(code)`, which gives the `CrsInfo` of
+  section 11.1 or `undefined` for a code that is not in the definitions, and `searchCrs(query, limit)`,
+  an array of the same objects ranked as step 12.4 says, at most 50. They only translate, like the other
+  exports (the answers are plain objects made with the same conversion, a field left out being absent
+  and not `undefined`). Because the bindings take and give `JsValue`s they cannot be run natively, so
+  the tests are in Node against the real built module (`packages/engine/src/kernel-crs.test.ts`, 12
+  tests): the exact objects for 4326, 32640, 27700, 2229 (the US survey foot with its metres), a
+  geocentric system and one with no definition, `undefined` for five codes that are not there, plain
+  objects that can be cloned, the code first in a search with or without `EPSG:`, the search giving
+  what `crsInfo` gives, the ranking, the limit never over 50, nothing for an empty query, and the same
+  list twice. The comparison is `toStrictEqual`, and two of the tests fail, as intended, when
+  `metresPerUnit` is serialised as `undefined` and not left out (tried, rebuilt and restored). The
+  wrappers of the engine (`KernelModule`, the types and the checks of the contract) are step 12.13's. The
+  build sizes before and after, measured as the brief asks, are in `docs/perf.md`: the exports added
+  12,339 bytes raw and 14,445 gzipped, and the module is 504,435 bytes gzipped above where phase 2
+  began, under the rule's 1 MB. The remark in step 12.11c that the start would "be felt" was a guess;
+  compiling the 5.8 MB module takes under 5 ms in Node's V8 (`docs/perf.md`), and the browser suites did
+  not get slower; the time to a ready engine in Chromium is not measured yet.
+- Step 12.13 is split into 12.13a (types and the contract check), 12.13b (the worker) and 12.13c (the
+  engine's methods). 12.13a: `CrsInfo`, `CrsKind` and `CrsUnits` with their lists of constants
+  (`CRS_KINDS`, `CRS_UNITS`, exported like the others and covered by the same exhaustive-switch test), and
+  `checkedCrsInfo` and `checkedCrsInfoList` in the strict contract checks that reject any key the types
+  lack and any key that is `undefined`. Beyond the shape the check holds to what the Rust side keeps
+  true: a unit of `m`, `ft` or `us_ft` has its `metresPerUnit` and any other has none, it is above 0, and
+  degrees belong to a geographic system. `CrsUnits` is `Units` and two more, which the type test shows
+  (`Units` extends it). The check is run, through the real built kernel, over every code from 0 to
+  65535: 6,184 definitions pass, and the tally by kind and unit is pinned to the one the Rust test
+  pins, so the two cannot drift apart. Tests: five for the checker, naming what each rejects, and two
+  with the real kernel (the sweep, and a search compared with `crsInfo` entry by entry). Seen to fail when the degrees rule is
+  removed and when metres stop being required for metres (both tried, file restored; the first attempt
+  at the second changed nothing, since the formatter had dropped the parentheses of the line I tried to
+  edit, which showed in "found: 0" and was done again).
+- Step 12.13b (the worker). `KernelModule` and the generated bindings it wraps gain `crsInfo` and
+  `searchCrs`; the protocol gains the requests `crsInfo` (params `{ code }`, result `CrsInfo` or
+  `undefined`) and `searchCrs` (params `{ query, limit }`, result a list), typed in `Requests` so that,
+  as the protocol's design intends, the compiler made the exhaustive tests of the protocol be
+  extended (it refused to build until they were). The handler runs them on the kernel, answers only
+  after `init`, and checks what the kernel gives with `checkedCrsInfo` and `checkedCrsInfoList`, as it
+  does for everything that crosses the boundary. It also refuses misuse itself: a code or a limit that
+  is not a whole number from 0 to 4,294,967,295 and a query that is not a string are an error reply,
+  because the generated binding would otherwise take `-1` for 4,294,967,295 and `4326.5` for 4326 and
+  answer as if nothing were wrong. An unknown code is a successful reply whose result is `undefined`;
+  a test sends that reply through `structuredClone` and `parseFromWorker` to show it survives, since
+  the envelope check asks `'result' in data`. Six tests, run on the real kernel (one with a kernel that lies), and the
+  two exhaustive protocol tests extended. They fail when the code is not validated and when the
+  kernel's answer is not checked (each tried, file restored). The engine's own methods are 12.13c.
+- Step 12.13c (the engine's methods). `Engine` gains `crsInfo(code)` (a `CrsInfo` or `undefined`) and
+  `searchCrs(query, limit)` (a list), as section 11.1 of the brief has them; `limit` is required, not
+  defaulted, as the brief writes it. Both wait for the worker as the other methods do, reject with
+  `EngineDisposedError` once the engine is disposed, and reject with `EngineError` for what the worker
+  refuses (step 12.13b), with the engine still usable afterwards. The test of phase 1 that said the
+  engine has "no search of coordinate systems" (it pins decision 3.25c) is changed on purpose, since this
+  phase brings it back: it now lists the two methods and their types. Tests: five over the in-process
+  channel and the real kernel (the answers, the search, the misuse, the disposed engine, and what a real
+  load makes of UTM-looking points under three codes: nothing under 32640, `crs.code.unknown` under
+  99999 and `crs.geographic.out_of_range` under 4269, which is step 12.11 seen through an engine), and
+  one with the real Web Worker in Chromium, which runs the same scenario in the page and in Node and
+  requires the two reports to be equal. Engine unit tests are at 297, its browser tests at 13.
+- Step 12.14 is split into 12.14a (the words), 12.14b (names for the found and the chosen code) and
+  12.14c (the search), because each changes what is photographed and the pictures have to be looked at.
+  The design, decided here: the field for the code stays where it is and becomes "EPSG code or name";
+  what is typed is still what the draft holds (`crs.epsg` is text), so the rest of the wizard, which
+  reads a code from it, does not change; a code typed is a code chosen, as before, and a name typed
+  shows matches to pick from, which puts the code in the field. The matches are a list of native radio
+  buttons (so keyboard and screen reader behave as they do everywhere, without a widget of our own),
+  at most 20, in a box of fixed height that scrolls, so that matches appearing moves nothing. A kind
+  is said as "longitude and latitude", "projected" or "another kind", and a unit in words
+  ("metres", "US survey feet", "degrees"); "geographic" is a word the person importing a file need not
+  know. 12.14a: `describeKind`, `describeInfo`, `describeNamed` and a fourth, optional, argument of
+  `summarizeCrs` for what the definitions say of the code (the system, `null` if the code is not in
+  them, `undefined` if nobody asked); with nothing known the sentences are those of phase 1, which the
+  existing tests still show. Four tests; no photographed state changes in this step.
+- Step 12.14b (names for the found and the chosen code). The step gets the engine (the dialog passes its
+  own) and asks `crsInfo` once for the code that was found and once for each code that is typed, keeping
+  the answers (the system, or `null` for a code that is not in the definitions); the "Found ..." line and
+  the "Chosen: ..." line then say the name and what it is: "Found EPSG 32640, WGS 84 / UTM zone 40N
+  (projected, in metres), from the .prj file points.prj." A code that is not known says so ("which is
+  not one of the coordinate systems Karmania knows") and the person can still go on, as step 12.11b
+  makes it a warning and not an error. If the engine cannot answer, no name is shown and the step is
+  what it was. The select's option still reads "The one found: EPSG 32640": a name there would be cut by
+  the width of a select. Changed on purpose, and the commit says it: seven tests that asserted the
+  phase 1 sentences, and one that asserted that "nothing is said about what the code stands for"
+  (decision 3.25c, reversed by this phase), now assert the names; a test was added for the unknown code.
+  A tried mutation (the dialog not passing the engine) fails two of them. The first full run of the end-to-end
+  suite failed four tests of the Review step, which stop on the fourth step with a stub of the engine that had
+  no `crsInfo`: the step's call threw while it was being made and the step never appeared. The stub is the
+  fault (it stood for an `Engine` that no longer has that shape), so it now answers `crsInfo` and
+  `searchCrs`; the step is not made to guard against a method the real engine always has. Pictures: of the 96 states,
+  two change, `wizard-crs-found` and `long-wizard-crs`, six baselines each, looked at at 1024 x 640,
+  1440 x 900 and 1920 x 1080 in both themes with the checklist of section 10.7 of the brief: the
+  sentence is longer, nothing clips, overlaps or overflows, the long file name still wraps inside its box,
+  the edges line up and the dark theme reads. One limit, not a fault of the picture: the name comes a
+  frame after the first paint, so in a narrow window with a long file name the sentence can gain a line
+  once; the lookup is not started earlier, because the step is not made before the fourth step.
+- Step 12.14c (the draft and its words). The search box and the code are different things once a name can
+  be typed, so the draft keeps `query` (what is in the box) beside `epsg` (the code, as typed or chosen).
+  `epsgAfterTyping` says what the code becomes as the box changes: digits typed are a code typed and are
+  chosen as they are typed, as in phase 1; a name leaves the code as it was, so a code that was chosen stays
+  chosen while a person looks for another; an empty box has none. A name is not an error, so `epsgError`
+  complains only of digits that are not a code (0, or more than six), in words that say the range ("An EPSG code is 1 to
+  999999, such as 32640", short enough for the one line the field keeps for it: a first, longer wording wrapped
+  and moved the line below it, which showed in the picture). Changed on purpose, and the commit says it: the test of the
+  error for a code that is not a whole number, and one scenario that typed "WGS84" to get that error (it
+  types "0" now, which is still not a code). The wording of the note that stops a person ("Enter the EPSG
+  code of the coordinate system.") is left for step 12.14d, which adds the matches it will point to. One
+  photographed state changes: `crs-missing` typed `WGS84`, which is no error now, so it types `0` and keeps
+  showing the error; its six pictures were looked at (1024 x 640 light, 1920 x 1080 dark and the others
+  retaken) with the checklist of section 10.7: the message is one line, the line below it does not move, and
+  both themes read.
+- Step 12.14d (the search). In the wizard's CRS step the field for the code is now "EPSG code or name" and
+  searches as a person types, asking `engine.searchCrs(text, 20)` and keeping only the latest answer. Under
+  the "Chosen:" line a box of a fixed height (four rows of the list-row token, so that matches coming and
+  going moves nothing, with its own scroll) holds the matches as native radio buttons, one line each: the
+  name (cut with an ellipsis, the whole in its `title`), and on the right the code, what kind of system it is
+  and its unit. The chosen one has the accent bar at its left edge, as the list of datasets does, and
+  the arrow keys move and choose as radio buttons do, with no widget of our own. Picking sets the code and
+  leaves the box, the text and the matches alone. The box says what to do when nothing is typed, when
+  nothing matches (the text is quoted back) and if the search failed. How many there are is said on the
+  line the field keeps under it (which was empty): "2 matches.", or "The first 20 matches; type more to
+  narrow them." when the list is as long as it can be. The note that stops a person reads "Enter an EPSG
+  code, or choose one of the matches." (a longer first wording took two lines of the footer). The box
+  goes below the "Chosen:" line, so nothing that was on the screen moves when it appears; the layout
+  where it fills the free room and the summary is pinned to the bottom was rejected because it would
+  have moved the line in every state, and the pictures of all of them with it. A property of the step called `matches`
+  clashed with `Element.matches`, which the compiler found. The stub engine and the state of an invalid
+  code: `crs-missing` is now the empty box, and `crs-code-invalid` keeps the error. Tests: eight new ones in
+  the end-to-end file (names with their code, kind and unit and the pick; a typed code first and chosen;
+  at most twenty, scrolling; the notes for nothing typed and nothing found; **nothing moves** as matches come
+  and go, by position of the summary and size of the box; keyboard alone, the arrows choosing; a chosen code
+  kept while another is looked for; a long name cut with its whole in its title), four existing ones updated
+  (the note, the draft with its `query`, overflow and axe now with matches showing). Pictures: five new states
+  (`crs-code-invalid`, `crs-search`, `crs-search-chosen`, `crs-search-many`, `crs-search-none`) and
+  `crs-missing`, 36 baselines, all looked at with the checklist of section 10.7 at 1024 x 640 in both
+  themes and at larger sizes: the rows line up, the chosen row is marked, nothing clips, overlaps, scrolls or
+  moves, the dark theme reads, the first of the two problems the pictures showed (a note over two lines in
+  the footer, and no sign that rows were hidden) was fixed and the pictures retaken. axe finds nothing in
+  any of the nine CRS states in either theme.
+- Risk found at step 12.14d, not fixed (**understated: corrected at the M12 gate, see step 12.F3, and removed at step 12.F7**): V8's optimizing WebAssembly compiler runs out of memory on the
+  definitions table. `crs_definitions::from_code`, a match of 6,184 arms, is one very large function, and
+  once it has been called often enough (a loop over 65,536 codes, or about 100 searches) Node 24's V8
+  (13.6) tries to optimise it in the background and dies with "Fatal process out of memory: Zone", always,
+  and a little after the work is done. Not seen in Chromium 156, the supported browser: three tries of 200,
+  1,000 and 3,000 searches, then 15 to 30 seconds' wait, none crashed and the page answered. With
+  `--liftoff-only` (no optimizing tier) Node does not crash either. What is not known: Firefox and Safari
+  (not tested, as phase 1 decided); whether another version of Chromium behaves as 156 does; and whether the
+  tests under Node can be hit by it (CI passed three times with the sweeps over all 65,536 codes, on Ubuntu
+  and Node 24.22.1, and so did every local run, but a crash comes after the work is done and could be
+  missed). What would remove it: not calling that function in a loop, by holding the definitions as data
+  (a table of codes and names made at build time, with `from_code` called once for a chosen code) and not
+  as a match; it costs a build step and some size, and is the owner's decision. Until then a search calls it
+  65,536 times, as the 2.5 ms of step 12.4 says.
+- Step 12.15 (the summary says what the code is). In the Data tab the Coordinates line of the selected
+  dataset is now `EPSG 32640, WGS 84 / UTM zone 40N, metres`, and its tooltip the same with what kind of
+  system it is (`EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)`). The name comes from the
+  engine's `crsInfo`, which the app hands down (app, panel, Data tab, summary) as one function; the
+  summary asks once for each code it is shown and draws again when the answer comes, so the first frame
+  has the code alone (a round trip to the worker, a few milliseconds) and the name follows it. A code the
+  definitions do not have reads `EPSG 99999, not one Karmania knows`; a local grid is unchanged. **The app's
+  lookup fails when there is no engine** (as `rows` does), and a failure leaves the code as it was and is
+  asked again the next time the summary is made: the first version resolved `undefined` for "no engine",
+  which the summary read as "the definitions do not have it", and a test caught it. A failing lookup,
+  whether it rejects or throws before it gives a promise, cannot take the summary with it: the first
+  version called it inside `willUpdate`, where a throw stops the update, and the Data tab states of the
+  long-content pictures, whose fake engine had no `crsInfo`, showed no summary at all. The call is now in
+  an `async` method with a `try`, and a test shows it (a throwing and a rejecting lookup, with a size for
+  each dataset so that a summary that was not drawn again would show); with the call made as it was, the
+  test fails on "100 points" (tried). The row takes **two lines, and no more**, with the whole in its
+  title: at the width of the panel (360 px) one line cut `UTM zone 40N, metres` to `UTM zone 40...`, which
+  hides the hemisphere and the unit, the two things the line is for; the first pictures were taken that way
+  and retaken. A longer name (the 78 characters of `NAD83(2011) / WISCRS Calumet, ...`) is cut with an
+  ellipsis after the second line. Lit sets an object-valued property again on every draw of its parent, so
+  a test cannot give the summary its own lookup: the tests give the app an engine that only answers
+  `crsInfo`. Tests: three label tests (`datasets.test.ts`), five end-to-end ones (the name and unit, with the
+  tooltip, for a code the definitions have, one they do not, and a local grid; two lines for a long name and
+  nothing cut for a usual one; the summary whole when the lookup fails), one updated (the imported
+  `points.csv`, with the real engine). The pictures of the Data tab states that show a summary,
+  `data-tab-one`, `-many`, `-long-names`, `-warnings`, `-table-focus`, and of `long-data-tab` and
+  `long-remove-question` (42 baselines, three sizes in both themes), changed by the line that is longer and
+  the summary that is one line taller under it; each was looked at with the checklist of section 10.7: the
+  name and unit read in full, nothing clips or overlaps, the table moves down by the one line and no more,
+  and the dark theme reads. The states with the real engine now wait for the name before the picture is
+  taken, so that the picture is not of the code alone. One existing test broke on the extra line: the
+  block-model case of `data-table-kinds.e2e.ts` counts the rows the table draws, which are the ones that
+  fit in the room the summary leaves it, and 17 of the 18 were drawn. It had relied on spare height without
+  saying so; it now sets a window of 1280 x 1000, and its assertions are as they were.
+
+## M12 gate
+
+The independent review of M12 (a fresh subagent, with the brief and `git diff main...dev`) found no
+defect in steps 12.1 to 12.15 but two major problems and several smaller ones. Each is a sub-step.
+
+- Step 12.F1 (units of a geographic system). The transformer read every `+proj=longlat` system as
+  degrees, but nine geographic systems of the registry have their coordinates in grads (EPSG:4807,
+  4810, 4811, 4816, 4819, 4821, 4901, 4902 and 7400, whose unit `crsInfo` calls `other`).
+  `Transformer::new(4326, 4807)` succeeded and read a position as degrees, with no finding: a grad is
+  0.9 degree, so every position was a tenth of its angle out. They are now refused in either direction with `crs.transform.unsupported` ("its
+  coordinates are not in degrees"), the alternative being to convert from grads, which nothing needs yet.
+  The registry sweep of 12.6c has a fifth group: 5,737 can be used and 447 are refused (238 datum files,
+  196 geocentric, 9 not degrees, 2 projection, 2 no definition), with the nine codes pinned. The new test
+  failed before the change (tried: the transformer was built for 4807).
+- Step 12.F2 (the notices). The data of the EPSG definitions is in the WebAssembly kernel since step 12.12,
+  and the owner's decision of step 12.2 was to bundle it "with notices", but the file the notices were
+  to be in (`THIRD_PARTY_NOTICES.md`, step 23.5) did not exist, and the types of the engine point at it.
+  Nothing is distributed yet (there is no deploy or release workflow, and no package is published), so
+  nobody has been given the data without the notice. The file exists now, but **the builds do not carry
+  it**: `packages/engine/wasm` and `packages/app/dist` hold the data and have no notice file in them (the
+  second review's correction of a first wording that said the notice was made so that none could be
+  given without it). Putting it into the builds is steps 23.5, 23.6 and 24.5. The
+  file is begun with the EPSG section only: the acknowledgement of IOGP, the statement that its terms
+  apply to anyone given the definitions, the terms as they were read (said again to be second-hand),
+  what Karmania does with the data and that it attributes nothing of its own to EPSG, and that the
+  kernel's build is therefore not purely Apache-2.0. Step 23.5 stays, and completes it for the libraries,
+  the font, the icons and the colour data. The terms have still not been read at the source.
+- Step 12.F3 (the Node abort, as it is). The risk recorded at step 12.14d said that about 100 searches
+  are needed and that CI had passed three times, so that the crash could be missed. Both were wrong, as
+  the independent review and the CI logs show. **What happens**: in the pinned Node (24.22.1, V8 13.6),
+  once `crs_definitions::from_code` (the 6,184-arm match) has been called a few dozen times, V8's
+  optimizing WebAssembly compiler tries to compile that one function in the background and the process
+  dies with `Fatal process out of memory: Zone`. Measured here with the built module, one process for each
+  number: 1 and 20 `crsInfo` calls, no abort; 100, 300, 700, 1,000, 2,000, 6,000, 12,000, 30,000 and 65,535
+  calls, abort; and one `searchCrs` is enough (it makes 65,536 calls). `node --liftoff-only` does not abort.
+  Cutting the number of calls (a list of the 6,184 valid codes, an index kept after the first search)
+  would not avoid it: the threshold is far below that. **What CI shows**: the log of each of the six
+  completed runs since step 12.13 (41379879158, 41382592821, 41384845258, 41388136670, 41392320322 and
+  41393711515, all green; the runs of the 12.13 commits themselves were cancelled by later pushes) has
+  the `Fatal process out of memory: Zone` trace once, in the step `pnpm test:e2e`, just after the 13th
+  engine test (the real-worker scenario of 12.13, which runs the same searches in the Node process of the
+  test and in the browser), and "13 passed" comes about twenty seconds after it (read in run 41392320322);
+  the last run before it (41375576111) has none. The runs are green because the results are written
+  before the process dies, and a run would fail if V8 were quicker. **What is not
+  affected**: Chromium (the supported browser): 1,500 searches queued, the page alive after 20 seconds (the
+  reviewer), and 200 to 3,000 here at step 12.14d. **What this means for a user**: anyone who runs the
+  engine in Node 24 (a test, a script, a server) and looks up or searches EPSG codes gets an abort a moment
+  later. The remedies are the owner's to choose (asked at the gate): hold the definitions as data, a
+  table of the codes and their constants searched by binary search, so that no giant function is called
+  (a generated file in the repository, checked against `from_code` by a test); or give the Node of the
+  tests a V8 flag, which hides it in CI and fixes nothing for anyone else; or merge as it is.
+- Step 12.F4 (stale words). The README still said that phase 1 does not know what a code means and that
+  EPSG:4326 is the one exception; it now says what the coordinate system is today (what a code means,
+  the wizard's search, the name in the summary, the check for a geographic system, the warning for an
+  unknown code, and that conversion exists but nothing on the screen uses it). Two comments in `codes.rs`
+  said "In EPSG:4326" of checks that are made for every geographic system. `docs/perf.md` said that no user
+  interface changed in M12, and had the app's sizes of step 12.12: the sizes after M12 are measured (the
+  module is the same bytes, the app's `index` and `theme` are 1,788 bytes gzipped larger and the worker
+  406, which `docs/perf.md` now says), and the module's size in the decisions (742,737 and 489,537) is
+  the table's (742,732 and 489,532); the 5 bytes are most likely the file name that `gzip -9 -c` writes
+  (not checked).
+- Step 12.F5 (the wording after a pick). The line "Chosen:" of the CRS step ended "as you entered it" for
+  every code of the "EPSG code" mode, also for one that was picked from the matches of a name, which a
+  person did not enter. It is "from the matches" when the box holds something other than the code (the
+  name that was typed), and "as you entered it" when the box is the code or empty. The words were
+  chosen to be as long as the ones they replace ("chosen from the matches" was six characters longer and
+  filled the dialog at 1024 x 640, so that a slightly longer name would have wrapped and moved the box
+  under it). The unit test failed before the change (tried); the six baselines of
+  `wizard-crs-search-chosen` were retaken, and the ones at 1024 x 640 (light) and 1440 x 900 (dark) looked at against the checklist
+  of section 10.7; the other four were not opened.
+- What the gate found and this milestone leaves as it is, with the reasons. (Numbers are the review's.) (1) Far outside the area of a
+  projection a conversion gives a finite number and no finding (4326 to 32640 at longitude -123 gives a
+  northing of 18,890,517 m; 4326 to 3857 at longitude 540 wraps to an ordinary easting): step 12.7 asks
+  for the positions that are not finite to be counted, and these are, so deciding which positions are
+  out of the area of a system belongs to the drawability rules of M13 (13.4). (2) Typing `EPSG:32640` in
+  the box shows the match and does not choose it, and `32640` does: phase 1's tests pin that the text
+  `EPSG:32640` is not a code in the field, so changing it is the owner's. (3) A code chosen earlier stays
+  chosen while a name is typed (decision 12.14c, and the line says so). (4) The query `0` shows the error
+  and twenty matches whose names contain a 0, which is what the two rules give together. (5) The check
+  mark of "No coordinate system is chosen yet." is phase 1's. (6) The 12.8 tolerances are as disclosed:
+  1 mm on 1 of 12 published rows, the others as their sources allow. (7) The commits over about 150
+  lines: 14 of 28, and the message of 99cb762 says "about 320" where it changed 241 lines, and the
+  commit 0dfacd7 did not tick the roadmap (the tick came with 99cb762, which completed 12.15); pushed
+  commits are not rewritten. (8) The message of `crs.code.unknown` says that the data "can only be drawn
+  on a map that uses the same code", which is the rule of M13 that nothing draws yet.
+- Step 12.F6 (a test that did not test what it said). `a_code_is_followed_by_the_names_that_start_with_and_then_contain_it`
+  of `search.rs` used "84" as the number that is a code and also part of names, but 84 is not in the
+  definitions, so the combination of an exact code followed by names was never tried there (the ranking is
+  covered by the other tests). It uses 2000 (a code, and in the names of the SIRGAS 2000 systems) and checks
+  that the code is first and that every other result has the number in its name. The review's other note
+  on tests, that the `karmania-wasm` unit tests go through `core_kernel()` and not `Kernel::new()`, so that
+  only the engine's tests would catch a regression there, is left as it is: nothing in the wasm crate
+  builds a kernel any other way.
+- Step 12.F7 (the definitions as data; the owner chose this remedy at the gate). The giant function is
+  `crs_definitions::from_code`, which nothing in the kernel calls any more. The constants the crate
+  already has, one for each definition (`EPSG_4326`, ...), are listed in a table in the order of their
+  codes, `crates/karmania-crs/src/registry/table.rs` (6,184 entries, 72.9 KB as committed (94.5 KB as the
+  script first wrote it, before rustfmt, which `cargo fmt --check` requires: see step 12.F9), generated and
+  tracked on purpose, with a header that says so), made by `scripts/generate-crs-table` from the crate's own source;
+  `registry::get` finds a code in it by binary search and `registry::all` goes through it, and `lookup`,
+  `search` and the transformer use those. The same crate and the same data as before, so the EPSG terms and
+  the values are as they were. A search used to try 65,536 codes with `from_code` and now goes through
+  the 6,184 definitions. **Tests**: that the table is what `from_code` says for every code from 0 to 65,535
+  and has 6,184 entries (it is the one place `from_code` is still called, and what fails if the crate is
+  updated and the table is not made again), that it is in order without a repeat, and, in the engine, that
+  a Node process which loads the built module and makes 3,000 lookups and 20 searches stays up for three
+  seconds after them (`kernel-node-stays-up.test.ts`): **with the module of before the change it fails**,
+  with the `Fatal process out of memory: Zone` trace, after 18 seconds (tried: the old module put in
+  place, the test run, the new module put back, its checksum looked at), and with the new module it passes
+  in 4.4 seconds. **Measured with the new module in Node 24.22.1**, one process for each number: 100, 1,000,
+  30,000 and 65,535 `crsInfo` calls, no abort (they aborted from about 100 before); 1, 5, 150 and 1,000
+  searches, none (one aborted before); the engine's end-to-end run in Node and Chromium, 13 passed in 11.7
+  seconds with no trace (the CI run with the trace took 25.0). **Size**: the module is 5,451,076 bytes raw
+  (323,867 fewer) and 647,422 gzipped (109,755 fewer), and a search takes a median of 1.75 ms in Node. What
+  it does not show: that CI is free of the trace (to be read in the run of this commit), and Firefox and
+  Safari, which were not tried before and are not now.
+
+## M12 gate, second round
+
+The second independent review (a fresh subagent, on the head `ffae13c`) found no blocker or major, three
+minors and four nits. Each is a sub-step, or recorded.
+
+- Step 12.F8 (a long name moved the box). The "Chosen:" line wraps, and a long name of a system made it two
+  lines, so that the box of the matches under it moved by a line when the name was chosen: 45% of the
+  definitions would wrap (the review's measure, at 1024 x 640), which is against what decision 12.14c says
+  of nothing moving. In the "EPSG code" mode, the only one with the matches under it, the line is now one
+  line, cut with an ellipsis, with the whole in its title (the status that is read out has it whole as
+  before). The other modes wrap as they did, since nothing is under them and their sentences are
+  explanations, not names (the first try cut them all and so cut "only to each other" of the local grid,
+  which the picture of `wizard-crs-local` showed). The new test failed before the change (the box was at 345
+  and moved to 365). No baseline changed: every wizard and CRS picture is as it was (26 passed, none
+  retaken).
+- Step 12.F9 (the script did not make the file in the repository). Run in a copy by the review, and here,
+  `scripts/generate-crs-table` wrote 6,193 lines and 94,518 bytes, and the committed table is 782 lines and
+  72,874 bytes, the same after rustfmt: so whoever made the table again would have had `cargo fmt --check`
+  (the first step of `pnpm check` and of the Rust job of CI) fail, and nothing said so. The script now ends
+  with `cargo fmt -p karmania-crs`, and running it changes nothing in the repository (tried: `git diff
+  --exit-code` clean, where before it showed the whole file changed). The Rust job of CI runs it and fails on
+  a difference, which is the test of this step: it fails with the script as it was. That step ran on GitHub in run
+  41407204647 (on `7d70ae0`) and passed: it logged "Wrote ... 6184 definitions from crs-definitions 0.6.0"
+  and `git diff --exit-code` was clean (read in the third review and here).
+- Step 12.F10 (the notices, again). The second review said that `https://epsg.org/terms-of-use.html`
+  answered it with HTTP 200 and the text of the terms, revised 8 April 2016, and that the summary in
+  `THIRD_PARTY_NOTICES.md` matches it, with one omission: an advisory about the essential elements of
+  IOGP Guidance Note 7-1, Annex A. **This was not verified here.** The fetch tool of this session got 403 for the page. A second try, with a
+  browser's User-Agent, was refused by the session's rules as a way round a block, and so did not go out (it
+  got no answer, 403 or other); no other way of getting the page was tried. So the terms are still
+  not read at the source by this work, the caveat in the notices file stays, and the report of the review
+  is a second-hand statement about a first-hand reading that nothing here has confirmed. For the owner: the
+  page is public, and it is worth reading it once in a browser against `THIRD_PARTY_NOTICES.md` and
+  `docs/dependencies.md`, including that advisory. What was corrected without that: the file says that it is
+  not yet in the builds, and the sentence of 12.F2 that said the notice was made "so that none can" be
+  given the data without it.
+- Step 12.F11 (the perf notes after the table). `docs/perf.md` still said, after step 12.F7, that the module
+  was 5.8 MB raw and had grown by 504,435 bytes, that the search time "is not measured in WebAssembly" while
+  the paragraph above it gave one, and that compiling took "the same" time as before when the 12.12 line has
+  other figures. The rule paragraph now says that it is the state of step 12.12 and gives the later one, the
+  raw size is 5,451,076 bytes, the compile times of the new module (2.0 ms and 3.8 ms) are in the list with
+  the others, and the search time in WebAssembly in Node (a median of 1.75 ms; the review got 1.89 ms) is
+  where the sentence said it was not measured. Documentation only.
+- Step 12.F12 (grads in validation). Step 12.F1 refused the nine geographic systems in grads in the
+  transformer, but `Definitions::geography` still called them `Geographic`, which the core documents as
+  "X is longitude and Y is latitude, in degrees", so the checks for degrees were made on values in grads:
+  a latitude of 95 grads (valid, as a grad is 0.9 degree and the pole is at 100) was a warning. They are
+  now `NotGeographic`: no range check and no "unknown code" warning, since the code is known. The other
+  answer, `Unknown`, would have given that warning. Two tests failed before the change (the answer for
+  EPSG:4807, and the sweep, whose count of `Geographic` codes is 754, the systems in degrees, and no longer
+  the 763 of step 12.3, the other nine being the ones in grads). The checks are still those of degrees:
+  converting from grads to check them as grads is not done, since nothing needs it.
+- Step 12.F13 (two lines, not one cut). The third review pointed out that the one line of step 12.F8 hides
+  the unit and where the code came from for about 43% of the systems (it laid out all 6,184 at the width of
+  the line, 646 px), that the system "7535" and its (ftUS) sibling differ only in the part that is cut,
+  and that the whole is then in a title that a keyboard or a touch cannot reach. The "Chosen:" line of the
+  "EPSG code" mode now has room for two lines (`min-height: 2lh`) and is clamped to two, so the box under it
+  still does not move (the line is two lines high whatever it says) and the name, the unit and the source
+  are shown; the title is gone, since the status that is read out has the whole text. The cost is a free
+  line between the sentence and the matches when it says one line, so that the gap under a one-line sentence
+  is larger than the one over it (17 px over and 36 under, the fourth review's measure; the first wording
+  of this record called it an even gap).
+  What is not known: whether every one of the 6,184 fits in two lines (the longest names are about 80
+  characters in a line of about 95, so they should; a longer text is cut after the second line); it was
+  looked at for 7535, 7594 and 4326. The test of 12.F8 was rewritten and failed on the one-line version
+  (the line was 20 px high and two lines of room are 40); it checks that the box and the line do not move,
+  that the long name uses both lines and is not cut, and that a short name leaves the box where it is.
+  Baselines: the six states in the "EPSG code" mode (`wizard-crs-missing`, `-code-invalid`, `-search`,
+  `-search-chosen`, `-search-many`, `-search-none`), 36 PNGs, each changed by the one free line; four
+  of them were looked at against the checklist of section 10.7 (`-search-chosen` and
+  `-code-invalid` at 1024 x 640 light, `-missing` at 1024 x 640 dark, `-search-many` at 1440 x 900 light); the
+  other 32 were not opened.
+- Step 12.F14 (only the one file). The script of step 12.F9 ended with `cargo fmt -p karmania-crs`, which
+  formats the whole crate: in a copy, with a badly formatted line put in another file, it reformatted that
+  too, so "it writes only the one file" was not true. It now runs `rustfmt` on the table alone, with the
+  edition of the workspace. Tried in a copy of the crates and scripts: with a badly formatted line in
+  `lookup.rs`, two runs of the script left that file as it was, and the table is byte-for-byte the committed
+  one; in the repository the run leaves `git diff --exit-code` clean. The Rust job of CI runs the script,
+  and that step passed on GitHub in run 41407204647 (on `7d70ae0`, with the `cargo fmt -p` form): it is to be
+  read again for this form in the run of this commit.
+- Step 12.F15 (words, after the third review). `docs/perf.md` had a sentence about the growth of the app's
+  JavaScript (48,430 bytes) that contradicted the last row of its own table (48,461), and neither was the
+  head, since steps 12.F8 and 12.F13 changed the built files and 12.F12 the module: a row for the head of
+  the milestone is added (module 5,451,087 bytes raw and 647,419 gzipped, `index` and `theme` 48,678, worker
+  8,831, all measured with `gzip -9 < file | wc -c` after the check of step 12.F14) and the sentence gives
+  those. `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md` said in two ways that epsg.org "did not answer"
+  and "answered with 403"; both now say that it refused the requests of this project's tools with HTTP 403.
+  The record of step 12.F10 read as if the refused request had also got 403, and that of 12.F9 still said
+  that the CI step had not run: it ran, and passed. Documentation only.
+- Step 12.F16 (a doc comment). After step 12.F12 the nine geographic systems in grads are `NotGeographic`,
+  but the doc of that variant in `karmania-core` still said "not one of longitude and latitude"; only the
+  doc of `Definitions` had been changed. It now says "not one of longitude and latitude in degrees" and
+  names the grads case. A comment only; no behaviour changed.
+
+## M12 gate, fourth round
+
+The fourth review (a fresh subagent, on `4378ed7`) found one major, three minors and two nits, all of them
+about the change of step 12.F13.
+
+- Step 12.F17 (the dialog scrolled). **Major.** The free line of step 12.F13 made the body of the dialog 8 px
+  too tall at 1024 x 640, the smallest window, in every state of the "EPSG code" mode: the box ended at 535
+  and the room it needs with its padding is 527 (at 7d70ae0 it ended at 515 and nothing overflowed). The
+  headless browser hides scroll bars, so no picture and no test showed it; with the bars that take room
+  (emulated by the reviewer) a bar of 15 px appeared, the fields went 327 to 319.5 px wide and the box
+  670 to 655 when the mode was picked, a shift, and the box was 16 px from the footer and not 24. No test
+  saw it because `assertNoOverflow` leaves the scroll region of the body alone. **Fix**: the box shows three
+  rows and a half, and not four, at every size (the half says that there are more); the 20 px are paid for
+  by the free line. The first try did it in windows up to 700 px high with a media query, and the
+  styles test of the UI (no raw lengths) failed on it: a media query cannot use a token, the test has no
+  exception for it and it was not changed, so there is no media query, and one box for every window is
+  simpler. The test measures the body itself (`scrollHeight` against `clientHeight`) in each state of the
+  mode at 1024 x 640 (nothing typed, a name, a code, "a" with twenty matches, "0" with its error, nothing
+  found, an unknown code, and a long name chosen); it failed before (8 px) and passes. **The line in a
+  narrow window** (the same review: at a width of 512 px, a 1024 px window at 200% zoom, 828 of the 12,368
+  sentences of the registry would need a third line and be cut, now with no title): the clamp to two lines
+  is gone, the line only keeps room for two (`min-height`) and takes the lines it needs, so nothing is
+  cut and the box moves in a narrow window or if the registry had longer names; the test at 520 x 800
+  failed before the change (the line was cut) and passes. The claim that every system fits in two lines
+  at the width of the dialog is the review's measure (all 6,184, both endings, in the real wizard: none
+  needs a third; the widest, 8206, is the longest name; the fifth review repeated the measure and found
+  all of them in two lines at 646 and at 631 px, but could not reproduce the "536 px" this first wrote, which
+  is dropped: the one-line width of 8206 is about 1,010 px), and it is in the comment of the style; step 12.F20
+  pins the longest name so that a new version of the definitions makes a test fail. **Baselines**: the 36
+  of the six states, all sizes, changed from four rows to three and a half; looked at against the
+  checklist of section 10.7: `-search-many` 1440 x 900 dark, `-search-chosen` 1920 x 1080 light,
+  `-missing` 1024 x 640 light, and at 1024 x 640 (seen when the half row was first made with the media query,
+  which gave the same box there) `-search-many` light, `-search-chosen` dark, `-code-invalid` dark and
+  `-search-none` light: the box ends 36 px over the footer at 1024 x 640 and the half row shows as a scroll
+  cue; the other 29 were not opened. **Not verified**: real scroll bars of Windows or Linux (the measure
+  of the body is what is tested, not a bar).
+- Step 12.F18 (the mark). The check mark was shown beside "No coordinate system is chosen yet." in the "EPSG
+  code" mode (nothing typed, a name not yet picked, a number that is not a code): the step used the alert
+  mark only when no mode was chosen. It is phase 1's behaviour, found by the fourth review, and it matters
+  more now that the mode has a box of matches under the sentence. The mark follows `crsOf(...) === null`,
+  the test the sentence itself uses, so the two cannot disagree. A phase-1 test pinned the mark for "no
+  mode" and for the local grid, and still passes unchanged; the new test goes through the EPSG mode (nothing
+  typed, a name, a pick, "0", a code) and failed before. Baselines: the five states with nothing chosen in the
+  mode (`wizard-crs-missing`, `-code-invalid`, `-search`, `-search-many`, `-search-none`), 30 PNGs, changed
+  by the mark only; `-search-chosen` and the others did not change. Three were looked at (`-missing` 1024 x 640
+  light, `-search-none` 1440 x 900 dark, `-code-invalid` 1920 x 1080 light); the other 27 were not opened.
+- Step 12.F19 (the CI step looked at one file). The step of the Rust job that runs `scripts/generate-crs-table`
+  compared only `table.rs`, so a script that changed another file (which the one of step 12.F9 did) would have
+  passed it; the fourth review pointed out that step 12.F14 had no test that fails without it. The step now
+  runs `git diff --exit-code` over the whole tree after the script (the checkout is clean at that point:
+  `cargo test --locked` does not change a tracked file). The test of 12.F14 is that step: with the script of
+  12.F9 and a badly formatted line in another file (the copy of 12.F14) it would have failed, and with the
+  script of 12.F14 it passes. The step can only be run on GitHub, so that is where it is to be read, in the run of this commit.
+- Step 12.F20 (the claim of two lines, guarded). The comment of the style of the "Chosen:" line says that
+  every system fits in two lines, which the fourth review measured and no test guarded. The width of the
+  sentence is decided by the name, so a test in `karmania-crs` (`lookup.rs`) pins the longest name of the
+  registry: 73 characters, EPSG:8206, the same system the review found the widest (about 1,010 px on one line, of the 646 of the
+  line). If a new version of `crs-definitions` has a longer name the test fails, and the line is to be
+  looked at before the number is changed. It is a guard on the data and was written with a placeholder
+  that failed and showed the 73. **One thing left as it is**: after a code is typed, typing a name keeps
+  that code chosen and the sentence says "from the matches" (the rule of step 12.F5, that the box holds
+  something other than the code), which is wrong for a code that was typed. Telling the two apart needs
+  the draft to record how the code was chosen, a new field, and it is not done; the fourth review rated
+  it a nit.
+
+## M12 gate, fifth round
+
+The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors and four nits.
+
+- Step 12.F21 (the "Found" line). **Major.** Step 12.F17 said that the CRS step no longer makes the dialog
+  scroll at 1024 x 640, but its test used `points.csv` with nothing beside it. When the "Found" line wraps to
+  two lines, which happens for a projection file with a name of seven characters or more and for a GeoJSON
+  with no `crs` member ("assumed ... GeoJSON default"), the body still spilled by 8 px in the "EPSG code" mode
+  (28 px for three lines, 64 with a finding): the same bar and the same shift as before (the review
+  reproduced it on `4378ed7`; `7d70ae0` has it too, so it is the box of step 12.14d and no older). The test
+  now goes through three inputs (nothing beside the file; `boreholes_collars.csv` with a `.prj` of its name;
+  `mixed.geojson`): it failed on the second and the third (8 px) and passes. **Fix**: the box shows three
+  rows, not three and a half, which pays for the line of the "Found" text (12 px of room are left for it)
+  and removes the half row that the review found arbitrary at the larger windows (164 px of empty body under
+  it at 1440 x 900) and that clipped the focus ring (step 12.F22); the cue of "there is more" is the count
+  line under the field ("The first 20 matches; type more to narrow them.") and the scroll bar when there is
+  one; the hidden bars of the headless browser show none. **Left as it is** (corrected by the re-run of the fifth review on `4943249`): the body still
+  scrolls at 1024 x 640 when the "Found" line has three lines (a `.prj` with a name of 77 characters or more:
+  8 px) and when a projection file names no EPSG code, such as `fixtures/esri.prj` (a readable ESRI-style
+  file, not an unreadable one as this record first said): nothing is found, the person is left in the "EPSG
+  code" mode with a finding under the "Found" line, and the body spills by 44 px (64 before 12.F21), the
+  fields shift by 7.5 px when the bar that takes room appears, and the box is cut off by the footer until
+  the body is scrolled. Nothing is lost, the body is a scroll region by design, 1280 x 720 and larger do not
+  spill, and it is not worse than before; what would remove the shift is a `scrollbar-gutter: stable` on
+  the body of `k-dialog`, which reserves the bar's room in every dialog on the platforms that have bars that
+  take room, so it is the owner's; the alternative is a box that gives up height when there is a finding,
+  which would need the step to be laid out so that it can shrink inside the body, and was not tried. Also the owner's: with
+  overlay scroll bars (the macOS trackpad default) three exact rows give no cue that 17 more matches
+  exist, and only the count line says so (the half row of steps 12.F13 to 12.F20 was that cue, and clipped
+  its ring, and was arbitrary where there is room). The re-run measured, in Chromium with bars of 15 px,
+  at 1024 x 640 in both themes: 0 px of spill and no shift for `points.csv`, with or without `points.prj`,
+  in every mode; for a `.prj` with a name of 7 to 72 characters (`boreholes_collars` included), for
+  `mixed.geojson`, and for a CSV with a name of 120 characters; 8 px for 73 to 116 characters, 44 px for
+  `esri.prj`; none at 1280 x 720 and 1366 x 768. The focus ring was clipped on 0 of the 38 steps of the walk
+  (12 before). The gap under the box is 56 px with a one-line "Found" line (36 before).. **Baselines**: the 36 of the six states in the "EPSG code"
+  mode, at every size, from three rows and a half to three; **every one was looked at**, as six contact
+  sheets of the six variants of a state (half size: layout, marks, clipping, overlap, the footer clear of
+  the box, the same at three sizes and in both themes; the fine detail of a pixel is not judged at half
+  size), after the 15 the reviews had seen in full size. Not verified: real scroll bars of Windows or Linux.
+- Other findings of the fifth round. The figure of 536 px for the widest sentence is dropped from the
+  comments and the records: the review could not reproduce it (it measured all 6,184 in two lines at 646
+  and 631 px in both wordings, 828 of 12,368 needing a third line at 512 px, and 8206 as about 1,010 px on one
+  line), and the comments say what was measured. "EPSG 99999, which is not one of the coordinate systems
+  Karmania knows, as you entered it" has the check mark because the data loads with a warning
+  (`crsOf` is not `null`), which the review called a contradiction of the sentence; it is by design and
+  left. The half row at the larger windows is gone with 12.F21.
+- Step 12.F22 (the ring at the edge). Minor. With the box at three rows and a half the arrow keys
+  scrolled the box by only the part of the row that was hidden, and Chromium put the radio flush with the
+  edge of the box, so that its ring (the 2 px of outline and the 2 px of offset) was cut by 4 px on 12 of the
+  38 steps of a walk through the twenty matches (10 with four rows). The box has `scroll-padding` of a space of
+  8 px at its top and bottom, so a row that the keyboard reaches is scrolled in with room for the ring. The
+  test walks down and up through all twenty matches at 1024 x 640 and checks, after each key, that the ring of
+  the focused radio is inside the room of the box. **What was tried**: at three rows and a half, without the
+  padding, the test fails (the ring is cut by 4 px under the box); at three rows and a half, with it, it
+  passes; at three rows (the box of step 12.F21) the margins never go below 12 px even without it, because
+  the rows then fit the box in whole, so the padding is not needed for the test to pass at this height and
+  is kept so that it cannot come back if the height of the box or of a row changes. The test does not fail
+  without the padding at three rows, which is said here so that it is not read as more.
+- Step 12.F23 (a new file). Nit. `git diff --exit-code` of step 12.F19 does not see a file that is not
+  tracked, which the review showed in a scratch repository (exit 0 with an untracked file), so a script that
+  wrote one would have passed. The step now fails if `git status --porcelain` says anything after the script,
+  and prints it. The tree was clean after the Rust tests here (no lines of `git status --porcelain` after
+  `pnpm check`), so it should not fail by itself on the runner; that is to be read in the run of this commit,
+  as nothing of it can run elsewhere.
+

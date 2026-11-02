@@ -12,7 +12,7 @@ import type {
 } from './api.js';
 import { assertNever } from './exhaustive.js';
 import type { DatasetInput } from './inputs.js';
-import type { Phase, Summary } from './types.js';
+import type { CrsInfo, Phase, Summary } from './types.js';
 
 function wording(phase: ImportPhase): string {
   switch (phase) {
@@ -44,6 +44,8 @@ function inertEngine(): Engine {
     importFiles: unavailable,
     load: unavailable,
     datasets: () => [],
+    crsInfo: unavailable,
+    searchCrs: unavailable,
     rows: unavailable,
     remove: unavailable,
     on: () => () => undefined,
@@ -63,11 +65,17 @@ describe('the engine interface', () => {
     expectTypeOf<EngineEvents>().toHaveProperty('datasets');
   });
 
-  it('has the methods of the brief, and no search of coordinate systems', () => {
+  it('has the methods of the briefs: those of phase 1, and the two EPSG lookups of phase 2', () => {
     expectTypeOf<Engine['load']>().parameter(0).toEqualTypeOf<DatasetInput>();
     expectTypeOf<Engine['datasets']>().returns.toEqualTypeOf<readonly Summary[]>();
-    expectTypeOf<Engine>().not.toHaveProperty('searchCrs');
+    expectTypeOf<Engine['crsInfo']>().toEqualTypeOf<
+      (code: number) => Promise<CrsInfo | undefined>
+    >();
+    expectTypeOf<Engine['searchCrs']>().toEqualTypeOf<
+      (query: string, limit: number) => Promise<readonly CrsInfo[]>
+    >();
     expect(Object.keys(inertEngine()).sort()).toEqual([
+      'crsInfo',
       'datasets',
       'dispose',
       'importFiles',
@@ -76,6 +84,7 @@ describe('the engine interface', () => {
       'preview',
       'remove',
       'rows',
+      'searchCrs',
     ]);
   });
 

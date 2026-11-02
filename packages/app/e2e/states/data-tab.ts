@@ -56,10 +56,15 @@ async function rest(page: Page): Promise<Locator[]> {
   return [app(page)];
 }
 
-/** Loads files, and waits for the table to have its first rows. */
+/** Loads files, and waits for the table to have its first rows and the summary to have the name of the coordinate system. */
 async function load(page: Page, ...picks: Pick[]): Promise<void> {
   await importAndLoad(page, ...picks);
   await table(page).locator('.rows [role="row"]').first().waitFor();
+  // The name comes from the engine a moment after the summary is first drawn, with the code alone.
+  await page
+    .locator('karmania-dataset-summary dt:text-is("Coordinates") + dd')
+    .filter({ hasNotText: /^\s*EPSG \d+\s*$/ })
+    .waitFor();
 }
 
 /** Points with a point twice: loaded, with a warning. */

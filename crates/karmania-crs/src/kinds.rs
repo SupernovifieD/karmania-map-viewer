@@ -1,0 +1,158 @@
+//! The definitions as the answer to `karmania_core::CrsKinds`.
+
+use karmania_core::{CrsGeography, CrsKinds};
+
+use crate::info::{AxisUnits, CrsKind};
+use crate::lookup::lookup;
+
+/// The EPSG definitions, as the core's validation wants to ask them: is this code a longitude
+/// and latitude system? Give it to `karmania_core::validate_with`.
+///
+/// A code that is in the definitions is [`CrsGeography::Geographic`] when it is a geographic
+/// system whose coordinates are in degrees and [`CrsGeography::NotGeographic`] otherwise (a
+/// projected or geocentric system, one with no definition, or a geographic one in grads, whose
+/// values the checks for degrees would judge wrongly); a code that is not in them is
+/// [`CrsGeography::Unknown`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Definitions;
+
+impl CrsKinds for Definitions {
+    fn geography(&self, code: u32) -> CrsGeography {
+        match lookup(code) {
+            Some(info) if info.kind == CrsKind::Geographic && info.units == AxisUnits::Degree => {
+                CrsGeography::Geographic
+            }
+            Some(_) => CrsGeography::NotGeographic,
+            None => CrsGeography::Unknown,
+        }
+    }
+
+    /// The definitions are the whole registry, as far as it goes: a code that is not in them is
+    /// one that validation says it does not know.
+    fn knows_every_code(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use karmania_core::{
+        CrsRef, Dataset, DatasetId, Findings, Geometry, Positions, Table, validate, validate_with,
+    };
+
+    use super::*;
+
+    #[test]
+    fn geographic_systems_are_geographic_and_the_rest_that_exist_are_not() {
+        for code in [4326, 4269, 4258, 4277, 4327, 3823] {
+            assert_eq!(
+                Definitions.geography(code),
+                CrsGeography::Geographic,
+                "{code}"
+            );
+        }
+        // Projected, geocentric, and one with no definition.
+        for code in [32640, 3857, 27700, 2229, 4978, 3822, 3993] {
+            assert_eq!(
+                Definitions.geography(code),
+                CrsGeography::NotGeographic,
+                "{code}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_geographic_system_in_grads_is_not_range_checked_as_degrees() {
+        // EPSG:4807 (NTF, Paris) has its latitude in grads, where 95 is a valid value and 95 degrees is not.
+        assert_eq!(Definitions.geography(4807), CrsGeography::NotGeographic);
+        let paris = points(4807, 10.0, 95.0);
+        assert!(codes(&validate_with(&paris, &Definitions)).is_empty());
+        // The same numbers in a system of degrees are not valid: 95 is not a latitude, 10 is, so the
+        // two look swapped.
+        let wgs84 = points(4326, 10.0, 95.0);
+        assert_eq!(
+            codes(&validate_with(&wgs84, &Definitions)),
+            ["crs.geographic.axes_swapped"]
+        );
+    }
+
+    #[test]
+    fn the_definitions_say_they_have_every_code() {
+        assert!(Definitions.knows_every_code());
+    }
+
+    #[test]
+    fn a_code_that_is_not_in_the_definitions_is_unknown() {
+        for code in [0, 1, 99, 99_999, 65_536, u32::MAX] {
+            assert_eq!(Definitions.geography(code), CrsGeography::Unknown, "{code}");
+        }
+    }
+
+    #[test]
+    fn it_agrees_with_lookup_for_every_code_of_the_registry() {
+        let mut geographic = 0;
+        for code in 0..=u32::from(u16::MAX) {
+            let expected = match lookup(code) {
+                Some(info)
+                    if info.kind == CrsKind::Geographic && info.units == AxisUnits::Degree =>
+                {
+                    CrsGeography::Geographic
+                }
+                Some(_) => CrsGeography::NotGeographic,
+                None => CrsGeography::Unknown,
+            };
+            let answer = Definitions.geography(code);
+            assert_eq!(answer, expected, "{code}");
+            geographic += usize::from(answer == CrsGeography::Geographic);
+        }
+        // The 754 geographic systems in degrees of the 763 counted at step 12.3: the other 9 are in grads.
+        assert_eq!(geographic, 754);
+    }
+
+    fn points(code: u32, x: f64, y: f64) -> Dataset {
+        let positions = Positions::from_xyz(&[x], &[y], None, &mut Findings::new()).unwrap();
+        let mut dataset = Dataset::new(
+            DatasetId(1),
+            "p",
+            None,
+            Geometry::Points(positions),
+            Table::empty(),
+        );
+        dataset.crs = Some(CrsRef::Epsg { code });
+        dataset
+    }
+
+    fn codes(report: &karmania_core::ValidationReport) -> Vec<&'static str> {
+        report
+            .findings()
+            .map(|finding| finding.code.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn validation_with_the_definitions_checks_every_geographic_code() {
+        // Projected-looking numbers labelled NAD83: the core alone cannot tell they are wrong.
+        let nad83 = points(4269, 500_000.0, 2_800_000.0);
+        assert!(codes(&validate(&nad83)).is_empty());
+        assert_eq!(
+            codes(&validate_with(&nad83, &Definitions)),
+            ["crs.geographic.out_of_range"]
+        );
+        // The same numbers in UTM are not range-checked, and say nothing.
+        let utm = points(32640, 500_000.0, 2_800_000.0);
+        assert!(codes(&validate_with(&utm, &Definitions)).is_empty());
+        // Under a code that is not in the definitions they are not range-checked either, but the
+        // code is a warning, and the data still loads. The core alone says nothing of it.
+        let unknown = points(99_999, 500_000.0, 2_800_000.0);
+        let report = validate_with(&unknown, &Definitions);
+        assert_eq!(codes(&report), ["crs.code.unknown"]);
+        assert!(report.is_loadable());
+        assert!(codes(&validate(&unknown)).is_empty());
+        // EPSG:4326 is still checked.
+        let wgs84 = points(4326, 500_000.0, 2_800_000.0);
+        assert_eq!(
+            codes(&validate_with(&wgs84, &Definitions)),
+            ["crs.geographic.out_of_range"]
+        );
+    }
+}

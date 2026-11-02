@@ -48,39 +48,125 @@ or releasing, and whenever the brief says to stop.
 
 ## M12: Coordinate systems (karmania-crs)
 
-- [ ] 12.1 Crate karmania-crs (depends on core), forbid unsafe, one test.
-- [ ] 12.2 Add crs-definitions (dependency-only; licence policy and EPSG terms as
+- [x] 12.1 Crate karmania-crs (depends on core), forbid unsafe, one test.
+- [x] 12.2 Add crs-definitions (dependency-only; licence policy and EPSG terms as
   section 4 of the brief says).
-- [ ] 12.3 `lookup(code) -> CrsInfo`. Tests: 4326, 32640, 2229 (US survey feet),
-  27700, a geocentric code (other), an unknown code.
-- [ ] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
+- [x] 12.3 `lookup(code) -> CrsInfo`. Tests: 4326, 32640, 2229 (US survey feet),
+  27700, a geocentric code (other), an unknown code. Split to stay under the
+  commit size guideline:
+  - [x] 12.3a The WKT reader (the parser of phase 1's `epsg.rs`).
+  - [x] 12.3b WKT queries: the name, a keyword's node, the part that places data.
+  - [x] 12.3c The `CrsInfo` contract types: `CrsKind`, `AxisUnits`, `CrsInfo`.
+  - [x] 12.3d `describe`: name, kind and units read from a WKT definition.
+  - [x] 12.3e `lookup(code)`; the IOGP acknowledgement in the crate documentation; the
+    tests of the brief.
+- [x] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
   Tests.
-- [ ] 12.5 Add proj4rs (dependency-only).
-- [ ] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
+- [x] 12.5 Add proj4rs (dependency-only).
+- [x] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
   scaling, EPSG-to-EPSG through proj4rs; local-to-EPSG and unbuildable
-  definitions give findings. New codes documented.
-- [ ] 12.7 Transform positions in place (f64, z untouched); non-finite results
+  definitions give findings. New codes documented. Split to stay under the
+  commit size guideline:
+  - [x] 12.6a The finding codes `crs.transform.local_grid`, `code_unknown` and
+    `unsupported`, in the registry of the core and documented.
+  - [x] 12.6b The transformer: identity, local-to-local unit scaling and
+    EPSG-to-EPSG through proj4rs; local-to-EPSG, codes that are not known and
+    definitions that cannot be used give findings.
+  - [x] 12.6c Which definitions of the registry can be used and why the others
+    cannot, over the whole registry, pinned.
+- [x] 12.7 Transform positions in place (f64, z untouched); non-finite results
   counted in a finding with examples.
-- [ ] 12.8 Accuracy tests: reference conversions from an independent source
+- [x] 12.8 Accuracy tests: reference conversions from an independent source
   (PROJ or pyproj if available on the machine, otherwise published values), the
   source named for each row; tolerance 1 mm projected, 1e-9 degrees geographic;
   round trips.
-- [ ] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
+- [x] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
   only). No behaviour change: phase 1 snapshots unchanged.
-- [ ] 12.10 karmania-crs implements CrsKinds.
-- [ ] 12.11 The wasm kernel passes it to validation on import and load; the "code
-  not in the definitions" warning; tests for 4269 (geographic, now
-  range-checked) and an unknown code.
-- [ ] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
+- [x] 12.10 karmania-crs implements CrsKinds.
+- [x] 12.11 The wasm kernel passes it to validation on import and load; the
+  "code not in the definitions" warning; tests for 4269 (geographic, now
+  range-checked) and an unknown code. Split to stay under the commit size
+  guideline:
+  - [x] 12.11a `karmania-io` passes a `CrsKinds` through: `Registry::load_with`,
+    `ImportRun::step_with` and `Kernel::with_kinds`; the defaults are unchanged.
+  - [x] 12.11b The warning for a code that is not in the definitions
+    (`crs.code.unknown`), asked only of a `CrsKinds` that has every code.
+  - [x] 12.11c The wasm kernel is built with the definitions; tests for 4269 and
+    an unknown code.
+- [x] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
   gzip) before and after; record in `docs/perf.md`; apply the build-size rule of
   section 4 of the brief.
-- [ ] 12.13 Engine: crsInfo() and searchCrs(), types, unit and real-worker tests.
-- [ ] 12.14 Wizard CRS step: search by code or name (top 20) showing name, kind
+- [x] 12.13 Engine: crsInfo() and searchCrs(), types, unit and real-worker
+  tests. Split to stay under the commit size guideline:
+  - [x] 12.13a The `CrsInfo` type and its constants, the strict contract check,
+    and every definition of the registry run through it.
+  - [x] 12.13b The worker: the kernel module's two calls, the two requests of the
+    protocol and the handler, with their tests.
+  - [x] 12.13c `engine.crsInfo()` and `engine.searchCrs()`, and a test with the
+    real worker.
+- [x] 12.14 Wizard CRS step: search by code or name (top 20) showing name, kind
   and units; the detected CRS shows its name (extends 8.8). Screenshots updated
-  and reviewed.
-- [ ] 12.15 Dataset summary: CRS shows code, name and units (extends 9.3).
+  and reviewed. Split to stay under the commit size guideline:
+  - [x] 12.14a The words: what a system is, a code with its name, and the
+    summary of what is chosen with the name in it (no change to the screen).
+  - [x] 12.14b The step asks the engine for the name of the found and of the
+    chosen code, and shows it. Screenshots updated and reviewed.
+  - [x] 12.14c The draft keeps what is in the search box apart from the code,
+    and a name typed is no error (no change to the screen).
+  - [x] 12.14d The field becomes "EPSG code or name", with up to 20 matches
+    under it (name, code, kind and units). Screenshots updated and reviewed.
+- [x] 12.15 Dataset summary: CRS shows code, name and units (extends 9.3).
   Screenshots updated and reviewed.
-- [ ] 12.G Gate.
+- [x] 12.F1 The transformer refuses a geographic system whose units are not
+  degrees (found at the gate: EPSG:4807 and eight others were read as degrees).
+- [x] 12.F2 `THIRD_PARTY_NOTICES.md` begun, with the EPSG acknowledgement and terms
+  (found at the gate: the engine's types pointed at a file that did not exist).
+- [x] 12.F3 The record of the Node 24 abort corrected: one search is enough, and CI
+  prints it in every run since 12.13 (found at the gate). No change to the code.
+- [x] 12.F4 Stale documents corrected: the README on coordinate systems, the sizes after
+  M12 in `docs/perf.md`, two comments in `codes.rs`, a sum in the decisions.
+- [x] 12.F5 The CRS step says "from the matches", not "as you entered it", of a
+  code that was picked from the matches of a name. Screenshots updated and reviewed.
+- [x] 12.F6 The search test of "a code that is also part of names" uses one that is
+  (2000), not 84, which is not a code.
+- [x] 12.F7 The definitions are held as a table, not as the one giant match of
+  `crs-definitions`, which made Node 24 abort after a few dozen lookups
+  (found at the gate).
+- [x] 12.F8 The "Chosen:" line of the CRS step is one line, cut, with the whole in its
+  title, when matches are under it: a long name no longer moves the box (second review).
+- [x] 12.F9 `scripts/generate-crs-table` writes the file `cargo fmt --check` wants, and CI
+  checks that regenerating it changes nothing (second review).
+- [x] 12.F10 The record of the notices corrected: the builds do not carry the file yet,
+  and the terms still have not been read at the source (second review).
+- [x] 12.F11 `docs/perf.md` read again after 12.F7: the rule paragraph, the raw size, the
+  start-up and search figures (second review).
+- [x] 12.F12 The nine geographic systems in grads are not range-checked as degrees by
+  validation (second review; 12.F1 did the transformer).
+- [x] 12.F13 The "Chosen:" line of the CRS step has room for two lines instead of being
+  cut to one, so that nothing moves and the unit is not hidden (third review).
+  Screenshots updated and reviewed.
+- [x] 12.F14 `scripts/generate-crs-table` formats only the table it writes (third review).
+- [x] 12.F15 Documents corrected: the perf figures at the head of the milestone, the
+  wording about epsg.org, the 12.F9 and 12.F10 records (third review).
+- [x] 12.F16 The doc of `CrsGeography::NotGeographic` says that it covers a geographic system
+  in grads (third review).
+- [x] 12.F17 The CRS step no longer makes the dialog scroll at 1024 x 640 (the box shows
+  3.5 rows), and its "Chosen:" line is not cut in a narrow window (fourth review).
+  Screenshots updated and reviewed.
+- [x] 12.F18 The CRS step shows the mark of "nothing chosen" in the EPSG mode until a code
+  is typed or a match picked (fourth review). Screenshots updated and reviewed.
+- [x] 12.F19 The CI step that regenerates the table compares the whole tree (fourth review).
+- [x] 12.F20 The longest name of the registry is pinned by a test, since the two lines of the
+  "Chosen:" line were measured for it (fourth review).
+- [x] 12.F21 The CRS step does not make the dialog scroll at 1024 x 640 when the "Found" line wraps
+  either (a long projection file name, a GeoJSON with no crs): the box shows 3 rows (fifth review).
+  Screenshots updated and reviewed.
+- [x] 12.F22 The focus ring of a match reached by the arrows is never clipped by the edge of
+  its box (fifth review).
+- [x] 12.F23 The CI step that regenerates the table also fails on a file that is new (fifth review).
+- [x] 12.F24 The record of what the fifth review's re-run leaves open at 1024 x 640 is
+  corrected: a projection file with no EPSG code, three-line "Found" lines (docs only).
+- [x] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)
 

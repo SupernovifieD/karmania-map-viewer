@@ -6,7 +6,7 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import { selectionAfterRemoving } from './datasets.js';
-import type { RowSource } from './datasets.js';
+import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
@@ -117,6 +117,17 @@ export class KarmaniaApp extends LitElement {
     return engine === undefined
       ? Promise.reject(new Error('There is no engine to ask for rows.'))
       : engine.rows(id, start, count);
+  };
+
+  /**
+   * Says what an EPSG code means, for the Data tab. With no engine it fails, as `rows` does: that is not
+   * the same as the definitions not having the code, which is an answer of `undefined`.
+   */
+  private readonly crsInfo: CrsLookup = (code) => {
+    const engine = this.engine;
+    return engine === undefined
+      ? Promise.reject(new Error('There is no engine to ask what a code means.'))
+      : engine.crsInfo(code);
   };
 
   override connectedCallback(): void {
@@ -251,6 +262,7 @@ export class KarmaniaApp extends LitElement {
           .datasets=${this.datasets}
           .selected=${this.selected}
           .rows=${this.rows}
+          .crsInfo=${this.crsInfo}
           @karmania-import-request=${this.chooseFiles}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}

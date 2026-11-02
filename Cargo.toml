@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/karmania-core", "crates/karmania-io", "crates/karmania-wasm"]
+members = [
+  "crates/karmania-core",
+  "crates/karmania-crs",
+  "crates/karmania-io",
+  "crates/karmania-wasm",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,8 +15,11 @@ publish = false
 
 [workspace.dependencies]
 karmania-core = { path = "crates/karmania-core" }
+karmania-crs = { path = "crates/karmania-crs" }
 karmania-io = { path = "crates/karmania-io" }
 serde = { version = "1.0.229", features = ["derive"] }
+crs-definitions = "0.6.0"
+proj4rs = { version = "0.3.0", default-features = false }
 serde_json = "1.0.154"
 libm = "0.2.16"
 csv = "1.4.0"

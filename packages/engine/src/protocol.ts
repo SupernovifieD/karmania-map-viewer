@@ -11,7 +11,7 @@ import { IMPORT_PHASES } from './api.js';
 import type { ImportPhase, ImportProgress } from './api.js';
 import type { SerializedError } from './errors.js';
 import type { DatasetInput } from './inputs.js';
-import type { ImportMapping, LoadResult, Page, Preview } from './types.js';
+import type { CrsInfo, ImportMapping, LoadResult, Page, Preview } from './types.js';
 
 /** A data file to look at, with the sidecar files that belong to it. */
 export interface PreviewGroup {
@@ -30,6 +30,16 @@ export interface Requests {
   readonly preview: {
     readonly params: { readonly groups: readonly PreviewGroup[] };
     readonly result: readonly Preview[];
+  };
+  /** What an EPSG code means; `undefined` if it is not in the definitions. */
+  readonly crsInfo: {
+    readonly params: { readonly code: number };
+    readonly result: CrsInfo | undefined;
+  };
+  /** Searches the EPSG definitions by code or name; at most `limit`, and never over 50. */
+  readonly searchCrs: {
+    readonly params: { readonly query: string; readonly limit: number };
+    readonly result: readonly CrsInfo[];
   };
   /** Imports a file, with `progress` replies on the way. */
   readonly import: {
@@ -58,7 +68,16 @@ export interface Requests {
 }
 
 /** Every type of request. */
-export const REQUEST_TYPES = ['init', 'preview', 'import', 'load', 'rows', 'remove'] as const;
+export const REQUEST_TYPES = [
+  'init',
+  'preview',
+  'crsInfo',
+  'searchCrs',
+  'import',
+  'load',
+  'rows',
+  'remove',
+] as const;
 
 /** The type of a request. */
 export type RequestType = keyof Requests;
