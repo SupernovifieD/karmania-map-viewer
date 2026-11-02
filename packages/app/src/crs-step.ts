@@ -106,22 +106,23 @@ export class KarmaniaCrsStep extends LitElement {
       /* With the matches of a name under it, what is chosen has room for two lines whatever it says, so
          that the box under it does not move when a long name is chosen: the name, the unit and where the
          code came from fit in two lines of the dialog's width (about 650 px) for every system of the
-         registry (measured at step 12.F17: the widest needs 536 px of 646). Nothing is cut: a longer text,
+         registry (measured by the reviews of steps 12.F17 and 12.F21: all 6,184 do, in both wordings, at 646 and at
+         631 px; the widest, EPSG 8206, is about 1,010 px on one line). Nothing is cut: a longer text,
          in a narrow window or in a registry with longer names, takes the lines it needs and moves the box. */
       .summary-text[data-two-lines] {
         min-height: 2lh;
       }
 
       /* What matches the search box: a box of a fixed height, so that matches coming and going moves nothing,
-         and one that scrolls when there are more rows than fit. It shows three rows and a half: the half
-         says that there are more, and with the room that the line above it keeps for two lines, four rows
-         would make the dialog of the smallest window (1024 x 640) scroll. The room round the rows keeps
-         the focus ring of a row from being cut. */
+         and one that scrolls when there are more rows than fit. It shows three rows: with the room that the
+         line above it keeps for two lines, and a line of the "found" text above that when a file name or a
+         GeoJSON default makes it wrap, more would make the dialog of the smallest window (1024 x 640)
+         scroll. The room round the rows keeps the focus ring of a row from being cut. */
       .matches {
         border: var(--k-border-width) solid var(--k-border-strong);
         border-radius: var(--k-radius-md);
         box-sizing: border-box;
-        height: calc(var(--k-list-row-height) * 3.5 + var(--k-space-8) + var(--k-border-width) * 2);
+        height: calc(var(--k-list-row-height) * 3 + var(--k-space-8) + var(--k-border-width) * 2);
         overflow: hidden auto;
         padding: var(--k-space-4) 0;
       }

@@ -2804,7 +2804,9 @@ about the change of step 12.F13.
   cut and the box moves in a narrow window or if the registry had longer names; the test at 520 x 800
   failed before the change (the line was cut) and passes. The claim that every system fits in two lines
   at the width of the dialog is the review's measure (all 6,184, both endings, in the real wizard: none
-  needs a third, the widest, 8206, needs 536 px of 646), and it is in the comment of the style; step 12.F20
+  needs a third; the widest, 8206, is the longest name; the fifth review repeated the measure and found
+  all of them in two lines at 646 and at 631 px, but could not reproduce the "536 px" this first wrote, which
+  is dropped: the one-line width of 8206 is about 1,010 px), and it is in the comment of the style; step 12.F20
   pins the longest name so that a new version of the definitions makes a test fail. **Baselines**: the 36
   of the six states, all sizes, changed from four rows to three and a half; looked at against the
   checklist of section 10.7: `-search-many` 1440 x 900 dark, `-search-chosen` 1920 x 1080 light,
@@ -2833,7 +2835,7 @@ about the change of step 12.F13.
 - Step 12.F20 (the claim of two lines, guarded). The comment of the style of the "Chosen:" line says that
   every system fits in two lines, which the fourth review measured and no test guarded. The width of the
   sentence is decided by the name, so a test in `karmania-crs` (`lookup.rs`) pins the longest name of the
-  registry: 73 characters, EPSG:8206, the same system the review found the widest (536 px of the 646 of the
+  registry: 73 characters, EPSG:8206, the same system the review found the widest (about 1,010 px on one line, of the 646 of the
   line). If a new version of `crs-definitions` has a longer name the test fails, and the line is to be
   looked at before the number is changed. It is a guard on the data and was written with a placeholder
   that failed and showed the 73. **One thing left as it is**: after a code is typed, typing a name keeps
@@ -2841,4 +2843,38 @@ about the change of step 12.F13.
   something other than the code), which is wrong for a code that was typed. Telling the two apart needs
   the draft to record how the code was chosen, a new field, and it is not done; the fourth review rated
   it a nit.
+
+## M12 gate, fifth round
+
+The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors and four nits.
+
+- Step 12.F21 (the "Found" line). **Major.** Step 12.F17 said that the CRS step no longer makes the dialog
+  scroll at 1024 x 640, but its test used `points.csv` with nothing beside it. When the "Found" line wraps to
+  two lines, which happens for a projection file with a name of seven characters or more and for a GeoJSON
+  with no `crs` member ("assumed ... GeoJSON default"), the body still spilled by 8 px in the "EPSG code" mode
+  (28 px for three lines, 64 with a finding): the same bar and the same shift as before (the review
+  reproduced it on `4378ed7`; `7d70ae0` has it too, so it is the box of step 12.14d and no older). The test
+  now goes through three inputs (nothing beside the file; `boreholes_collars.csv` with a `.prj` of its name;
+  `mixed.geojson`): it failed on the second and the third (8 px) and passes. **Fix**: the box shows three
+  rows, not three and a half, which pays for the line of the "Found" text (12 px of room are left for it)
+  and removes the half row that the review found arbitrary at the larger windows (164 px of empty body under
+  it at 1440 x 900) and that clipped the focus ring (step 12.F22); the cue of "there is more" is the count
+  line under the field ("The first 20 matches; type more to narrow them.") and the scroll bar when there is
+  one; the hidden bars of the headless browser show none. **Left as it is**: a "Found" line of three lines
+  (a name of 80 characters or more) or findings under it (an unreadable `.prj`) still make the body scroll at
+  that window, 28 and 64 px by the review: the body is a scroll region by design, nothing is lost, and the
+  shift of a bar that takes room is the dialog's (a `scrollbar-gutter: stable` on the body of `k-dialog`
+  would remove it for every dialog, but reserves the bar's room in all of them on the platforms that have
+  bars that take room, so it is the owner's). **Baselines**: the 36 of the six states in the "EPSG code"
+  mode, at every size, from three rows and a half to three; **every one was looked at**, as six contact
+  sheets of the six variants of a state (half size: layout, marks, clipping, overlap, the footer clear of
+  the box, the same at three sizes and in both themes; the fine detail of a pixel is not judged at half
+  size), after the 15 the reviews had seen in full size. Not verified: real scroll bars of Windows or Linux.
+- Other findings of the fifth round. The figure of 536 px for the widest sentence is dropped from the
+  comments and the records: the review could not reproduce it (it measured all 6,184 in two lines at 646
+  and 631 px in both wordings, 828 of 12,368 needing a third line at 512 px, and 8206 as about 1,010 px on one
+  line), and the comments say what was measured. "EPSG 99999, which is not one of the coordinate systems
+  Karmania knows, as you entered it" has the check mark because the data loads with a warning
+  (`crsOf` is not `null`), which the review called a contradiction of the sentence; it is by design and
+  left. The half row at the larger windows is gone with 12.F21.
 
