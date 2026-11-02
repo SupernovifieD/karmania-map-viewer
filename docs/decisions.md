@@ -2219,3 +2219,17 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   `thiserror`, `thiserror-impl` and, for `wasm32` only, `console_log`, `log` and `web-sys`, all under
   licences the policy allows; they are in `docs/dependencies.md`. The size of the kernel with it is
   measured at step 12.12.
+- Step 12.6 is split into 12.6a (the finding codes), 12.6b (the transformer without proj4rs) and
+  12.6c (the transformer through proj4rs). 12.6a registers `crs.transform.local_grid`,
+  `crs.transform.code_unknown` and `crs.transform.unsupported` (all errors, with no wizard step: they
+  are met when drawing, not when importing) and documents them in `docs/validation-codes.md`. They are
+  in the registry of `karmania-core`, because every finding is made with a `FindingCode` and the
+  registry is one enum there; section 5.1 of the brief says the core gains only the CrsKinds hook,
+  and this is a second, smaller addition that the single registry makes necessary (the three codes
+  and, at 12.7, `crs.transform.not_finite`; later steps add the `display`, `contours` and `classes`
+  codes the same way). The names are new: none of the codes retired at steps 3.25a and 3.25b is
+  reused. Three codes and not one per cause: a local grid and an EPSG system cannot be converted
+  (the message names the EPSG code); a code that is not in the definitions; and a known system that
+  cannot be used, with the reason in the message (needs datum-shift grid files; its projection is
+  not supported; it is geocentric; or its definition cannot be read), which are the reasons step
+  12.5 measured. Whether a dataset is drawn, and the `display` findings that say so, are step 13.4's.
