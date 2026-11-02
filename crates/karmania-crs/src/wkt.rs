@@ -1,9 +1,10 @@
 //! A small reader for the WKT text of a coordinate system definition.
 //!
 //! The definitions come as WKT strings such as `PROJCS["WGS 84 / UTM zone 40N",GEOGCS[...],...]`.
-//! This reads the text into a tree. It is a reader of the definitions this crate ships, not of
-//! any WKT: text it cannot read gives `None`, never a panic, and nesting beyond [`MAX_DEPTH`]
-//! is refused so that no text can exhaust the stack.
+//! This reads the text into a tree, and has the few questions that are asked of it: the
+//! system's name, the part that places 2D data, and a keyword's node. It is a reader of the
+//! definitions this crate ships, not of any WKT: text it cannot read gives `None`, never a
+//! panic, and nesting beyond [`MAX_DEPTH`] is refused so that no text can exhaust the stack.
 
 /// A parsed WKT value.
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +138,36 @@ impl Parser<'_> {
     }
 }
 
+/// The first quoted string anywhere in the tree, which in a definition is the system's name.
+#[must_use]
+pub fn first_text(node: &Node) -> Option<String> {
+    match node {
+        Node::Text(s) => Some(s.clone()),
+        Node::Call { args, .. } => args.iter().find_map(first_text),
+        Node::Number(_) | Node::Word => None,
+    }
+}
+
+/// The first node with this keyword, searching depth first, the node itself included.
+#[must_use]
+pub fn find_keyword<'a>(node: &'a Node, keyword: &str) -> Option<&'a Node> {
+    if node.keyword() == Some(keyword) {
+        return Some(node);
+    }
+    node.args().iter().find_map(|n| find_keyword(n, keyword))
+}
+
+/// The geographic, projected or geocentric part that places 2D data: the node itself, or for
+/// compound and bound systems the first such part inside. `None` for anything else.
+#[must_use]
+pub fn horizontal_part(node: &Node) -> Option<&Node> {
+    match node.keyword()? {
+        "PROJCS" | "PROJCRS" | "GEOGCS" | "GEOGCRS" | "GEOCCS" => Some(node),
+        "COMPD_CS" | "BOUNDCRS" | "SOURCECRS" => node.args().iter().find_map(horizontal_part),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,10 +219,33 @@ mod tests {
     }
 
     #[test]
+    fn it_finds_the_name_a_keyword_and_the_part_that_places_data() {
+        let projected =
+            parse(r#"PROJCS["Grid",GEOGCS["Datum",UNIT["degree",0.0174]],UNIT["metre",1]]"#)
+                .unwrap();
+        assert_eq!(first_text(&projected).as_deref(), Some("Grid"));
+        assert_eq!(horizontal_part(&projected), Some(&projected));
+        let unit = find_keyword(&projected, "UNIT").unwrap();
+        assert_eq!(unit.args().first(), Some(&Node::Text("degree".to_string())));
+
+        let compound =
+            parse(r#"COMPD_CS["Grid + height",VERT_CS["height",UNIT["metre",1]],GEOGCS["Datum"]]"#)
+                .unwrap();
+        let part = horizontal_part(&compound).unwrap();
+        assert_eq!(part.keyword(), Some("GEOGCS"));
+
+        let vertical = parse(r#"VERT_CS["height",UNIT["metre",1]]"#).unwrap();
+        assert_eq!(horizontal_part(&vertical), None);
+        assert_eq!(horizontal_part(&Node::Word), None);
+        assert_eq!(find_keyword(&vertical, "PROJCS"), None);
+    }
+
+    #[test]
     fn the_questions_of_a_node_that_is_not_a_call_have_empty_answers() {
         for node in [Node::Word, Node::Number(1.0), Node::Text("t".to_string())] {
             assert_eq!(node.keyword(), None);
             assert!(node.args().is_empty());
         }
+        assert_eq!(first_text(&Node::Number(1.0)), None);
     }
 }
