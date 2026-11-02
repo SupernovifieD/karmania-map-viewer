@@ -2368,3 +2368,17 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   docs example is what the check says. The test of `Definitions` that expected nothing for 99999 now
   expects this warning, on purpose. Seen to fail, with the phase 1 snapshots among eight tests, when
   the warning is made of every `Unknown` whoever answers (tried, file restored). Core is at 247 tests.
+- Step 12.11c (the kernel is built with the definitions). `karmania-wasm` depends on `karmania-crs`
+  (now in the workspace dependencies) and builds its kernel with `Definitions`, in one small function
+  that the native tests can call, since the bindings themselves take `JsValue`s and cannot run without a
+  JavaScript engine; the bindings still hold no logic. Native tests through that function: points from
+  arrays and a file imported from bytes, with UTM-looking numbers, are an out-of-range warning when
+  labelled EPSG:4269 (which the core alone does not know), a `crs.code.unknown` warning when labelled
+  99999 (the data is loaded), and nothing when labelled 32640; they fail, three of them, when the kernel
+  is built without the definitions (tried, file restored). **The build-size rule**: the module grew
+  from 632,213 to 5,762,604 bytes raw (5.1 MB, the 4.8 MB of tables of phase 1's estimate and
+  `proj4rs`) and from 253,200 to 742,737 bytes gzipped (`gzip -9`): 489,537 bytes, under the 1 MB at
+  which the brief says to stop, so the rule is not triggered. The raw size is what a browser compiles
+  (5.8 MB), so the time to start the worker will be felt; it is measured with the rest at step 12.12.
+  Options if it matters, none taken: build the release profile for size (`opt-level = "z"`, link-time
+  optimisation), or load the definitions as a separate module (the choice step 12.2 offered).

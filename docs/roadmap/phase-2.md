@@ -83,7 +83,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
   only). No behaviour change: phase 1 snapshots unchanged.
 - [x] 12.10 karmania-crs implements CrsKinds.
-- [ ] 12.11 The wasm kernel passes it to validation on import and load; the
+- [x] 12.11 The wasm kernel passes it to validation on import and load; the
   "code not in the definitions" warning; tests for 4269 (geographic, now
   range-checked) and an unknown code. Split to stay under the commit size
   guideline:
@@ -91,7 +91,7 @@ or releasing, and whenever the brief says to stop.
     `ImportRun::step_with` and `Kernel::with_kinds`; the defaults are unchanged.
   - [x] 12.11b The warning for a code that is not in the definitions
     (`crs.code.unknown`), asked only of a `CrsKinds` that has every code.
-  - [ ] 12.11c The wasm kernel is built with the definitions; tests for 4269 and
+  - [x] 12.11c The wasm kernel is built with the definitions; tests for 4269 and
     an unknown code.
 - [ ] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
   gzip) before and after; record in `docs/perf.md`; apply the build-size rule of
