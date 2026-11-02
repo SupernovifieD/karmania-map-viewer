@@ -2454,3 +2454,25 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   `summarizeCrs` for what the definitions say of the code (the system, `null` if the code is not in
   them, `undefined` if nobody asked); with nothing known the sentences are those of phase 1, which the
   existing tests still show. Four tests; no photographed state changes in this step.
+- Step 12.14b (names for the found and the chosen code). The step gets the engine (the dialog passes its
+  own) and asks `crsInfo` once for the code that was found and once for each code that is typed, keeping
+  the answers (the system, or `null` for a code that is not in the definitions); the "Found ..." line and
+  the "Chosen: ..." line then say the name and what it is: "Found EPSG 32640, WGS 84 / UTM zone 40N
+  (projected, in metres), from the .prj file points.prj." A code that is not known says so ("which is
+  not one of the coordinate systems Karmania knows") and the person can still go on, as step 12.11b
+  makes it a warning and not an error. If the engine cannot answer, no name is shown and the step is
+  what it was. The select's option still reads "The one found: EPSG 32640": a name there would be cut by
+  the width of a select. Changed on purpose, and the commit says it: seven tests that asserted the
+  phase 1 sentences, and one that asserted that "nothing is said about what the code stands for"
+  (decision 3.25c, reversed by this phase), now assert the names; a test was added for the unknown code.
+  A tried mutation (the dialog not passing the engine) fails two of them. The first full run of the end-to-end
+  suite failed four tests of the Review step, which stop on the fourth step with a stub of the engine that had
+  no `crsInfo`: the step's call threw while it was being made and the step never appeared. The stub is the
+  fault (it stood for an `Engine` that no longer has that shape), so it now answers `crsInfo` and
+  `searchCrs`; the step is not made to guard against a method the real engine always has. Pictures: of the 96 states,
+  two change, `wizard-crs-found` and `long-wizard-crs`, six baselines each, looked at at 1024 x 640,
+  1440 x 900 and 1920 x 1080 in both themes with the checklist of section 10.7 of the brief: the
+  sentence is longer, nothing clips, overlaps or overflows, the long file name still wraps inside its box,
+  the edges line up and the dark theme reads. One limit, not a fault of the picture: the name comes a
+  frame after the first paint, so in a narrow window with a long file name the sentence can gain a line
+  once; the lookup is not started earlier, because the step is not made before the fourth step.

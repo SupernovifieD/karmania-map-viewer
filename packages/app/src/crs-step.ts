@@ -3,9 +3,17 @@ import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
-import type { Units } from '@karmania/engine';
+import type { CrsInfo, Engine, Units } from '@karmania/engine';
 import './findings.js';
-import { describeCrs, describeSource, epsgError, summarizeCrs, UNIT_NAMES } from './import-crs.js';
+import {
+  describeCrs,
+  describeNamed,
+  describeSource,
+  epsgError,
+  parseEpsg,
+  summarizeCrs,
+  UNIT_NAMES,
+} from './import-crs.js';
 import type { CrsMode } from './import-crs.js';
 import type { ImportDraft } from './import-draft.js';
 import type { FileEntry } from './import-files.js';
@@ -24,14 +32,16 @@ const UNIT_OPTIONS: readonly SelectOption[] = (Object.entries(UNIT_NAMES) as [Un
  * and where it came from (the file's own `crs` member, a `.prj` file next to it, or the default of
  * GeoJSON), and a person chooses what the coordinates are in: what was found, an EPSG code that they
  * type, or a local grid, which is not tied to a place on the Earth (a mine grid) and has only its
- * units. The code is shown as it was given. There is no name, kind or unit beside it, because the
- * kernel has no list of coordinate systems to look it up in. A line at the end sums up what is chosen
- * and where it came from.
+ * units. The code is shown with its name, what kind of system it is and its unit, from the engine's
+ * definitions of the EPSG codes (a code that is not in them says so). A line at the end sums up what is
+ * chosen and where it came from.
  */
 export class KarmaniaCrsStep extends LitElement {
   static override properties = {
     entry: { attribute: false },
     draft: { attribute: false },
+    engine: { attribute: false },
+    names: { state: true },
   };
 
   static override styles = [
@@ -96,11 +106,43 @@ export class KarmaniaCrsStep extends LitElement {
   declare entry: FileEntry | undefined;
   /** What is to be done with it. */
   declare draft: ImportDraft | undefined;
+  /** The engine whose definitions give the names of the codes; without it no name is shown. */
+  declare engine: Engine | undefined;
+  /** What the definitions say of the codes that have been asked about: the system, or `null` if the code is not in them. */
+  declare names: ReadonlyMap<number, CrsInfo | null>;
+  /** The codes the engine has been asked about, so that none is asked twice. */
+  private readonly asked = new Set<number>();
 
   constructor() {
     super();
     this.entry = undefined;
     this.draft = undefined;
+    this.engine = undefined;
+    this.names = new Map();
+  }
+
+  /** Asks the engine what a code means, once, and shows the answer when it comes. */
+  private lookUp(code: number | undefined): void {
+    const engine = this.engine;
+    if (engine === undefined || code === undefined || this.asked.has(code)) {
+      return;
+    }
+    this.asked.add(code);
+    engine
+      .crsInfo(code)
+      .then((info) => {
+        this.names = new Map(this.names).set(code, info ?? null);
+      })
+      // If the engine cannot say, no name is shown: the step is what it was without them.
+      .catch(() => undefined);
+  }
+
+  protected override willUpdate(): void {
+    const found = this.entry?.preview.crs?.crs;
+    this.lookUp(found?.kind === 'epsg' ? found.code : undefined);
+    if (this.draft?.crs.mode === 'epsg') {
+      this.lookUp(parseEpsg(this.draft.crs.epsg));
+    }
   }
 
   private tell(change: DraftChange): void {
@@ -128,6 +170,13 @@ export class KarmaniaCrsStep extends LitElement {
       { value: 'local', label: 'A local grid' },
     ];
     const about = findings.filter((finding) => finding.step === 'crs');
+    const nameOf = (code: number | undefined): CrsInfo | null | undefined =>
+      code === undefined ? undefined : this.names.get(code);
+    const chosenCode = draft.crs.mode === 'epsg' ? parseEpsg(draft.crs.epsg) : undefined;
+    const summaryInfo =
+      draft.crs.mode === 'detected'
+        ? nameOf(found?.crs.kind === 'epsg' ? found.crs.code : undefined)
+        : nameOf(chosenCode);
     return html`
       <p>Say which coordinate system the coordinates in the file are in.</p>
       <p class="found">
@@ -136,7 +185,7 @@ export class KarmaniaCrsStep extends LitElement {
           >${
             found === undefined
               ? 'No coordinate system was found in or beside the file.'
-              : `Found ${describeCrs(found.crs)}, from ${describeSource(found.source, sidecar)}.`
+              : `Found ${describeNamed(found.crs, nameOf(found.crs.kind === 'epsg' ? found.crs.code : undefined))}, from ${describeSource(found.source, sidecar)}.`
           }</span
         >
       </p>
@@ -190,7 +239,7 @@ export class KarmaniaCrsStep extends LitElement {
       <p class="summary" role="status">
         <k-icon name=${draft.crs.mode === undefined ? 'circle-alert' : 'check'} size="16"></k-icon>
         <span class="summary-text"
-          ><strong>Chosen:</strong> ${summarizeCrs(draft.crs, found, sidecar)}</span
+          ><strong>Chosen:</strong> ${summarizeCrs(draft.crs, found, sidecar, summaryInfo)}</span
         >
       </p>
     `;

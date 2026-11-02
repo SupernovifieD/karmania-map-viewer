@@ -109,7 +109,7 @@ or releasing, and whenever the brief says to stop.
   and reviewed. Split to stay under the commit size guideline:
   - [x] 12.14a The words: what a system is, a code with its name, and the
     summary of what is chosen with the name in it (no change to the screen).
-  - [ ] 12.14b The step asks the engine for the name of the found and of the
+  - [x] 12.14b The step asks the engine for the name of the found and of the
     chosen code, and shows it. Screenshots updated and reviewed.
   - [ ] 12.14c The field becomes "EPSG code or name", with up to 20 matches
     under it (name, code, kind and units). Screenshots updated and reviewed.

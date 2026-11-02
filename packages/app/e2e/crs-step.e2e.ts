@@ -95,7 +95,9 @@ test.describe('the coordinate system step', () => {
   }) => {
     const p = parts(page);
     await crsOf(page, 'points.csv', 'points.prj');
-    await expect(p.found).toHaveText('Found EPSG 32640, from the .prj file points.prj.');
+    await expect(p.found).toHaveText(
+      'Found EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+    );
     expect(await p.select.inputValue()).toBe('detected');
     expect(await optionsOf(p.select)).toEqual([
       'The one found: EPSG 32640',
@@ -138,7 +140,7 @@ test.describe('the coordinate system step', () => {
     const p = parts(page);
     await crsOf(page, 'mixed.geojson');
     await expect(p.found).toHaveText(
-      'Found EPSG 4326, from the GeoJSON default, which is assumed because the file names none.',
+      'Found EPSG 4326, WGS 84 (longitude and latitude, in degrees), from the GeoJSON default, which is assumed because the file names none.',
     );
     expect(await p.select.inputValue()).toBe('detected');
     await expect(p.next.locator('button')).toBeEnabled();
@@ -147,7 +149,9 @@ test.describe('the coordinate system step', () => {
   test("says that a GeoJSON file's own crs member was used", async ({ page }) => {
     const p = parts(page);
     await crsOf(page, GEOJSON_WITH_CRS);
-    await expect(p.found).toHaveText("Found EPSG 32640, from the file's own crs member.");
+    await expect(p.found).toHaveText(
+      "Found EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the file's own crs member.",
+    );
   });
 
   test('says that nothing was found, and that a system has to be chosen before going on', async ({
@@ -191,8 +195,10 @@ test.describe('the coordinate system step', () => {
     await expect(p.next.locator('button')).toBeEnabled();
     await expect(p.note).toHaveCount(0);
     expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '32640', units: 'm' });
-    // Nothing is said about what the code stands for: the kernel has no list to look it up in.
-    await expect(p.step).not.toContainText(/UTM|WGS|zone|projected|geographic/i);
+    // What the code stands for is said, from the engine's definitions of the EPSG codes.
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
+    );
   });
 
   test('says what is wrong with a code that is not a whole number, and does not go on', async ({
@@ -277,16 +283,36 @@ test.describe('the coordinate system step', () => {
   test('sums up what is chosen and where it came from, as the choice changes', async ({ page }) => {
     const p = parts(page);
     await crsOf(page, 'points.csv', 'points.prj');
-    await expect(p.summary).toHaveText('Chosen: EPSG 32640, from the .prj file points.prj.');
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+    );
     await p.select.selectOption('epsg');
     await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
     await p.codeInput.fill('28350');
-    await expect(p.summary).toHaveText('Chosen: EPSG 28350, as you entered it.');
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 28350, GDA94 / MGA zone 50 (projected, in metres), as you entered it.',
+    );
     await p.select.selectOption('local');
     await expect(p.summary).toContainText('Chosen: a local grid, in metres');
     await p.unitsSelect.selectOption('us_ft');
     await expect(p.summary).toContainText('a local grid, in US survey feet');
     await expect(p.summary).toContainText('not tied to a place on the Earth');
+  });
+
+  test('says so when a code is not one of the coordinate systems that are known, and still goes on', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('99999');
+    await expect(p.summary).toHaveText(
+      'Chosen: EPSG 99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
+    );
+    // The data can still be loaded under it: the review says what that means.
+    await expect(p.next.locator('button')).toBeEnabled();
+    await expect(p.note).toHaveCount(0);
+    expect(await draftCrs(page)).toEqual({ mode: 'epsg', epsg: '99999', units: 'm' });
   });
 
   test('says when nothing is chosen, with a different mark from when something is', async ({
