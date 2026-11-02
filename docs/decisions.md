@@ -2414,3 +2414,17 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   removed and when metres stop being required for metres (both tried, file restored; the first attempt
   at the second changed nothing, since the formatter had dropped the parentheses of the line I tried to
   edit, which showed in "found: 0" and was done again).
+- Step 12.13b (the worker). `KernelModule` and the generated bindings it wraps gain `crsInfo` and
+  `searchCrs`; the protocol gains the requests `crsInfo` (params `{ code }`, result `CrsInfo` or
+  `undefined`) and `searchCrs` (params `{ query, limit }`, result a list), typed in `Requests` so that,
+  as the protocol's design intends, the compiler made the exhaustive tests of the protocol be
+  extended (it refused to build until they were). The handler runs them on the kernel, answers only
+  after `init`, and checks what the kernel gives with `checkedCrsInfo` and `checkedCrsInfoList`, as it
+  does for everything that crosses the boundary. It also refuses misuse itself: a code or a limit that
+  is not a whole number from 0 to 4,294,967,295 and a query that is not a string are an error reply,
+  because the generated binding would otherwise take `-1` for 4,294,967,295 and `4326.5` for 4326 and
+  answer as if nothing were wrong. An unknown code is a successful reply whose result is `undefined`;
+  a test sends that reply through `structuredClone` and `parseFromWorker` to show it survives, since
+  the envelope check asks `'result' in data`. Six tests, run on the real kernel (one with a kernel that lies), and the
+  two exhaustive protocol tests extended. They fail when the code is not validated and when the
+  kernel's answer is not checked (each tried, file restored). The engine's own methods are 12.13c.

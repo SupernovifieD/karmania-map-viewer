@@ -100,7 +100,7 @@ or releasing, and whenever the brief says to stop.
   tests. Split to stay under the commit size guideline:
   - [x] 12.13a The `CrsInfo` type and its constants, the strict contract check,
     and every definition of the registry run through it.
-  - [ ] 12.13b The worker: the kernel module's two calls, the two requests of the
+  - [x] 12.13b The worker: the kernel module's two calls, the two requests of the
     protocol and the handler, with their tests.
   - [ ] 12.13c `engine.crsInfo()` and `engine.searchCrs()`, and a test with the
     real worker.
