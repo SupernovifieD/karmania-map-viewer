@@ -2137,3 +2137,12 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   of them, one of them a quotation by Apache SIS; no one asked IOGP; nothing here is legal advice.
   The size of the kernel with the definitions is not yet measured (step 12.12 does it, against the
   rule of 1 MB gzipped); the crate is not yet used, so the module has not grown.
+- Step 12.3 (the lookup) is split into 12.3a, 12.3b and 12.3c to stay near the size guideline.
+  12.3a is the WKT reader, `karmania-crs/src/wkt.rs`. Reused from history, as the brief asks: the
+  parser (`Node`, `Parser`, `parse`, with the limit of 64 levels of nesting and the doubled-quote
+  rule) of `epsg.rs` as it was before step 3.25b (`git show 64d53d0^:crates/karmania-core/src/epsg.rs`),
+  unchanged in what it does. New: the module is public (`pub mod wkt`), because the sub-steps would
+  otherwise leave code that nothing uses yet, which the lint denies, with doc comments on every item
+  and its tests rewritten (the nesting test now also reads text exactly at the limit, and the
+  spaces-and-line-breaks case is covered). At 197 lines, about 110 of them the old parser as it was,
+  it is over the guideline of about 150 changed lines; a parser is one piece and was not cut further.

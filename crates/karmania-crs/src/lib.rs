@@ -10,6 +10,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod wkt;
+
 #[cfg(test)]
 mod tests {
     use karmania_core::CrsRef;
