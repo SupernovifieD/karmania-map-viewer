@@ -2187,3 +2187,16 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   The definitions are those of PostGIS (`crs-definitions` says it pulls them from `crs-csv`), not
   of the current EPSG registry, so the accuracy tests of step 12.8 compare reprojection with an
   independent source and not with them.
+- Step 12.4 (`search`). Ranked as section 11.1 of the brief says: the system whose code is the
+  query (digits, with or without `EPSG:`), then names that start with it, then names that contain
+  it, compared without regard to case, in order of code inside each group, at most 50 (`MAX_RESULTS`),
+  nothing for an empty query or a limit of 0. Substring matching is as the brief says, so "utm 40"
+  does not find "UTM zone 40N"; a search by words is not part of this step. The entries named
+  `EPSG:<code>` (those with no definition) are found by "epsg:" because they contain it. For speed
+  the names are matched from the first quoted string of each definition, and only the results are
+  read in full: measured natively in a release build, 2.5 ms per query against about 50 ms for
+  reading every definition, and a test pins that the quick name is the one `describe` gives for
+  every entry of the registry (only entries with no definition need the full reading). The tests
+  compare the results with the plain ranking over fully read names for seventeen queries, at two
+  limits, and were seen to fail when the groups were swapped and when the exact code was ignored.
+  At 289 lines (about 90 of code) the change is over the size guideline; the tests are most of it.

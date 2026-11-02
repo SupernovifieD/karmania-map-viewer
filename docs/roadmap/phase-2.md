@@ -60,7 +60,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 12.3d `describe`: name, kind and units read from a WKT definition.
   - [x] 12.3e `lookup(code)`; the IOGP acknowledgement in the crate documentation; the
     tests of the brief.
-- [ ] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
+- [x] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
   Tests.
 - [ ] 12.5 Add proj4rs (dependency-only).
 - [ ] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
