@@ -369,4 +369,54 @@ mod tests {
         let [cx, cy] = to_utm.convert(1e300, -1e300);
         assert!(cx.is_nan() == cy.is_nan());
     }
+
+    #[test]
+    fn every_definition_of_the_registry_is_used_or_refused_with_a_reason_and_the_counts_are_pinned()
+    {
+        use std::collections::BTreeMap;
+
+        let mut tally: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
+        let mut usable = 0_u32;
+        for code in 0..=u32::from(u16::MAX) {
+            if crate::lookup(code).is_none() {
+                continue;
+            }
+            let Err(finding) = Transformer::new(epsg(4326), epsg(code)) else {
+                usable += 1;
+                continue;
+            };
+            assert_eq!(finding.code, FindingCode::CrsTransformUnsupported, "{code}");
+            assert!(finding.hint.is_some(), "{code}");
+            let reason = finding.message.rsplit(": ").next().unwrap_or_default();
+            let group = match reason {
+                "it needs files for shifting between datums, which are not available." => {
+                    "datum files"
+                }
+                "it is geocentric, not a map coordinate system." => "geocentric",
+                "its projection is not supported." => "projection",
+                "it has no definition." => "no definition",
+                other => panic!("{code}: a reason that is not one of the four: {other}"),
+            };
+            tally.entry(group).or_default().push(code);
+        }
+        // If `crs-definitions` or `proj4rs` is updated these change: look at which codes moved
+        // before changing the numbers, since they are the reasons shown to a person.
+        let counts: Vec<(&str, usize)> = tally
+            .iter()
+            .map(|(group, codes)| (*group, codes.len()))
+            .collect();
+        assert_eq!(
+            counts,
+            [
+                ("datum files", 238),
+                ("geocentric", 196),
+                ("no definition", 2),
+                ("projection", 2)
+            ]
+        );
+        assert_eq!(usable, 5_746);
+        assert_eq!(tally["projection"], [8441, 27_200]);
+        assert_eq!(tally["no definition"], [22_300, 29_701]);
+        assert!(tally["datum files"].contains(&2085) && tally["geocentric"].contains(&4978));
+    }
 }

@@ -2251,3 +2251,13 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   conversions broken (all tried, file restored), and the examples of the docs are tested against what
   the transformer really says. A test that only counted the elements of the result was deleted
   because it could not fail. The accuracy against an independent source is step 12.8's.
+- Step 12.6c (what can be used). The transformer was tried from EPSG:4326 to every definition of the
+  registry (6,184). 5,746 can be used. 438 are refused, each with `crs.transform.unsupported` and
+  one of four reasons: 238 need datum-shift grid files that are not available, 196 are geocentric
+  (or similar, in metres) and so not map systems, 2 name a projection `proj4rs` does not have
+  (EPSG:8441 and 27200) and 2 have no definition (22300 and 29701). The counts and those four codes
+  are pinned in a test, with the note that if `crs-definitions` or `proj4rs` is updated the codes that
+  moved are to be looked at first, since these are the reasons a person will be shown. That is 7.1%
+  of the registry, and 4.0% (242 of 5,988) when the geocentric ones, which are not meant for maps,
+  are left out. Step
+  13.4 turns them into `display` findings for datasets.

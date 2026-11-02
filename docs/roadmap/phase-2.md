@@ -63,7 +63,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.4 `search(query, limit)` with the ranking of section 11.1 of the brief.
   Tests.
 - [x] 12.5 Add proj4rs (dependency-only).
-- [ ] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
+- [x] 12.6 Transformer between two CrsRefs: identity, local-to-local unit
   scaling, EPSG-to-EPSG through proj4rs; local-to-EPSG and unbuildable
   definitions give findings. New codes documented. Split to stay under the
   commit size guideline:
@@ -72,7 +72,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 12.6b The transformer: identity, local-to-local unit scaling and
     EPSG-to-EPSG through proj4rs; local-to-EPSG, codes that are not known and
     definitions that cannot be used give findings.
-  - [ ] 12.6c Which definitions of the registry can be used and why the others
+  - [x] 12.6c Which definitions of the registry can be used and why the others
     cannot, over the whole registry, pinned.
 - [ ] 12.7 Transform positions in place (f64, z untouched); non-finite results
   counted in a finding with examples.
