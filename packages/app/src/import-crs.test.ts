@@ -162,6 +162,17 @@ describe('writing a coordinate system for people', () => {
     expect(summarizeCrs({ ...base, mode: 'epsg', epsg: '28350' }, undefined, undefined)).toBe(
       'EPSG 28350, as you entered it.',
     );
+    // A code that is typed is the text as well; one that is picked from the matches of a name is not.
+    expect(
+      summarizeCrs({ ...base, mode: 'epsg', epsg: '28350', query: '28350' }, undefined, undefined),
+    ).toBe('EPSG 28350, as you entered it.');
+    expect(
+      summarizeCrs(
+        { ...base, mode: 'epsg', epsg: '32740', query: 'WGS 84 / UTM zone 40' },
+        undefined,
+        undefined,
+      ),
+    ).toBe('EPSG 32740, from the matches.');
     expect(summarizeCrs({ ...base, mode: 'local', units: 'ft' }, undefined, undefined)).toContain(
       'a local grid, in feet',
     );

@@ -125,6 +125,8 @@ or releasing, and whenever the brief says to stop.
   prints it in every run since 12.13 (found at the gate). No change to the code.
 - [x] 12.F4 Stale documents corrected: the README on coordinate systems, the sizes after
   M12 in `docs/perf.md`, two comments in `codes.rs`, a sum in the decisions.
+- [x] 12.F5 The CRS step says "from the matches", not "as you entered it", of a
+  code that was picked from the matches of a name. Screenshots updated and reviewed.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

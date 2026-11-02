@@ -362,7 +362,7 @@ test.describe('the coordinate system step', () => {
     await expect(p.next.locator('button')).toBeDisabled();
     await p.rows.nth(1).click();
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 32740, WGS 84 / UTM zone 40S (projected, in metres), as you entered it.',
+      'Chosen: EPSG 32740, WGS 84 / UTM zone 40S (projected, in metres), from the matches.',
     );
     await expect(p.next.locator('button')).toBeEnabled();
     expect(await draftCrs(page)).toEqual({

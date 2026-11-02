@@ -2626,4 +2626,28 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   406, which `docs/perf.md` now says), and the module's size in the decisions (742,737 and 489,537) is
   the table's (742,732 and 489,532); the 5 bytes are most likely the file name that `gzip -9 -c` writes
   (not checked).
+- Step 12.F5 (the wording after a pick). The line "Chosen:" of the CRS step ended "as you entered it" for
+  every code of the "EPSG code" mode, also for one that was picked from the matches of a name, which a
+  person did not enter. It is "from the matches" when the box holds something other than the code (the
+  name that was typed), and "as you entered it" when the box is the code or empty. The words were
+  chosen to be as long as the ones they replace ("chosen from the matches" was six characters longer and
+  filled the dialog at 1024 x 640, so that a slightly longer name would have wrapped and moved the box
+  under it). The unit test failed before the change (tried); the six baselines of
+  `wizard-crs-search-chosen` were retaken, and the ones at 1024 x 640 (light) and 1440 x 900 (dark) looked at against the checklist
+  of section 10.7; the other four were not opened.
+- What the gate found and this milestone leaves as it is, with the reasons. (Numbers are the review's.) (1) Far outside the area of a
+  projection a conversion gives a finite number and no finding (4326 to 32640 at longitude -123 gives a
+  northing of 18,890,517 m; 4326 to 3857 at longitude 540 wraps to an ordinary easting): step 12.7 asks
+  for the positions that are not finite to be counted, and these are, so deciding which positions are
+  out of the area of a system belongs to the drawability rules of M13 (13.4). (2) Typing `EPSG:32640` in
+  the box shows the match and does not choose it, and `32640` does: phase 1's tests pin that the text
+  `EPSG:32640` is not a code in the field, so changing it is the owner's. (3) A code chosen earlier stays
+  chosen while a name is typed (decision 12.14c, and the line says so). (4) The query `0` shows the error
+  and twenty matches whose names contain a 0, which is what the two rules give together. (5) The check
+  mark of "No coordinate system is chosen yet." is phase 1's. (6) The 12.8 tolerances are as disclosed:
+  1 mm on 1 of 12 published rows, the others as their sources allow. (7) The commits over about 150
+  lines: 14 of 28, and the message of 99cb762 says "about 320" where it changed 241 lines, and the
+  commit 0dfacd7 did not tick the roadmap (the tick came with 99cb762, which completed 12.15); pushed
+  commits are not rewritten. (8) The message of `crs.code.unknown` says that the data "can only be drawn
+  on a map that uses the same code", which is the rule of M13 that nothing draws yet.
 
