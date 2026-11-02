@@ -10,7 +10,9 @@
 
 use std::collections::VecDeque;
 
-use karmania_core::{CrsRef, Dataset, Findings, ValidationReport, validate};
+use karmania_core::{
+    CrsKinds, CrsRef, Dataset, Findings, ValidationReport, Wgs84Only, validate_with,
+};
 use serde::Serialize;
 
 use crate::import_job::{ImportJob, Step};
@@ -90,8 +92,16 @@ impl ImportRun {
         }
     }
 
-    /// Does up to `budget_rows` rows of parsing, or validates one dataset.
+    /// Does up to `budget_rows` rows of parsing, or validates one dataset. The core alone
+    /// knows which EPSG codes are longitude and latitude (EPSG:4326 only); use
+    /// [`ImportRun::step_with`] to say more.
     pub fn step(&mut self, budget_rows: usize) -> RunStep {
+        self.step_with(budget_rows, &Wgs84Only)
+    }
+
+    /// Like [`ImportRun::step`], with `kinds` telling validation which EPSG codes are
+    /// longitude and latitude systems.
+    pub fn step_with(&mut self, budget_rows: usize, kinds: &dyn CrsKinds) -> RunStep {
         match &mut self.stage {
             Stage::Reading(job) => match job.step(budget_rows) {
                 Step::Progress(progress) => RunStep::Progress(RunProgress {
@@ -128,7 +138,7 @@ impl ImportRun {
                 findings,
             } => {
                 if let Some(dataset) = pending.pop_front() {
-                    let report = validate(&dataset);
+                    let report = validate_with(&dataset, kinds);
                     done.push((dataset, report));
                 }
                 if pending.is_empty() {

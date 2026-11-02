@@ -2338,3 +2338,15 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   its expectation the way the code does, so what it can show is the count and the lists of codes of the
   other tests, which are written out. Seen to fail when projected systems are taken for geographic
   ones (tried, file restored).
+- Step 12.11 is split into 12.11a (the plumbing in `karmania-io`), 12.11b (the warning) and 12.11c (the
+  kernel is built with the definitions). 12.11a: the `Kernel` holds a boxed `CrsKinds` (`Wgs84Only` unless
+  `Kernel::with_kinds` gives another) and asks it for what it imports (`ImportRun::step_with`, new) and
+  for what it loads from arrays (`Registry::load_with`, new). `karmania-io` does not depend on
+  `karmania-crs`: the caller brings the definitions, which keeps the readers free of them as the brief
+  says ("unchanged, except passing the hook through"). The existing `load` and `step` stay, and mean
+  what they meant, so no caller and no test of phase 1 changed. `Kernel` no longer derives `Default`
+  (a boxed trait object has none); `Default` is written by hand and is `Kernel::new()`. Three tests: a
+  file of projected-looking numbers labelled NAD83 (4269) gets the out-of-range warning from a kernel
+  that was told 4269 is geographic and not from one that was not, the same for points made from
+  arrays, and a kernel asks its own kinds and not another's. They fail when the import ignores the
+  kinds (two of them) and when `load_with` does (one), both tried and the files restored.
