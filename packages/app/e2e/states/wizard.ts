@@ -142,7 +142,7 @@ export const SHOTS: Shot[] = [
   shot('crs-found', (page) => at(page, 'crs', 'points.csv', 'points.prj')),
   shot('crs-missing', async (page) => {
     await at(page, 'crs', 'points.csv');
-    await edit(page, "({ ...draft, crs: { ...draft.crs, mode: 'epsg', epsg: 'WGS84' } })");
+    await edit(page, "({ ...draft, crs: { ...draft.crs, mode: 'epsg', epsg: '0' } })");
   }),
   shot('crs-local', async (page) => {
     await at(page, 'crs', 'points.csv');

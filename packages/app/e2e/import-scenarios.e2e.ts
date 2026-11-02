@@ -428,9 +428,9 @@ test.describe('importing', () => {
     await choice.selectOption('epsg');
     await expect(w.next.locator('button')).toBeDisabled();
     await expect(w.note).toHaveText('Enter the EPSG code of the coordinate system.');
-    await crs.locator('k-input input').fill('WGS84');
+    await crs.locator('k-input input').fill('0');
     await expect(crs.locator('k-input .error')).toHaveText(
-      'An EPSG code is a whole number, such as 32640.',
+      'An EPSG code is 1 to 999999, such as 32640.',
     );
     await expect(w.next.locator('button')).toBeDisabled();
 
