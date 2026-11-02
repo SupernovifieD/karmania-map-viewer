@@ -2150,3 +2150,12 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   name), `find_keyword` and `horizontal_part` (the geographic, projected or geocentric part that
   places 2D data, reached through compound and bound systems), reused from `epsg.rs` as they were,
   public like the reader, with doc comments and a new test on hand-written definitions.
+- Step 12.3 is split further, into 12.3a (the reader), 12.3b (its queries), 12.3c (the types),
+  12.3d (`describe`) and 12.3e (`lookup`, with the notice and the tests of the brief), because the
+  types, the reading of units and the registry tests together came to 357 lines. 12.3c: `CrsKind`,
+  `AxisUnits` (`m`, `ft`, `us_ft`, `degree`, `other`) and `CrsInfo` with the JSON shape of section
+  11.1 of the brief (`metresPerUnit` left out for degrees and other units). Reused from
+  `epsg.rs` before step 3.25b: the idea and the names `CrsKind` and its JSON form. Changed: the
+  unit is no longer a name and a factor but one of the five values of the contract, with the
+  metres of a unit taken from `karmania_core::Units`, so a foot is the same foot as the one of a
+  local grid; there is no `metresPerUnit` for other units, as the brief says.

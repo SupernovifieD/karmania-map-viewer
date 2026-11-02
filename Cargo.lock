@@ -97,6 +97,8 @@ version = "0.1.0"
 dependencies = [
  "crs-definitions",
  "karmania-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

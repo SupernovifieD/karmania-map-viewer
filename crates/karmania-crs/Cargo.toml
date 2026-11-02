@@ -9,6 +9,10 @@ publish.workspace = true
 [dependencies]
 karmania-core.workspace = true
 crs-definitions.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true
