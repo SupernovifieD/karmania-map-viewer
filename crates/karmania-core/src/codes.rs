@@ -164,6 +164,8 @@ finding_codes! {
     MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
     /// The mapping names a column that is not in the file.
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
+    /// The EPSG code is not one of the coordinate systems Karmania knows.
+    CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
     /// In EPSG:4326, X fits latitude and Y does not, so the two look swapped.

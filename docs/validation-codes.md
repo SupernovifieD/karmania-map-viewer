@@ -79,6 +79,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `crs.code.unknown`
+
+- Severity: warning
+- Step: crs
+- Message: EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
+- Hint: Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads.
+- Example: EPSG:99999 is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
+
 ## `crs.geographic.axes_swapped`
 
 - Severity: warning

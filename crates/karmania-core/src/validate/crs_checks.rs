@@ -13,7 +13,33 @@ use crate::findings::{Finding, Findings, Location};
 /// Runs the CRS checks.
 pub(super) fn check(dataset: &Dataset, kinds: &dyn CrsKinds, findings: &mut Findings) {
     check_present(dataset, findings);
-    check_geographic_range(dataset, kinds, findings);
+    // A local grid or a missing system has no code to ask about.
+    let Some(CrsRef::Epsg { code }) = dataset.crs else {
+        return;
+    };
+    let geography = kinds.geography(code);
+    check_known(code, geography, kinds, findings);
+    if geography == CrsGeography::Geographic {
+        check_geographic_range(dataset, findings);
+    }
+}
+
+/// A code that is not in the definitions is a warning, so the data still loads (it can be
+/// drawn on a map that uses the same code). Said only by something that has every code: for
+/// the others, "unknown" is not a fault of the dataset.
+fn check_known(code: u32, geography: CrsGeography, kinds: &dyn CrsKinds, findings: &mut Findings) {
+    if geography != CrsGeography::Unknown || !kinds.knows_every_code() {
+        return;
+    }
+    findings.add(
+        Finding::new(
+            FindingCode::CrsCodeUnknown,
+            format!(
+                "EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code."
+            ),
+        )
+        .with_hint("Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads."),
+    );
 }
 
 /// Longitude may be written from -180 or from 0 (so up to 360); latitude is
@@ -32,13 +58,7 @@ fn is_latitude(y: f64) -> bool {
 /// In a longitude and latitude system X is longitude and Y is latitude, so the
 /// values must fit those ranges. A warning, so the data still loads. If the values
 /// only fit with the axes swapped, say so instead.
-fn check_geographic_range(dataset: &Dataset, kinds: &dyn CrsKinds, findings: &mut Findings) {
-    let Some(CrsRef::Epsg { code }) = dataset.crs else {
-        return;
-    };
-    if kinds.geography(code) != CrsGeography::Geographic {
-        return;
-    }
+fn check_geographic_range(dataset: &Dataset, findings: &mut Findings) {
     let Some(bbox) = dataset.bbox() else {
         return;
     };
@@ -353,5 +373,100 @@ mod tests {
         assert_eq!(kinds.1.get(), 0);
         found(&kinds, &with_code(32640, &[(1.0, 1.0)]));
         assert_eq!(kinds.1.get(), 1);
+    }
+
+    /// A `CrsKinds` that has the whole registry: what it does not list does not exist.
+    struct Whole(&'static [(u32, CrsGeography)]);
+
+    impl CrsKinds for Whole {
+        fn geography(&self, code: u32) -> CrsGeography {
+            self.0
+                .iter()
+                .find(|(known, _)| *known == code)
+                .map_or(CrsGeography::Unknown, |&(_, answer)| answer)
+        }
+
+        fn knows_every_code(&self) -> bool {
+            true
+        }
+    }
+
+    const WHOLE: Whole = Whole(&[
+        (4269, CrsGeography::Geographic),
+        (32640, CrsGeography::NotGeographic),
+    ]);
+
+    fn findings_of(kinds: &dyn CrsKinds, d: &Dataset) -> Findings {
+        let mut f = Findings::new();
+        super::check(d, kinds, &mut f);
+        f
+    }
+
+    #[test]
+    fn a_code_that_is_not_in_the_definitions_is_a_warning_and_the_data_still_loads() {
+        let d = with_code(99_999, &[(1.0, 1.0)]);
+        let f = findings_of(&WHOLE, &d);
+        assert_eq!(codes(&f), ["crs.code.unknown"]);
+        let one = &f.as_slice()[0];
+        assert_eq!(one.severity, crate::findings::Severity::Warning);
+        assert_eq!(one.step, Some(crate::findings::WizardStep::Crs));
+        assert!(
+            one.message
+                .starts_with("EPSG:99999 is not one of the coordinate systems")
+        );
+        assert!(!f.has_errors());
+        assert!(crate::validate::validate_with(&d, &WHOLE).is_loadable());
+    }
+
+    #[test]
+    fn something_that_does_not_have_every_code_says_nothing_of_one_it_does_not_know() {
+        let d = with_code(99_999, &[(1.0, 1.0)]);
+        // `Told` has no `knows_every_code`, and nor has the core alone.
+        assert!(findings_of(&told(&[]), &d).is_empty());
+        assert!(findings_of(&Wgs84Only, &d).is_empty());
+        assert!(findings_of(&Wgs84Only, &with_code(4269, &[(1.0, 1.0)])).is_empty());
+    }
+
+    #[test]
+    fn a_code_that_is_known_is_no_warning_whether_it_is_geographic_or_not() {
+        for code in [4269, 32640] {
+            let d = with_code(code, &[(1.0, 1.0)]);
+            assert!(findings_of(&WHOLE, &d).is_empty(), "{code}");
+        }
+    }
+
+    #[test]
+    fn a_local_grid_and_a_missing_system_are_not_called_unknown() {
+        let mut local = with_code(1, &[(1.0, 1.0)]);
+        local.crs = Some(CrsRef::Local {
+            units: Units::Metre,
+        });
+        assert!(findings_of(&WHOLE, &local).is_empty());
+        let mut missing = with_code(1, &[(1.0, 1.0)]);
+        missing.crs = None;
+        assert_eq!(codes(&findings_of(&WHOLE, &missing)), ["crs.missing"]);
+    }
+
+    #[test]
+    fn a_code_that_is_not_known_is_not_range_checked() {
+        // Projected-looking numbers under a code that does not exist: only the warning.
+        let d = with_code(99_999, &[(500_000.0, 2_800_000.0)]);
+        assert_eq!(codes(&findings_of(&WHOLE, &d)), ["crs.code.unknown"]);
+    }
+
+    #[test]
+    fn the_docs_example_of_the_unknown_code_warning_is_what_the_check_says() {
+        const DOCS: &str = include_str!("../../../../docs/validation-codes.md");
+        let f = findings_of(&WHOLE, &with_code(99_999, &[(1.0, 1.0)]));
+        let one = &f.as_slice()[0];
+        let section = DOCS
+            .split("\n## `")
+            .find(|section| section.starts_with("crs.code.unknown"))
+            .expect("the code is in the docs");
+        assert!(section.contains(&format!("- Example: {}", one.message)));
+        assert!(section.contains(&format!(
+            "- Hint: {}",
+            one.hint.as_deref().unwrap_or_default()
+        )));
     }
 }

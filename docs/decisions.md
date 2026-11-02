@@ -2350,3 +2350,21 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   that was told 4269 is geographic and not from one that was not, the same for points made from
   arrays, and a kernel asks its own kinds and not another's. They fail when the import ignores the
   kinds (two of them) and when `load_with` does (one), both tried and the files restored.
+- Step 12.11b (the warning for a code that is not in the definitions). The brief says the warning comes
+  with the hook, but the hook alone cannot give it: the core alone answers `Unknown` for every code but
+  4326, and saying "EPSG:32640 is not one we know" of every UTM dataset would change what phase 1 does
+  and be untrue. So `CrsKinds` gets a provided method `knows_every_code()`, `false` unless an
+  implementation has the whole registry, and only then is `Unknown` a finding. `Definitions` says it
+  has. The code is `crs.code.unknown` (a warning, wizard step `crs`; not `crs.epsg.unknown`, which was
+  retired at step 3.25b): "EPSG:{code} is not one of the coordinate systems Karmania knows, so its
+  positions cannot be checked, and the data can only be drawn on a map that uses the same code", with
+  the hint to check the code or choose another in the coordinate step, and that the data still loads;
+  the second half of the message is what step 9.2 of the brief says of a code that is not in the
+  definitions (drawn only when the map uses the same code). A code that is not known is not
+  range-checked, and the hook is still asked once per EPSG dataset (`check` asks it, and hands the
+  answer to the two checks). Six tests: a warning that does not block, nothing from an implementation
+  without every code (the core alone included), nothing for a known code geographic or not, nothing for
+  a local grid or a missing system (which is `crs.missing`), no range check on an unknown code, and the
+  docs example is what the check says. The test of `Definitions` that expected nothing for 99999 now
+  expects this warning, on purpose. Seen to fail, with the phase 1 snapshots among eight tests, when
+  the warning is made of every `Unknown` whoever answers (tried, file restored). Core is at 247 tests.

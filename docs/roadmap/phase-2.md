@@ -89,7 +89,7 @@ or releasing, and whenever the brief says to stop.
   guideline:
   - [x] 12.11a `karmania-io` passes a `CrsKinds` through: `Registry::load_with`,
     `ImportRun::step_with` and `Kernel::with_kinds`; the defaults are unchanged.
-  - [ ] 12.11b The warning for a code that is not in the definitions
+  - [x] 12.11b The warning for a code that is not in the definitions
     (`crs.code.unknown`), asked only of a `CrsKinds` that has every code.
   - [ ] 12.11c The wasm kernel is built with the definitions; tests for 4269 and
     an unknown code.
