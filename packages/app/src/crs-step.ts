@@ -104,25 +104,23 @@ export class KarmaniaCrsStep extends LitElement {
 
       /* With the matches of a name under it, what is chosen has room for two lines whatever it says, so
          that the box under it does not move when a long name is chosen: the name, the unit and where the
-         code came from all fit in two (about 650 px wide) for the systems of the registry, and a longer
-         text is cut after the second line. */
+         code came from fit in two lines of the dialog's width (about 650 px) for every system of the
+         registry (measured at step 12.F17: the widest needs 536 px of 646). Nothing is cut: a longer text,
+         in a narrow window or in a registry with longer names, takes the lines it needs and moves the box. */
       .summary-text[data-two-lines] {
-        -webkit-box-orient: vertical;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
         min-height: 2lh;
-        overflow: hidden;
       }
 
       /* What matches the search box: a box of a fixed height, so that matches coming and going moves nothing,
-         and one that scrolls when there are more rows than fit. The room round the rows keeps the focus
-         ring of a row from being cut. */
+         and one that scrolls when there are more rows than fit. It shows three rows and a half: the half
+         says that there are more, and with the room that the line above it keeps for two lines, four rows
+         would make the dialog of the smallest window (1024 x 640) scroll. The room round the rows keeps
+         the focus ring of a row from being cut. */
       .matches {
         border: var(--k-border-width) solid var(--k-border-strong);
         border-radius: var(--k-radius-md);
         box-sizing: border-box;
-        height: calc(var(--k-list-row-height) * 4 + var(--k-space-8) + var(--k-border-width) * 2);
+        height: calc(var(--k-list-row-height) * 3.5 + var(--k-space-8) + var(--k-border-width) * 2);
         overflow: hidden auto;
         padding: var(--k-space-4) 0;
       }
