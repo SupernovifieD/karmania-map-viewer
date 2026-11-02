@@ -22,10 +22,12 @@
 
 pub mod info;
 pub mod lookup;
+pub mod search;
 pub mod wkt;
 
 pub use info::{AxisUnits, CrsInfo, CrsKind, describe};
 pub use lookup::lookup;
+pub use search::{MAX_RESULTS, search};
 
 #[cfg(test)]
 mod tests {
