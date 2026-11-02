@@ -15,6 +15,7 @@ publish = false
 
 [workspace.dependencies]
 karmania-core = { path = "crates/karmania-core" }
+karmania-crs = { path = "crates/karmania-crs" }
 karmania-io = { path = "crates/karmania-io" }
 serde = { version = "1.0.229", features = ["derive"] }
 crs-definitions = "0.6.0"
