@@ -2772,4 +2772,8 @@ minors and four nits. Each is a sub-step, or recorded.
   and "answered with 403"; both now say that it refused the requests of this project's tools with HTTP 403.
   The record of step 12.F10 read as if the refused request had also got 403, and that of 12.F9 still said
   that the CI step had not run: it ran, and passed. Documentation only.
+- Step 12.F16 (a doc comment). After step 12.F12 the nine geographic systems in grads are `NotGeographic`,
+  but the doc of that variant in `karmania-core` still said "not one of longitude and latitude"; only the
+  doc of `Definitions` had been changed. It now says "not one of longitude and latitude in degrees" and
+  names the grads case. A comment only; no behaviour changed.
 
