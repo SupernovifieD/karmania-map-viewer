@@ -9,7 +9,9 @@
 import {
   CHECK_GROUPS,
   COLUMN_TYPES,
+  CRS_KINDS,
   CRS_SOURCES,
+  CRS_UNITS,
   DELIMITERS,
   FORMATS,
   KINDS,
@@ -19,6 +21,7 @@ import {
   WIZARD_STEPS,
   type BBox,
   type ColumnSummary,
+  type CrsInfo,
   type CrsRef,
   type DetectedCrs,
   type Finding,
@@ -183,6 +186,42 @@ export function checkedDetectedCrs(value: unknown, path: string): DetectedCrs {
   checkedCrs(o['crs'], `${path}.crs`);
   checkedOneOf(o['source'], `${path}.source`, CRS_SOURCES);
   return o as unknown as DetectedCrs;
+}
+
+/**
+ * What an EPSG code means. Besides the shape, it holds to what the definitions keep true: a unit
+ * in metres or feet has its metres and any other has none, and degrees belong to a geographic
+ * system.
+ */
+export function checkedCrsInfo(value: unknown, path = 'crsInfo'): CrsInfo {
+  const o = checkedObject(value, path, ['code', 'name', 'kind', 'units'], ['metresPerUnit']);
+  checkedCount(o['code'], `${path}.code`);
+  if (checkedString(o['name'], `${path}.name`).trim() === '') {
+    throw new ContractError(`${path}.name`, 'is empty');
+  }
+  checkedOneOf(o['kind'], `${path}.kind`, CRS_KINDS);
+  const units = checkedOneOf(o['units'], `${path}.units`, CRS_UNITS);
+  const hasMetres = units === 'm' || units === 'ft' || units === 'us_ft';
+  if (hasMetres !== 'metresPerUnit' in o) {
+    throw new ContractError(
+      path,
+      hasMetres
+        ? `a unit of "${units}" has its metresPerUnit`
+        : `a unit of "${units}" has no metresPerUnit`,
+    );
+  }
+  if ('metresPerUnit' in o && checkedNumber(o['metresPerUnit'], `${path}.metresPerUnit`) <= 0) {
+    throw new ContractError(`${path}.metresPerUnit`, 'is not above 0');
+  }
+  if (units === 'degree' && o['kind'] !== 'geographic') {
+    throw new ContractError(path, 'degrees belong to a geographic system');
+  }
+  return o as unknown as CrsInfo;
+}
+
+/** A list of what EPSG codes mean: the answer of `searchCrs`. */
+export function checkedCrsInfoList(value: unknown, path = 'crsInfos'): readonly CrsInfo[] {
+  return checkedArray(value, path).map((info, i) => checkedCrsInfo(info, `${path}[${String(i)}]`));
 }
 
 function checkedRoleSuggestion(value: unknown, path: string): RoleSuggestion {

@@ -115,6 +115,35 @@ export interface DetectedCrs {
   readonly source: CrsSource;
 }
 
+/** Every kind of coordinate system the definitions tell apart. */
+export const CRS_KINDS = ['geographic', 'projected', 'other'] as const;
+
+/**
+ * What kind of system an EPSG code is: longitude and latitude, easting and northing on a
+ * projection, or anything else (a geocentric system, or an entry with no definition).
+ */
+export type CrsKind = (typeof CRS_KINDS)[number];
+
+/** Every unit of the horizontal axes that the definitions tell apart. */
+export const CRS_UNITS = ['m', 'ft', 'us_ft', 'degree', 'other'] as const;
+
+/** The unit of the horizontal axes of a coordinate system: a `Units`, degrees, or another unit. */
+export type CrsUnits = (typeof CRS_UNITS)[number];
+
+/**
+ * What an EPSG code means, from the definitions. The EPSG Dataset is owned by IOGP (see
+ * `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md`).
+ */
+export interface CrsInfo {
+  readonly code: number;
+  /** The system's name, for example `WGS 84 / UTM zone 40N`; `EPSG:<code>` for an entry with no definition. */
+  readonly name: string;
+  readonly kind: CrsKind;
+  readonly units: CrsUnits;
+  /** How many metres one unit is. Present for `m`, `ft` and `us_ft`, absent for degrees and other units. */
+  readonly metresPerUnit?: number;
+}
+
 /** A suggested role for a column, and how sure the guess is, from 0 to 1. */
 export interface RoleSuggestion {
   readonly role: Role;

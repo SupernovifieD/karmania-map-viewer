@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as generated from '../wasm/karmania_wasm.js';
+import { checkedCrsInfo, checkedCrsInfoList } from './contract-check.js';
 import { loadKernel } from './test-support/kernel.js';
 
 /** The kernel returns `any`; what comes out of it is checked before it is used. */
@@ -83,6 +84,39 @@ describe('crsInfo', () => {
     const value = info(32640);
     expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
     expect(structuredClone(value)).toStrictEqual(value);
+  });
+});
+
+describe('every definition of the registry, as the contract has it', () => {
+  loadKernel();
+
+  it('is a CrsInfo that keeps what the definitions keep true, and the counts are those of Rust', () => {
+    const tally = new Map<string, number>();
+    for (let code = 0; code <= 65_535; code += 1) {
+      const found = info(code);
+      if (found === undefined) continue;
+      const checked = checkedCrsInfo(found, `crsInfo(${String(code)})`);
+      expect(checked.code).toBe(code);
+      const key = `${checked.kind}/${checked.units}`;
+      tally.set(key, (tally.get(key) ?? 0) + 1);
+    }
+    // The counts of `every_definition_of_the_registry_is_described...` in karmania-crs.
+    expect(Object.fromEntries([...tally].sort())).toEqual({
+      'geographic/degree': 754,
+      'geographic/other': 9,
+      'other/m': 196,
+      'other/other': 8,
+      'projected/ft': 155,
+      'projected/m': 4157,
+      'projected/other': 32,
+      'projected/us_ft': 873,
+    });
+  });
+
+  it('is what a search gives, entry by entry', () => {
+    const found = checkedCrsInfoList(generated.searchCrs('UTM zone', 50) as unknown);
+    expect(found).toHaveLength(50);
+    for (const entry of found) expect(entry).toStrictEqual(info(entry.code));
   });
 });
 

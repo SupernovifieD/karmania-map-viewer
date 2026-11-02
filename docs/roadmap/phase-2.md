@@ -96,7 +96,14 @@ or releasing, and whenever the brief says to stop.
 - [x] 12.12 wasm exports crsInfo and searchCrs. Measure the module size (raw and
   gzip) before and after; record in `docs/perf.md`; apply the build-size rule of
   section 4 of the brief.
-- [ ] 12.13 Engine: crsInfo() and searchCrs(), types, unit and real-worker tests.
+- [ ] 12.13 Engine: crsInfo() and searchCrs(), types, unit and real-worker
+  tests. Split to stay under the commit size guideline:
+  - [x] 12.13a The `CrsInfo` type and its constants, the strict contract check,
+    and every definition of the registry run through it.
+  - [ ] 12.13b The worker: the kernel module's two calls, the two requests of the
+    protocol and the handler, with their tests.
+  - [ ] 12.13c `engine.crsInfo()` and `engine.searchCrs()`, and a test with the
+    real worker.
 - [ ] 12.14 Wizard CRS step: search by code or name (top 20) showing name, kind
   and units; the detected CRS shows its name (extends 8.8). Screenshots updated
   and reviewed.

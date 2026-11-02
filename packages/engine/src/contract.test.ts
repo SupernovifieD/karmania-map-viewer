@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ContractError,
+  checkedCrsInfo,
+  checkedCrsInfoList,
   checkedFinding,
   checkedLocation,
   checkedValidationReport,
@@ -102,5 +104,77 @@ describe('the checks reject what is not the contract', () => {
       ],
     };
     expect(() => checkedValidationReport(swapped)).toThrow('expected structure');
+  });
+});
+
+describe('checkedCrsInfo rejects what is not the contract', () => {
+  const utm = {
+    code: 32640,
+    name: 'WGS 84 / UTM zone 40N',
+    kind: 'projected',
+    units: 'm',
+    metresPerUnit: 1,
+  };
+  const wgs84 = { code: 4326, name: 'WGS 84', kind: 'geographic', units: 'degree' };
+
+  it('accepts a system with its metres and one without', () => {
+    expect(checkedCrsInfo(utm, 'c').code).toBe(32640);
+    expect(checkedCrsInfo(wgs84, 'c').units).toBe('degree');
+    expect(
+      checkedCrsInfo({ code: 3993, name: 'EPSG:3993', kind: 'other', units: 'other' }, 'c').kind,
+    ).toBe('other');
+    expect(checkedCrsInfo({ ...utm, units: 'us_ft', metresPerUnit: 1200 / 3937 }, 'c').units).toBe(
+      'us_ft',
+    );
+  });
+
+  it('rejects a field Rust added without a TypeScript type, and one that is undefined', () => {
+    expect(() => checkedCrsInfo({ ...utm, extra: 1 }, 'c')).toThrow('unexpected "extra"');
+    expect(() => checkedCrsInfo({ ...wgs84, metresPerUnit: undefined }, 'c')).toThrow(
+      '"metresPerUnit" is undefined',
+    );
+  });
+
+  it('rejects wrong values, naming where they are', () => {
+    const cases: [object, string][] = [
+      [{ ...utm, code: -1 }, 'c.code'],
+      [{ ...utm, code: 4326.5 }, 'c.code'],
+      [{ ...utm, name: ' ' }, 'c.name'],
+      [{ ...utm, name: 7 }, 'c.name'],
+      [{ ...utm, kind: 'cartesian' }, 'c.kind'],
+      [{ ...utm, units: 'km' }, 'c.units'],
+      [{ ...utm, metresPerUnit: 0 }, 'c.metresPerUnit'],
+      [{ ...utm, metresPerUnit: -1 }, 'c.metresPerUnit'],
+      [{ ...utm, metresPerUnit: Number.NaN }, 'c.metresPerUnit'],
+    ];
+    for (const [bad, where] of cases) {
+      expect(() => checkedCrsInfo(bad, 'c')).toThrow(where);
+    }
+    const withoutName = Object.fromEntries(Object.entries(utm).filter(([key]) => key !== 'name'));
+    expect(() => checkedCrsInfo(withoutName, 'c')).toThrow('missing "name"');
+    expect(() => checkedCrsInfo(null, 'c')).toThrow('expected an object');
+  });
+
+  it('holds to what the definitions keep true about metres and degrees', () => {
+    // Metres and feet have their metres, and nothing else has.
+    const withoutMetres = Object.fromEntries(
+      Object.entries(utm).filter(([key]) => key !== 'metresPerUnit'),
+    );
+    expect(() => checkedCrsInfo(withoutMetres, 'c')).toThrow('has its metresPerUnit');
+    expect(() => checkedCrsInfo({ ...wgs84, metresPerUnit: 111_000 }, 'c')).toThrow(
+      'has no metresPerUnit',
+    );
+    expect(() => checkedCrsInfo({ ...utm, units: 'other' }, 'c')).toThrow('has no metresPerUnit');
+    // Degrees belong to a geographic system.
+    expect(() => checkedCrsInfo({ ...wgs84, kind: 'projected' }, 'c')).toThrow(
+      'degrees belong to a geographic system',
+    );
+  });
+
+  it('checks every entry of a list, and says which one is wrong', () => {
+    expect(checkedCrsInfoList([utm, wgs84], 'l')).toHaveLength(2);
+    expect(checkedCrsInfoList([], 'l')).toEqual([]);
+    expect(() => checkedCrsInfoList([utm, { ...wgs84, kind: 'x' }], 'l')).toThrow('l[1].kind');
+    expect(() => checkedCrsInfoList({}, 'l')).toThrow('expected an array');
   });
 });

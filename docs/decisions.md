@@ -2400,3 +2400,17 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   began, under the rule's 1 MB. The remark in step 12.11c that the start would "be felt" was a guess;
   compiling the 5.8 MB module takes under 5 ms in Node's V8 (`docs/perf.md`), and the browser suites did
   not get slower; the time to a ready engine in Chromium is not measured yet.
+- Step 12.13 is split into 12.13a (types and the contract check), 12.13b (the worker) and 12.13c (the
+  engine's methods). 12.13a: `CrsInfo`, `CrsKind` and `CrsUnits` with their lists of constants
+  (`CRS_KINDS`, `CRS_UNITS`, exported like the others and covered by the same exhaustive-switch test), and
+  `checkedCrsInfo` and `checkedCrsInfoList` in the strict contract checks that reject any key the types
+  lack and any key that is `undefined`. Beyond the shape the check holds to what the Rust side keeps
+  true: a unit of `m`, `ft` or `us_ft` has its `metresPerUnit` and any other has none, it is above 0, and
+  degrees belong to a geographic system. `CrsUnits` is `Units` and two more, which the type test shows
+  (`Units` extends it). The check is run, through the real built kernel, over every code from 0 to
+  65535: 6,184 definitions pass, and the tally by kind and unit is pinned to the one the Rust test
+  pins, so the two cannot drift apart. Tests: five for the checker, naming what each rejects, and two
+  with the real kernel (the sweep, and a search compared with `crsInfo` entry by entry). Seen to fail when the degrees rule is
+  removed and when metres stop being required for metres (both tried, file restored; the first attempt
+  at the second changed nothing, since the formatter had dropped the parentheses of the line I tried to
+  edit, which showed in "found: 0" and was done again).
