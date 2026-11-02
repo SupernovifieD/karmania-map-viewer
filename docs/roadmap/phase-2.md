@@ -117,6 +117,8 @@ or releasing, and whenever the brief says to stop.
     under it (name, code, kind and units). Screenshots updated and reviewed.
 - [x] 12.15 Dataset summary: CRS shows code, name and units (extends 9.3).
   Screenshots updated and reviewed.
+- [x] 12.F1 The transformer refuses a geographic system whose units are not
+  degrees (found at the gate: EPSG:4807 and eight others were read as degrees).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

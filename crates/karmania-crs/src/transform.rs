@@ -1,5 +1,7 @@
 //! Converting positions from one coordinate system to another.
 
+use crate::info::{AxisUnits, CrsKind};
+use crate::lookup::lookup;
 use karmania_core::{CrsRef, Finding, FindingCode, Findings, Location};
 use proj4rs::Proj;
 use proj4rs::errors::Error;
@@ -158,6 +160,14 @@ fn build(code: u32) -> Result<Proj, Finding> {
             code,
             "it is geocentric, not a map coordinate system",
         ));
+    }
+    // Positions of a geographic system are taken to be degrees, as the rest of Karmania has them, and
+    // that is not what a system in grads says, so it is refused rather than placed wrongly.
+    if proj.is_latlong()
+        && lookup(code)
+            .is_some_and(|info| info.kind == CrsKind::Geographic && info.units != AxisUnits::Degree)
+    {
+        return Err(unsupported(code, "its coordinates are not in degrees"));
     }
     Ok(proj)
 }
@@ -330,6 +340,21 @@ mod tests {
     }
 
     #[test]
+    fn a_geographic_system_whose_units_are_not_degrees_is_refused_in_either_direction() {
+        // EPSG:4807 (NTF, Paris) has its longitude and latitude in grads. Positions are read as
+        // degrees, so it would have given places that are wrong by a tenth, with no finding.
+        for (from, to) in [(4326, 4807), (4807, 4326), (4807, 32_631)] {
+            let finding = failure(epsg(from), epsg(to));
+            assert_eq!(finding.code, FindingCode::CrsTransformUnsupported);
+            assert_eq!(
+                finding.message,
+                "Positions cannot be converted to or from EPSG:4807: its coordinates are not in degrees."
+            );
+            assert!(finding.hint.is_some());
+        }
+    }
+
+    #[test]
     fn the_examples_of_the_docs_are_what_the_transformer_says() {
         for finding in [
             failure(local(Units::Metre), epsg(32640)),
@@ -442,7 +467,8 @@ mod tests {
                 "it is geocentric, not a map coordinate system." => "geocentric",
                 "its projection is not supported." => "projection",
                 "it has no definition." => "no definition",
-                other => panic!("{code}: a reason that is not one of the four: {other}"),
+                "its coordinates are not in degrees." => "not degrees",
+                other => panic!("{code}: a reason that is not one of the five: {other}"),
             };
             tally.entry(group).or_default().push(code);
         }
@@ -458,10 +484,15 @@ mod tests {
                 ("datum files", 238),
                 ("geocentric", 196),
                 ("no definition", 2),
+                ("not degrees", 9),
                 ("projection", 2)
             ]
         );
-        assert_eq!(usable, 5_746);
+        assert_eq!(usable, 5_737);
+        assert_eq!(
+            tally["not degrees"],
+            [4807, 4810, 4811, 4816, 4819, 4821, 4901, 4902, 7400]
+        );
         assert_eq!(tally["projection"], [8441, 27_200]);
         assert_eq!(tally["no definition"], [22_300, 29_701]);
         assert!(tally["datum files"].contains(&2085) && tally["geocentric"].contains(&4978));

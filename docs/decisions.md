@@ -2567,3 +2567,18 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   block-model case of `data-table-kinds.e2e.ts` counts the rows the table draws, which are the ones that
   fit in the room the summary leaves it, and 17 of the 18 were drawn. It had relied on spare height without
   saying so; it now sets a window of 1280 x 1000, and its assertions are as they were.
+
+## M12 gate
+
+The independent review of M12 (a fresh subagent, with the brief and `git diff main...dev`) found no
+defect in steps 12.1 to 12.15 but two major problems and several smaller ones. Each is a sub-step.
+
+- Step 12.F1 (units of a geographic system). The transformer read every `+proj=longlat` system as
+  degrees, but nine geographic systems of the registry have their coordinates in grads (EPSG:4807,
+  4810, 4811, 4816, 4819, 4821, 4901, 4902 and 7400, whose unit `crsInfo` calls `other`).
+  `Transformer::new(4326, 4807)` succeeded and read a position as degrees, with no finding: a grad is
+  0.9 degree, so every position was a tenth of its angle out. They are now refused in either direction with `crs.transform.unsupported` ("its
+  coordinates are not in degrees"), the alternative being to convert from grads, which nothing needs yet.
+  The registry sweep of 12.6c has a fifth group: 5,737 can be used and 447 are refused (238 datum files,
+  196 geocentric, 9 not degrees, 2 projection, 2 no definition), with the nine codes pinned. The new test
+  failed before the change (tried: the transformer was built for 4807).
