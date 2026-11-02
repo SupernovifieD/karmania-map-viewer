@@ -482,6 +482,24 @@ test.describe('the coordinate system step', () => {
     await assertNoOverflow(p.dialog);
   });
 
+  test('shows all of what is chosen when the window is narrow, as it is at 200% zoom', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 520, height: 800 });
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    await p.codeInput.fill('WISCRS Calumet');
+    await expect(p.rows.first()).toBeVisible();
+    await p.rows.first().click();
+    await expect(p.summary).toHaveText(/, from the matches\.$/);
+    // It wraps over as many lines as it needs and nothing is cut: there is no room to keep for two.
+    expect(
+      await p.summary.evaluate((element) => element.scrollHeight <= element.clientHeight),
+    ).toBe(true);
+    await assertNoOverflow(p.dialog);
+  });
+
   test('is used from the keyboard alone: type, Tab to the matches, and the arrows choose', async ({
     page,
   }) => {
@@ -608,6 +626,29 @@ test.describe('the coordinate system step', () => {
     await p.codeInput.fill('a');
     await expect(p.rows).toHaveCount(20);
     await assertNoOverflow(p.dialog);
+  });
+
+  test('has room for every state of the EPSG mode at the smallest window, so that the dialog does not scroll', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await crsOf(page, 'points.csv');
+    await p.select.selectOption('epsg');
+    // The body of the dialog is a scroll region, which `assertNoOverflow` leaves alone, and a scroll bar
+    // that takes room (not the hidden ones of the headless browser) would move what is in it.
+    const body = p.host.locator('div.body[data-scroll-region]');
+    const spill = () => body.evaluate((element) => element.scrollHeight - element.clientHeight);
+    expect(await spill(), 'nothing typed').toBeLessThanOrEqual(0);
+    for (const text of ['utm zone 40', 'a', '0', 'zzzzqq', '99999', '32640', 'WISCRS Calumet']) {
+      await p.codeInput.fill(text);
+      await expect(p.rows.first().or(p.hint)).toBeVisible();
+      expect(await spill(), `"${text}" typed`).toBeLessThanOrEqual(0);
+    }
+    // And with a long name chosen, which fills the two lines of its room.
+    await p.rows.first().click();
+    await expect(p.summary).toContainText('from the matches');
+    expect(await spill(), 'a long name chosen').toBeLessThanOrEqual(0);
   });
 
   for (const theme of ['light', 'dark']) {

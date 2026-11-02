@@ -150,6 +150,9 @@ or releasing, and whenever the brief says to stop.
   wording about epsg.org, the 12.F9 and 12.F10 records (third review).
 - [x] 12.F16 The doc of `CrsGeography::NotGeographic` says that it covers a geographic system
   in grads (third review).
+- [x] 12.F17 The CRS step no longer makes the dialog scroll at 1024 x 640 (the box shows
+  3.5 rows), and its "Chosen:" line is not cut in a narrow window (fourth review).
+  Screenshots updated and reviewed.
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

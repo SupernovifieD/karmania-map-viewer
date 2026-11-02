@@ -2777,3 +2777,37 @@ minors and four nits. Each is a sub-step, or recorded.
   doc of `Definitions` had been changed. It now says "not one of longitude and latitude in degrees" and
   names the grads case. A comment only; no behaviour changed.
 
+## M12 gate, fourth round
+
+The fourth review (a fresh subagent, on `4378ed7`) found one major, three minors and two nits, all of them
+about the change of step 12.F13.
+
+- Step 12.F17 (the dialog scrolled). **Major.** The free line of step 12.F13 made the body of the dialog 8 px
+  too tall at 1024 x 640, the smallest window, in every state of the "EPSG code" mode: the box ended at 535
+  and the room it needs with its padding is 527 (at 7d70ae0 it ended at 515 and nothing overflowed). The
+  headless browser hides scroll bars, so no picture and no test showed it; with the bars that take room
+  (emulated by the reviewer) a bar of 15 px appeared, the fields went 327 to 319.5 px wide and the box
+  670 to 655 when the mode was picked, a shift, and the box was 16 px from the footer and not 24. No test
+  saw it because `assertNoOverflow` leaves the scroll region of the body alone. **Fix**: the box shows three
+  rows and a half, and not four, at every size (the half says that there are more); the 20 px are paid for
+  by the free line. The first try did it in windows up to 700 px high with a media query, and the
+  styles test of the UI (no raw lengths) failed on it: a media query cannot use a token, the test has no
+  exception for it and it was not changed, so there is no media query, and one box for every window is
+  simpler. The test measures the body itself (`scrollHeight` against `clientHeight`) in each state of the
+  mode at 1024 x 640 (nothing typed, a name, a code, "a" with twenty matches, "0" with its error, nothing
+  found, an unknown code, and a long name chosen); it failed before (8 px) and passes. **The line in a
+  narrow window** (the same review: at a width of 512 px, a 1024 px window at 200% zoom, 828 of the 12,368
+  sentences of the registry would need a third line and be cut, now with no title): the clamp to two lines
+  is gone, the line only keeps room for two (`min-height`) and takes the lines it needs, so nothing is
+  cut and the box moves in a narrow window or if the registry had longer names; the test at 520 x 800
+  failed before the change (the line was cut) and passes. The claim that every system fits in two lines
+  at the width of the dialog is the review's measure (all 6,184, both endings, in the real wizard: none
+  needs a third, the widest, 8206, needs 536 px of 646), and it is in the comment of the style; step 12.F20
+  pins the longest name so that a new version of the definitions makes a test fail. **Baselines**: the 36
+  of the six states, all sizes, changed from four rows to three and a half; looked at against the
+  checklist of section 10.7: `-search-many` 1440 x 900 dark, `-search-chosen` 1920 x 1080 light,
+  `-missing` 1024 x 640 light, and at 1024 x 640 (seen when the half row was first made with the media query,
+  which gave the same box there) `-search-many` light, `-search-chosen` dark, `-code-invalid` dark and
+  `-search-none` light: the box ends 36 px over the footer at 1024 x 640 and the half row shows as a scroll
+  cue; the other 29 were not opened. **Not verified**: real scroll bars of Windows or Linux (the measure
+  of the body is what is tested, not a bar).
