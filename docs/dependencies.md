@@ -108,7 +108,8 @@ to bundle the definitions in the kernel with notices, and accepted that the kern
 build is therefore not purely Apache-2.0: Karmania's own code stays Apache-2.0, and the
 EPSG data in it is under IOGP's terms. No written confirmation was asked of IOGP. What
 that commits the project to: the acknowledgement and the terms in
-`THIRD_PARTY_NOTICES.md` (step 23.5) and `docs/embedding.md` (step 23.6), which go with
+`THIRD_PARTY_NOTICES.md` (begun at step 12.F2, completed at step 23.5) and `docs/embedding.md`
+(step 23.6), which go with
 every build that holds the data; the same notice in the README (step 24.5) and in the
 crate documentation of `karmania-crs` (step 12.3); no change to the values beyond what
 the terms permit (reading the name, kind and unit out of the WKT is not a change); and
