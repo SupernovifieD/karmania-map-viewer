@@ -146,6 +146,11 @@ const AXIS_UNIT_WORDS: Readonly<Record<CrsUnits, string>> = {
   other: 'other units',
 };
 
+/** What a unit of the axes of a system is called, in the middle of a sentence: `metres`, `degrees`. */
+export function describeUnits(units: CrsUnits): string {
+  return AXIS_UNIT_WORDS[units];
+}
+
 /** What a system is, in a few words: `projected, in metres`. */
 export function describeKind(info: CrsInfo): string {
   return `${KIND_WORDS[info.kind]}, in ${AXIS_UNIT_WORDS[info.units]}`;
