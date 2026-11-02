@@ -2533,3 +2533,37 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   (a table of codes and names made at build time, with `from_code` called once for a chosen code) and not
   as a match; it costs a build step and some size, and is the owner's decision. Until then a search calls it
   65,536 times, as the 2.5 ms of step 12.4 says.
+- Step 12.15 (the summary says what the code is). In the Data tab the Coordinates line of the selected
+  dataset is now `EPSG 32640, WGS 84 / UTM zone 40N, metres`, and its tooltip the same with what kind of
+  system it is (`EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)`). The name comes from the
+  engine's `crsInfo`, which the app hands down (app, panel, Data tab, summary) as one function; the
+  summary asks once for each code it is shown and draws again when the answer comes, so the first frame
+  has the code alone (a round trip to the worker, a few milliseconds) and the name follows it. A code the
+  definitions do not have reads `EPSG 99999, not one Karmania knows`; a local grid is unchanged. **The app's
+  lookup fails when there is no engine** (as `rows` does), and a failure leaves the code as it was and is
+  asked again the next time the summary is made: the first version resolved `undefined` for "no engine",
+  which the summary read as "the definitions do not have it", and a test caught it. A failing lookup,
+  whether it rejects or throws before it gives a promise, cannot take the summary with it: the first
+  version called it inside `willUpdate`, where a throw stops the update, and the Data tab states of the
+  long-content pictures, whose fake engine had no `crsInfo`, showed no summary at all. The call is now in
+  an `async` method with a `try`, and a test shows it (a throwing and a rejecting lookup, with a size for
+  each dataset so that a summary that was not drawn again would show); with the call made as it was, the
+  test fails on "100 points" (tried). The row takes **two lines, and no more**, with the whole in its
+  title: at the width of the panel (360 px) one line cut `UTM zone 40N, metres` to `UTM zone 40...`, which
+  hides the hemisphere and the unit, the two things the line is for; the first pictures were taken that way
+  and retaken. A longer name (the 78 characters of `NAD83(2011) / WISCRS Calumet, ...`) is cut with an
+  ellipsis after the second line. Lit sets an object-valued property again on every draw of its parent, so
+  a test cannot give the summary its own lookup: the tests give the app an engine that only answers
+  `crsInfo`. Tests: three label tests (`datasets.test.ts`), five end-to-end ones (the name and unit, with the
+  tooltip, for a code the definitions have, one they do not, and a local grid; two lines for a long name and
+  nothing cut for a usual one; the summary whole when the lookup fails), one updated (the imported
+  `points.csv`, with the real engine). The pictures of the Data tab states that show a summary,
+  `data-tab-one`, `-many`, `-long-names`, `-warnings`, `-table-focus`, and of `long-data-tab` and
+  `long-remove-question` (42 baselines, three sizes in both themes), changed by the line that is longer and
+  the summary that is one line taller under it; each was looked at with the checklist of section 10.7: the
+  name and unit read in full, nothing clips or overlaps, the table moves down by the one line and no more,
+  and the dark theme reads. The states with the real engine now wait for the name before the picture is
+  taken, so that the picture is not of the code alone. One existing test broke on the extra line: the
+  block-model case of `data-table-kinds.e2e.ts` counts the rows the table draws, which are the ones that
+  fit in the room the summary leaves it, and 17 of the 18 were drawn. It had relied on spare height without
+  saying so; it now sets a window of 1280 x 1000, and its assertions are as they were.

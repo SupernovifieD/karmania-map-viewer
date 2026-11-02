@@ -5,7 +5,7 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './dataset-list.js';
 import './dataset-summary.js';
-import type { RowSource } from './datasets.js';
+import type { CrsLookup, RowSource } from './datasets.js';
 import { IMPORT_REQUEST } from './map-area.js';
 
 /**
@@ -18,6 +18,7 @@ export class KarmaniaDataTab extends LitElement {
     datasets: { attribute: false },
     selected: { attribute: false },
     rows: { attribute: false },
+    crsInfo: { attribute: false },
   };
 
   static override styles = [
@@ -54,6 +55,8 @@ export class KarmaniaDataTab extends LitElement {
   declare selected: number | undefined;
   /** Gets the rows of a dataset. */
   declare rows: RowSource | undefined;
+  /** Says what an EPSG code means, for the coordinate system of the summary. */
+  declare crsInfo: CrsLookup | undefined;
 
   /**
    * What each dataset's table asks for rows with. The table starts again when it is given another,
@@ -66,6 +69,7 @@ export class KarmaniaDataTab extends LitElement {
     this.datasets = [];
     this.selected = undefined;
     this.rows = undefined;
+    this.crsInfo = undefined;
   }
 
   /** The function the table of dataset `id` gets its rows with. */
@@ -120,7 +124,10 @@ export class KarmaniaDataTab extends LitElement {
           .datasets=${this.datasets}
           .selected=${this.selected}
         ></karmania-dataset-list>
-        <karmania-dataset-summary .summary=${selected}></karmania-dataset-summary>
+        <karmania-dataset-summary
+          .summary=${selected}
+          .crsInfo=${this.crsInfo}
+        ></karmania-dataset-summary>
         ${
           selected === undefined
             ? nothing
