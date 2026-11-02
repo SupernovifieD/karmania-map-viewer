@@ -106,7 +106,13 @@ or releasing, and whenever the brief says to stop.
     real worker.
 - [ ] 12.14 Wizard CRS step: search by code or name (top 20) showing name, kind
   and units; the detected CRS shows its name (extends 8.8). Screenshots updated
-  and reviewed.
+  and reviewed. Split to stay under the commit size guideline:
+  - [x] 12.14a The words: what a system is, a code with its name, and the
+    summary of what is chosen with the name in it (no change to the screen).
+  - [ ] 12.14b The step asks the engine for the name of the found and of the
+    chosen code, and shows it. Screenshots updated and reviewed.
+  - [ ] 12.14c The field becomes "EPSG code or name", with up to 20 matches
+    under it (name, code, kind and units). Screenshots updated and reviewed.
 - [ ] 12.15 Dataset summary: CRS shows code, name and units (extends 9.3).
   Screenshots updated and reviewed.
 - [ ] 12.G Gate.

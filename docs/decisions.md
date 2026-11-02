@@ -2440,3 +2440,17 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   99999 and `crs.geographic.out_of_range` under 4269, which is step 12.11 seen through an engine), and
   one with the real Web Worker in Chromium, which runs the same scenario in the page and in Node and
   requires the two reports to be equal. Engine unit tests are at 297, its browser tests at 13.
+- Step 12.14 is split into 12.14a (the words), 12.14b (names for the found and the chosen code) and
+  12.14c (the search), because each changes what is photographed and the pictures have to be looked at.
+  The design, decided here: the field for the code stays where it is and becomes "EPSG code or name";
+  what is typed is still what the draft holds (`crs.epsg` is text), so the rest of the wizard, which
+  reads a code from it, does not change; a code typed is a code chosen, as before, and a name typed
+  shows matches to pick from, which puts the code in the field. The matches are a list of native radio
+  buttons (so keyboard and screen reader behave as they do everywhere, without a widget of our own),
+  at most 20, in a box of fixed height that scrolls, so that matches appearing moves nothing. A kind
+  is said as "longitude and latitude", "projected" or "another kind", and a unit in words
+  ("metres", "US survey feet", "degrees"); "geographic" is a word the person importing a file need not
+  know. 12.14a: `describeKind`, `describeInfo`, `describeNamed` and a fourth, optional, argument of
+  `summarizeCrs` for what the definitions say of the code (the system, `null` if the code is not in
+  them, `undefined` if nobody asked); with nothing known the sentences are those of phase 1, which the
+  existing tests still show. Four tests; no photographed state changes in this step.
