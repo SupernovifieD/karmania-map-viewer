@@ -514,3 +514,71 @@ describe('progress and stopping an import', () => {
     expect(engine.datasets()).toEqual([]);
   });
 });
+
+describe('the EPSG definitions', () => {
+  it('say what a code means, and nothing for a code that is not in them', async () => {
+    const engine = start();
+    // Asked at once, before the worker can be ready: the engine waits for it.
+    const known = engine.crsInfo(32640);
+    const unknown = engine.crsInfo(99_999);
+    expect(await known).toStrictEqual({
+      code: 32640,
+      name: 'WGS 84 / UTM zone 40N',
+      kind: 'projected',
+      units: 'm',
+      metresPerUnit: 1,
+    });
+    expect(await unknown).toBeUndefined();
+  });
+
+  it('are searched by code and by name, the code first', async () => {
+    const engine = start();
+    const byCode = await engine.searchCrs('EPSG:4326', 5);
+    expect(byCode[0]).toStrictEqual({
+      code: 4326,
+      name: 'WGS 84',
+      kind: 'geographic',
+      units: 'degree',
+    });
+    expect((await engine.searchCrs('WGS 84 / UTM zone 40', 5)).map((found) => found.code)).toEqual([
+      32640, 32740,
+    ]);
+    expect(await engine.searchCrs('', 5)).toEqual([]);
+    expect(await engine.searchCrs('a', 1000)).toHaveLength(50);
+  });
+
+  it('reject what is not a code or a limit, as misuse', async () => {
+    const engine = start();
+    for (const code of [-1, 4326.5, Number.NaN, 2 ** 32]) {
+      await expect(engine.crsInfo(code)).rejects.toBeInstanceOf(EngineError);
+      await expect(engine.crsInfo(code)).rejects.toThrow(/whole number/);
+    }
+    await expect(engine.searchCrs('a', -1)).rejects.toThrow(/limit must be a whole number/);
+    await expect(engine.searchCrs('a', 1.5)).rejects.toThrow(/limit must be a whole number/);
+    // The engine is still usable after misuse.
+    expect((await engine.crsInfo(4326))?.name).toBe('WGS 84');
+  });
+
+  it('cannot be asked once the engine is disposed', async () => {
+    const engine = start();
+    engine.dispose();
+    await expect(engine.crsInfo(4326)).rejects.toBeInstanceOf(EngineDisposedError);
+    await expect(engine.searchCrs('a', 1)).rejects.toBeInstanceOf(EngineDisposedError);
+  });
+
+  it('are what loading uses: a code that is not in them is a warning, and NAD83 is range-checked', async () => {
+    const engine = start();
+    const codesOf = async (code: number): Promise<string[]> => {
+      // UTM-looking numbers, which cannot be degrees.
+      const result = await engine.load(somePoints(`code ${String(code)}`, { kind: 'epsg', code }));
+      if (result.status !== 'loaded') {
+        throw new Error(`blocked: ${result.findings.map((f) => f.code).join(', ')}`);
+      }
+      return (result.summaries[0]?.findings ?? []).map((f) => f.code);
+    };
+    expect(await codesOf(32640)).toEqual([]);
+    expect(await codesOf(99_999)).toEqual(['crs.code.unknown']);
+    expect(await codesOf(4269)).toEqual(['crs.geographic.out_of_range']);
+    expect(engine.datasets()).toHaveLength(3);
+  });
+});
