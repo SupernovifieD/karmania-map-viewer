@@ -32,6 +32,9 @@ definition, and it converts positions with the PROJ definition. It changes no va
 dataset, and it attributes to EPSG nothing that it computes itself (a converted position is
 Karmania's result, not EPSG's).
 
+This file is not yet copied into the builds of the engine and of the app: that is steps 23.5 and 23.6
+(and the README, step 24.5).
+
 Because of these terms the kernel's build is not purely Apache-2.0: Karmania's code in it is,
 and the EPSG data in it is under IOGP's terms. This was decided by the owner at step 12.2
 (`docs/decisions.md`), and no written confirmation was asked of IOGP.

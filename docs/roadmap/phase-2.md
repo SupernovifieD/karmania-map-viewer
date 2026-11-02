@@ -136,6 +136,8 @@ or releasing, and whenever the brief says to stop.
   title, when matches are under it: a long name no longer moves the box (second review).
 - [x] 12.F9 `scripts/generate-crs-table` writes the file `cargo fmt --check` wants, and CI
   checks that regenerating it changes nothing (second review).
+- [x] 12.F10 The record of the notices corrected: the builds do not carry the file yet,
+  and the terms still have not been read at the source (second review).
 - [ ] 12.G Gate.
 
 ## M13: Display preparation (karmania-prep)

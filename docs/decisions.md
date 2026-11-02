@@ -2586,7 +2586,10 @@ defect in steps 12.1 to 12.15 but two major problems and several smaller ones. E
   and the owner's decision of step 12.2 was to bundle it "with notices", but the file the notices were
   to be in (`THIRD_PARTY_NOTICES.md`, step 23.5) did not exist, and the types of the engine point at it.
   Nothing is distributed yet (there is no deploy or release workflow, and no package is published), so
-  nobody has been given the data without the notice; the notice is made now so that none can be. The
+  nobody has been given the data without the notice. The file exists now, but **the builds do not carry
+  it**: `packages/engine/wasm` and `packages/app/dist` hold the data and have no notice file in them (the
+  second review's correction of a first wording that said the notice was made so that none could be
+  given without it). Putting it into the builds is steps 23.5, 23.6 and 24.5. The
   file is begun with the EPSG section only: the acknowledgement of IOGP, the statement that its terms
   apply to anyone given the definitions, the terms as they were read (said again to be second-hand),
   what Karmania does with the data and that it attributes nothing of its own to EPSG, and that the
@@ -2705,4 +2708,16 @@ minors and four nits. Each is a sub-step, or recorded.
   --exit-code` clean, where before it showed the whole file changed). The Rust job of CI runs it and fails on
   a difference, which is the test of this step: it fails with the script as it was. That step has not run on
   GitHub yet; it is to be read in the run of this commit.
+- Step 12.F10 (the notices, again). The second review said that `https://epsg.org/terms-of-use.html`
+  answered it with HTTP 200 and the text of the terms, revised 8 April 2016, and that the summary in
+  `THIRD_PARTY_NOTICES.md` matches it, with one omission: an advisory about the essential elements of
+  IOGP Guidance Note 7-1, Annex A. **This was not verified here.** A request for the page with the tools of
+  this session (the fetch tool, and an earlier one with a browser's User-Agent, which the session's rules
+  refused as a way round a block) got 403, and no other way of getting it was tried. So the terms are still
+  not read at the source by this work, the caveat in the notices file stays, and the report of the review
+  is a second-hand statement about a first-hand reading that nothing here has confirmed. For the owner: the
+  page is public, and it is worth reading it once in a browser against `THIRD_PARTY_NOTICES.md` and
+  `docs/dependencies.md`, including that advisory. What was corrected without that: the file says that it is
+  not yet in the builds, and the sentence of 12.F2 that said the notice was made "so that none can" be
+  given the data without it.
 
