@@ -13,7 +13,7 @@
 pub mod info;
 pub mod wkt;
 
-pub use info::{AxisUnits, CrsInfo, CrsKind};
+pub use info::{AxisUnits, CrsInfo, CrsKind, describe};
 
 #[cfg(test)]
 mod tests {
