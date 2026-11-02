@@ -168,9 +168,9 @@ finding_codes! {
     CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
     CrsMissing => "crs.missing", Error, Some(WizardStep::Crs);
-    /// In EPSG:4326, X fits latitude and Y does not, so the two look swapped.
+    /// In a geographic system, X fits latitude and Y does not, so the two look swapped.
     CrsGeographicAxesSwapped => "crs.geographic.axes_swapped", Warning, Some(WizardStep::Crs);
-    /// In EPSG:4326, some coordinates are not valid longitudes and latitudes.
+    /// In a geographic system, some coordinates are not valid longitudes and latitudes.
     CrsGeographicOutOfRange => "crs.geographic.out_of_range", Warning, Some(WizardStep::Crs);
     /// A local grid has no known place on the Earth, so it cannot be converted to or from an EPSG system.
     CrsTransformLocalGrid => "crs.transform.local_grid", Error, None;
