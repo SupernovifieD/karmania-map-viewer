@@ -23,6 +23,7 @@
 pub mod info;
 pub mod kinds;
 pub mod lookup;
+mod registry;
 pub mod search;
 pub mod transform;
 pub mod wkt;
