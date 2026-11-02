@@ -130,6 +130,11 @@ export const FAKE_ENGINE = `(() => {
       control.fail = (message) => reject(new Error(message));
       options.signal.addEventListener('abort', () => reject(options.signal.reason));
     }),
+    // What the definitions say of the code the preview reports, and nothing for any other.
+    crsInfo: async (code) => code === 32640
+      ? { code: 32640, name: 'WGS 84 / UTM zone 40N', kind: 'projected', units: 'm', metresPerUnit: 1 }
+      : undefined,
+    searchCrs: async () => [],
     remove: async () => undefined,
     datasets: () => [],
     dispose: () => undefined,

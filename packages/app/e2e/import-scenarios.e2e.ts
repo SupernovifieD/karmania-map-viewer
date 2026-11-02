@@ -46,7 +46,7 @@ test.describe('importing', () => {
 
     // CRS: from the projection file.
     await expect(w.host.locator('karmania-crs-step .found-text')).toHaveText(
-      'Found EPSG 32640, from the .prj file points.prj.',
+      'Found EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
     );
     await goTo(page, 'review');
 
@@ -196,7 +196,7 @@ test.describe('importing', () => {
     await goTo(page, 'crs');
     // CRS: the default of GeoJSON, which the step says is assumed, and a person keeps.
     await expect(w.host.locator('karmania-crs-step .found-text')).toHaveText(
-      'Found EPSG 4326, from the GeoJSON default, which is assumed because the file names none.',
+      'Found EPSG 4326, WGS 84 (longitude and latitude, in degrees), from the GeoJSON default, which is assumed because the file names none.',
     );
     await goTo(page, 'review');
 
