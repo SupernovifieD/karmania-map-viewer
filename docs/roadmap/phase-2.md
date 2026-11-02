@@ -80,7 +80,7 @@ or releasing, and whenever the brief says to stop.
   (PROJ or pyproj if available on the machine, otherwise published values), the
   source named for each row; tolerance 1 mm projected, 1e-9 degrees geographic;
   round trips.
-- [ ] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
+- [x] 12.9 CrsKinds hook in karmania-core with the default implementation (4326
   only). No behaviour change: phase 1 snapshots unchanged.
 - [ ] 12.10 karmania-crs implements CrsKinds.
 - [ ] 12.11 The wasm kernel passes it to validation on import and load; the "code

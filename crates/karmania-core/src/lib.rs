@@ -32,7 +32,7 @@ pub use bbox::BBox;
 pub use blocks::Blocks;
 pub use codes::FindingCode;
 pub use column::{Column, ColumnData, ColumnType, LengthMismatch, Value};
-pub use crs::{CrsRef, Units};
+pub use crs::{CrsGeography, CrsKinds, CrsRef, Units, Wgs84Only};
 pub use dataset::{Dataset, DatasetId, Geometry, Kind, Provenance};
 pub use findings::{Finding, Findings, Location, MAX_EXAMPLES, Severity, WizardStep};
 pub use grid::{Grid, GridZ};
@@ -45,7 +45,7 @@ pub use polygons::Polygons;
 pub use positions::Positions;
 pub use summary::{ColumnSummary, Summary};
 pub use table::Table;
-pub use validate::{CheckGroup, ValidationReport, validate};
+pub use validate::{CheckGroup, ValidationReport, validate, validate_with};
 pub use validity::Validity;
 
 #[cfg(test)]

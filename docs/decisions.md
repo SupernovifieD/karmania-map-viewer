@@ -2310,3 +2310,21 @@ phase 1. The plan is `docs/roadmap/phase-2.md`.
   Seen to fail: with the source and target swapped (three of four tests) and with 6 mm added to every
   projected northing (three of four, including the 1 mm round trip); both tried, file restored. The file
   is 314 lines, mostly the table of rows and the reasons, over the size guideline.
+- Step 12.9 (the `CrsKinds` hook). `karmania-core` defines `CrsKinds`, a trait that answers
+  `CrsGeography::{Geographic, NotGeographic, Unknown}` for an EPSG code, and `Wgs84Only`, the answers
+  the core gives alone: 4326 is geographic and every other code is unknown. `validate(dataset)` uses
+  `Wgs84Only`, so a dataset is judged exactly as before, and the new `validate_with(dataset, kinds)`
+  takes any. The range and swapped-axes checks now ask the hook, so they apply to every code it calls
+  geographic and to none of the others, whatever the code (4326 included, if it says not or does not
+  know); this replaces the constant `GEOGRAPHIC_EPSG_CODE` that decision 4.16 said to replace "when
+  EPSG definitions return". A local grid or a missing system never asks. No behaviour changes: every
+  test the core had, with the snapshots of phase 1 among them, passes without being touched (the CRS
+  tests got a two-argument `check` in their own module to call the new three-argument one, and
+  nothing else). Six tests were added: the default answers; a code the hook calls geographic is
+  checked (range and swapped axes) while the core alone says nothing of the same data; one it calls
+  not geographic or does not know is not (4326 too); the hook is asked about an EPSG code and about
+  nothing else; `validate_with` with what the core knows is `validate`; and `validate_with` with more
+  kinds checks more. Four of them fail when the check ignores the hook and tests for 4326 (tried, file
+  restored). The warning for a code that is not in the
+  definitions is step 12.11's, since it needs the hook to say that a code is missing and not just
+  that it is not known.
