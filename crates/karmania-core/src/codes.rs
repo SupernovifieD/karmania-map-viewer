@@ -202,6 +202,8 @@ finding_codes! {
     DisplayExtentNone => "display.extent.none", Warning, None;
     /// Some polygons could not be filled in, so only their outlines are drawn.
     DisplayPolygonsOutlineOnly => "display.polygons.outline_only", Warning, None;
+    /// Some polygons have too many vertices to be filled in, so only their outlines are drawn.
+    DisplayPolygonsTooDetailed => "display.polygons.too_detailed", Warning, None;
     /// The map's coordinate system was chosen from data in longitude and latitude: a UTM zone.
     DisplayFrameUtmChosen => "display.frame.utm_chosen", Info, None;
     /// The X, Y and Z coordinate lists have different lengths.

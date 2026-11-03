@@ -8,10 +8,14 @@ use karmania_core::{CrsRef, Finding, FindingCode, Findings, Location, Polygons};
 use crate::origin::Frame;
 use crate::project::{Prepared, project};
 
-/// The most vertices of one polygon that are triangulated. More than this is drawn as an outline only:
-/// the triangulation of the `earcut` crate keeps its nodes at 40 bytes each under a 32-bit offset, and
-/// panics when they do not fit, which no data may be able to make it do.
-const MAX_FILLED_VERTICES: usize = 16_000_000;
+/// The most vertices of one polygon (its rings, holes included) that are triangulated: 100,000. More than
+/// this is drawn as an outline only, with `display.polygons.too_detailed`. A polygon is one step of a
+/// prepare, which cannot be cut, and the time `earcut` takes grows faster than the size of the polygon:
+/// measured natively, 20 ms for 25,000 vertices, 140 ms for 100,000, 670 ms for 200,000 and 3.3 s for
+/// 400,000 (the review of the milestone saw 9.5 s for 1,000,000 in WebAssembly), and the worker hears nothing,
+/// not a request to stop, while it works. The limit also keeps the nodes of `earcut` (40 bytes each under a
+/// 32-bit offset) far from the size at which it panics.
+const MAX_FILLED_VERTICES: usize = 100_000;
 
 /// How far the area of the triangles may be from the area of the polygon (as a fraction of it) before
 /// the triangulation is taken to be wrong, which it is for a polygon that crosses itself.
@@ -65,12 +69,20 @@ pub(crate) struct PolygonsFill {
     buffers: PolygonsBuffers,
     earcut: Earcut<f64>,
     unfilled: Finding,
+    too_detailed: Finding,
+    /// The most vertices of a polygon that are triangulated.
+    limit: usize,
     next: usize,
 }
 
 impl PolygonsFill {
     /// Starts with the `positions` of the vertices on the map.
     pub(crate) fn new(positions: Vec<f32>) -> Self {
+        Self::with_limit(positions, MAX_FILLED_VERTICES)
+    }
+
+    /// Starts as [`PolygonsFill::new`], with polygons of more than `limit` vertices outlined and not filled.
+    pub(crate) fn with_limit(positions: Vec<f32>, limit: usize) -> Self {
         let mut unfilled = Finding::new(
             FindingCode::DisplayPolygonsOutlineOnly,
             "Some polygons could not be filled in, so only their outlines are drawn.",
@@ -79,6 +91,15 @@ impl PolygonsFill {
             "Check that no ring crosses itself or another ring, and that each polygon has some area.",
         );
         unfilled.count = 0;
+        let mut too_detailed = Finding::new(
+            FindingCode::DisplayPolygonsTooDetailed,
+            format!(
+                "Some polygons have more than {} vertices, which is too many to fill in, so only their outlines are drawn.",
+                karmania_core::text::format_count(MAX_FILLED_VERTICES as u64)
+            ),
+        )
+        .with_hint("Simplify the polygons, or split them into smaller ones, to fill them in.");
+        too_detailed.count = 0;
         Self {
             buffers: PolygonsBuffers {
                 positions,
@@ -89,6 +110,8 @@ impl PolygonsFill {
             },
             earcut: Earcut::new(),
             unfilled,
+            too_detailed,
+            limit,
             next: 0,
         }
     }
@@ -118,7 +141,12 @@ impl PolygonsFill {
             for range in &ranges {
                 outline_ring(&mut self.buffers, range.clone(), number);
             }
-            if !fill(&mut self.buffers, &mut self.earcut, &ranges, number) {
+            let vertices: usize = ranges.iter().map(ExactSizeIterator::len).sum();
+            if vertices > self.limit {
+                self.too_detailed.count += 1;
+                self.too_detailed
+                    .add_example(Location::default().with_element(u64::from(number)));
+            } else if !fill(&mut self.buffers, &mut self.earcut, &ranges, number) {
                 self.unfilled.count += 1;
                 self.unfilled
                     .add_example(Location::default().with_element(u64::from(number)));
@@ -139,6 +167,9 @@ impl PolygonsFill {
     pub(crate) fn finish(self, findings: &mut Findings) -> PolygonsBuffers {
         if self.unfilled.count > 0 {
             findings.add(self.unfilled);
+        }
+        if self.too_detailed.count > 0 {
+            findings.add(self.too_detailed);
         }
         self.buffers
     }
@@ -188,7 +219,7 @@ fn fill(
     // The rings of a polygon follow each other in the vertex list, and a polygon has three vertices at least.
     let contiguous = rings.windows(2).all(|pair| pair[0].end == pair[1].start);
     let size = end.saturating_sub(start);
-    if !contiguous || !(3..=MAX_FILLED_VERTICES).contains(&size) {
+    if !contiguous || size < 3 {
         return false;
     }
     let Some(data) = (start..end)
@@ -539,5 +570,68 @@ mod tests {
             assert_eq!(findings, whole.findings, "budget {budget}");
         }
         assert_eq!(whole.findings.as_slice()[0].count, 2);
+    }
+
+    /// A regular polygon of `n` vertices of radius 1,000 (a circle, with no area problem).
+    fn circle(n: usize) -> Vec<(f64, f64)> {
+        (0..n)
+            .map(|i| {
+                let angle = std::f64::consts::TAU * i as f64 / n as f64;
+                (1_000.0 * angle.cos(), 1_000.0 * angle.sin())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_polygon_with_too_many_vertices_is_outlined_only_with_a_finding_of_its_own() {
+        // Found by the review of the milestone: earcut takes longer than its size (0.14 s for 100,000 vertices,
+        // 3.3 s for 400,000) and a polygon is one step, during which the worker hears nothing.
+        let n = MAX_FILLED_VERTICES + 1;
+        let out = prepare(&polygons(&[&[&SQUARE], &[&circle(n)]]));
+        let b = &out.buffers;
+        assert_eq!(
+            b.triangle_polygon,
+            [0, 0],
+            "the square is filled, the circle is not"
+        );
+        assert_eq!(b.outline_polygon.iter().filter(|&&p| p == 1).count(), n);
+        let codes: Vec<_> = out.findings.iter().map(|f| f.code.as_str()).collect();
+        assert_eq!(codes, ["display.polygons.too_detailed"]);
+        let finding = &out.findings.as_slice()[0];
+        assert_eq!(finding.count, 1);
+        assert_eq!(finding.examples[0].element, Some(1));
+        assert_eq!(
+            finding.message,
+            "Some polygons have more than 100,000 vertices, which is too many to fill in, so only their outlines are drawn."
+        );
+    }
+
+    #[test]
+    fn the_limit_is_in_vertices_of_one_polygon_holes_included_and_a_small_limit_shows_the_edge() {
+        for (limit, outer, hole, filled) in [
+            (8, 4, 4, true),
+            (7, 4, 4, false),
+            (8, 8, 0, true),
+            (8, 9, 0, false),
+        ] {
+            let hole_ring: Vec<(f64, f64)> = HOLE.to_vec();
+            let exterior = circle(outer);
+            let rings: Vec<&[(f64, f64)]> = if hole == 0 {
+                vec![&exterior]
+            } else {
+                vec![&exterior, &hole_ring]
+            };
+            let p = polygons(&[&rings]);
+            let positions = project(&p.positions, LOCAL, &frame(), &mut Findings::new()).unwrap();
+            let mut fill = PolygonsFill::with_limit(positions, limit);
+            fill.advance(&p, usize::MAX);
+            let mut findings = Findings::new();
+            let buffers = fill.finish(&mut findings);
+            assert_eq!(
+                !buffers.triangles.is_empty(),
+                filled,
+                "limit {limit}, {outer} + {hole}"
+            );
+        }
     }
 }

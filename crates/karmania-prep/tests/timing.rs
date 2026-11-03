@@ -358,3 +358,45 @@ fn new_classes_for_four_million_cells() {
     }
     within("new classes for 4,000,000 cells", slowest, RESTYLE_LIMIT);
 }
+
+/// One polygon of `vertices` vertices: a circle of 50 km with a ragged edge, in UTM 40.
+fn one_big_polygon(vertices: usize) -> Dataset {
+    let mut rng = Lcg(11);
+    let (mut x, mut y) = (Vec::new(), Vec::new());
+    for i in 0..vertices {
+        let angle = std::f64::consts::TAU * i as f64 / vertices as f64;
+        let radius = 50_000.0 + (rng.next() % 2_000) as f64;
+        x.push(500_000.0 + radius * angle.cos());
+        y.push(2_750_000.0 + radius * angle.sin());
+    }
+    let positions = Positions::from_xyz(&x, &y, None, &mut Findings::new()).expect("lengths");
+    let polygons = karmania_core::Polygons {
+        positions,
+        ring_offsets: vec![0, vertices as u32],
+        polygon_offsets: vec![0, 1],
+    };
+    Dataset::new(
+        DatasetId(5),
+        "one polygon",
+        Some(UTM40),
+        Geometry::Polygons(polygons),
+        Table::empty(),
+    )
+}
+
+/// How long one step takes when it has to triangulate a single polygon of many vertices: the worker hears
+/// nothing for that long, because a polygon is not cut into steps.
+#[test]
+#[ignore = "timing; run in a release build with --ignored"]
+fn the_longest_step_for_one_large_polygon() {
+    for vertices in [25_000, 50_000, 100_000, 200_000, 400_000] {
+        let dataset = one_big_polygon(vertices);
+        let timed = prepare(&dataset, frame(UTM40, [500_000.0, 2_750_000.0, 0.0]), 4096);
+        println!(
+            "one polygon of {vertices} vertices: {:.0} ms in {} steps (longest {:.0} ms)",
+            timed.seconds * 1000.0,
+            timed.steps,
+            timed.longest_ms
+        );
+    }
+}
