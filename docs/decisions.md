@@ -2935,3 +2935,18 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   system, a system of another kind, and a geographic one in grads (which the transformer refuses).
   Such a dataset is not drawn (step 13.4); the brief's "its own CRS if projected" is read as needing
   the definitions to say so, because an unknown code could be anything.
+- Step 13.3 (the origin, and rebasing). `karmania_prep::origin` has `Frame { map_crs, origin, source }`
+  (JSON `{"mapCrs":{...},"origin":[x,y,z],"source":"auto"|"user"}`, the contract of section 11.3),
+  `origin_near` and `Frame::rebase` / `rebase_all`. The origin is the centre of the extent of the first
+  drawable dataset in the map CRS, x and y rounded to the nearest 1,000 map units and z to the nearest
+  100, halves away from zero (`f64::round`), and a position sent to the GPU is `(position - origin)`
+  worked out in `f64` and then rounded once to `f32`. Where the brief is silent: for a map in longitude
+  and latitude (a person may choose one, section 9.2) the origin of x and y is rounded to a whole degree,
+  not to 1,000 degrees, which would put it at 0 and leave an `f32` at 100 degrees 0.85 m coarse; a
+  centre that is not finite gives 0 on that axis. The precision test of section 9.1 is in the unit tests:
+  from 0 to 99,999 map units from the origin, on both sides, two points 1 cm apart stay apart and each
+  is within 5 mm of where it should be (an `f32` between 65,536 and 131,072 is 7.8 mm coarse, so 1 cm is
+  kept and 2 cm is not at the very edge of the promise); and the same pair at a northing of 4,012,345 m is
+  the same `f32` without the origin (the grid there is 0.25 m), which is why there is one. It is a test
+  of numbers, not yet of a picture (step 16.13 repeats it on screen). `serde` and `serde_json` (dev) are
+  added to `karmania-prep`; both were already in the lock file.

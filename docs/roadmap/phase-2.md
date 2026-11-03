@@ -173,7 +173,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.1 Crate karmania-prep (depends on core and crs), forbid unsafe.
 - [x] 13.2 Frame choice (section 9.2 of the brief) with the info finding for the
   UTM choice. Tests: projected, local, geographic north and south, zone edges.
-- [ ] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
+- [x] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
 - [ ] 13.4 Drawability per dataset (9.2) with display findings; documented.
 - [ ] 13.5 Points buffers.
 - [ ] 13.6 Lines buffers.
