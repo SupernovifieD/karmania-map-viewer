@@ -152,12 +152,12 @@ fn local_grids_assumed(from: Units, to: Units) -> Finding {
     Finding::new(
         FindingCode::DisplayCrsLocalGridsAssumed,
         format!(
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from {} to {}.",
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {} to {}; heights are drawn as given.",
             units_word(from),
             units_word(to)
         ),
     )
-    .with_hint("If they are different grids, their positions will not line up.")
+    .with_hint("If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.")
 }
 
 /// The reason the transformer gave, as the reason the dataset is not drawn.
@@ -260,7 +260,7 @@ mod tests {
         assert_eq!(codes(&d), ["display.crs.local_grids_assumed"]);
         assert_eq!(
             d.findings[0].message,
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from feet to metres."
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given."
         );
     }
 

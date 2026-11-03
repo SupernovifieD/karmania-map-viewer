@@ -323,9 +323,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: info
 - Step: none
-- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from {units} to {map units}.
-- Hint: If they are different grids, their positions will not line up.
-- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from feet to metres.
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {units} to {map units}; heights are drawn as given.
+- Hint: If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given.
 
 ## `display.crs.not_convertible`
 
