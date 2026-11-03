@@ -3503,3 +3503,12 @@ reviewer and reproduced here by a test that failed before the fix.
   `Transformer::convert` and not with the code under test, in cells: a 2,000 x 1 row and a 1 x 4,096 column in degrees are not rough, are
   cut along their length and not across, and are within a tenth of a cell (by 5 % of it) at the middle of every part; every tile of a
   4,097 x 4,097 grid in 4,096 textures (the tile, both strips and the corner) is as good. Both fail under the old rule (a mutation).
+- Step 13.F6 (heights of two local grids). Minor. A local grid in feet drawn on a map in metres had its x and y scaled and its heights not (a
+  height of 328.084 stayed 328.084, so in 3D it is stretched 3.28 times), and `display.crs.local_grids_assumed` said "its positions are scaled".
+  The behaviour is what section 9.1 says ("Z is never reprojected; it is drawn as given") and what step 12.8 pinned in a test of the
+  transformer (z is not touched), so it is **kept**, and the finding is made true: "its horizontal positions are scaled from feet to
+  metres; heights are drawn as given", with the hint that if its heights are in the same units they will look stretched. Documented in
+  `docs/validation-codes.md`. A test pins both the heights and the words. **This is the owner's to decide**: the core's own
+  doc says the coordinates of a dataset are "in the units of its CRS with Z up", which for a local grid in feet would make the
+  heights feet too, and scaling them would be the other consistent choice; it needs a change to the transformer's test of 12.8, which this
+  step does not make.

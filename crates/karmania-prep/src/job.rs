@@ -776,4 +776,51 @@ mod tests {
         let mut wrong = PrepareJob::new(points, frame(), 4096);
         assert_eq!(wrong.step(grid, 10), PrepareStep::Cancelled);
     }
+
+    #[test]
+    fn heights_of_a_local_grid_in_other_units_are_drawn_as_given_as_the_finding_says() {
+        // Found by the review of the milestone: the finding said that "positions are scaled" and the height was not.
+        // Section 9.1 has the height drawn as given; the finding says so, and this pins what it says.
+        let feet = CrsRef::Local { units: Units::Foot };
+        let metres = CrsRef::Local {
+            units: Units::Metre,
+        };
+        let d = dataset(
+            feet,
+            Geometry::Points(Positions::from_interleaved(
+                vec![3_280.84, 6_561.68, 328.084],
+                true,
+            )),
+            Table::empty(),
+        );
+        let on_metres = Frame {
+            map_crs: metres,
+            origin: [0.0; 3],
+            source: FrameSource::User,
+        };
+        let PrepareStep::Done(PrepareResult::Drawn { buffers, findings }) =
+            PrepareJob::new(&d, on_metres, 4096).step(&d, 10)
+        else {
+            panic!("not drawn");
+        };
+        let RenderBuffers::Points(p) = buffers else {
+            panic!("not points")
+        };
+        assert!(
+            (f64::from(p.positions[0]) - 1_000.0).abs() < 0.01
+                && (f64::from(p.positions[1]) - 2_000.0).abs() < 0.01
+        );
+        assert!(
+            (f64::from(p.positions[2]) - 328.084).abs() < 0.001,
+            "the height is as given: {}",
+            p.positions[2]
+        );
+        let message = &findings.as_slice()[0].message;
+        assert!(
+            message.contains(
+                "horizontal positions are scaled from feet to metres; heights are drawn as given"
+            ),
+            "{message}"
+        );
+    }
 }
