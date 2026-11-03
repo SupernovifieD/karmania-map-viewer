@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 karmania-core.workspace = true
 karmania-crs.workspace = true
+earcut.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
