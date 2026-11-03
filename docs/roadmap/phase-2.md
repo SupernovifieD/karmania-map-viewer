@@ -190,7 +190,9 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.10 Grid image placement and tiling by a maximum texture size.
 - [ ] 13.11 Grid warp when the grid's CRS differs from the map CRS: subdivide
   until the error measured at sub-cell midpoints is under 0.1 cell; test across
-  a UTM zone change.
+  a UTM zone change. Split to stay under the commit size guideline:
+  - [x] 13.11a The mesh of one tile: cut finer until the middles of its parts are within 0.1 cell.
+  - [ ] 13.11b The warp for a whole grid: the tiles, `GridLayout::Warp`, the findings.
 - [ ] 13.12 Grid surface buffers (elevations from a column).
 - [ ] 13.13 Block buffers (own CRS only).
 - [ ] 13.14 Column statistics: count, nulls, finite min and max, distinct values

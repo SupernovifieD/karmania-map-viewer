@@ -3090,3 +3090,29 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   2,048; this is wired at step 13.19). A size of 0 is taken as 1. Where the brief is silent: a grid with
   more than one layer is drawn from its first layer only, with a new warning, `display.grid.layers_hidden`,
   because the picture is of one layer and said so; elevations that are not finite are 0.
+- Step 13.11a (the mesh of a warped tile). `warp_tile(lattice, tile, elevation, transformer, frame)` gives the mesh of
+  one texture of a grid in another system: `positions` (where each vertex goes, relative to the frame's origin),
+  `uvs` (from 0 to 1 across the tile's texture, `u` along `i`), `triangles`, and how it was cut. The tile
+  is cut into `n` by `n` equal parts, `n` = 1, 2, 4, ..., until the mesh is within 0.1 cell (the brief's
+  figure) of the exact conversion at the middle of every part. "Middle" is taken as the centre of a part
+  and the middles of its four sides, compared with what the triangles of that part give there (the average of
+  its two corners on a side, of the corners of the diagonal at the centre, which is the diagonal the triangles
+  are cut along). A cell's size on the map is that of the shorter side of a cell at the middle of the tile. Equal
+  parts, not a tree that is cut finer where it is needed, because neighbouring parts of different fineness
+  leave cracks at their edges (a vertex of the finer one is not on the edge of the coarser) and a nearest-
+  sampled picture shows cracks as holes; with equal parts the neighbours share their vertices, which are
+  computed by the same expression, so they are the same bits. The cost: a tile is as fine as its worst
+  place needs it. `n` is at most the cells of the short side of the tile and 256; if the mesh is still not
+  within a tenth of a cell it is `rough`, and the step after this says so with a finding. A vertex the
+  conversion cannot place is NaN and the triangles that use it are left out (`unplaced` counts them). Measured
+  and tested, with the conversion itself as the judge and not the code under test: a grid of 600 by 400
+  cells of 0.01 degrees (6 by 4 degrees, about 1 km a cell) from longitude and latitude to zone 40 needs 8 by 8
+  parts and its worst middle is 98 m off, a tenth of a cell being 100 m (with one part it is far off, which
+  the test also checks, so that it cannot pass for want of a need); across a zone change, a grid of 10 m cells
+  20 km across at the edge of zone 40 on the map of zone 41 has its corners where the conversion puts them
+  (within 1 cm) and is turned by 2.3 to 2.7 degrees, which is the two grids' convergences (about 1.26
+  degrees each, longitude difference times the sine of the latitude), and needs 2 by 2 parts (measured: the
+  mapping is not a rotation and a scale to within 1 m over 20 km, which is a tenth of a 10 m cell; a first
+  version of this record said one part, which was a guess, and the test now requires more than one); a grid north of the pole is left out where it cannot be placed;
+  and a whole world of 0.0036-degree cells in one tile is `rough`. The tile is not yet taken from a
+  grid, nor given a layout: step 13.11b.

@@ -24,6 +24,7 @@ pub mod polygons;
 pub mod project;
 #[cfg(test)]
 mod testutil;
+pub mod warp;
 
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
