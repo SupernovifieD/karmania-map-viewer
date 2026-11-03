@@ -3304,3 +3304,16 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   step counts (40 points 5 at a time take at least 8, a million at once takes 1, a warped grid of 6 tiles takes 6);
   every reason a dataset is not drawn; cancellation and a dataset of another kind. Two mutations were tried and
   caught: the budget ignored, and the findings of `drawable` dropped.
+- Step 13.19a (what the worker keeps). The frame has to be remembered between requests (it stays while any dataset is
+  loaded, section 9.1) and a prepare is a job that is stepped, so something has to hold them. It is `Preparer`
+  in `karmania-prep`, not the wasm crate, which the brief says has no logic of its own and which cannot be
+  tested without JavaScript: `choose_frame(preferred, datasets)` keeps the frame it returns, `start`, `step`,
+  `cancel` and `forget_dataset` run the jobs under identifiers that are never reused, like the imports'. A job
+  that is done or cancelled is forgotten by the step that says so (a later step is `None`, which the bindings
+  turn into a thrown error, as for an import that is over), and a step with no dataset (it was removed in the
+  meantime) cancels the job. `Registry::datasets()` (in `karmania-io`) gives the datasets in load order, which
+  the frame's "first dataset" needs. The JSON of the contract: `ClassBreaks` is `{kind: "ranges" |
+  "categories", column, ...}` with `sampled` and `other` left out when there are none, a `Category` is the number,
+  the string or the boolean itself (untagged), `Method` is `equal`, `quantile`, `jenks` or `categories`, `Tile`
+  is `{i0, j0, nx, ny}`; tested by writing and reading them back. The typed arrays are not serde's: they are made
+  by the bindings (step 13.19b).

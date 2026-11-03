@@ -6,6 +6,7 @@
 //! both use it, so the legend's numbers are those of the picture.
 
 use karmania_core::{Column, ColumnType, Finding, FindingCode, Value};
+use serde::{Deserialize, Serialize};
 
 use crate::jenks;
 use crate::stats::{Category, DISTINCT_LIMIT, Distinct, column_stats};
@@ -16,8 +17,9 @@ pub const MAX_CLASSES: usize = 254;
 /// The most values shown as categories before the rest are "Other".
 pub const MAX_CATEGORIES: usize = 20;
 
-/// How a column of numbers is divided into ranges.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// How a column is divided into classes. In JSON: `equal`, `quantile`, `jenks` or `categories`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Method {
     /// Equal intervals from the smallest to the largest finite value.
     Equal,
@@ -30,7 +32,12 @@ pub enum Method {
 }
 
 /// Classes of a column, and how many rows are in each.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// JSON: `{"kind":"ranges","column":..,"bounds":[..],"counts":[..],"nulls":..,"sampled":..}` or
+/// `{"kind":"categories","column":..,"values":[..],"counts":[..],"other":..,"nulls":..}`; `sampled` and
+/// `other` are left out when there are none.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum ClassBreaks {
     /// Ranges of numbers.
     Ranges {
@@ -49,6 +56,7 @@ pub enum ClassBreaks {
         /// For natural breaks of a column with more than 10,000 values: how many values the breaks were found
         /// from (an evenly strided sample of the rows, so the same every time), which the legend says. `None`
         /// when every value was used. The counts are always of every row.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         sampled: Option<u64>,
     },
     /// The values that most rows have, one class each, and the rest together.
@@ -61,6 +69,7 @@ pub enum ClassBreaks {
         /// How many rows have each of `values`.
         counts: Vec<u64>,
         /// How many rows have a value that is not in `values`: the class "Other"; `None` when there is none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         other: Option<u64>,
         /// How many rows have no value: null, or not a finite number.
         nulls: u64,
@@ -592,5 +601,51 @@ mod tests {
                 .as_str(),
             "classes.column.no_values"
         );
+    }
+
+    #[test]
+    fn the_json_forms_are_those_of_the_contract_and_read_back() {
+        let ranges = classify(&floats(&[0.0, 5.0, 10.0]), Method::Equal, 2).unwrap();
+        let json = serde_json::to_value(&ranges).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"kind":"ranges","column":"v","bounds":[0.0,5.0,10.0],"counts":[1,2],"nulls":0})
+        );
+        assert_eq!(serde_json::from_value::<ClassBreaks>(json).unwrap(), ranges);
+        let cats = Column::without_nulls("c", ColumnData::Int64(vec![3, 3, 1, 2]));
+        let breaks = classify(&cats, Method::Categories, 2).unwrap();
+        let json = serde_json::to_value(&breaks).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"kind":"categories","column":"c","values":[3.0,1.0],"counts":[2,1],"other":1,"nulls":0})
+        );
+        assert_eq!(serde_json::from_value::<ClassBreaks>(json).unwrap(), breaks);
+        // Text and truth values are the string and the boolean themselves; `other` is left out when there is none.
+        let mixed = ClassBreaks::Categories {
+            column: "k".into(),
+            values: vec![
+                Category::Text("ore".into()),
+                Category::Bool(true),
+                Category::Number(2.5),
+            ],
+            counts: vec![3, 2, 1],
+            other: None,
+            nulls: 0,
+        };
+        let json = serde_json::to_value(&mixed).unwrap();
+        assert_eq!(json["values"], serde_json::json!(["ore", true, 2.5]));
+        assert!(json.get("other").is_none());
+        assert_eq!(serde_json::from_value::<ClassBreaks>(json).unwrap(), mixed);
+        for (name, method) in [
+            ("equal", Method::Equal),
+            ("quantile", Method::Quantile),
+            ("jenks", Method::Jenks),
+            ("categories", Method::Categories),
+        ] {
+            assert_eq!(
+                serde_json::from_str::<Method>(&format!("\"{name}\"")).unwrap(),
+                method
+            );
+        }
     }
 }

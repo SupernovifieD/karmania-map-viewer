@@ -26,6 +26,7 @@ pub mod mesh;
 pub mod origin;
 pub mod points;
 pub mod polygons;
+pub mod preparer;
 pub mod project;
 pub mod stats;
 pub mod surface;
@@ -48,6 +49,7 @@ pub use mesh::{MeshBuffers, mesh_buffers};
 pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
 pub use polygons::{PolygonsBuffers, polygons_buffers};
+pub use preparer::Preparer;
 pub use project::{Prepared, Projector, project};
 pub use stats::{
     Category, ColumnStats, DISTINCT_LIMIT, Distinct, category_at, column_stats,

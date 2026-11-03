@@ -8,14 +8,17 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use karmania_core::{Column, Value};
+use serde::{Deserialize, Serialize};
 
 /// The most distinct values counted. A column with more has too many to be classified as categories, and
 /// is said to have [`Distinct::TooMany`]; counting a million identifiers one by one would only be thrown away.
 pub const DISTINCT_LIMIT: usize = 10_000;
 
 /// One value of a column, owned, as a category: a number (integers as the number they are, `f64`), text
-/// or a truth value. A category of a categorical column is its label.
-#[derive(Debug, Clone, PartialEq)]
+/// or a truth value. A category of a categorical column is its label. In JSON it is the number, the string or
+/// the boolean itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Category {
     /// A number.
     Number(f64),

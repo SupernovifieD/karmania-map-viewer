@@ -135,6 +135,12 @@ impl Registry {
         self.loaded.get(&id.0).map(|l| &l.dataset)
     }
 
+    /// Every loaded dataset, in the order they were loaded (identifiers only ever grow).
+    #[must_use]
+    pub fn datasets(&self) -> Vec<&Dataset> {
+        self.loaded.values().map(|l| &l.dataset).collect()
+    }
+
     /// Unloads a dataset. Returns whether there was one with that identifier.
     pub fn remove(&mut self, id: DatasetId) -> bool {
         self.loaded.remove(&id.0).is_some()
@@ -322,5 +328,33 @@ mod tests {
         assert_eq!(v["status"], "blocked");
         assert_eq!(v["findings"][0]["code"], "crs.missing");
         assert_eq!(v.as_object().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn the_datasets_come_in_the_order_they_were_loaded_and_without_the_removed() {
+        let mut registry = Registry::new();
+        let named = |name: &str| {
+            let mut findings = Findings::new();
+            let positions = Positions::from_xyz(&[1.0], &[2.0], None, &mut findings).unwrap();
+            Dataset::new(
+                DatasetId(0),
+                name,
+                Some(CrsRef::Local {
+                    units: Units::Metre,
+                }),
+                Geometry::Points(positions),
+                Table::empty(),
+            )
+        };
+        registry.load(vec![named("a"), named("b"), named("c")], Findings::new());
+        let names = |r: &Registry| {
+            r.datasets()
+                .iter()
+                .map(|d| d.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(&registry), ["a", "b", "c"]);
+        registry.remove(registry.datasets()[1].id);
+        assert_eq!(names(&registry), ["a", "c"]);
     }
 }
