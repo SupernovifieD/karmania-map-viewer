@@ -3074,3 +3074,19 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   and the selection; a trailing partial triangle (also refused by validation) is left out. No new finding:
   the causes are findings already (`mesh.indices.*` from validation, `crs.transform.not_finite` from the
   conversion). Edges are straight between the converted vertices, as for lines and polygons.
+- Step 13.10 (grid image placement and tiles). `grid_image(lattice, elevation, own, frame, max_texture_size)`
+  gives `GridBuffers { layout, size: [nx, ny], tiles }` for a flat grid in the map's system or in a local
+  grid (scaled by the ratio of the units, as `drawable` says): the placement is the lattice moved to map
+  units and relative to the frame's origin (`origin` of the outer corner of cell 0, with z the elevation
+  of the grid's plane, `spacing` of a cell along `i` and `j`, and `rotation` in degrees counter-clockwise
+  about +Z at the origin, the lattice's own convention), and the tiles cut the `nx` by `ny` cells into
+  rectangles of at most `max_texture_size` on a side, row by row from `j = 0`, the last of a row and of a
+  column taking what is left, so that together they cover every cell once (a test checks that for several
+  sizes, by counting the cells each tile covers). A grid in another system than the map's, which is not a
+  local grid, gives `None`: it is warped, step 13.11. The values are not in the buffers: the renderer is
+  given one class index per cell (step 13.17), cut up by the tiles. **The contract of section 11.4 gains
+  one input**: the GPU's largest texture is the renderer's to say, so `prepare(id, { frame, maxTextureSize })`
+  takes it, with 4,096 as the default when the page does not say (the guaranteed minimum of WebGL2 is
+  2,048; this is wired at step 13.19). A size of 0 is taken as 1. Where the brief is silent: a grid with
+  more than one layer is drawn from its first layer only, with a new warning, `display.grid.layers_hidden`,
+  because the picture is of one layer and said so; elevations that are not finite are 0.

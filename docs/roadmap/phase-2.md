@@ -187,7 +187,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
   the "outline only" warning; collinear and degenerate cases.
 - [x] 13.9 Mesh buffers.
-- [ ] 13.10 Grid image placement and tiling by a maximum texture size.
+- [x] 13.10 Grid image placement and tiling by a maximum texture size.
 - [ ] 13.11 Grid warp when the grid's CRS differs from the map CRS: subdivide
   until the error measured at sub-cell midpoints is under 0.1 cell; test across
   a UTM zone change.

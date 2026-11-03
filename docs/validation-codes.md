@@ -319,6 +319,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Change the map's coordinate system if another one suits the data better.
 - Example: The map is drawn in WGS 84 / UTM zone 40N (EPSG:32640): the data is in longitude and latitude, and its centre is at 57.30° E, 25.20° N.
 
+## `display.grid.layers_hidden`
+
+- Severity: warning
+- Step: none
+- Message: The grid has {layers} layers, and only the first is drawn.
+- Hint: Split the layers into separate grids to see the others.
+- Example: The grid has 3 layers, and only the first is drawn.
+
 ## `display.polygons.outline_only`
 
 - Severity: warning

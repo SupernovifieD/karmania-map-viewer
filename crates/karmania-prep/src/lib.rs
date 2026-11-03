@@ -15,6 +15,7 @@
 pub mod choice;
 pub mod drawable;
 pub mod frame;
+pub mod grid;
 pub mod lines;
 pub mod mesh;
 pub mod origin;
@@ -27,6 +28,7 @@ mod testutil;
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
+pub use grid::{GridBuffers, GridLayout, GridPlacement, Tile, grid_image, tiles};
 pub use lines::{LinesBuffers, lines_buffers};
 pub use mesh::{MeshBuffers, mesh_buffers};
 pub use origin::{Frame, FrameSource, origin_near};
