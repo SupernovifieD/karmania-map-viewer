@@ -3531,3 +3531,14 @@ reviewer and reproduced here by a test that failed before the fix.
   same; with the change, 15,000 values would be sampled by their first 10,000 rows and not evenly. A test now takes 10,001, 12,345, 15,000, 19,999 and 30,001
   values (each value is its own row number), requires the sample to be exactly the rows `floor(i * n / 10,000)`, and to run from the first row to
   near the last. The reviewer's mutation fails it.
+- Step 13.F10 (small things of the review). (1) **A frame that is not a frame** (nit): `startPrepare` took a frame with an origin of NaN and answered "drawn" with positions
+  that were all NaN, and no word. The handler now checks the frame with `checkedFrame` before the kernel is asked (an origin has to be three finite numbers,
+  the system and the source valid); a test, seen to fail first. (2) **A removal that was not one** (nit): when the job was gone, the handler called any
+  error "The dataset was removed while it was being prepared", so a contract error on the last step would have been hidden. It does that only for the
+  kernel's "no prepare with that id" now; a test (a kernel that finishes the job and then answers wrongly) fails before and passes. The older misuse
+  test of a bad frame has the new, more precise words of the check. (3) **Words** (nits): the buffers of points and the projection said NaN for a position with none, and
+  a number too large for `f32` once it is relative to the origin is infinite (x of 1e300 gave plus and minus infinity), so the doc says that any coordinate that is not
+  finite is no position and the renderer takes it so (`isFinite`); the module doc of `stats` still said ordered maps after step 13.21a. Not changed, as the
+  reviewer said it is not reachable: the `u32::try_from(..).unwrap_or(u32::MAX)` of the warp and the surface (`dataset.too_large` stops 134 million
+  cells long before a count reaches 4 billion; it would matter only if that limit were raised). The surface triangle's colour from its lowest-numbered corner
+  (the reviewer's N6) is the disclosed design choice of step 13.12, for the owner.

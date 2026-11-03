@@ -8,6 +8,7 @@ import {
   checkedClassBreaks,
   checkedClassifyResult,
   checkedClassMethod,
+  checkedFrame,
   checkedFrameChoice,
   checkedPrepareStep,
 } from './display-check.js';
@@ -65,6 +66,11 @@ function requireWholeNumber(value: unknown, what: string): number {
     throw new TypeError(`${what} must be a whole number from 0 to ${String(MAX_UINT32)}.`);
   }
   return value;
+}
+
+/** Whether an error is the kernel's answer to a step of a prepare that no longer exists. */
+function isNoSuchPrepare(error: unknown): boolean {
+  return error instanceof Error && /no prepare with that id/.test(error.message);
 }
 
 /** Thrown inside a request to unwind it when the main thread asked for it to stop. */
@@ -256,7 +262,8 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
     if (maxTextureSize < 1) {
       throw new TypeError('The largest texture must be at least 1 cell on a side.');
     }
-    const job = kernel.startPrepare(dataset, params.frame, maxTextureSize);
+    // A frame with an origin that is not a number would give positions that are all NaN and no word about it.
+    const job = kernel.startPrepare(dataset, checkedFrame(params.frame, 'frame'), maxTextureSize);
     const report = prepareReporter(id);
     try {
       for (;;) {
@@ -272,9 +279,10 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         await yieldToEventLoop();
       }
     } catch (error) {
-      // Whatever stopped the prepare, what it had made is dropped. If the job is gone already (the
-      // dataset was removed in the meantime) say that and not the kernel's "no prepare with that id".
-      if (!kernel.cancelPrepare(job) && !(error instanceof Cancelled)) {
+      // Whatever stopped the prepare, what it had made is dropped. If the job is gone already because the dataset was
+      // removed in the meantime, the kernel says "no prepare with that id": say that in words. Any other error is
+      // not a removal and is passed on as it is, even if the job is gone (it had finished).
+      if (!kernel.cancelPrepare(job) && isNoSuchPrepare(error)) {
         throw new Error('The dataset was removed while it was being prepared.', { cause: error });
       }
       throw error;

@@ -1,8 +1,8 @@
 //! Statistics of a column: how many values, how many are missing, the range, and the distinct values.
 //!
 //! Everything here is exact and in a fixed order, so that the same column always gives the same
-//! numbers and the same classes: distinct values are kept in an ordered map and listed by value, never in
-//! the order a hash map happens to give.
+//! numbers and the same classes: the distinct values are counted in a hash map (fast, with no random state)
+//! and sorted by value once at the end, so that nothing leaves the map in the order it keeps.
 
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};

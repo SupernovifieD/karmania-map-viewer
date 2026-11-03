@@ -9,7 +9,9 @@ use crate::project::{Prepared, project};
 /// point is the number of its row in the attribute table.
 ///
 /// Positions are `f32`, relative to the frame's origin, in map units, `x y z` interleaved. A point that
-/// has no position on the map (not finite, or not convertible) is NaN, and the renderer leaves it out.
+/// has no position on the map (not finite, or not convertible) is NaN, and the renderer leaves it out. A
+/// number too large for an `f32` once it is made relative to the origin is infinite and not NaN, so the
+/// renderer takes any coordinate that is not finite (`isFinite`) to be no position.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PointsBuffers {
     /// `3 * point count` values.

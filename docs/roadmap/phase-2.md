@@ -242,7 +242,7 @@ or releasing, and whenever the brief says to stop.
   layer, the one that is drawn.
 - [x] 13.F8 Gate fix: the browser and Node reports of display preparation compare the bytes of the buffers.
 - [x] 13.F9 Gate fix: a test of the sample of natural breaks that is not a multiple of its stride.
-- [ ] 13.F10 Gate fix: small things (words about NaN and infinity, the module doc of `stats`, the frame
+- [x] 13.F10 Gate fix: small things (words about NaN and infinity, the module doc of `stats`, the frame
   checked before a prepare starts, the error of a job that is gone).
 - [ ] 13.G Gate.
 
