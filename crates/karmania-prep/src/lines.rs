@@ -34,6 +34,20 @@ pub fn lines_buffers(
 ) -> Result<Prepared<LinesBuffers>, Finding> {
     let mut findings = Findings::new();
     let positions = project(&lines.positions, own, frame, &mut findings)?;
+    let (segments, segment_line) = lines_segments(lines, &positions);
+    Ok(Prepared {
+        buffers: LinesBuffers {
+            positions,
+            segments,
+            segment_line,
+        },
+        findings,
+    })
+}
+
+/// The segments of `lines` (see [`LinesBuffers`]) and the line of each, given the `positions` of the
+/// vertices on the map.
+pub(crate) fn lines_segments(lines: &Lines, positions: &[f32]) -> (Vec<u32>, Vec<u32>) {
     let present = |vertex: usize| {
         vertex
             .checked_mul(3)
@@ -60,14 +74,7 @@ pub fn lines_buffers(
             }
         }
     }
-    Ok(Prepared {
-        buffers: LinesBuffers {
-            positions,
-            segments,
-            segment_line,
-        },
-        findings,
-    })
+    (segments, segment_line)
 }
 
 #[cfg(test)]

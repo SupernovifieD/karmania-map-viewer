@@ -207,7 +207,9 @@ or releasing, and whenever the brief says to stop.
   Split to stay under the commit size guideline:
   - [x] 13.18a The projection of positions in parts (`Projector`), and the
     transformer's `convert_chunk_in_place`, with the same results in parts of any size.
-  - [ ] 13.18b The `PrepareJob` over every kind, and its cancellation.
+  - [x] 13.18b The one-shot functions rebuilt from parts that can be stepped (lines, mesh,
+    polygons, blocks, surface and the warped grid), with no change of behaviour.
+  - [ ] 13.18c The `PrepareJob` over every kind, and its cancellation.
 - [ ] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
   arrays as transferables.
 - [ ] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol

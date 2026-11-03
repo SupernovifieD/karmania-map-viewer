@@ -33,6 +33,18 @@ pub fn mesh_buffers(
 ) -> Result<Prepared<MeshBuffers>, Finding> {
     let mut findings = Findings::new();
     let positions = project(&mesh.positions, own, frame, &mut findings)?;
+    let triangles = mesh_triangles(mesh, &positions);
+    Ok(Prepared {
+        buffers: MeshBuffers {
+            positions,
+            triangles,
+        },
+        findings,
+    })
+}
+
+/// The triangles of `mesh` (see [`MeshBuffers`]), given the `positions` of the vertices on the map.
+pub(crate) fn mesh_triangles(mesh: &Mesh, positions: &[f32]) -> Vec<u32> {
     let present = |vertex: u32| {
         usize::try_from(vertex)
             .ok()
@@ -49,13 +61,7 @@ pub fn mesh_buffers(
             triangles.extend([0, 0, 0]);
         }
     }
-    Ok(Prepared {
-        buffers: MeshBuffers {
-            positions,
-            triangles,
-        },
-        findings,
-    })
+    triangles
 }
 
 #[cfg(test)]

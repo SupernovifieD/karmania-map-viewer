@@ -6,7 +6,7 @@ use karmania_crs::Transformer;
 use crate::drawable::not_convertible;
 use crate::origin::Frame;
 use crate::project::Prepared;
-use crate::warp::warp_tile;
+use crate::warp::{WarpTile, warp_tile};
 
 /// Where an image of cells goes, in the frame: the lattice of the grid, moved to the map's units and
 /// made relative to the frame's origin.
@@ -196,17 +196,40 @@ pub fn grid_buffers(
     }
     let transformer =
         Transformer::new(own, frame.map_crs).map_err(|cause| not_convertible(&cause))?;
-    let [nx, ny, layers] = lattice.dims;
-    let tiles = tiles(nx, ny, max_texture_size);
-    let mut warp = GridWarp {
-        positions: Vec::new(),
-        uvs: Vec::new(),
-        triangles: Vec::new(),
-        tile_triangles: Vec::new(),
-    };
-    let (mut rough, mut unplaced) = (false, 0_u64);
+    let tiles = tiles(lattice.dims[0], lattice.dims[1], max_texture_size);
+    let mut warp = WarpBuilder::new();
     for tile in &tiles {
-        let part = warp_tile(lattice, *tile, elevation, &transformer, frame);
+        warp.add(warp_tile(lattice, *tile, elevation, &transformer, frame));
+    }
+    Ok(warp.finish(lattice, tiles))
+}
+
+/// The meshes of a warped grid put together one tile at a time, so that a long list of tiles can be done
+/// in steps. Done in any number of steps it gives the same buffers and findings as all at once.
+pub(crate) struct WarpBuilder {
+    warp: GridWarp,
+    rough: bool,
+    unplaced: u64,
+}
+
+impl WarpBuilder {
+    /// Starts with no tile.
+    pub(crate) fn new() -> Self {
+        Self {
+            warp: GridWarp {
+                positions: Vec::new(),
+                uvs: Vec::new(),
+                triangles: Vec::new(),
+                tile_triangles: Vec::new(),
+            },
+            rough: false,
+            unplaced: 0,
+        }
+    }
+
+    /// Adds the mesh of the next tile after those already added.
+    pub(crate) fn add(&mut self, part: WarpTile) {
+        let warp = &mut self.warp;
         let first = u32::try_from(warp.positions.len() / 3).unwrap_or(u32::MAX);
         warp.triangles
             .extend(part.triangles.iter().map(|v| v.saturating_add(first)));
@@ -214,32 +237,37 @@ pub fn grid_buffers(
             .push(u32::try_from(part.triangles.len() / 3).unwrap_or(u32::MAX));
         warp.positions.extend(part.positions);
         warp.uvs.extend(part.uvs);
-        rough |= part.rough;
-        unplaced += part.unplaced;
+        self.rough |= part.rough;
+        self.unplaced += part.unplaced;
     }
-    let mut findings = layers_hidden(layers);
-    if rough {
-        findings.add(
-            Finding::new(
-                FindingCode::DisplayGridWarpRough,
-                "The grid is warped so much that its picture may be off by more than a tenth of a cell.",
-            )
-            .with_hint("Change the map's coordinate system to the one this dataset is in."),
-        );
+
+    /// The buffers and findings of the grid whose tiles these are.
+    pub(crate) fn finish(self, lattice: &Lattice, tiles: Vec<Tile>) -> Prepared<GridBuffers> {
+        let [nx, ny, layers] = lattice.dims;
+        let mut findings = layers_hidden(layers);
+        if self.rough {
+            findings.add(
+                Finding::new(
+                    FindingCode::DisplayGridWarpRough,
+                    "The grid is warped so much that its picture may be off by more than a tenth of a cell.",
+                )
+                .with_hint("Change the map's coordinate system to the one this dataset is in."),
+            );
+        }
+        if self.unplaced > 0 {
+            let mut finding = karmania_crs::transform::not_finite();
+            finding.count = self.unplaced;
+            findings.add(finding);
+        }
+        Prepared {
+            buffers: GridBuffers {
+                layout: GridLayout::Warp(self.warp),
+                size: [nx, ny],
+                tiles,
+            },
+            findings,
+        }
     }
-    if unplaced > 0 {
-        let mut finding = karmania_crs::transform::not_finite();
-        finding.count = unplaced;
-        findings.add(finding);
-    }
-    Ok(Prepared {
-        buffers: GridBuffers {
-            layout: GridLayout::Warp(warp),
-            size: [nx, ny],
-            tiles,
-        },
-        findings,
-    })
 }
 
 #[cfg(test)]

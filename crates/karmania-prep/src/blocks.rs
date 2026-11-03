@@ -33,23 +33,56 @@ pub fn blocks_buffers(
     if own != frame.map_crs {
         return Err(blocks_other_crs(own, frame.map_crs));
     }
-    let count = usize::try_from(blocks.block_count().unwrap_or(0)).unwrap_or(0);
-    let mut centres = Vec::with_capacity(count.saturating_mul(3));
-    for block in 0..count {
-        let centre = blocks
-            .block_ijk(block)
-            .and_then(|[i, j, k]| blocks.lattice.cell_centre(i, j, k));
-        centres.extend(centre.map_or([f32::NAN; 3], |c| frame.rebase(c)));
-    }
-    let [dx, dy, dz] = blocks.lattice.spacing;
+    let mut builder = BlocksBuilder::new(blocks);
+    builder.advance(blocks, frame, usize::MAX);
     Ok(Prepared {
-        buffers: BlocksBuffers {
-            centres,
-            spacing: [dx as f32, dy as f32, dz as f32],
-            rotation: blocks.lattice.rotation as f32,
-        },
+        buffers: builder.finish(blocks),
         findings: Findings::new(),
     })
+}
+
+/// The centres of the blocks a few at a time, so that a long list can be done in steps. Done in steps
+/// of any size it gives the same buffers as all at once.
+pub(crate) struct BlocksBuilder {
+    centres: Vec<f32>,
+    count: usize,
+    next: usize,
+}
+
+impl BlocksBuilder {
+    /// Starts on the blocks of `blocks`.
+    pub(crate) fn new(blocks: &Blocks) -> Self {
+        let count = usize::try_from(blocks.block_count().unwrap_or(0)).unwrap_or(0);
+        Self {
+            centres: Vec::with_capacity(count.saturating_mul(3)),
+            count,
+            next: 0,
+        }
+    }
+
+    /// Does the next `budget` blocks (at least one). Returns whether every block is done.
+    pub(crate) fn advance(&mut self, blocks: &Blocks, frame: &Frame, budget: usize) -> bool {
+        let end = self.next.saturating_add(budget.max(1)).min(self.count);
+        for block in self.next..end {
+            let centre = blocks
+                .block_ijk(block)
+                .and_then(|[i, j, k]| blocks.lattice.cell_centre(i, j, k));
+            self.centres
+                .extend(centre.map_or([f32::NAN; 3], |c| frame.rebase(c)));
+        }
+        self.next = end;
+        self.next >= self.count
+    }
+
+    /// The buffers.
+    pub(crate) fn finish(self, blocks: &Blocks) -> BlocksBuffers {
+        let [dx, dy, dz] = blocks.lattice.spacing;
+        BlocksBuffers {
+            centres: self.centres,
+            spacing: [dx as f32, dy as f32, dz as f32],
+            rotation: blocks.lattice.rotation as f32,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -151,5 +184,40 @@ mod tests {
                 .centres
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn blocks_done_a_few_at_a_time_are_those_done_all_at_once() {
+        let b = Blocks {
+            lattice: lattice([5, 4, 3], 30.0),
+            ijk: None,
+        };
+        let f = frame([100.0, 200.0, 50.0]);
+        let whole = blocks_buffers(&b, LOCAL, &f).unwrap().buffers;
+        assert_eq!(whole.centres.len(), 60 * 3);
+        for budget in [0, 1, 7, 59, 60, 1_000] {
+            let mut builder = BlocksBuilder::new(&b);
+            let mut steps = 0;
+            while !builder.advance(&b, &f, budget) {
+                steps += 1;
+                assert!(steps <= 60, "a budget of {budget} must move forward");
+            }
+            let parts = builder.finish(&b);
+            let same = parts
+                .centres
+                .iter()
+                .zip(&whole.centres)
+                .all(|(a, c)| a.to_bits() == c.to_bits());
+            assert!(
+                same && parts.centres.len() == whole.centres.len(),
+                "budget {budget}"
+            );
+        }
+        // Nothing to do is done at once.
+        let none = Blocks {
+            lattice: lattice([2, 2, 2], 0.0),
+            ijk: Some(vec![]),
+        };
+        assert!(BlocksBuilder::new(&none).advance(&none, &f, 10));
     }
 }

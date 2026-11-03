@@ -3268,3 +3268,14 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   in parts of 1, 3, 4, 7, 13, 40 and more, give the same bits and findings (counts and examples: the findings of
   the parts merge into the one the whole gives, because the parts are in order and findings merge on code and
   message). A budget of 0 moves one position, as the import jobs' do.
+- Step 13.18b (the one-shot functions from parts). The job of step 13.18c needs each kind's work in pieces it can
+  step through. Nothing changes for a caller of the one-shot functions: each is now the pieces run to the end,
+  and its tests, unchanged, are what shows it (the 106 that existed pass; two are new). The pieces: `lines_segments(lines,
+  positions)` and `mesh_triangles(mesh, positions)` (work done once the positions are), `PolygonsFill`
+  (polygons a few vertices at a time, at least one polygon a step, the finding for the polygons not filled in
+  added at the end), `BlocksBuilder` (blocks a few at a time), `surface_positions` and `surface_triangles` (the
+  centres, then the triangles, with `Projector` between), and `WarpBuilder` (the meshes put together a tile at a
+  time). Two of them can be stepped by a budget, so each has a test with the whole as the judge: polygons
+  (a square, a square with a hole, a line and a bow tie that are not filled, a triangle) in budgets of 0, 1, 4, 5,
+  13 and 1,000 vertices, and blocks (60 blocks turned 30 degrees) in budgets of 0 to 1,000, give the same bits and
+  findings. The others are one step each (lines, mesh, surface triangles) or a tile each (the warp).
