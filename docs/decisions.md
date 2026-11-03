@@ -2920,3 +2920,18 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   step is checked with `pnpm check` (lint included) and the full gate (end-to-end, visual and axe
   runs, the independent review) is run once, at the end of the milestone, before the pull request is
   merged.
+- Step 13.2 (the map's coordinate system). `karmania_prep::frame` has `utm_crs(longitude, latitude)` and
+  `map_crs_for(crs, extent)`, the rule of section 9.2 of the brief. A local grid, or a projected EPSG
+  system that is in the definitions, is its own map system; a geographic system in degrees gives the
+  WGS 84 / UTM zone of the centre of its extent (zone `floor((lon + 180) / 6) + 1`, EPSG 326xx at the
+  equator and north, 327xx south), with the info finding `display.frame.utm_chosen` that names the zone
+  and the centre. Decided where the brief is silent, and tested: a longitude of 180 is the meridian of
+  -180, so it is in zone 1 and never in a 61st zone, and a longitude outside -180 to 180 wraps round the
+  globe; a latitude of exactly 0 (or -0) is north; there are no special zones for Norway or Svalbard
+  (the brief says so), and UTM is used as far as proj4rs takes it, outside its usual 80 S to 84 N too.
+  A dataset across the antimeridian has its centre on the other side of the globe (the middle of -179
+  and 179 is 0), so it gets that zone: not handled, and the person can change the map's system. A
+  system that cannot give a map system gives none: a code that is not in the definitions, a geocentric
+  system, a system of another kind, and a geographic one in grads (which the transformer refuses).
+  Such a dataset is not drawn (step 13.4); the brief's "its own CRS if projected" is read as needing
+  the definitions to say so, because an unknown code could be anything.

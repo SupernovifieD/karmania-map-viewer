@@ -180,6 +180,8 @@ finding_codes! {
     CrsTransformUnsupported => "crs.transform.unsupported", Error, None;
     /// Some positions could not be converted to the other coordinate system.
     CrsTransformNotFinite => "crs.transform.not_finite", Warning, None;
+    /// The map's coordinate system was chosen from data in longitude and latitude: a UTM zone.
+    DisplayFrameUtmChosen => "display.frame.utm_chosen", Info, None;
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The per-vertex table does not have one row per vertex.

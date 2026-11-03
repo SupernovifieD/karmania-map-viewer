@@ -279,6 +279,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Move those values to the attribute table, or remove them.
 - Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
 
+## `display.frame.utm_chosen`
+
+- Severity: info
+- Step: none
+- Message: The map is drawn in {name} (EPSG:{code}): the data is in longitude and latitude, and its centre is at {longitude}, {latitude}.
+- Hint: Change the map's coordinate system if another one suits the data better.
+- Example: The map is drawn in WGS 84 / UTM zone 40N (EPSG:32640): the data is in longitude and latitude, and its centre is at 57.30° E, 25.20° N.
+
 ## `file.empty`
 
 - Severity: error
