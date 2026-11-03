@@ -3343,3 +3343,16 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   the one failure was a count I had worked out wrongly by hand (the result, 5 and 6, was right: 0 to 8 are below 11).
   **Size of the module** after this step: 5,628,971 bytes, 714,570 gzipped (`gzip -9`), 461,828 more than at the start of
   the phase (252,742), against the rule's 1 MB; the row for `docs/perf.md` is the gate's.
+- Step 13.20a (the types and their checks). `display.ts` is the public type of display preparation: `Frame`,
+  `FrameChoice` and `DrawableEntry`, `RenderBuffers` (a union by `kind`, every typed array named and typed, a
+  grid with exactly one of `placement` and `warp`), `PrepareResult`, `ClassBreaks`, `ClassifyResult`, the
+  constants `FRAME_SOURCES`, `DRAW_STATUSES`, `CLASS_METHODS` and `NO_CLASS` (255), and are exported from the package.
+  `display-check.ts` is what the engine does to anything that crosses from the kernel, as `contract-check.ts` does for the
+  rest: it rejects a key that is not in the type, a typed array of the wrong kind (`Float32Array` for positions,
+  `Uint32Array` for indices, a plain array is refused), and lists that do not match each other (a line number for each
+  segment, a cell for each triangle, a warp whose tiles' triangles add up to its triangles, bounds that go down,
+  a count for each class); a dataset that is not drawn, or a column that is not classified, has to say why. Tested in
+  both directions, because a check that accepts everything passes the first and one that rejects some wrong
+  shapes passes the second: what the built kernel gives for a dataset of each of the seven kinds passes, and
+  26 values that are wrong in one way each are refused with the message that says how. The first version of the test
+  took one step per dataset and a polygon set needs two; the test was changed, not the check.

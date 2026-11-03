@@ -16,6 +16,24 @@ export type {
   ImportProgress,
   LoadOptions,
 } from './api.js';
+export { CLASS_METHODS, DRAW_STATUSES, FRAME_SOURCES, NO_CLASS } from './display.js';
+export type {
+  CategoryValue,
+  ClassBreaks,
+  ClassMethod,
+  ClassifyResult,
+  DrawableEntry,
+  DrawStatus,
+  Frame,
+  FrameChoice,
+  FrameSource,
+  GridPlacement,
+  GridTile,
+  GridWarp,
+  PrepareProgress,
+  PrepareResult,
+  RenderBuffers,
+} from './display.js';
 export {
   CHECK_GROUPS,
   COLUMN_TYPES,
