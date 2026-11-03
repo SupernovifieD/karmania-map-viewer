@@ -16,6 +16,8 @@ pub mod choice;
 pub mod drawable;
 pub mod frame;
 pub mod origin;
+pub mod points;
+pub mod project;
 #[cfg(test)]
 mod testutil;
 
@@ -23,6 +25,8 @@ pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use origin::{Frame, FrameSource, origin_near};
+pub use points::{PointsBuffers, points_buffers};
+pub use project::{Prepared, project};
 
 #[cfg(test)]
 mod tests {
