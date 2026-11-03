@@ -183,7 +183,11 @@ fn reason(error: &Error) -> &'static str {
     }
 }
 
-fn not_finite() -> Finding {
+/// The `crs.transform.not_finite` finding for one occurrence: positions that the new coordinate
+/// system cannot place. `count` and `examples` are the caller's to set; findings with this code and
+/// this message merge into one.
+#[must_use]
+pub fn not_finite() -> Finding {
     Finding::new(
         FindingCode::CrsTransformNotFinite,
         "Some positions are outside the area where the new coordinate system can place them, so they could not be converted.",

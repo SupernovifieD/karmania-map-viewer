@@ -3116,3 +3116,17 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   version of this record said one part, which was a guess, and the test now requires more than one); a grid north of the pole is left out where it cannot be placed;
   and a whole world of 0.0036-degree cells in one tile is `rough`. The tile is not yet taken from a
   grid, nor given a layout: step 13.11b.
+- Step 13.11b (the warp of a whole grid). `grid_buffers(lattice, elevation, own, frame, max_texture_size)` is the
+  entry for a flat grid: the image of step 13.10 if the grid is in the map's system or a local grid, otherwise
+  one mesh for each tile (`warp_tile`), laid one after another in `GridLayout::Warp(GridWarp { positions,
+  uvs, triangles, tile_triangles })`; `tile_triangles[t]` is how many triangles tile `t` has, so the
+  renderer takes the next that many, with the texture of tile `t`, and the vertex numbers run on from tile
+  to tile. This extends the contract of section 11.4 (`warp: { positions, uvs, triangles }`) by the one list that
+  says which triangles belong to which texture, which tiling needs. Two findings: `display.grid.warp_rough`
+  (new, a warning, in `docs/validation-codes.md`) when any tile's mesh is not within a tenth of a cell of the
+  conversion at the finest cut, and the existing `crs.transform.not_finite` for vertices the conversion
+  cannot place, counted as vertices with no examples (the finding's own words, "some positions are outside
+  the area where the new coordinate system can place them", are true of mesh vertices too). The constructor of
+  that finding is now public in `karmania-crs` (`transform::not_finite`), so that the message is written once:
+  findings merge on code and message. A grid whose system cannot be converted to the map's is the error
+  `display.crs.not_convertible`, as for the other kinds. `GridLayout` is no longer `Copy`.

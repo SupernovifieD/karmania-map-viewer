@@ -29,7 +29,9 @@ pub mod warp;
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
-pub use grid::{GridBuffers, GridLayout, GridPlacement, Tile, grid_image, tiles};
+pub use grid::{
+    GridBuffers, GridLayout, GridPlacement, GridWarp, Tile, grid_buffers, grid_image, tiles,
+};
 pub use lines::{LinesBuffers, lines_buffers};
 pub use mesh::{MeshBuffers, mesh_buffers};
 pub use origin::{Frame, FrameSource, origin_near};

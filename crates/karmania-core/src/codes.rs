@@ -186,6 +186,8 @@ finding_codes! {
     DisplayCrsLocalGridsAssumed => "display.crs.local_grids_assumed", Info, None;
     /// A grid with several layers is drawn from its first layer only.
     DisplayGridLayersHidden => "display.grid.layers_hidden", Warning, None;
+    /// A grid is warped so much that its picture may be off by more than a tenth of a cell.
+    DisplayGridWarpRough => "display.grid.warp_rough", Warning, None;
     /// A dataset is not drawn because its positions cannot be converted to the map's coordinate system.
     DisplayCrsNotConvertible => "display.crs.not_convertible", Warning, None;
     /// A dataset is not drawn because none of its positions can be placed on the map.
