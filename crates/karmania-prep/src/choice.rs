@@ -51,31 +51,52 @@ pub struct FrameChoice {
 /// - With neither, the first dataset that has a system and a position gives the map's system
 ///   ([`map_crs_for`], with a finding for a UTM zone) and the origin is the centre of its extent in it.
 ///
-/// The origin of a map in which nothing is drawn is 0.
+/// The origin of a map in which nothing is drawn is 0, and is worked out again by a later call when a
+/// dataset can be drawn in it: see [`choose_frame_tracking`], which a caller that keeps the frame uses.
 #[must_use]
 pub fn choose_frame(
     previous: Option<&Frame>,
     preferred: Option<CrsRef>,
     datasets: &[&Dataset],
 ) -> FrameChoice {
+    choose_frame_tracking(previous, preferred, datasets, false).0
+}
+
+/// [`choose_frame`] for a caller that keeps the frame between calls. `origin_waiting` says that `previous` was
+/// made when no dataset could be drawn in it, so that its origin (0) was not made from a dataset: the origin
+/// of the section 9.1 rule is the centre of the extent of the first drawable dataset, and when one comes
+/// the origin is made from it, once. Returns the choice, and whether the origin is still waiting.
+#[must_use]
+pub fn choose_frame_tracking(
+    previous: Option<&Frame>,
+    preferred: Option<CrsRef>,
+    datasets: &[&Dataset],
+    origin_waiting: bool,
+) -> (FrameChoice, bool) {
     let mut findings = Vec::new();
+    let mut waiting = false;
+    let mut made = |(frame, found): (Frame, bool)| {
+        waiting = !found;
+        frame
+    };
     let frame = if datasets.is_empty() {
         None
     } else {
         match (preferred, previous) {
-            (Some(crs), Some(kept)) if kept.map_crs == crs => Some(Frame {
+            (Some(crs), Some(kept)) if kept.map_crs == crs && !origin_waiting => Some(Frame {
                 source: FrameSource::User,
                 ..*kept
             }),
-            (Some(crs), _) => Some(frame_in(crs, datasets, FrameSource::User)),
-            (None, Some(kept)) => Some(*kept),
+            (Some(crs), _) => Some(made(frame_in(crs, datasets, FrameSource::User))),
+            (None, Some(kept)) if !origin_waiting => Some(*kept),
+            (None, Some(kept)) => Some(made(frame_in(kept.map_crs, datasets, kept.source))),
             (None, None) => datasets
                 .iter()
                 .filter(|dataset| unusable(dataset).is_none())
                 .find_map(|dataset| {
                     let choice = map_crs_for(dataset.crs?, &dataset.bbox()?)?;
                     findings.extend(choice.finding);
-                    Some(frame_in(choice.crs, datasets, FrameSource::Auto))
+                    Some(made(frame_in(choice.crs, datasets, FrameSource::Auto)))
                 }),
         }
     };
@@ -98,24 +119,31 @@ pub fn choose_frame(
             }
         })
         .collect();
-    FrameChoice {
-        frame,
-        drawable,
-        findings,
-    }
+    (
+        FrameChoice {
+            frame,
+            drawable,
+            findings,
+        },
+        waiting,
+    )
 }
 
-/// The frame of a map in `crs`: the origin is the centre of the extent of the first dataset drawn in it.
-fn frame_in(crs: CrsRef, datasets: &[&Dataset], source: FrameSource) -> Frame {
+/// The frame of a map in `crs`: the origin is the centre of the extent of the first dataset drawn in it (0
+/// if none is, and then the second answer is `false`).
+fn frame_in(crs: CrsRef, datasets: &[&Dataset], source: FrameSource) -> (Frame, bool) {
     let centre = datasets
         .iter()
         .filter(|dataset| drawable(crs, dataset).status == DrawStatus::Drawn)
         .find_map(|dataset| extent_in(crs, dataset))
-        .map_or([0.0; 3], |extent| {
+        .map(|extent| {
             let [x, y, z] = std::array::from_fn(|axis| (extent.min[axis] + extent.max[axis]) / 2.0);
             [x, y, z]
         });
-    Frame::new(crs, centre, source)
+    (
+        Frame::new(crs, centre.unwrap_or([0.0; 3]), source),
+        centre.is_some(),
+    )
 }
 
 /// The extent of `dataset` in `crs`: its own extent if it is in `crs`, otherwise the extent of the

@@ -145,6 +145,29 @@ describe('chooseFrame', () => {
     expect(kernel.chooseFrame()).toStrictEqual({ frame: null, drawable: [], findings: [] });
   });
 
+  it('makes the origin from the first dataset that can be drawn, when the person’s choice had none', () => {
+    // A local grid is loaded and the person chooses UTM 40, in which nothing is drawn: the origin is 0.
+    const kernel = createKernel();
+    points(kernel, METRES, [[1, 1]]);
+    const chosen = frameOf(kernel, UTM40);
+    expect(chosen.origin).toStrictEqual([0, 0, 0]);
+    // Data in UTM 40 comes: it is drawn, and the origin is made from it (once), so that points 1 cm
+    // apart are two numbers.
+    const id = points(kernel, UTM40, [
+      [512_000.01, 4_012_345.01],
+      [512_000.02, 4_012_345.02],
+    ]);
+    const frame = frameOf(kernel);
+    expect(frame.origin).toStrictEqual([512_000, 4_012_000, 0]);
+    expect(frame.source).toBe('user');
+    const positions = asObject(prepare(kernel, id, frame).result.buffers).positions as Float32Array;
+    expect(positions[0]).toBeLessThan(positions[3] ?? Number.NaN);
+    expect(positions[1]).toBeLessThan(positions[4] ?? Number.NaN);
+    // And it stays, however many datasets come after.
+    points(kernel, UTM40, [[300_000, 4_000_000]]);
+    expect(frameOf(kernel)).toStrictEqual(frame);
+  });
+
   it('throws for a preferred system that is not one', () => {
     expect(() => createKernel().chooseFrame({ kind: 'nonsense' })).toThrow(/not valid/);
   });
