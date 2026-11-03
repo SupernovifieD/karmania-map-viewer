@@ -164,6 +164,8 @@ finding_codes! {
     MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
     /// The mapping names a column that is not in the file.
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
+    /// The dataset has no column of the name given, so nothing can be classified by it.
+    ClassesColumnMissing => "classes.column.missing", Warning, None;
     /// The column to classify has no number that can be put in a class.
     ClassesColumnNoValues => "classes.column.no_values", Warning, None;
     /// The column to classify by ranges is not made of numbers.

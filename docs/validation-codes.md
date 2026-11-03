@@ -79,6 +79,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `classes.column.missing`
+
+- Severity: warning
+- Step: none
+- Message: The dataset has no column named {name}, so nothing can be coloured by it.
+- Hint: Colour by a column the dataset has, or draw the layer in a single colour.
+- Example: The dataset has no column named grade, so nothing can be coloured by it.
+
 ## `classes.column.no_values`
 
 - Severity: warning

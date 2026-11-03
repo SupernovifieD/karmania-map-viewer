@@ -52,6 +52,23 @@ pub struct ColumnStats {
     pub distinct: Distinct,
 }
 
+/// The value at `row` of `column` as a category, or `None` if it has no value to put in a class: a null, a
+/// number that is not finite, a categorical code that is not in its dictionary, or a row past the end. A
+/// number is the number it is, with -0 taken as 0, as [`column_stats`] counts it.
+#[must_use]
+pub fn category_at(column: &Column, row: usize) -> Option<Category> {
+    match column.get(row)? {
+        Value::Float64(v) if v.is_finite() => {
+            Some(Category::Number(if v == 0.0 { 0.0 } else { v }))
+        }
+        Value::Float64(_) => None,
+        Value::Int64(v) => Some(Category::Number(v as f64)),
+        Value::Bool(v) => Some(Category::Bool(v)),
+        Value::Utf8(v) => Some(Category::Text(v.to_owned())),
+        Value::Category { label, .. } => label.map(|v| Category::Text(v.to_owned())),
+    }
+}
+
 /// A number ordered by [`f64::total_cmp`], with -0 taken as 0, so that it can be a key.
 #[derive(Debug, Clone, Copy)]
 struct Number(f64);
