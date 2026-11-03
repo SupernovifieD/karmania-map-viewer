@@ -63,12 +63,12 @@ impl Drawability {
 /// Whether `dataset` can be drawn in a map in `map_crs`.
 #[must_use]
 pub fn drawable(map_crs: CrsRef, dataset: &Dataset) -> Drawability {
+    if let Some(unusable) = unusable(dataset) {
+        return unusable;
+    }
     let Some(own) = dataset.crs else {
         return Drawability::not_drawn(missing());
     };
-    if dataset.bbox().is_none() {
-        return Drawability::not_drawn(no_extent());
-    }
     if own == map_crs {
         return Drawability::drawn(false, Vec::new());
     }
@@ -82,6 +82,24 @@ pub fn drawable(map_crs: CrsRef, dataset: &Dataset) -> Drawability {
         Ok(_) => Drawability::drawn(true, Vec::new()),
         Err(cause) => Drawability::not_drawn(not_convertible(&cause)),
     }
+}
+
+/// A dataset that cannot be drawn in any map: it has no coordinate system, or no position that can
+/// be placed. `None` for any other dataset.
+pub(crate) fn unusable(dataset: &Dataset) -> Option<Drawability> {
+    if dataset.crs.is_none() {
+        return Some(Drawability::not_drawn(missing()));
+    }
+    dataset
+        .bbox()
+        .is_none()
+        .then(|| Drawability::not_drawn(no_extent()))
+}
+
+/// What is said of a dataset that has a system and a position but gave no map system, which happens
+/// only if the centre of its extent is not a position on the Earth.
+pub(crate) fn not_placeable() -> Drawability {
+    Drawability::not_drawn(no_extent())
 }
 
 /// A system in a few words: `EPSG:32640`, or `a local grid in metres`.
