@@ -194,7 +194,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 13.11a The mesh of one tile: cut finer until the middles of its parts are within 0.1 cell.
   - [x] 13.11b The warp for a whole grid: the tiles, `GridLayout::Warp`, the findings.
 - [x] 13.12 Grid surface buffers (elevations from a column).
-- [ ] 13.13 Block buffers (own CRS only).
+- [x] 13.13 Block buffers (own CRS only).
 - [ ] 13.14 Column statistics: count, nulls, finite min and max, distinct values
   with counts up to a limit; deterministic.
 - [ ] 13.15 Class breaks: equal intervals and quantiles.

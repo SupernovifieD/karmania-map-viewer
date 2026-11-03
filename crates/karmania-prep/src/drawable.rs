@@ -136,7 +136,7 @@ fn no_extent() -> Finding {
     .with_hint("Check the positions and the coordinate system of the data.")
 }
 
-fn blocks_other_crs(own: CrsRef, map_crs: CrsRef) -> Finding {
+pub(crate) fn blocks_other_crs(own: CrsRef, map_crs: CrsRef) -> Finding {
     Finding::new(
         FindingCode::DisplayBlocksOtherCrs,
         format!(

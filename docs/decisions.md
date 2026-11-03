@@ -3149,3 +3149,15 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   **the surface is linear between the centres, for display**: it says nothing of the ground between them.
   Only the first layer of a grid with several is drawn (`display.grid.layers_hidden`, as for the image).
   A column shorter than the grid leaves the cells it does not reach without an elevation.
+- Step 13.13 (block buffers). `blocks_buffers(blocks, own, frame)` gives `BlocksBuffers { centres, spacing, rotation
+  }`: the centre of every block in block order (dense: lattice order; sparse: the order given, so a block's
+  number is its row's), `x y z` relative to the frame's origin with the lattice's rotation already
+  applied to the centre; the block size `[dx, dy, dz]` along the block's own axes; and the rotation in
+  degrees counter-clockwise about +Z, that each box is turned by about its own centre. Blocks are drawn only in
+  the map's own system (section 9.2: "blocks are not warped in phase 2"), so a different system, two local
+  grids in other units included, is the error `display.blocks.other_crs`, the same finding as `drawable`'s
+  (it is one function). A block that is not in the lattice (validation refuses it) has a centre of NaN
+  and keeps its number; a trailing partial triplet is not a block. The centres are worked out one at a time
+  with the lattice's own `cell_centre`, which finds the sine and cosine of the rotation each time; if that
+  costs too much it shows in step 13.21's timing of a million blocks. Which faces to draw for a dense model is
+  the renderer's (section 9.6 leaves it to a measure).

@@ -12,6 +12,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod blocks;
 pub mod choice;
 pub mod drawable;
 pub mod frame;
@@ -27,6 +28,7 @@ pub mod surface;
 mod testutil;
 pub mod warp;
 
+pub use blocks::{BlocksBuffers, blocks_buffers};
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
