@@ -1,0 +1,312 @@
+//! Class breaks: dividing the values of a column into classes for colouring.
+//!
+//! The breaks are numbers that were given (the smallest and largest value, and for quantiles values of
+//! the column) or the equal steps between them; nothing is interpolated between values. The class of a
+//! value is decided in one place, [`class_of`], and the counts below and the class index of step 13.17
+//! both use it, so the legend's numbers are those of the picture.
+
+use karmania_core::{Column, ColumnType, Finding, FindingCode, Value};
+
+/// The most classes: the class index is one byte, and 255 means no value.
+pub const MAX_CLASSES: usize = 254;
+
+/// How a column of numbers is divided into ranges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Method {
+    /// Equal intervals from the smallest to the largest finite value.
+    Equal,
+    /// Quantiles, exact, from the sorted values: about as many values in each class.
+    Quantile,
+}
+
+/// Classes of a column, and how many rows are in each.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ClassBreaks {
+    /// Ranges of numbers.
+    Ranges {
+        /// `classes + 1` numbers, ascending: class `c` is from `bounds[c]` up to, but not including,
+        /// `bounds[c + 1]`, and the last class includes its upper bound. There can be fewer classes than were
+        /// asked for, when the values do not make that many different ranges (a column of one value has one).
+        bounds: Vec<f64>,
+        /// How many rows are in each class.
+        counts: Vec<u64>,
+        /// How many rows have no value to put in a class: null, or not a finite number.
+        nulls: u64,
+    },
+}
+
+/// The class of a number, given the `bounds` of ranges (see [`ClassBreaks::Ranges`]): the last class
+/// that starts at or below it. A number below the first bound is in the first class and one above the last
+/// bound in the last, so that a number is always in a class; `None` for a number that is not finite, and
+/// when there are no classes (fewer than two bounds).
+#[must_use]
+pub fn class_of(bounds: &[f64], value: f64) -> Option<usize> {
+    let classes = bounds.len().checked_sub(1).filter(|&n| n > 0)?;
+    if !value.is_finite() {
+        return None;
+    }
+    let starting_at_or_below = bounds.partition_point(|&bound| bound <= value);
+    Some(starting_at_or_below.saturating_sub(1).min(classes - 1))
+}
+
+/// The finite numbers of `column`, in row order, and how many rows have none.
+fn numbers(column: &Column) -> (Vec<f64>, u64) {
+    let mut values = Vec::with_capacity(column.len());
+    let mut without = 0;
+    for row in 0..column.len() {
+        match column.get(row) {
+            Some(Value::Float64(v)) if v.is_finite() => values.push(v),
+            Some(Value::Int64(v)) => values.push(v as f64),
+            _ => without += 1,
+        }
+    }
+    (values, without)
+}
+
+/// Divides the numbers of `column` into `classes` ranges by `method`, and counts the rows of each.
+///
+/// `classes` is taken from 1 to [`MAX_CLASSES`]. Where the values do not make that many different
+/// ranges the result has fewer (a column of one value has one class, bounds `[v, v]`).
+///
+/// # Errors
+///
+/// A finding: `classes.column.not_numeric` for a column of text, truth values or categories, and
+/// `classes.column.no_values` for a column with no finite number.
+pub fn classify(column: &Column, method: Method, classes: usize) -> Result<ClassBreaks, Finding> {
+    let classes = classes.clamp(1, MAX_CLASSES);
+    if !matches!(
+        column.column_type(),
+        ColumnType::Float64 | ColumnType::Int64
+    ) {
+        return Err(not_numeric(column));
+    }
+    let (mut values, nulls) = numbers(column);
+    if values.is_empty() {
+        return Err(no_values(column));
+    }
+    let bounds = match method {
+        Method::Equal => equal_bounds(&values, classes),
+        Method::Quantile => {
+            values.sort_unstable_by(f64::total_cmp);
+            quantile_bounds(&values, classes)
+        }
+    };
+    let mut counts = vec![0; bounds.len() - 1];
+    for &value in &values {
+        if let Some(count) = class_of(&bounds, value).and_then(|c| counts.get_mut(c)) {
+            *count += 1;
+        }
+    }
+    Ok(ClassBreaks::Ranges {
+        bounds,
+        counts,
+        nulls,
+    })
+}
+
+/// Removes a bound equal to the one before it, which would be a class with no range; at least two bounds
+/// stay (the smallest and the largest, equal for a column of one value).
+fn without_empty_classes(mut bounds: Vec<f64>) -> Vec<f64> {
+    bounds.dedup();
+    if bounds.len() == 1 {
+        bounds.push(bounds[0]);
+    }
+    bounds
+}
+
+/// Equal steps from the smallest to the largest of `values` (not empty, finite). The step is worked out as
+/// `max / n - min / n` so that a range wider than a float does not overflow; the last bound is the
+/// largest value itself.
+fn equal_bounds(values: &[f64], classes: usize) -> Vec<f64> {
+    let (min, max) = values
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| {
+            (lo.min(v), hi.max(v))
+        });
+    let n = classes as f64;
+    let step = max / n - min / n;
+    let mut bounds: Vec<f64> = (0..classes).map(|k| min + step * k as f64).collect();
+    bounds.push(max);
+    without_empty_classes(bounds)
+}
+
+/// Quantiles of `sorted` (not empty): the bound `k` is the value `floor(k * n / classes)` places from the
+/// start, so a value that is a bound starts the class above it, and about `n / classes` values are in
+/// each. The first bound is the smallest value and the last the largest. A value that many rows share
+/// makes bounds that are equal, which are one bound (fewer classes).
+fn quantile_bounds(sorted: &[f64], classes: usize) -> Vec<f64> {
+    let n = sorted.len() as u128;
+    let at = |rank: u128| {
+        usize::try_from(rank)
+            .ok()
+            .and_then(|i| sorted.get(i))
+            .copied()
+    };
+    let mut bounds: Vec<f64> = (0..classes as u128)
+        .filter_map(|k| at(k * n / classes as u128))
+        .collect();
+    bounds.extend(sorted.last());
+    without_empty_classes(bounds)
+}
+
+fn not_numeric(column: &Column) -> Finding {
+    let kind = match column.column_type() {
+        ColumnType::Utf8 => "text",
+        ColumnType::Bool => "true or false",
+        _ => "categories",
+    };
+    Finding::new(
+        FindingCode::ClassesColumnNotNumeric,
+        format!(
+            "The column {} is {kind}, not numbers, so it cannot be divided into ranges.",
+            column.name()
+        ),
+    )
+    .with_hint("Colour by categories instead, or by a column of numbers.")
+}
+
+fn no_values(column: &Column) -> Finding {
+    Finding::new(
+        FindingCode::ClassesColumnNoValues,
+        format!(
+            "The column {} has no value that can be put in a class: every entry is empty or not a finite number.",
+            column.name()
+        ),
+    )
+    .with_hint("Colour by another column, or draw the layer in a single colour.")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use karmania_core::{ColumnData, Validity};
+
+    fn floats(values: &[f64]) -> Column {
+        Column::without_nulls("v", ColumnData::Float64(values.to_vec()))
+    }
+
+    fn ranges(c: &Column, method: Method, classes: usize) -> (Vec<f64>, Vec<u64>, u64) {
+        match classify(c, method, classes).unwrap() {
+            ClassBreaks::Ranges {
+                bounds,
+                counts,
+                nulls,
+            } => (bounds, counts, nulls),
+        }
+    }
+
+    #[test]
+    fn equal_intervals_run_from_the_smallest_to_the_largest_value() {
+        let (bounds, counts, nulls) =
+            ranges(&floats(&[0.0, 2.5, 5.0, 7.5, 10.0]), Method::Equal, 5);
+        assert_eq!(bounds, [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+        // The largest value is in the last class, and a value on a bound starts the class above it.
+        assert_eq!((counts, nulls), (vec![1, 1, 1, 1, 1], 0));
+        let (bounds, counts, _) = ranges(&floats(&[-10.0, 0.0, 4.0, 10.0]), Method::Equal, 2);
+        assert_eq!((bounds, counts), (vec![-10.0, 0.0, 10.0], vec![1, 3]));
+    }
+
+    #[test]
+    fn a_column_of_one_value_is_one_class_and_so_is_equal_to_its_own_bound() {
+        for method in [Method::Equal, Method::Quantile] {
+            let (bounds, counts, _) = ranges(&floats(&[7.0, 7.0, 7.0]), method, 5);
+            assert_eq!((bounds, counts), (vec![7.0, 7.0], vec![3]), "{method:?}");
+        }
+    }
+
+    #[test]
+    fn rows_with_no_number_are_counted_as_nulls() {
+        let c = Column::new(
+            "v",
+            ColumnData::Float64(vec![1.0, f64::NAN, 3.0, 99.0, f64::INFINITY]),
+            Validity::from_flags([true, true, true, false, true]),
+        )
+        .unwrap();
+        let (bounds, counts, nulls) = ranges(&c, Method::Equal, 2);
+        assert_eq!(
+            (bounds, counts, nulls),
+            (vec![1.0, 2.0, 3.0], vec![1, 1], 3)
+        );
+        let ints = Column::without_nulls("i", ColumnData::Int64(vec![1, 2, 3, 4]));
+        assert_eq!(ranges(&ints, Method::Equal, 2).1, [2, 2]);
+    }
+
+    #[test]
+    fn quantiles_are_values_of_the_column_with_about_as_many_rows_in_each_class() {
+        let (bounds, counts, _) = ranges(&floats(&[4.0, 1.0, 3.0, 2.0]), Method::Quantile, 2);
+        assert_eq!((bounds, counts), (vec![1.0, 3.0, 4.0], vec![2, 2]));
+        let ten: Vec<f64> = (1..=10).map(f64::from).rev().collect();
+        let (bounds, counts, _) = ranges(&floats(&ten), Method::Quantile, 4);
+        assert_eq!(bounds, [1.0, 3.0, 6.0, 8.0, 10.0]);
+        assert_eq!(counts, [2, 3, 2, 3]);
+        assert!(
+            bounds.iter().all(|b| ten.contains(b)),
+            "every bound is a value that was given"
+        );
+    }
+
+    #[test]
+    fn values_that_many_rows_share_make_fewer_classes_not_empty_ones() {
+        let (bounds, counts, _) = ranges(&floats(&[1.0, 1.0, 1.0, 1.0, 5.0]), Method::Quantile, 3);
+        assert_eq!((bounds, counts), (vec![1.0, 5.0], vec![5]));
+        let (bounds, counts, _) = ranges(
+            &floats(&[1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0]),
+            Method::Quantile,
+            4,
+        );
+        assert!(counts.iter().all(|&n| n > 0), "{bounds:?} {counts:?}");
+        assert_eq!(counts.iter().sum::<u64>(), 8);
+    }
+
+    #[test]
+    fn the_class_of_a_number_is_the_last_that_starts_at_or_below_it() {
+        let bounds = [0.0, 10.0, 20.0, 30.0];
+        for (value, class) in [
+            (0.0, 0),
+            (9.99, 0),
+            (10.0, 1),
+            (29.0, 2),
+            (30.0, 2),
+            (-5.0, 0),
+            (1e9, 2),
+        ] {
+            assert_eq!(class_of(&bounds, value), Some(class), "{value}");
+        }
+        assert_eq!(class_of(&bounds, f64::NAN), None);
+        assert_eq!(class_of(&bounds, f64::INFINITY), None);
+        assert_eq!(class_of(&[5.0], 5.0), None);
+        assert_eq!(class_of(&[], 5.0), None);
+        assert_eq!(class_of(&[7.0, 7.0], 7.0), Some(0));
+    }
+
+    #[test]
+    fn a_range_wider_than_a_float_and_a_number_of_classes_out_of_range() {
+        let (bounds, counts, _) = ranges(&floats(&[-1.0e308, 0.0, 1.0e308]), Method::Equal, 2);
+        assert!(bounds.iter().all(|b| b.is_finite()), "{bounds:?}");
+        assert_eq!(counts.iter().sum::<u64>(), 3);
+        assert_eq!(
+            ranges(&floats(&[1.0, 2.0, 3.0]), Method::Equal, 0).1.len(),
+            1,
+            "0 is taken as 1"
+        );
+        let many: Vec<f64> = (0..1000).map(f64::from).collect();
+        assert_eq!(
+            ranges(&floats(&many), Method::Equal, 10_000).1.len(),
+            MAX_CLASSES
+        );
+    }
+
+    #[test]
+    fn a_column_that_cannot_be_divided_gives_a_finding() {
+        let text = Column::without_nulls("rock", ColumnData::Utf8(vec!["a".into()]));
+        let error = classify(&text, Method::Equal, 5).unwrap_err();
+        assert_eq!(error.code.as_str(), "classes.column.not_numeric");
+        assert_eq!(
+            error.message,
+            "The column rock is text, not numbers, so it cannot be divided into ranges."
+        );
+        let nothing = Column::without_nulls("grade", ColumnData::Float64(vec![f64::NAN]));
+        let error = classify(&nothing, Method::Quantile, 5).unwrap_err();
+        assert_eq!(error.code.as_str(), "classes.column.no_values");
+    }
+}

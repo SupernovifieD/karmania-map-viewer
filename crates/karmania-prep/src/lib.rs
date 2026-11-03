@@ -14,6 +14,7 @@
 
 pub mod blocks;
 pub mod choice;
+pub mod classify;
 pub mod drawable;
 pub mod frame;
 pub mod grid;
@@ -31,6 +32,7 @@ pub mod warp;
 
 pub use blocks::{BlocksBuffers, blocks_buffers};
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
+pub use classify::{ClassBreaks, MAX_CLASSES, Method, class_of, classify};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use grid::{

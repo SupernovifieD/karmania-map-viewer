@@ -79,6 +79,22 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `classes.column.no_values`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} has no value that can be put in a class: every entry is empty or not a finite number.
+- Hint: Colour by another column, or draw the layer in a single colour.
+- Example: The column grade has no value that can be put in a class: every entry is empty or not a finite number.
+
+## `classes.column.not_numeric`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} is {type}, not numbers, so it cannot be divided into ranges.
+- Hint: Colour by categories instead, or by a column of numbers.
+- Example: The column rock is text, not numbers, so it cannot be divided into ranges.
+
 ## `crs.code.unknown`
 
 - Severity: warning
