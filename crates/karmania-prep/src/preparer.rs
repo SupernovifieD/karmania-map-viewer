@@ -1,0 +1,204 @@
+//! What the worker keeps between requests to prepare: the frame, and the jobs under way.
+
+use std::collections::BTreeMap;
+
+use karmania_core::{CrsRef, Dataset, DatasetId};
+
+use crate::choice::{FrameChoice, choose_frame};
+use crate::job::{PrepareJob, PrepareStep};
+use crate::origin::Frame;
+
+/// The frame the map is drawn in and the preparing under way. Several can exist at once and share nothing,
+/// like the kernels that hold them.
+#[derive(Default)]
+pub struct Preparer {
+    frame: Option<Frame>,
+    jobs: BTreeMap<u32, (DatasetId, PrepareJob)>,
+    /// The identifier the next job gets. Identifiers are never reused.
+    next: u32,
+}
+
+impl Preparer {
+    /// A preparer with no frame and no job.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            frame: None,
+            jobs: BTreeMap::new(),
+            next: 1,
+        }
+    }
+
+    /// The frame the map is in, if there is one.
+    #[must_use]
+    pub fn frame(&self) -> Option<&Frame> {
+        self.frame.as_ref()
+    }
+
+    /// Chooses the frame for `datasets` (in the order they were loaded), keeps it, and says which are
+    /// drawn: see [`choose_frame`]. The frame stays for as long as any dataset is loaded, and goes when
+    /// the last is removed, so call this again after datasets are added or removed.
+    pub fn choose_frame(
+        &mut self,
+        preferred: Option<CrsRef>,
+        datasets: &[&Dataset],
+    ) -> FrameChoice {
+        let choice = choose_frame(self.frame.as_ref(), preferred, datasets);
+        self.frame = choice.frame;
+        choice
+    }
+
+    /// Starts preparing `dataset` for drawing in `frame` and returns the job's identifier. Nothing is done
+    /// until [`Preparer::step`].
+    pub fn start(&mut self, dataset: &Dataset, frame: Frame, max_texture_size: u32) -> u32 {
+        let id = self.next;
+        self.next += 1;
+        self.jobs.insert(
+            id,
+            (
+                dataset.id,
+                PrepareJob::new(dataset, frame, max_texture_size),
+            ),
+        );
+        id
+    }
+
+    /// Does the next part of a job. `dataset` is the one it was started on, or `None` if that dataset is
+    /// gone, which cancels the job. A job that is done or cancelled is forgotten with the step that says
+    /// so. `None` if there is no job with that identifier (it never existed, or it is over).
+    pub fn step(
+        &mut self,
+        job: u32,
+        dataset: Option<&Dataset>,
+        budget: usize,
+    ) -> Option<PrepareStep> {
+        let (_, running) = self.jobs.get_mut(&job)?;
+        let step = match dataset {
+            Some(dataset) => running.step(dataset, budget),
+            None => PrepareStep::Cancelled,
+        };
+        if !matches!(step, PrepareStep::Progress { .. }) {
+            self.jobs.remove(&job);
+        }
+        Some(step)
+    }
+
+    /// Stops a job and gives back what it holds. Returns whether there was one.
+    pub fn cancel(&mut self, job: u32) -> bool {
+        self.jobs.remove(&job).is_some()
+    }
+
+    /// Stops the jobs that are preparing `dataset`, which is being removed.
+    pub fn forget_dataset(&mut self, dataset: DatasetId) {
+        self.jobs.retain(|_, (id, _)| *id != dataset);
+    }
+
+    /// How many jobs are under way.
+    #[must_use]
+    pub fn jobs(&self) -> usize {
+        self.jobs.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::origin::FrameSource;
+    use crate::testutil::points;
+
+    const UTM40: CrsRef = CrsRef::Epsg { code: 32640 };
+
+    fn at(id: u64, xy: &[(f64, f64)]) -> Dataset {
+        let mut d = points(Some(UTM40), xy);
+        d.id = DatasetId(id);
+        d
+    }
+
+    #[test]
+    fn the_frame_is_kept_between_calls_and_goes_with_the_last_dataset() {
+        let a = at(1, &[(512_000.0, 4_012_000.0)]);
+        let b = at(2, &[(300_000.0, 4_000_000.0)]);
+        let mut p = Preparer::new();
+        assert_eq!(p.frame(), None);
+        let first = p.choose_frame(None, &[&a]);
+        assert_eq!(p.frame(), first.frame.as_ref());
+        // A second dataset does not move it, nor does removing the first.
+        assert_eq!(p.choose_frame(None, &[&a, &b]).frame, first.frame);
+        assert_eq!(p.choose_frame(None, &[&b]).frame, first.frame);
+        // A choice of the person's is kept too.
+        let user = p.choose_frame(Some(CrsRef::Epsg { code: 32641 }), &[&b]);
+        assert_eq!(
+            user.frame.map(|f| (f.map_crs, f.source)),
+            Some((CrsRef::Epsg { code: 32641 }, FrameSource::User))
+        );
+        assert_eq!(
+            p.choose_frame(None, &[&b]).frame.map(|f| f.map_crs),
+            Some(CrsRef::Epsg { code: 32641 })
+        );
+        // The last dataset goes: no frame, and the next dataset starts afresh.
+        assert_eq!(p.choose_frame(None, &[]).frame, None);
+        assert_eq!(p.frame(), None);
+        assert_eq!(
+            p.choose_frame(None, &[&b]).frame.map(|f| f.map_crs),
+            Some(UTM40)
+        );
+    }
+
+    #[test]
+    fn a_job_is_stepped_until_done_and_is_then_forgotten() {
+        let d = at(
+            1,
+            &[
+                (512_000.0, 4_012_000.0),
+                (512_010.0, 4_012_010.0),
+                (512_020.0, 4_012_020.0),
+            ],
+        );
+        let mut p = Preparer::new();
+        let frame = p.choose_frame(None, &[&d]).frame.unwrap();
+        let job = p.start(&d, frame, 4096);
+        assert_eq!(p.jobs(), 1);
+        assert!(matches!(
+            p.step(job, Some(&d), 2),
+            Some(PrepareStep::Progress { .. })
+        ));
+        assert!(matches!(
+            p.step(job, Some(&d), 2),
+            Some(PrepareStep::Done(_))
+        ));
+        assert_eq!(
+            (p.jobs(), p.step(job, Some(&d), 2)),
+            (0, None),
+            "forgotten once it is done"
+        );
+        assert_eq!(p.step(99, Some(&d), 2), None, "there is no such job");
+    }
+
+    #[test]
+    fn cancelling_removing_the_dataset_and_a_step_without_it_all_stop_a_job() {
+        let d = at(1, &[(512_000.0, 4_012_000.0); 10]);
+        let other = at(2, &[(1.0, 1.0)]);
+        let mut p = Preparer::new();
+        let frame = p.choose_frame(None, &[&d]).frame.unwrap();
+        let (a, b, c) = (
+            p.start(&d, frame, 4096),
+            p.start(&d, frame, 4096),
+            p.start(&other, frame, 4096),
+        );
+        assert_eq!((a, b, c), (1, 2, 3), "identifiers are never reused");
+        assert!(p.cancel(a));
+        assert!(!p.cancel(a));
+        // The dataset the job is for is gone: the step says so, and the job is forgotten.
+        assert_eq!(p.step(b, None, 2), Some(PrepareStep::Cancelled));
+        assert_eq!(p.step(b, Some(&d), 2), None);
+        // Removing a dataset stops the jobs on it and leaves the others.
+        let again = p.start(&d, frame, 4096);
+        p.forget_dataset(DatasetId(1));
+        assert_eq!(p.step(again, Some(&d), 2), None);
+        assert_eq!(p.jobs(), 1);
+        assert!(matches!(
+            p.step(c, Some(&other), 1),
+            Some(PrepareStep::Done(_))
+        ));
+    }
+}

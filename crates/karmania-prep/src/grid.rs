@@ -2,6 +2,7 @@
 
 use karmania_core::{CrsRef, Finding, FindingCode, Findings, Lattice};
 use karmania_crs::Transformer;
+use serde::Serialize;
 
 use crate::drawable::not_convertible;
 use crate::origin::Frame;
@@ -22,7 +23,7 @@ pub struct GridPlacement {
 }
 
 /// A rectangle of cells that is one texture: `nx` by `ny` cells starting at cell `(i0, j0)`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Tile {
     /// The first cell along `i`.
     pub i0: u32,
