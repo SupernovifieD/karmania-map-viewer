@@ -72,6 +72,19 @@ await write(
   },
 );
 
-for (const name of ['points-1m', 'grid-4m']) {
+// 1,000,000 blocks: a dense model of 100 x 100 x 100 blocks of 10 m, one row for each block, in lattice order
+// (X fastest, then Y, then Z), with a density and a domain. The columns are those of fixtures/blocks.csv.
+const domains = ['ore', 'waste', 'transition'];
+const nextBlock = generator(7);
+const side = 100;
+await write(join(out, 'blocks-1m.csv'), 'XC,YC,ZC,Density,Domain\n', side * side * side, (at) => {
+  const i = at % side;
+  const j = Math.floor(at / side) % side;
+  const k = Math.floor(at / (side * side));
+  const density = (2 + (nextBlock() % 1_000) / 1_000).toFixed(3);
+  return `${String(500_005 + i * 10)},${String(2_765_005 + j * 10)},${String(5 + k * 10)},${density},${domains[nextBlock() % 3]}`;
+});
+
+for (const name of ['points-1m', 'grid-4m', 'blocks-1m']) {
   copyFileSync(join(root, 'fixtures', 'points.prj'), join(out, `${name}.prj`));
 }

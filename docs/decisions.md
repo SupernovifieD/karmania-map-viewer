@@ -3413,3 +3413,16 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   which I had written as a bow tie by swapping two y values, and which the polygon check rightly reported as
   outline-only (`display.polygons.outline_only`). The engine's whole browser suite (14 tests) passes. Timing is not
   asserted: a prepare that stops in some number of milliseconds would be a test of the machine.
+- Step 13.21 (the fixtures and the timings). `scripts/generate-fixtures` also writes `blocks-1m.csv`, a dense model of
+  100 x 100 x 100 blocks of 10 m in the columns of `fixtures/blocks.csv` (30.4 MB, from a fixed seed, in the ignored
+  directory). `crates/karmania-prep/tests/timing.rs` has ignored timing tests, as the readers' do, for 1,000,000 points
+  (in the map's system and converted from longitude and latitude), 4,000,000 cells (as an image, warped from
+  degrees, as a surface), 1,000,000 blocks, and new classes for 4,000,000 cells by every method, each prepared as the
+  worker does, a job stepped 100,000 at a time. The results are in `docs/perf.md`: preparing is a small part of every target
+  (15 to 300 ms against 1.5 s and 3 s, natively), **and one target is missed**: new classes for 4,000,000 cells take
+  0.13 to 0.19 s by ranges and 0.34 to 0.40 s by categories (about 2,000 distinct values), against the restyle's 0.3 s, in native
+  code and before the transfer and the drawing. The brief says to stop and report a miss after reasonable effort and not to
+  relax it, so the test asserts the target and fails for categories on this machine, and the first effort is
+  step 13.21a. The brief's pnpm perf (the browser performance project of the app) is run at the gate. The timing file
+  allows `expect` and `panic` for the whole file (the workspace denies them, `clippy.toml` allows them in tests, and clippy
+  does not count helper functions outside a `#[test]` as tests).

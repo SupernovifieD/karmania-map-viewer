@@ -262,3 +262,62 @@ quoted string of each definition, against about 50 ms if every definition were r
 12.4). In WebAssembly in Node (step 12.F7, the definitions as a table, going through 6,184 definitions
 and not trying 65,536 codes): a median of 1.75 ms per search over 50 searches; in a browser it is not
 measured here.
+
+## Preparing for drawing (step 13.21)
+
+Section 9.6 of the Phase 2 brief sets the targets for loading a file and drawing its first frame: under
+1.5 s for 1,000,000 points, 1.5 s for a grid of 4,000,000 cells, 3 s for 1,000,000 blocks, and new classes
+visible under 300 ms for the grid. Preparing the data for the renderer is a part of each. These are the
+timings of that part alone, natively in a release build (not WebAssembly, which is slower, and not reading
+the file, uploading to the graphics card or drawing, which the browser measurements of milestone M16 will add):
+
+```
+scripts/generate-fixtures
+cargo test -p karmania-prep --release --test timing -- --ignored --nocapture --test-threads=1
+```
+
+`scripts/generate-fixtures` now also writes `fixtures/generated/blocks-1m.csv` (a dense model of 100 x 100 x
+100 blocks of 10 m, 30.4 MB, from a fixed seed, not committed). The timing tests make their data in memory
+from fixed seeds, like those of the readers, so making it is not timed, and prepare a dataset as the worker
+does, a job stepped 100,000 positions, vertices or blocks at a time (a tile of a warped grid is a step); the
+longest step is the longest the worker cannot hear a request to stop. Three runs, on the machine named at the
+top of this file (1.1 GHz, so a slow one):
+
+| What | Run 1 | Run 2 | Run 3 | Longest step | Brief's target |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1,000,000 points in the map's system | 19 ms | 15 ms | 14 ms | 5 to 7 ms | 1.5 s (all of loading) |
+| 1,000,000 points converted from longitude and latitude | 281 ms | 253 ms | 297 ms | 31 to 53 ms | 1.5 s |
+| 4,000,000 cells as an image (placed) | 0 ms | 0 ms | 0 ms | 0 ms | 1.5 s |
+| 4,000,000 cells warped from degrees (4 by 4 degrees) | 1 ms | 1 ms | 1 ms | 1 ms | 1.5 s |
+| 4,000,000 cells as a surface (a vertex and two triangles for each) | 366 ms | 433 ms | 370 ms | 164 to 194 ms | 1.5 s |
+| 1,000,000 blocks | 29 ms | 32 ms | 41 ms | 3 to 5 ms | 3 s |
+
+An image of cells has almost nothing to prepare (its placement and its tiles), so the time of a grid is in
+what is done to it afterwards: the class of every cell. New classes for the same 4,000,000 cells (a value
+for all but one in 97), the classification and then the class of every cell, in milliseconds:
+
+| Method | Run 1 | Run 2 | Run 3 |
+| --- | ---: | ---: | ---: |
+| Equal intervals | 58 + 69 | 65 + 66 | 102 + 56 |
+| Quantiles | 117 + 73 | 125 + 66 | 109 + 68 |
+| Natural breaks (a sample of 10,000) | 96 + 66 | 87 + 62 | 78 + 70 |
+| Categories (about 2,000 different values) | 321 + 75 | 286 + 65 | 275 + 62 |
+
+**The restyle target is missed for categories**: 0.34 to 0.40 s for the classification and the class of every
+cell, against 0.3 s for the whole restyle, in native code, before the transfer to the page, the upload of a
+texture and the drawing, and before WebAssembly's slowdown. The other three methods take 0.13 to 0.19 s, so
+they have room but not much. The test (`new_classes_for_four_million_cells`) fails on this machine for that
+reason, as it should. The brief says to stop and report a target that is missed after reasonable effort, and
+not to relax it; the first effort is the next step (13.21a), which makes the count of distinct values faster
+(an ordered map costs about 11 comparisons a value, and the order is only needed at the end), and the
+numbers above are those from before it. Not measured here and left to M16: the same in WebAssembly, the
+page's side (receiving 4,000,000 bytes, uploading them as a texture), and a column of integer codes (the usual
+case for categories, with a few distinct values, which a 2,000-value column is not).
+
+What the numbers say about the steps: the longest step of any kind is the one that makes the triangles of a
+surface (180 ms, one step for 4,000,000 cells), which is how long the worker cannot hear a stop while it
+runs; a conversion of positions is stepped 100,000 at a time and its longest step is about 30 to 50 ms. The
+conversion of 1,000,000 positions from longitude and latitude (about 270 ms) is the one preparing cost that
+is more than a few tens of milliseconds, and it is a part of drawing data that is not in the map's system. The
+warp of a grid of 4,000,000 cells is 1 ms because it is a mesh of about 64 parts, not a picture of cells: the
+cells are in the texture the renderer is given.
