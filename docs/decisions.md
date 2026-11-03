@@ -2950,3 +2950,14 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   the same `f32` without the origin (the grid there is 0.25 m), which is why there is one. It is a test
   of numbers, not yet of a picture (step 16.13 repeats it on screen). `serde` and `serde_json` (dev) are
   added to `karmania-prep`; both were already in the lock file.
+- Step 13.4a (a correction of step 13.2). Step 13.2 gave no map system to a dataset whose code is not
+  in the definitions, a geocentric system or a geographic one in grads, and said they would not be
+  drawn. That contradicts the message of `crs.code.unknown` (step 12.11): "the data can only be drawn
+  on a map that uses the same code", and the order of the rules of section 9.2, whose first line is
+  "same CRS: drawn". `map_crs_for` now gives the system itself for everything that is not longitude and
+  latitude in degrees (a local grid, a projected system, an unknown code, a geocentric one, grads): the
+  first dataset needs nothing converted. What is converted, or not, for the datasets that come after
+  it is `drawable`'s (step 13.4b). The test that said "none" is now a test that each of 99,999 (not in
+  the definitions), 4978 (geocentric) and 4807 (grads) is its own map system. The map in an unknown code
+  has no units to measure in, so the scale bar of M17 will have to be absent for it, like a geographic
+  map: to be written down there.

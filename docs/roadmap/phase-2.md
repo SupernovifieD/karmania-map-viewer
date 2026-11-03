@@ -174,7 +174,13 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.2 Frame choice (section 9.2 of the brief) with the info finding for the
   UTM choice. Tests: projected, local, geographic north and south, zone edges.
 - [x] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
-- [ ] 13.4 Drawability per dataset (9.2) with display findings; documented.
+- [ ] 13.4 Drawability per dataset (9.2) with display findings; documented. Split to stay under the
+  commit size guideline:
+  - [x] 13.4a A correction of 13.2: every system that is not longitude and latitude in degrees is its
+    own map system, an unknown code included.
+  - [ ] 13.4b `drawable(map_crs, dataset)` and the display findings.
+  - [ ] 13.4c `choose_frame`: the frame and the drawable list of every dataset, with the rule that the
+    map CRS stays until it is changed or the last dataset is removed.
 - [ ] 13.5 Points buffers.
 - [ ] 13.6 Lines buffers.
 - [ ] 13.7 Add the earcut port (dependency-only).

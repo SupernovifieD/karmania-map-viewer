@@ -6,7 +6,7 @@
 //! extent, with a finding that says which zone and why.
 
 use karmania_core::{BBox, CrsGeography, CrsKinds, CrsRef, Finding, FindingCode};
-use karmania_crs::{CrsKind, Definitions, lookup};
+use karmania_crs::{Definitions, lookup};
 
 /// The first EPSG code of WGS 84 / UTM, north of the equator (zone 1 is 32601).
 const UTM_NORTH_BASE: u32 = 32600;
@@ -48,31 +48,30 @@ pub struct MapCrsChoice {
     pub finding: Option<Finding>,
 }
 
-/// The map CRS that the dataset in `crs`, with the extent `extent` in that system, gives; `None` if
-/// its system cannot give one.
+/// The map CRS that the dataset in `crs`, with the extent `extent` in that system, gives; `None` only
+/// when the centre of a geographic extent is not a position (never, for an extent of finite numbers).
 ///
-/// - A local grid, or a projected EPSG system that is in the definitions: its own system.
-/// - A geographic EPSG system in degrees: WGS 84 / UTM at the centre of the extent ([`utm_crs`]),
-///   with an info finding (`display.frame.utm_chosen`). A dataset across the antimeridian has its
-///   centre on the wrong side of the globe, and gets the zone of that centre.
-/// - Anything else (a code that is not in the definitions, a geocentric system, an angle in grads,
-///   a system of another kind): none. Such a dataset is not drawn (see `drawable`).
+/// - A geographic EPSG system in degrees: WGS 84 / UTM at the centre of the extent ([`utm_crs`]), with
+///   an info finding (`display.frame.utm_chosen`). A dataset across the antimeridian has its centre on
+///   the wrong side of the globe, and gets the zone of that centre.
+/// - Anything else is its own system: a local grid, a projected system, and also a code that is not in
+///   the definitions, a geocentric system and a geographic one in grads. Nothing has to be converted
+///   for the first dataset, and the message of `crs.code.unknown` promises that data with an unknown
+///   code can be drawn on a map that uses the same code. What is not a map system for the datasets
+///   that come after it is decided by `drawable`, which has to convert them.
 #[must_use]
 pub fn map_crs_for(crs: CrsRef, extent: &BBox) -> Option<MapCrsChoice> {
-    let CrsRef::Epsg { code } = crs else {
+    let geographic = matches!(crs, CrsRef::Epsg { code } if Definitions.geography(code) == CrsGeography::Geographic);
+    if !geographic {
         return Some(MapCrsChoice { crs, finding: None });
-    };
-    if Definitions.geography(code) == CrsGeography::Geographic {
-        let longitude = (extent.min[0] + extent.max[0]) / 2.0;
-        let latitude = (extent.min[1] + extent.max[1]) / 2.0;
-        let utm = utm_crs(longitude, latitude)?;
-        return Some(MapCrsChoice {
-            crs: utm,
-            finding: Some(utm_chosen(utm, longitude, latitude)),
-        });
     }
-    let info = lookup(code)?;
-    (info.kind == CrsKind::Projected).then_some(MapCrsChoice { crs, finding: None })
+    let longitude = (extent.min[0] + extent.max[0]) / 2.0;
+    let latitude = (extent.min[1] + extent.max[1]) / 2.0;
+    let utm = utm_crs(longitude, latitude)?;
+    Some(MapCrsChoice {
+        crs: utm,
+        finding: Some(utm_chosen(utm, longitude, latitude)),
+    })
 }
 
 fn utm_chosen(utm: CrsRef, longitude: f64, latitude: f64) -> Finding {
@@ -209,11 +208,19 @@ mod tests {
     }
 
     #[test]
-    fn systems_that_cannot_give_a_map_system_give_none() {
+    fn a_system_that_is_not_degrees_is_its_own_map_system_even_if_it_is_unknown() {
         let any = extent([0.0, 0.0], [1.0, 1.0]);
         // Not in the definitions, geocentric, a geographic system in grads (Paris, EPSG:4807).
         for code in [99_999, 4978, 4807] {
-            assert_eq!(map_crs_for(epsg(code), &any), None, "{code}");
+            let choice = map_crs_for(epsg(code), &any).unwrap();
+            assert_eq!(
+                choice,
+                MapCrsChoice {
+                    crs: epsg(code),
+                    finding: None
+                },
+                "{code}"
+            );
         }
     }
 }
