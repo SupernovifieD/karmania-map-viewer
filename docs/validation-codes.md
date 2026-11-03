@@ -327,6 +327,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Split the layers into separate grids to see the others.
 - Example: The grid has 3 layers, and only the first is drawn.
 
+## `display.grid.warp_rough`
+
+- Severity: warning
+- Step: none
+- Message: The grid is warped so much that its picture may be off by more than a tenth of a cell.
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: The grid is warped so much that its picture may be off by more than a tenth of a cell.
+
 ## `display.polygons.outline_only`
 
 - Severity: warning

@@ -1,9 +1,12 @@
 //! Render buffers of grids drawn as an image: where it goes, and how it is cut into textures.
 
 use karmania_core::{CrsRef, Finding, FindingCode, Findings, Lattice};
+use karmania_crs::Transformer;
 
+use crate::drawable::not_convertible;
 use crate::origin::Frame;
 use crate::project::Prepared;
+use crate::warp::warp_tile;
 
 /// Where an image of cells goes, in the frame: the lattice of the grid, moved to the map's units and
 /// made relative to the frame's origin.
@@ -32,11 +35,28 @@ pub struct Tile {
 }
 
 /// How a grid is placed on the map.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GridLayout {
     /// As a rotated rectangle of square-edged cells: the grid is in the map's system, or in a local
     /// grid that is scaled to the map's units.
     Placement(GridPlacement),
+    /// As a mesh that carries the cells to where the conversion puts them: the grid is in another system.
+    Warp(GridWarp),
+}
+
+/// The meshes of a warped grid, one for each tile, one after another.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridWarp {
+    /// `x y z` of every vertex of every tile, relative to the frame's origin, in map units; NaN where the
+    /// conversion cannot place it.
+    pub positions: Vec<f32>,
+    /// `u v` of every vertex, from 0 to 1 across the texture of its tile.
+    pub uvs: Vec<f32>,
+    /// Three vertex numbers (0-based, into the lists above, for all the tiles) per triangle.
+    pub triangles: Vec<u32>,
+    /// How many triangles each tile has, in the order of `tiles`: the triangles of tile `t` are the next
+    /// `tile_triangles[t]` after those of the tiles before it.
+    pub tile_triangles: Vec<u32>,
 }
 
 /// The buffers of a grid drawn as an image. The values are not in them: the renderer takes one class
@@ -91,6 +111,24 @@ fn units_factor(own: CrsRef, map_crs: CrsRef) -> Option<f64> {
     }
 }
 
+/// The finding for a grid of several layers, which are drawn from the first only.
+fn layers_hidden(layers: u32) -> Findings {
+    let mut findings = Findings::new();
+    if layers > 1 {
+        findings.add(
+            Finding::new(
+                FindingCode::DisplayGridLayersHidden,
+                format!(
+                    "The grid has {} layers, and only the first is drawn.",
+                    karmania_core::text::format_count(u64::from(layers))
+                ),
+            )
+            .with_hint("Split the layers into separate grids to see the others."),
+        );
+    }
+    findings
+}
+
 /// Prepares a flat grid for drawing as an image: `lattice` in the system `own`, its plane at `elevation`
 /// (not finite is taken as 0), in `frame`, cut into textures of at most `max_texture_size` cells a side.
 ///
@@ -125,23 +163,80 @@ pub fn grid_image(
     };
     let [nx, ny, layers] = lattice.dims;
     let mut findings = Findings::new();
-    if layers > 1 {
-        findings.add(
-            Finding::new(
-                FindingCode::DisplayGridLayersHidden,
-                format!(
-                    "The grid has {} layers, and only the first is drawn.",
-                    karmania_core::text::format_count(u64::from(layers))
-                ),
-            )
-            .with_hint("Split the layers into separate grids to see the others."),
-        );
-    }
+    findings.extend(layers_hidden(layers));
     Some(Prepared {
         buffers: GridBuffers {
             layout: GridLayout::Placement(placement),
             size: [nx, ny],
             tiles: tiles(nx, ny, max_texture_size),
+        },
+        findings,
+    })
+}
+
+/// Prepares a flat grid for drawing: as an image if it is in the map's system or a local grid (see
+/// [`grid_image`]), otherwise as a warped image, a mesh for each tile (see [`crate::warp::warp_tile`]).
+///
+/// A tile whose mesh cannot be within a tenth of a cell of the conversion is said to be rough in one
+/// `display.grid.warp_rough` finding; vertices that cannot be placed are counted by
+/// `crs.transform.not_finite`, with no examples, and the triangles that use them are left out.
+///
+/// # Errors
+///
+/// A `display.crs.not_convertible` finding if `own` cannot be converted to the map's system.
+pub fn grid_buffers(
+    lattice: &Lattice,
+    elevation: f64,
+    own: CrsRef,
+    frame: &Frame,
+    max_texture_size: u32,
+) -> Result<Prepared<GridBuffers>, Finding> {
+    if let Some(image) = grid_image(lattice, elevation, own, frame, max_texture_size) {
+        return Ok(image);
+    }
+    let transformer =
+        Transformer::new(own, frame.map_crs).map_err(|cause| not_convertible(&cause))?;
+    let [nx, ny, layers] = lattice.dims;
+    let tiles = tiles(nx, ny, max_texture_size);
+    let mut warp = GridWarp {
+        positions: Vec::new(),
+        uvs: Vec::new(),
+        triangles: Vec::new(),
+        tile_triangles: Vec::new(),
+    };
+    let (mut rough, mut unplaced) = (false, 0_u64);
+    for tile in &tiles {
+        let part = warp_tile(lattice, *tile, elevation, &transformer, frame);
+        let first = u32::try_from(warp.positions.len() / 3).unwrap_or(u32::MAX);
+        warp.triangles
+            .extend(part.triangles.iter().map(|v| v.saturating_add(first)));
+        warp.tile_triangles
+            .push(u32::try_from(part.triangles.len() / 3).unwrap_or(u32::MAX));
+        warp.positions.extend(part.positions);
+        warp.uvs.extend(part.uvs);
+        rough |= part.rough;
+        unplaced += part.unplaced;
+    }
+    let mut findings = layers_hidden(layers);
+    if rough {
+        findings.add(
+            Finding::new(
+                FindingCode::DisplayGridWarpRough,
+                "The grid is warped so much that its picture may be off by more than a tenth of a cell.",
+            )
+            .with_hint("Change the map's coordinate system to the one this dataset is in."),
+        );
+    }
+    if unplaced > 0 {
+        let mut finding = karmania_crs::transform::not_finite();
+        finding.count = unplaced;
+        findings.add(finding);
+    }
+    Ok(Prepared {
+        buffers: GridBuffers {
+            layout: GridLayout::Warp(warp),
+            size: [nx, ny],
+            tiles,
         },
         findings,
     })
@@ -161,6 +256,13 @@ mod tests {
             spacing: [25.0, 10.0, 1.0],
             dims,
             rotation: 30.0,
+        }
+    }
+
+    fn placement(buffers: &GridBuffers) -> GridPlacement {
+        match &buffers.layout {
+            GridLayout::Placement(p) => *p,
+            GridLayout::Warp(_) => panic!("warped, not placed"),
         }
     }
 
@@ -247,7 +349,7 @@ mod tests {
             4096,
         )
         .unwrap();
-        let GridLayout::Placement(p) = out.buffers.layout;
+        let p = placement(&out.buffers);
         assert_eq!(
             p,
             GridPlacement {
@@ -273,7 +375,7 @@ mod tests {
             rotation: 0.0,
         };
         let out = grid_image(&l, 0.0, feet, &frame(metres, [0.0; 3]), 4096).unwrap();
-        let GridLayout::Placement(p) = out.buffers.layout;
+        let p = placement(&out.buffers);
         assert_eq!(p.origin, [304.8, 609.6, 0.0]);
         assert_eq!(p.spacing, [3.048, 3.048]);
     }
@@ -310,7 +412,96 @@ mod tests {
             out.findings.as_slice()[0].message,
             "The grid has 3 layers, and only the first is drawn."
         );
-        let GridLayout::Placement(p) = out.buffers.layout;
+        let p = placement(&out.buffers);
         assert_eq!(p.origin[2], 0.0);
+    }
+
+    fn warp(buffers: &GridBuffers) -> &GridWarp {
+        match &buffers.layout {
+            GridLayout::Warp(w) => w,
+            GridLayout::Placement(_) => panic!("placed, not warped"),
+        }
+    }
+
+    #[test]
+    fn a_grid_in_another_system_is_warped_one_mesh_per_tile() {
+        // 600 by 400 cells of 0.01 degrees, in tiles of 256: three columns and two rows.
+        let l = Lattice {
+            origin: [54.0, 22.0, 0.0],
+            spacing: [0.01, 0.01, 1.0],
+            dims: [600, 400, 1],
+            rotation: 0.0,
+        };
+        let f = frame(UTM40, [500_000.0, 2_600_000.0, 0.0]);
+        let out = grid_buffers(&l, 0.0, CrsRef::Epsg { code: 4326 }, &f, 256).unwrap();
+        assert!(out.findings.is_empty(), "{:?}", out.findings);
+        let w = warp(&out.buffers);
+        assert_eq!(out.buffers.tiles.len(), 6);
+        assert_eq!(w.tile_triangles.len(), 6);
+        assert_eq!(
+            w.tile_triangles.iter().map(|&n| n as usize).sum::<usize>() * 3,
+            w.triangles.len()
+        );
+        let vertices = w.positions.len() / 3;
+        assert_eq!(w.uvs.len() / 2, vertices);
+        assert!(w.triangles.iter().all(|&v| (v as usize) < vertices));
+        // The meshes follow one another: every vertex a tile's triangles use comes after every vertex the
+        // triangles of the tile before it use.
+        let mut start = 0;
+        let mut last_largest = None;
+        for &count in &w.tile_triangles {
+            let end = start + count as usize * 3;
+            let used = &w.triangles[start..end];
+            let (smallest, largest) = (used.iter().min().unwrap(), used.iter().max().unwrap());
+            assert!(last_largest.is_none_or(|before| before < *smallest));
+            last_largest = Some(*largest);
+            start = end;
+        }
+    }
+
+    #[test]
+    fn a_grid_that_needs_no_warp_is_still_an_image_and_one_that_cannot_be_placed_is_an_error() {
+        let l = lattice([2, 2, 1]);
+        let image = grid_buffers(&l, 0.0, UTM40, &frame(UTM40, [0.0; 3]), 4096).unwrap();
+        assert!(matches!(image.buffers.layout, GridLayout::Placement(_)));
+        let local = CrsRef::Local {
+            units: Units::Metre,
+        };
+        let error = grid_buffers(&l, 0.0, local, &frame(UTM40, [0.0; 3]), 4096)
+            .map(|_| ())
+            .unwrap_err();
+        assert_eq!(error.code.as_str(), "display.crs.not_convertible");
+    }
+
+    #[test]
+    fn what_cannot_be_placed_is_counted_and_a_hopeless_mesh_is_said_to_be_rough() {
+        let f = frame(UTM40, [0.0; 3]);
+        let beyond = Lattice {
+            origin: [57.0, 88.0, 0.0],
+            spacing: [0.5, 0.5, 1.0],
+            dims: [10, 10, 1],
+            rotation: 0.0,
+        };
+        let out = grid_buffers(&beyond, 0.0, CrsRef::Epsg { code: 4326 }, &f, 4096).unwrap();
+        let finding = out
+            .findings
+            .as_slice()
+            .iter()
+            .find(|f| f.code.as_str() == "crs.transform.not_finite")
+            .unwrap();
+        assert!(finding.count > 0);
+        let world = Lattice {
+            origin: [-179.0, -80.0, 0.0],
+            spacing: [0.0036, 0.0036, 1.0],
+            dims: [100_000, 100, 1],
+            rotation: 0.0,
+        };
+        let out = grid_buffers(&world, 0.0, CrsRef::Epsg { code: 4326 }, &f, 200_000).unwrap();
+        assert!(
+            out.findings
+                .as_slice()
+                .iter()
+                .any(|f| f.code.as_str() == "display.grid.warp_rough")
+        );
     }
 }
