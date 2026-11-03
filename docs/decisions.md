@@ -3519,3 +3519,10 @@ reviewer and reproduced here by a test that failed before the fix.
   keep their meaning: every row). The contract of step 13.17, "one byte for each element", is now "for each element that is drawn"; the doc of
   `Engine.classIndex` says so. Test, seen to fail first (counts `[6, 2]` over 8 rows): the counts, the bounds and the index by ranges and by categories
   are those of the first layer, and a grid of one layer and another shape are as before.
+- Step 13.F8 (the browser and Node, bit for bit). Minor. The record of step 13.20d and its commit said that conversion and classification are "bit for bit the
+  same in Chromium and in Node", but the report that the two are compared on had the first position rounded to 0.01, the length of the array and
+  a count of NaNs; only the class breaks (as JSON) were compared exactly. **Fix**: the report also has a hash (FNV-1a, 32 bits) of every byte of the
+  positions of the points, of the positions, triangles and outline of the polygons, and of the positions, uvs and triangles of the
+  meshes of the warped grid, and the browser's report, from the real worker in Chromium, must equal Node's. It does (the test passed at the first run
+  after the hashes were added), so the statement is now true of those arrays: the conversion by `proj4rs` in WebAssembly, the triangulation and the warp give the same bytes
+  in Chromium and in Node, for this data. It is one data set, not a proof for all.

@@ -243,7 +243,11 @@ test.describe('display preparation, through the real worker', () => {
     expect(inBrowser.points.notPlaced).toBe(1);
     expect(inBrowser.points.findings).toEqual(['crs.transform.not_finite x1']);
     // Three squares, two triangles each.
-    expect(inBrowser.polygons).toEqual({ triangles: 6, outline: 12, findings: [] });
+    expect([
+      inBrowser.polygons.triangles,
+      inBrowser.polygons.outline,
+      inBrowser.polygons.findings,
+    ]).toEqual([6, 12, []]);
     // 90 by 40 cells in textures of 32: three columns, two rows; each tile has a mesh, no placement.
     expect(inBrowser.warpedGrid.tiles).toBe(6);
     expect(inBrowser.warpedGrid.tileTriangles).toHaveLength(6);
@@ -259,8 +263,16 @@ test.describe('display preparation, through the real worker', () => {
     expect(inBrowser.stopped).toEqual({ outcome: 'AbortError', nextWorks: true });
     expect(inBrowser.progress).toEqual({ reports: true, ascending: true });
 
-    // The same data gives the same result everywhere: the browser, through the real worker, and Node,
-    // through the in-process channel, agree on every number.
+    // The same data gives the same result everywhere: the browser, through the real worker, and Node, through
+    // the in-process channel, agree on every number, and on every byte of the positions of the points, of the polygons and
+    // of the meshes of the warped grid (a hash of each, so that one bit that differs fails).
+    for (const hash of [
+      inBrowser.points.hash,
+      ...inBrowser.polygons.hashes,
+      ...inBrowser.warpedGrid.hashes,
+    ]) {
+      expect(hash).toMatch(/^[0-9a-f]{8}$/);
+    }
     const engine = engineOverChannel();
     try {
       expect(inBrowser).toEqual(await runDisplay(engine));
