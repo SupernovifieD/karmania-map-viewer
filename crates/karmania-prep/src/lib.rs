@@ -12,6 +12,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod frame;
+
+pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
+
 #[cfg(test)]
 mod tests {
     /// The crate builds against the core and the coordinate systems.
