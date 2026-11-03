@@ -233,7 +233,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.F1 Gate fix: quantile classes of a column with two values, or with most rows at one value, are
   not collapsed to one class.
 - [x] 13.F2 Gate fix: a frame made when nothing was drawable gets its origin from the first dataset that is.
-- [ ] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
+- [x] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
   own, and the claims about the length of a step are corrected.
 - [ ] 13.F4 Gate fix: removing the last dataset drops the frame in the kernel itself.
 - [ ] 13.F5 Gate fix: the mesh of a warped tile is cut along `i` and along `j` by what each side needs.

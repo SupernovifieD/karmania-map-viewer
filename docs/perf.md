@@ -326,10 +326,18 @@ bounds by partitioning the values, which needs no full sort). Not measured here 
 the page's side, and a column of integer codes (the usual case for categories, with a few distinct values, which a
 column of 2,000 is not).
 
-What the numbers say about the steps: the longest step of any kind is the one that makes the triangles of a
-surface (180 ms, one step for 4,000,000 cells), which is how long the worker cannot hear a stop while it
-runs; a conversion of positions is stepped 100,000 at a time and its longest step is about 30 to 50 ms. The
-conversion of 1,000,000 positions from longitude and latitude (about 270 ms) is the one preparing cost that
-is more than a few tens of milliseconds, and it is a part of drawing data that is not in the map's system. The
-warp of a grid of 4,000,000 cells is 1 ms because it is a mesh of about 64 parts, not a picture of cells: the
-cells are in the texture the renderer is given.
+What the numbers say about the steps (corrected at the gate, step 13.F3: the first version said that the longest step of
+any kind was the surface's, 180 ms, which was not so). The worker hears a request to stop only between steps, so the
+longest step is the longest it hears nothing. A conversion of positions is stepped 100,000 at a time and its longest step is
+30 to 50 ms natively and 83 ms in WebAssembly. Two steps cannot be cut: the triangles of a surface (one step for 4,000,000
+cells: 180 ms natively, 445 ms in WebAssembly in Node) and the triangulation of one polygon, whose time grows faster than its
+size. Natively, in one step, one polygon of 25,000 vertices takes 20 ms, 50,000 take 47 ms, 100,000 take 140 ms, 200,000 take
+670 ms and 400,000 take 3.3 s (the review of the milestone saw 9.5 s for 1,000,000 in WebAssembly); a polygon of 100,000 vertices is
+one step of 373 ms in WebAssembly here. A polygon of more than 100,000 vertices is therefore outlined and not filled, with its own
+finding (`display.polygons.too_detailed`), which bounds that step. The conversion of 1,000,000 positions from longitude and latitude
+(about 270 ms natively, 650 ms in WebAssembly) is the one preparing cost that is more than a few tens of milliseconds as a whole, and
+it is a part of drawing data that is not in the map's system. The warp of a grid of 4,000,000 cells is 1 ms because it is a mesh of
+about 64 parts, not a picture of cells: the cells are in the texture the renderer is given. WebAssembly in Node, one run each, this
+machine. Not measured: the cost of yielding between steps in a browser, where `setTimeout(0)` is held to about 4 ms after a few nested
+calls, so that a prepare of many steps (the 40 of a surface of 4,000,000 cells, or one for each tile of a very large warped grid) takes that
+much longer than its work.

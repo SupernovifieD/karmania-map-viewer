@@ -3471,3 +3471,18 @@ reviewer and reproduced here by a test that failed before the fix.
   centred on it, which another dataset must not move (a test). The source stays `user`. Tests: in `Preparer` (fails before: the origin
   stayed `[0, 0, 0]`; with the flag never set, fails again), and through the built kernel in Node (`kernel-prep.test.ts`, the
   prepared positions 1 cm apart are two numbers).
+- Step 13.F3 (one polygon, one long step). **Major.** A polygon is one step of a prepare (earcut cannot be stopped), and the time it
+  takes grows faster than the polygon: natively 140 ms for 100,000 vertices, 670 ms for 200,000, 3.3 s for 400,000 (a new ignored
+  timing test, `the_longest_step_for_one_large_polygon`); the reviewer saw 9.5 s for 1,000,000 in WebAssembly. For that time the worker hears no
+  request to stop, no removal and no other request. The cap was 16,000,000 vertices, chosen to keep `earcut` from panicking and not for time.
+  **Fix**: a polygon of more than 100,000 vertices (its rings, holes included) is outlined and not filled, with a finding of its own,
+  `display.polygons.too_detailed` ("Some polygons have more than 100,000 vertices, which is too many to fill in, so only their outlines
+  are drawn", hint: simplify or split them; in `docs/validation-codes.md`), because the advice of `display.polygons.outline_only`
+  (check that no ring crosses itself) is wrong for them. A fill of a polygon at the limit takes 140 ms natively, 373 ms in WebAssembly on
+  this machine. **Also corrected**: the claims that "a step takes well under a tenth of a second" (the handler's comment, the record of step
+  13.20b) and that the longest step of any kind is the surface's 180 ms were false; in WebAssembly the two steps that cannot be cut, one polygon
+  at the limit and the triangles of a surface of 4,000,000 cells, take 373 and 445 ms here (measured in Node), and the comment and
+  `docs/perf.md` now say so. The surface's step could be cut by rows and is not: it is left as a known limit. Tests (the first
+  failed before the fix): a polygon of 100,001 vertices is outlined, its square neighbour is filled, and the finding has the
+  count, the example and the words; the limit counts the vertices of the rings of one polygon together, and shows its edge with a small limit
+  (8 against 7 and 9). Mutation: the limit ignored (both tests fail).
