@@ -3016,3 +3016,14 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   chosen by `prepare` (step 13.18), after `drawable` has said the dataset is drawn. The first try had a
   function of the dataset that said "wrong kind" with the code `display.extent.none`, which is not what
   that code means, and was replaced before it was committed.
+- Step 13.6 (lines buffers). `lines_buffers(lines, own, frame)` gives `LinesBuffers { positions, segments,
+  segment_line }`: the positions of every vertex of the dataset, in vertex order, as for points; a pair of
+  0-based vertex numbers for every two neighbouring vertices of a line, so a line of `n` vertices has
+  `n - 1` segments and a line of fewer than two has none (`lines.line.too_short` already says so, as a
+  warning); and the 0-based number of the line of each segment (the row of its attributes, which the
+  renderer needs for one colour per line and for selection). A segment with an end that has no position on
+  the map (NaN: a vertex that could not be converted) is left out, which breaks the line there and leaves
+  the other segments as they were; the vertices stay in their places, so no number changes. A line whose
+  offsets are malformed, which validation refuses to load, is skipped and not a panic. Lines are straight
+  between their converted vertices: long edges are not densified (section 9.2, recorded in step 13.4b).
+  The vertex-number arithmetic is checked, since a 32-bit WebAssembly `usize` would wrap.
