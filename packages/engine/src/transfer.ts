@@ -1,6 +1,7 @@
 /**
  * Finds the buffers of a dataset that can be handed to the worker instead of copied.
  */
+import type { PrepareResult } from './display.js';
 import type { DatasetInput } from './inputs.js';
 
 /** How deep a dataset goes: the dataset, a list of columns, a column, its arrays. */
@@ -39,5 +40,17 @@ function collect(value: unknown, depth: number, into: Set<ArrayBuffer>): void {
 export function transferablesOf(input: DatasetInput): ArrayBuffer[] {
   const buffers = new Set<ArrayBuffer>();
   collect(input, 0, buffers);
+  return [...buffers];
+}
+
+/**
+ * Every `ArrayBuffer` under the typed arrays of the buffers of a prepare result, each once: the worker
+ * hands them to the page instead of copying them. A result that is not drawn has none.
+ */
+export function transferablesOfResult(result: PrepareResult): ArrayBuffer[] {
+  const buffers = new Set<ArrayBuffer>();
+  if (result.status === 'drawn') {
+    collect(result.buffers, 0, buffers);
+  }
   return [...buffers];
 }

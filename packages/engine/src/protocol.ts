@@ -11,7 +11,16 @@ import { IMPORT_PHASES } from './api.js';
 import type { ImportPhase, ImportProgress } from './api.js';
 import type { SerializedError } from './errors.js';
 import type { DatasetInput } from './inputs.js';
-import type { CrsInfo, ImportMapping, LoadResult, Page, Preview } from './types.js';
+import type {
+  ClassBreaks,
+  ClassifyResult,
+  ClassMethod,
+  Frame,
+  FrameChoice,
+  PrepareProgress,
+  PrepareResult,
+} from './display.js';
+import type { CrsInfo, CrsRef, ImportMapping, LoadResult, Page, Preview } from './types.js';
 
 /** A data file to look at, with the sidecar files that belong to it. */
 export interface PreviewGroup {
@@ -65,6 +74,39 @@ export interface Requests {
     readonly params: { readonly dataset: number };
     readonly result: boolean;
   };
+  /** Chooses the map's coordinate system for the loaded datasets, and says which are drawn in it. */
+  readonly chooseFrame: {
+    readonly params: { readonly preferred?: CrsRef };
+    readonly result: FrameChoice;
+  };
+  /**
+   * Prepares a dataset for drawing in a frame, with `prepareProgress` replies on the way. The buffers of
+   * the result are handed over, not copied.
+   */
+  readonly prepare: {
+    readonly params: {
+      readonly dataset: number;
+      readonly frame: Frame;
+      /** The largest texture the graphics card takes, in cells on a side. Defaults to 4,096. */
+      readonly maxTextureSize?: number;
+    };
+    readonly result: PrepareResult;
+  };
+  /** Divides a column of a dataset into classes. */
+  readonly classify: {
+    readonly params: {
+      readonly dataset: number;
+      readonly column: string;
+      readonly method: ClassMethod;
+      readonly classes: number;
+    };
+    readonly result: ClassifyResult;
+  };
+  /** The class of every element of a dataset under class breaks: one byte each, handed over. */
+  readonly classIndex: {
+    readonly params: { readonly dataset: number; readonly breaks: ClassBreaks };
+    readonly result: Uint8Array;
+  };
 }
 
 /** Every type of request. */
@@ -77,6 +119,10 @@ export const REQUEST_TYPES = [
   'load',
   'rows',
   'remove',
+  'chooseFrame',
+  'prepare',
+  'classify',
+  'classIndex',
 ] as const;
 
 /** The type of a request. */
@@ -119,6 +165,13 @@ export interface ProgressMessage {
   readonly progress: ImportProgress;
 }
 
+/** How far a prepare has got. Any number of these come before its result. */
+export interface PrepareProgressMessage {
+  readonly type: 'prepareProgress';
+  readonly id: number;
+  readonly progress: PrepareProgress;
+}
+
 /** The request failed: it was misuse, or the worker could not do it. */
 export interface ErrorMessage {
   readonly type: 'error';
@@ -133,7 +186,8 @@ export interface CancelledMessage {
 }
 
 /** Everything the worker sends. */
-export type FromWorker = ResultMessage | ProgressMessage | ErrorMessage | CancelledMessage;
+export type FromWorker =
+  ResultMessage | ProgressMessage | PrepareProgressMessage | ErrorMessage | CancelledMessage;
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
@@ -197,6 +251,15 @@ export function parseFromWorker(data: unknown): FromWorker | undefined {
             id,
             progress: { phase: progress['phase'], fraction: progress['fraction'] },
           }
+        : undefined;
+    }
+    case 'prepareProgress': {
+      const progress = data['progress'];
+      return isRecord(progress) &&
+        typeof progress['fraction'] === 'number' &&
+        progress['fraction'] >= 0 &&
+        progress['fraction'] <= 1
+        ? { type: 'prepareProgress', id, progress: { fraction: progress['fraction'] } }
         : undefined;
     }
     case 'error': {
