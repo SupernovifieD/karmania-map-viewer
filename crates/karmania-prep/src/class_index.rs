@@ -1,8 +1,8 @@
 //! The class of every element: one byte each, for the renderer to look a colour up by.
 
-use karmania_core::{Column, Dataset, Finding, FindingCode};
+use karmania_core::{Column, Dataset, Finding};
 
-use crate::classify::{ClassBreaks, class_of};
+use crate::classify::{ClassBreaks, class_of, column_missing};
 use crate::stats::category_at;
 
 /// The class index of an element that has no value to put in a class.
@@ -49,13 +49,10 @@ pub fn class_index_of(dataset: &Dataset, breaks: &ClassBreaks) -> Result<Vec<u8>
     let name = match breaks {
         ClassBreaks::Ranges { column, .. } | ClassBreaks::Categories { column, .. } => column,
     };
-    let column = dataset.attributes.column(name).ok_or_else(|| {
-        Finding::new(
-            FindingCode::ClassesColumnMissing,
-            format!("The dataset has no column named {name}, so nothing can be coloured by it."),
-        )
-        .with_hint("Colour by a column the dataset has, or draw the layer in a single colour.")
-    })?;
+    let column = dataset
+        .attributes
+        .column(name)
+        .ok_or_else(|| column_missing(name))?;
     Ok(class_index(column, breaks))
 }
 

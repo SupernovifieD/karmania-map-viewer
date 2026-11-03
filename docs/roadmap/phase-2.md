@@ -210,11 +210,11 @@ or releasing, and whenever the brief says to stop.
   - [x] 13.18b The one-shot functions rebuilt from parts that can be stepped (lines, mesh,
     polygons, blocks, surface and the warped grid), with no change of behaviour.
   - [x] 13.18c The `PrepareJob` over every kind, and its cancellation.
-- [ ] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
+- [x] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
   arrays as transferables. Split to stay under the commit size guideline:
   - [x] 13.19a What the worker keeps between requests (`Preparer`: the frame and the jobs), the
     JSON forms of the class breaks, and `Registry::datasets`.
-  - [ ] 13.19b The exports of the wasm `Kernel`, with typed arrays, and a test in Node.
+  - [x] 13.19b The exports of the wasm `Kernel`, with typed arrays, and a test in Node.
 - [ ] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol
   types; a test that transferred buffers are detached on the sending side;
   real-worker tests.

@@ -83,6 +83,12 @@ impl Preparer {
         Some(step)
     }
 
+    /// The dataset a job is preparing, or `None` if there is no such job.
+    #[must_use]
+    pub fn dataset_of(&self, job: u32) -> Option<DatasetId> {
+        self.jobs.get(&job).map(|(dataset, _)| *dataset)
+    }
+
     /// Stops a job and gives back what it holds. Returns whether there was one.
     pub fn cancel(&mut self, job: u32) -> bool {
         self.jobs.remove(&job).is_some()

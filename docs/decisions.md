@@ -3317,3 +3317,29 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   the string or the boolean itself (untagged), `Method` is `equal`, `quantile`, `jenks` or `categories`, `Tile`
   is `{i0, j0, nx, ny}`; tested by writing and reading them back. The typed arrays are not serde's: they are made
   by the bindings (step 13.19b).
+- Step 13.19b (the exports of the kernel). The wasm `Kernel` gains `chooseFrame(preferred?)`, `startPrepare(dataset, frame,
+  maxTextureSize)`, `stepPrepare(job, budget)`, `cancelPrepare(job)`, `classify(dataset, column, method,
+  classes)` and `classIndex(dataset, breaks)`; `remove` also stops the jobs on the dataset. **They only translate**: the
+  frame and the jobs are `Preparer`'s (step 13.19a) and the classes are `classify_dataset`'s, so the bindings
+  hold no state of their own beyond the `Preparer`. **Typed arrays**: every array of a buffer is made with
+  `Float32Array::from` or `Uint32Array::from`, a copy in the JavaScript heap with an `ArrayBuffer` of its own, not a
+  view of the module's memory, so the worker can post it as a transferable and the page gets it without a second
+  copy. A test transfers a result's positions with `structuredClone(..., { transfer })` and checks that the
+  sender's buffer is detached afterwards, and that `buffer.byteLength` is the array's own (not the module's
+  memory). The results: `chooseFrame` gives `{ frame, drawable, findings }` with `frame: null` (the
+  contract's `| null`; the serializer is told to write a missing field as `null`, which the other results, whose
+  absent fields are `undefined` by design, do not need); `stepPrepare` gives `{ status: "progress", fraction }`, `{
+  status: "done", result }` or `{ status: "cancelled" }`, with `result` `{ status: "drawn", buffers, findings }` (a
+  grid's `placement` or `warp`, never both; `size`; `tiles`) or `{ status: "not_drawn", findings }`; `classify`
+  gives `{ status: "classified", breaks }` or `{ status: "not_classified", findings }` (**the contract of 11.4 said
+  `Promise<ClassBreaks>`; a column that cannot be classified is a data problem, so a finding and not a throw**);
+  `classIndex` gives a `Uint8Array`, and throws for breaks that are not breaks or of a column the dataset
+  does not have (misuse: breaks come from `classify` of the same dataset). A step of a job that is over, cancelled or
+  whose dataset was removed throws "there is no prepare with that id", as a step of an import that is over does. **Tested in
+  Node against the built module** (`kernel-prep.test.ts`, 18 tests): the frame in each of its states, the typed
+  arrays of every kind of buffer (a dataset of each of the six shapes, a warped grid with six tiles), the budget
+  and the progress, positions that cannot be converted, a dataset that is not drawn, cancellation and removal, the
+  classes by every method, and the legend's counts against the tally of the class index. 17 passed at the first run;
+  the one failure was a count I had worked out wrongly by hand (the result, 5 and 6, was right: 0 to 8 are below 11).
+  **Size of the module** after this step: 5,628,971 bytes, 714,570 gzipped (`gzip -9`), 461,828 more than at the start of
+  the phase (252,742), against the rule's 1 MB; the row for `docs/perf.md` is the gate's.

@@ -156,6 +156,7 @@ dependencies = [
  "karmania-core",
  "karmania-crs",
  "karmania-io",
+ "karmania-prep",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
