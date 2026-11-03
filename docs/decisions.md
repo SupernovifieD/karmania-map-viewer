@@ -3039,3 +3039,28 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   in `cargo metadata`). Its code is derived in part from Mapbox's, under ISC, which asks that the
   notice be kept in all copies: it is in `THIRD_PARTY_NOTICES.md` (not yet in a build, as for the EPSG
   notice: steps 23.5, 23.6 and 24.5). Dependency only: nothing calls it before step 13.8.
+- Step 13.8 (polygons). `polygons_buffers(polygons, own, frame)` gives `PolygonsBuffers { positions, triangles,
+  triangle_polygon, outline, outline_polygon }`: the positions of every vertex as for the other kinds;
+  three vertex numbers per triangle and the polygon's number for each triangle; and a pair of vertex
+  numbers for every side of every ring (the closing side included, holes too) with the polygon's number.
+  A MultiPolygon is already one polygon per part (step 3.14), so a polygon here is one exterior ring and
+  its holes. Each polygon is triangulated alone with `earcut` on the converted, rebased positions
+  (`f32` taken as `f64`, so the triangles tile exactly what is drawn), with a reused `Earcut`. Earcut
+  does not say when it has failed, so the triangles are checked: the sum of their areas has to be the
+  area of the polygon (exterior minus holes, shoelace) to within 1e-6 of it, and neither may be 0. A
+  polygon that fails (a symmetric bow tie, which has area 0 by the shoelace formula, a ring on one line,
+  a ring that is one point, a vertex with no position on the map, rings that are not one after another
+  in the vertex list, or more than 16,000,000 vertices) has an outline and no triangles, and one
+  `display.polygons.outline_only` warning (a new code, in `docs/validation-codes.md`) counts them, with the
+  first 20 polygon numbers as examples. The tolerance is not claimed to find every wrong fill: a ring
+  that crosses itself and happens to keep its area is filled as earcut fills it, as every earcut user's
+  is. `earcut` is a dependency with `unsafe` inside (it forbids nothing; our crate does) and with
+  documented panics for a hole index past the data and for 4 billion bytes of nodes, which are made
+  impossible here (the hole indices come from the rings, which are one after another and counted, and
+  the size is limited to 16,000,000 vertices per polygon); a test runs 3,000 random rings and holes on a
+  5 x 5 grid, which repeat vertices, run along one line and cross, and checks that nothing panics, every
+  index is in range and what is filled has area, and 482 of them are filled (measured, with a bound of 100 in the test, so that a change that left almost all of them unfilled would fail it). Counter-clockwise
+  triangles: earcut gives them so for either direction of the ring, a test pins it (an orientation fix I
+  first wrote could not be made to fail by any test, so it was removed). Outline segments touching a
+  vertex with no position are left out. The ring-by-ring outline is not a hairline of the polygon's own
+  edge: the renderer draws it 1 px wide (section 9.3).

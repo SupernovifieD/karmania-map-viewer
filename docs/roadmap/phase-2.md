@@ -184,7 +184,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.5 Points buffers.
 - [x] 13.6 Lines buffers.
 - [x] 13.7 Add the earcut port (dependency-only).
-- [ ] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
+- [x] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
   the "outline only" warning; collinear and degenerate cases.
 - [ ] 13.9 Mesh buffers.
 - [ ] 13.10 Grid image placement and tiling by a maximum texture size.

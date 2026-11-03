@@ -319,6 +319,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Change the map's coordinate system if another one suits the data better.
 - Example: The map is drawn in WGS 84 / UTM zone 40N (EPSG:32640): the data is in longitude and latitude, and its centre is at 57.30° E, 25.20° N.
 
+## `display.polygons.outline_only`
+
+- Severity: warning
+- Step: none
+- Message: Some polygons could not be filled in, so only their outlines are drawn.
+- Hint: Check that no ring crosses itself or another ring, and that each polygon has some area.
+- Example: Some polygons could not be filled in, so only their outlines are drawn.
+
 ## `file.empty`
 
 - Severity: error

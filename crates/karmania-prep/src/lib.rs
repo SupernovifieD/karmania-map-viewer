@@ -18,6 +18,7 @@ pub mod frame;
 pub mod lines;
 pub mod origin;
 pub mod points;
+pub mod polygons;
 pub mod project;
 #[cfg(test)]
 mod testutil;
@@ -28,6 +29,7 @@ pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use lines::{LinesBuffers, lines_buffers};
 pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
+pub use polygons::{PolygonsBuffers, polygons_buffers};
 pub use project::{Prepared, project};
 
 #[cfg(test)]
