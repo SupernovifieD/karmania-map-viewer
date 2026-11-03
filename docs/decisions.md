@@ -3161,3 +3161,17 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   with the lattice's own `cell_centre`, which finds the sine and cosine of the rotation each time; if that
   costs too much it shows in step 13.21's timing of a million blocks. Which faces to draw for a dense model is
   the renderer's (section 9.6 leaves it to a measure).
+- Step 13.14 (column statistics). `column_stats(column)` gives `ColumnStats { count, nulls, non_finite, range,
+  distinct }` in one pass. `count` is the rows; `nulls` the real nulls (a categorical code that is not in
+  its dictionary has no label to count and is taken as a null; validation refuses such data); `non_finite`
+  the NaN and infinite values of a float column, which are data and not null, and are in neither the range
+  nor the distinct values; `range` the smallest and largest finite number of a float or integer column;
+  `distinct` every distinct value with its count, **in ascending order by value** (numbers by
+  `f64::total_cmp` with -0 taken as 0, text by its bytes, false before true), kept in ordered maps so
+  that the result does not depend on the order of the rows or on a hash (a test gives the same column in two
+  orders). Integers are counted as the number they are, as `f64`, which is exact up to 2^53 and the JSON the
+  engine hands out has no other number. A column with more than 10,000 distinct values (`DISTINCT_LIMIT`) is
+  `Distinct::TooMany` and lists none: the counting stops there, and everything else is still exact; the
+  categories method of step 13.16 says "too many values" for such a column. A value already counted does
+  not count against the limit. The limit is the code's, not the brief's, which says "up to a limit" and
+  does not give one.

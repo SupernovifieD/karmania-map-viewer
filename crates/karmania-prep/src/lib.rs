@@ -23,6 +23,7 @@ pub mod origin;
 pub mod points;
 pub mod polygons;
 pub mod project;
+pub mod stats;
 pub mod surface;
 #[cfg(test)]
 mod testutil;
@@ -41,6 +42,9 @@ pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
 pub use polygons::{PolygonsBuffers, polygons_buffers};
 pub use project::{Prepared, project};
+pub use stats::{
+    Category, ColumnStats, DISTINCT_LIMIT, Distinct, column_stats, column_stats_with_limit,
+};
 pub use surface::{SurfaceBuffers, surface_buffers};
 
 #[cfg(test)]

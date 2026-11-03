@@ -195,7 +195,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 13.11b The warp for a whole grid: the tiles, `GridLayout::Warp`, the findings.
 - [x] 13.12 Grid surface buffers (elevations from a column).
 - [x] 13.13 Block buffers (own CRS only).
-- [ ] 13.14 Column statistics: count, nulls, finite min and max, distinct values
+- [x] 13.14 Column statistics: count, nulls, finite min and max, distinct values
   with counts up to a limit; deterministic.
 - [ ] 13.15 Class breaks: equal intervals and quantiles.
 - [ ] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
