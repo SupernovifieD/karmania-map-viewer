@@ -180,6 +180,14 @@ finding_codes! {
     CrsTransformUnsupported => "crs.transform.unsupported", Error, None;
     /// Some positions could not be converted to the other coordinate system.
     CrsTransformNotFinite => "crs.transform.not_finite", Warning, None;
+    /// A block model is not drawn because it is not in the map's coordinate system.
+    DisplayBlocksOtherCrs => "display.blocks.other_crs", Warning, None;
+    /// Two local grids are taken to be the same grid, and one is scaled to the units of the other.
+    DisplayCrsLocalGridsAssumed => "display.crs.local_grids_assumed", Info, None;
+    /// A dataset is not drawn because its positions cannot be converted to the map's coordinate system.
+    DisplayCrsNotConvertible => "display.crs.not_convertible", Warning, None;
+    /// A dataset is not drawn because none of its positions can be placed on the map.
+    DisplayExtentNone => "display.extent.none", Warning, None;
     /// The map's coordinate system was chosen from data in longitude and latitude: a UTM zone.
     DisplayFrameUtmChosen => "display.frame.utm_chosen", Info, None;
     /// The X, Y and Z coordinate lists have different lengths.
