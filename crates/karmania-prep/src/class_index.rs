@@ -2,7 +2,7 @@
 
 use karmania_core::{Column, Dataset, Finding};
 
-use crate::classify::{ClassBreaks, class_of, column_missing};
+use crate::classify::{ClassBreaks, class_of, column_missing, drawn_rows};
 use crate::stats::category_at;
 
 /// The class index of an element that has no value to put in a class.
@@ -16,8 +16,14 @@ pub const NO_VALUE: u8 = 255;
 /// is not of the kind the breaks are for, and a value in no class give [`NO_VALUE`].
 #[must_use]
 pub fn class_index(column: &Column, breaks: &ClassBreaks) -> Vec<u8> {
+    class_index_rows(column, breaks, column.len())
+}
+
+/// As [`class_index`], for the first `rows` rows of the column.
+#[must_use]
+pub fn class_index_rows(column: &Column, breaks: &ClassBreaks, rows: usize) -> Vec<u8> {
     let byte = |class: usize| u8::try_from(class).unwrap_or(NO_VALUE);
-    (0..column.len())
+    (0..rows.min(column.len()))
         .map(|row| match breaks {
             ClassBreaks::Ranges { bounds, .. } => match category_at(column, row) {
                 Some(crate::stats::Category::Number(value)) => {
@@ -53,7 +59,7 @@ pub fn class_index_of(dataset: &Dataset, breaks: &ClassBreaks) -> Result<Vec<u8>
         .attributes
         .column(name)
         .ok_or_else(|| column_missing(name))?;
-    Ok(class_index(column, breaks))
+    Ok(class_index_rows(column, breaks, drawn_rows(dataset)))
 }
 
 #[cfg(test)]
@@ -238,5 +244,72 @@ mod tests {
             error.message,
             "The dataset has no column named v, so nothing can be coloured by it."
         );
+    }
+
+    #[test]
+    fn a_grid_with_several_layers_is_classified_by_its_first_layer_the_one_that_is_drawn() {
+        // Found by the review of the milestone: a 2 x 2 x 2 grid was classified over its 8 rows, and its class index had 8
+        // entries, while only the first layer (4 cells) is drawn, so the counts of the legend were not the picture's.
+        let values = [1.0, 2.0, 3.0, 4.0, 100.0, 200.0, 300.0, 400.0];
+        let table = Table::from_columns(
+            vec![Column::without_nulls(
+                "v",
+                ColumnData::Float64(values.to_vec()),
+            )],
+            &mut Findings::new(),
+        )
+        .unwrap();
+        let lattice = karmania_core::Lattice {
+            origin: [0.0; 3],
+            spacing: [1.0; 3],
+            dims: [2, 2, 2],
+            rotation: 0.0,
+        };
+        let grid = karmania_core::Grid {
+            lattice,
+            z: karmania_core::GridZ::Flat { elevation: 0.0 },
+        };
+        let dataset = Dataset::new(DatasetId(1), "g", None, Geometry::Grid(grid), table);
+        let breaks = crate::classify::classify_dataset(&dataset, "v", Method::Equal, 2).unwrap();
+        let ClassBreaks::Ranges {
+            bounds,
+            counts,
+            nulls,
+            ..
+        } = &breaks
+        else {
+            panic!("ranges")
+        };
+        assert_eq!(
+            (bounds.as_slice(), counts.as_slice(), *nulls),
+            ([1.0, 2.5, 4.0].as_slice(), [2, 2].as_slice(), 0)
+        );
+        let index = class_index_of(&dataset, &breaks).unwrap();
+        assert_eq!(index, [0, 0, 1, 1], "one byte for each cell that is drawn");
+        // By categories too: the four values of the first layer, and none of the others.
+        let cats =
+            crate::classify::classify_dataset(&dataset, "v", Method::Categories, 20).unwrap();
+        let ClassBreaks::Categories { values, counts, .. } = &cats else {
+            panic!("categories")
+        };
+        assert_eq!((values.len(), counts.iter().sum::<u64>()), (4, 4));
+        assert_eq!(class_index_of(&dataset, &cats).unwrap().len(), 4);
+        // A grid of one layer, and every other shape, are as before: every row.
+        let flat = Dataset::new(
+            DatasetId(2),
+            "p",
+            None,
+            Geometry::Points(Positions::from_interleaved(vec![0.0; 24], false)),
+            Table::from_columns(
+                vec![Column::without_nulls(
+                    "v",
+                    ColumnData::Float64(values.to_vec()),
+                )],
+                &mut Findings::new(),
+            )
+            .unwrap(),
+        );
+        let breaks = crate::classify::classify_dataset(&flat, "v", Method::Equal, 2).unwrap();
+        assert_eq!(class_index_of(&flat, &breaks).unwrap().len(), 8);
     }
 }

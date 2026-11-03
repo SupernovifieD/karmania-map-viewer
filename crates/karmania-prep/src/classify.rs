@@ -5,11 +5,11 @@
 //! value is decided in one place, [`class_of`], and the counts below and the class index of step 13.17
 //! both use it, so the legend's numbers are those of the picture.
 
-use karmania_core::{Column, ColumnType, Dataset, Finding, FindingCode, Value};
+use karmania_core::{Column, ColumnType, Dataset, Finding, FindingCode, Geometry, Value};
 use serde::{Deserialize, Serialize};
 
 use crate::jenks;
-use crate::stats::{Category, DISTINCT_LIMIT, Distinct, column_stats};
+use crate::stats::{Category, DISTINCT_LIMIT, Distinct, column_stats_rows};
 
 /// The most classes: the class index is one byte, and 255 means no value.
 pub const MAX_CLASSES: usize = 254;
@@ -91,10 +91,11 @@ pub fn class_of(bounds: &[f64], value: f64) -> Option<usize> {
 }
 
 /// The finite numbers of `column`, in row order, and how many rows have none.
-fn numbers(column: &Column) -> (Vec<f64>, u64) {
-    let mut values = Vec::with_capacity(column.len());
+fn numbers(column: &Column, rows: usize) -> (Vec<f64>, u64) {
+    let rows = rows.min(column.len());
+    let mut values = Vec::with_capacity(rows);
     let mut without = 0;
-    for row in 0..column.len() {
+    for row in 0..rows {
         match column.get(row) {
             Some(Value::Float64(v)) if v.is_finite() => values.push(v),
             Some(Value::Int64(v)) => values.push(v as f64),
@@ -114,8 +115,23 @@ fn numbers(column: &Column) -> (Vec<f64>, u64) {
 /// A finding: `classes.column.not_numeric` for a column of text, truth values or categories, and
 /// `classes.column.no_values` for a column with no finite number.
 pub fn classify(column: &Column, method: Method, classes: usize) -> Result<ClassBreaks, Finding> {
+    classify_rows(column, method, classes, column.len())
+}
+
+/// As [`classify`], over the first `rows` rows of the column: for a grid of several layers, of which the first
+/// is what is drawn, so that the counts of the legend are those of the picture.
+///
+/// # Errors
+///
+/// The findings of [`classify`].
+pub fn classify_rows(
+    column: &Column,
+    method: Method,
+    classes: usize,
+    rows: usize,
+) -> Result<ClassBreaks, Finding> {
     if method == Method::Categories {
-        return categories(column, classes);
+        return categories(column, classes, rows);
     }
     let classes = classes.clamp(1, MAX_CLASSES);
     if !matches!(
@@ -124,7 +140,7 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
     ) {
         return Err(not_numeric(column));
     }
-    let (mut values, nulls) = numbers(column);
+    let (mut values, nulls) = numbers(column, rows);
     if values.is_empty() {
         return Err(no_values(column));
     }
@@ -136,7 +152,7 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
             quantile_bounds(&values, classes)
         }
         // Handled above, before the numbers of the column are taken; here so that the match is whole.
-        Method::Categories => return categories(column, classes),
+        Method::Categories => return categories(column, classes, rows),
         Method::Jenks => {
             let (min, max) = extent(&values);
             let mut used = jenks::sample(&values);
@@ -165,8 +181,8 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
 
 /// The most common values of `column` as classes, up to `classes` (from 1 to [`MAX_CATEGORIES`]), and the
 /// rest as "Other".
-fn categories(column: &Column, classes: usize) -> Result<ClassBreaks, Finding> {
-    let stats = column_stats(column);
+fn categories(column: &Column, classes: usize, rows: usize) -> Result<ClassBreaks, Finding> {
+    let stats = column_stats_rows(column, rows);
     let Distinct::Values(mut values) = stats.distinct else {
         return Err(too_many_values(column));
     };
@@ -266,7 +282,20 @@ pub fn classify_dataset(
         .attributes
         .column(column)
         .ok_or_else(|| column_missing(column))?;
-    classify(found, method, classes)
+    classify_rows(found, method, classes, drawn_rows(dataset))
+}
+
+/// How many rows of the attributes of `dataset` are drawn: all of them, except for a grid of several layers, of
+/// which only the first is (`display.grid.layers_hidden`), the `nx * ny` cells of its first layer.
+#[must_use]
+pub fn drawn_rows(dataset: &Dataset) -> usize {
+    match &dataset.geometry {
+        Geometry::Grid(grid) => {
+            let [nx, ny, _] = grid.lattice.dims;
+            usize::try_from(u64::from(nx) * u64::from(ny)).unwrap_or(usize::MAX)
+        }
+        _ => usize::MAX,
+    }
 }
 
 /// The finding for a column that a dataset does not have.

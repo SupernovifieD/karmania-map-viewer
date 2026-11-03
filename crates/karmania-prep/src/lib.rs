@@ -36,9 +36,10 @@ pub mod warp;
 
 pub use blocks::{BlocksBuffers, blocks_buffers};
 pub use choice::{DrawableEntry, FrameChoice, choose_frame, choose_frame_tracking};
-pub use class_index::{NO_VALUE, class_index, class_index_of};
+pub use class_index::{NO_VALUE, class_index, class_index_of, class_index_rows};
 pub use classify::{
     ClassBreaks, MAX_CATEGORIES, MAX_CLASSES, Method, class_of, classify, classify_dataset,
+    classify_rows, drawn_rows,
 };
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};

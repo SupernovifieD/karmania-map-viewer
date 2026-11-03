@@ -3512,3 +3512,10 @@ reviewer and reproduced here by a test that failed before the fix.
   doc says the coordinates of a dataset are "in the units of its CRS with Z up", which for a local grid in feet would make the
   heights feet too, and scaling them would be the other consistent choice; it needs a change to the transformer's test of 12.8, which this
   step does not make.
+- Step 13.F7 (classes of a grid with several layers). Minor. A 2 x 2 x 2 grid was classified over its 8 rows and its class index had 8 entries, while the
+  picture is of the first layer, 4 cells (`display.grid.layers_hidden`), so the legend's counts were not the picture's (section 9.3).
+  **Fix**: `classify_dataset` and `class_index_of` work on `drawn_rows(dataset)`, which is the `nx * ny` cells of the first layer for a grid and
+  every row for any other shape, through `classify_rows`, `class_index_rows` and `column_stats_rows` (the column-level functions
+  keep their meaning: every row). The contract of step 13.17, "one byte for each element", is now "for each element that is drawn"; the doc of
+  `Engine.classIndex` says so. Test, seen to fail first (counts `[6, 2]` over 8 rows): the counts, the bounds and the index by ranges and by categories
+  are those of the first layer, and a grid of one layer and another shape are as before.
