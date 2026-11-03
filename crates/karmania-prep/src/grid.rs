@@ -112,7 +112,7 @@ fn units_factor(own: CrsRef, map_crs: CrsRef) -> Option<f64> {
 }
 
 /// The finding for a grid of several layers, which are drawn from the first only.
-fn layers_hidden(layers: u32) -> Findings {
+pub(crate) fn layers_hidden(layers: u32) -> Findings {
     let mut findings = Findings::new();
     if layers > 1 {
         findings.add(
