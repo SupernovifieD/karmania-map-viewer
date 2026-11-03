@@ -209,6 +209,16 @@ export async function runCrs(engine: Engine): Promise<CrsReport> {
   };
 }
 
+/** A hash (FNV-1a, 32 bits) of the bytes of a typed array: two arrays with one bit different give different hashes. */
+export function hashOf(array: ArrayBufferView): string {
+  const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) {
+    hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
 /** What preparing and classifying a few datasets came to, in plain data: the same in every environment. */
 export interface DisplayReport {
   /** The map's coordinate system and the origin, and what the choice said. */
@@ -224,11 +234,15 @@ export interface DisplayReport {
     readonly triangles: number;
     readonly outline: number;
     readonly findings: readonly string[];
+    /** Hashes of every byte of the positions, the triangles and the outline. */
+    readonly hashes: readonly string[];
   };
   readonly warpedGrid: {
     readonly tiles: number;
     readonly tileTriangles: readonly number[];
     readonly placement: boolean;
+    /** Hashes of every byte of the positions, the uvs and the triangles of the meshes. */
+    readonly hashes: readonly string[];
   };
   /** Classes of a column: bounds and counts, and whether the class index's tally is the same. */
   readonly classes: readonly {
@@ -246,6 +260,8 @@ interface PointsReport {
   readonly isFloat32: boolean;
   readonly length: number;
   readonly firstThree: readonly number[];
+  /** A hash of every byte of the positions. */
+  readonly hash: string;
   readonly notPlaced: number;
   readonly findings: readonly string[];
 }
@@ -319,6 +335,7 @@ export async function runDisplay(engine: Engine): Promise<DisplayReport> {
     // A position that cannot be placed has NaN for x and for y, and its height as it was.
     notPlaced: Array.from(positions).filter((n, i) => i % 3 === 0 && Number.isNaN(n)).length,
     findings: pointsResult.findings.map((f) => `${f.code} x${String(f.count)}`),
+    hash: hashOf(positions),
   };
 
   const polygonResult = await prepare(leases);
@@ -388,11 +405,17 @@ export async function runDisplay(engine: Engine): Promise<DisplayReport> {
       triangles: polygonBuffers.triangles.length / 3,
       outline: polygonBuffers.outline.length / 2,
       findings: polygonResult.findings.map((f) => f.code),
+      hashes: [polygonBuffers.positions, polygonBuffers.triangles, polygonBuffers.outline].map(
+        hashOf,
+      ),
     },
     warpedGrid: {
       tiles: gridBuffers.tiles.length,
       tileTriangles: Array.from(gridBuffers.warp.tileTriangles),
       placement: 'placement' in gridBuffers,
+      hashes: [gridBuffers.warp.positions, gridBuffers.warp.uvs, gridBuffers.warp.triangles].map(
+        hashOf,
+      ),
     },
     classes,
     stopped: { outcome, nextWorks: again.status === 'drawn' },
