@@ -4,8 +4,8 @@
 //! numbers and the same classes: distinct values are kept in an ordered map and listed by value, never in
 //! the order a hash map happens to give.
 
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 
 use karmania_core::{Column, Value};
 use serde::{Deserialize, Serialize};
@@ -72,32 +72,40 @@ pub fn category_at(column: &Column, row: usize) -> Option<Category> {
     }
 }
 
-/// A number ordered by [`f64::total_cmp`], with -0 taken as 0, so that it can be a key.
-#[derive(Debug, Clone, Copy)]
-struct Number(f64);
+/// A hasher with no random state, for the maps that count values: the keys are the bits of numbers and
+/// text, a lookup is made for every row of a column of millions, and nothing leaves a map in the order it
+/// keeps (see [`Counts::into_distinct`], which sorts), so the hash only has to be fast and spread well.
+#[derive(Default)]
+struct FastHasher(u64);
 
-impl PartialEq for Number {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
+impl Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.write_u64(u64::from(byte));
+        }
+    }
+
+    /// One round of the finaliser of splitmix64, which gives every bit of a number's bits a say.
+    fn write_u64(&mut self, n: u64) {
+        let mut z = (self.0 ^ n).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        self.0 = z ^ (z >> 31);
     }
 }
-impl Eq for Number {}
-impl PartialOrd for Number {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for Number {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.total_cmp(&other.0)
-    }
-}
+
+type Counted<K> = HashMap<K, u64, BuildHasherDefault<FastHasher>>;
 
 /// The counts of the distinct values of one kind, until there are too many.
 #[derive(Default)]
 struct Counts {
-    numbers: BTreeMap<Number, u64>,
-    texts: BTreeMap<String, u64>,
+    /// By the bits of the number, which are those of the value once -0 is 0 (a NaN never gets here).
+    numbers: Counted<u64>,
+    texts: Counted<String>,
     bools: [u64; 2],
     too_many: bool,
 }
@@ -115,11 +123,11 @@ impl Counts {
     }
 
     fn number(&mut self, value: f64, limit: usize) {
-        let value = if value == 0.0 { 0.0 } else { value };
-        if let Some(n) = self.numbers.get_mut(&Number(value)) {
+        let bits = if value == 0.0 { 0 } else { value.to_bits() };
+        if let Some(n) = self.numbers.get_mut(&bits) {
             *n += 1;
         } else if self.room(limit) {
-            self.numbers.insert(Number(value), 1);
+            self.numbers.insert(bits, 1);
         }
     }
 
@@ -135,6 +143,8 @@ impl Counts {
         self.bools[usize::from(value)] += 1;
     }
 
+    /// The distinct values in ascending order: the maps do not keep one, so the values are sorted here,
+    /// and every value is different, so the order is total and does not depend on how the map was filled.
     fn into_distinct(self) -> Distinct {
         if self.too_many {
             return Distinct::TooMany;
@@ -147,12 +157,16 @@ impl Counts {
                 .filter(|(_, n)| **n > 0)
                 .map(|(b, n)| (Category::Bool(b == 1), *n)),
         );
-        values.extend(
-            self.numbers
-                .into_iter()
-                .map(|(v, n)| (Category::Number(v.0), n)),
-        );
-        values.extend(self.texts.into_iter().map(|(v, n)| (Category::Text(v), n)));
+        let mut numbers: Vec<(f64, u64)> = self
+            .numbers
+            .into_iter()
+            .map(|(bits, n)| (f64::from_bits(bits), n))
+            .collect();
+        numbers.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        values.extend(numbers.into_iter().map(|(v, n)| (Category::Number(v), n)));
+        let mut texts: Vec<(String, u64)> = self.texts.into_iter().collect();
+        texts.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        values.extend(texts.into_iter().map(|(v, n)| (Category::Text(v), n)));
         Distinct::Values(values)
     }
 }
