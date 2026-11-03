@@ -3064,3 +3064,13 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   first wrote could not be made to fail by any test, so it was removed). Outline segments touching a
   vertex with no position are left out. The ring-by-ring outline is not a hairline of the polygon's own
   edge: the renderer draws it 1 px wide (section 9.3).
+- Step 13.9 (mesh buffers). `mesh_buffers(mesh, own, frame)` gives `MeshBuffers { positions, triangles }`:
+  the positions of every vertex as for the other kinds, and the three vertex numbers of every triangle, in
+  triangle order, so triangle `t` is row `t` of the attributes (one colour per triangle, section 9.3). The
+  vertices are not duplicated: flat shading is the renderer's, from the derivatives in the fragment shader.
+  A triangle that cannot be drawn (a vertex number that does not exist, which validation refuses; a corner
+  with no position on the map) is kept in its place as `0, 0, 0`, which has no area, and is not removed,
+  because removing it would change the number of every triangle after it, and with it the class indices
+  and the selection; a trailing partial triangle (also refused by validation) is left out. No new finding:
+  the causes are findings already (`mesh.indices.*` from validation, `crs.transform.not_finite` from the
+  conversion). Edges are straight between the converted vertices, as for lines and polygons.
