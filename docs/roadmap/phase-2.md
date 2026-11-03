@@ -197,7 +197,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.13 Block buffers (own CRS only).
 - [x] 13.14 Column statistics: count, nulls, finite min and max, distinct values
   with counts up to a limit; deterministic.
-- [ ] 13.15 Class breaks: equal intervals and quantiles.
+- [x] 13.15 Class breaks: equal intervals and quantiles.
 - [ ] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
   categories with "Other".
 - [ ] 13.17 Class index per element (u8, 255 = no value) for every kind.

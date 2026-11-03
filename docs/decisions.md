@@ -3175,3 +3175,24 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   categories method of step 13.16 says "too many values" for such a column. A value already counted does
   not count against the limit. The limit is the code's, not the brief's, which says "up to a limit" and
   does not give one.
+- Step 13.15 (class breaks: equal intervals and quantiles). `classify(column, method, classes)` gives
+  `ClassBreaks::Ranges { bounds, counts, nulls }` (the contract's `kind: "ranges"`) or a finding. **Bounds**:
+  `classes + 1` ascending numbers; class `c` runs from `bounds[c]` up to but not including `bounds[c + 1]`, and the
+  last class includes its upper bound. Equal intervals are `min + k * step` with the last bound the largest
+  value itself (the step is `max / n - min / n`, which does not overflow for a range wider than a float).
+  Quantiles are exact, from the sorted values, and every bound is a value of the column, not an
+  interpolation between two (section 1: Karmania never invents values): bound `k` is the value
+  `floor(k * n / classes)` places from the start, which puts a value that is a bound in the class above it
+  and gives 2, 3, 2, 3 rows in four classes of ten. **Fewer classes than asked**: bounds that come out
+  equal (many rows with one value, or steps too small for a float) are one bound, so a class never has no
+  range, and a column of one value has one class with the bounds `[v, v]`, as the brief says; the legend and the
+  style editor must read the number of classes from the result, not from what was asked. **One function
+  decides a class**: `class_of(bounds, value)` is the last class that starts at or below the value (below the
+  first bound is the first class, above the last is the last, so a number is always in one), the counts
+  here use it, and step 13.17's class index will too, so that the legend's counts are those of the picture
+  (section 9.3). `nulls` counts the rows that have no value to put in a class: nulls and values that are not
+  finite numbers (they all get 255 in the class index). The number of classes is taken from 1 to 254 (the
+  index is a byte, 255 meaning no value; the style editor offers 3 to 12). Two new warnings in the `classes`
+  area, in `docs/validation-codes.md`: `classes.column.not_numeric` (text, truth values and categories are
+  not divided into ranges) and `classes.column.no_values`. Not here: natural breaks and categories
+  (step 13.16).
