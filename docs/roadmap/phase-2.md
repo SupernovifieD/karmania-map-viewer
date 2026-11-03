@@ -202,7 +202,7 @@ or releasing, and whenever the brief says to stop.
   categories with "Other". Split to stay under the commit size guideline:
   - [x] 13.16a Natural breaks (Jenks) from an evenly strided sample of at most 10,000 values.
   - [x] 13.16b Categories: up to 20 values by count, ties by value, the rest as "Other".
-- [ ] 13.17 Class index per element (u8, 255 = no value) for every kind.
+- [x] 13.17 Class index per element (u8, 255 = no value) for every kind.
 - [ ] 13.18 PrepareJob with step(budget) and cancellation for large datasets.
 - [ ] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
   arrays as transferables.

@@ -14,6 +14,7 @@
 
 pub mod blocks;
 pub mod choice;
+pub mod class_index;
 pub mod classify;
 pub mod drawable;
 pub mod frame;
@@ -33,6 +34,7 @@ pub mod warp;
 
 pub use blocks::{BlocksBuffers, blocks_buffers};
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
+pub use class_index::{NO_VALUE, class_index, class_index_of};
 pub use classify::{ClassBreaks, MAX_CATEGORIES, MAX_CLASSES, Method, class_of, classify};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
@@ -46,7 +48,8 @@ pub use points::{PointsBuffers, points_buffers};
 pub use polygons::{PolygonsBuffers, polygons_buffers};
 pub use project::{Prepared, project};
 pub use stats::{
-    Category, ColumnStats, DISTINCT_LIMIT, Distinct, column_stats, column_stats_with_limit,
+    Category, ColumnStats, DISTINCT_LIMIT, Distinct, category_at, column_stats,
+    column_stats_with_limit,
 };
 pub use surface::{SurfaceBuffers, surface_buffers};
 

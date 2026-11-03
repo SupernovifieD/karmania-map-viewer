@@ -3239,3 +3239,23 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   ranges instead; a column with no value gives `classes.column.no_values`. Tests: counts with ties and "Other"
   worked out by hand (granite 4, basalt 2, shale 2, chert 1, coal 1), numbers with a null, non-finite
   numbers, truth values, labels, the limit of 20, 0 classes taken as 1, too many values, no values.
+- Step 13.17 (the class index). `class_index(column, breaks)` gives one byte for each row of the column, in row
+  order, and `class_index_of(dataset, breaks)` the same for a dataset by the column the breaks name: **one
+  byte for each element, whatever the shape**, because an attribute table has one row for each point, line,
+  polygon, triangle, cell (in lattice order, `i` fastest) or block; a test makes one dataset of each of the six
+  shapes and checks the length against `element_count`. A range is the class `class_of` says, the function the counts
+  of `classify` use; a category is its place in the list, "Other" is the place after the list (for any
+  other value, if there is an Other class), and **255 (`NO_VALUE`) is a row with no value to put in a class**
+  (a null, a number that is not finite, a categorical code outside its dictionary), a column that is not of the
+  kind the breaks are for, and a value in no class (breaks of another column, no Other). The ranges and the
+  categories of section 9.3 say "the legend's counts come from the same computation, so they match what is
+  drawn": a test classifies a column with repeats, nulls and non-finite numbers by every method and 1, 3, 5 and 12
+  classes, tallies the class index, and requires the tally to equal the counts, the Other count and the nulls
+  of `classify` (it fails if either side is changed: "Other" given no class, and the value of a range shifted by
+  0.4, each tried). **The contract of section 11.4 is extended**: `ClassBreaks` carries `column`, the name of the
+  column it is of, because `engine.classIndex(id, breaks)` takes no column and could not otherwise know
+  which to use; `classify` fills it in. The shared `category_at` (in `stats`) gives the category of a row
+  for the counts and for the index, so that the two cannot read a value differently. A column that the
+  dataset does not have is the new warning `classes.column.missing` (`docs/validation-codes.md`). The
+  grid's index is one byte for each cell in lattice order; cutting it into the tiles of step 13.10 is the
+  renderer's, which has `tiles` and the size.

@@ -34,6 +34,8 @@ pub enum Method {
 pub enum ClassBreaks {
     /// Ranges of numbers.
     Ranges {
+        /// The column the classes are of.
+        column: String,
         /// `classes + 1` numbers, ascending: class `c` is from `bounds[c]` up to, but not including,
         /// `bounds[c + 1]`, and the last class includes its upper bound. There can be fewer classes than were
         /// asked for, when the values do not make that many different ranges (a column of one value has one).
@@ -51,6 +53,8 @@ pub enum ClassBreaks {
     },
     /// The values that most rows have, one class each, and the rest together.
     Categories {
+        /// The column the classes are of.
+        column: String,
         /// The values, the most common first; rows that have the same number of each are in ascending order
         /// of value (numbers by value, text by its bytes, false before true). A categorical column gives its labels.
         values: Vec<Category>,
@@ -142,6 +146,7 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
         }
     }
     Ok(ClassBreaks::Ranges {
+        column: column.name().to_owned(),
         bounds,
         counts,
         nulls,
@@ -166,6 +171,7 @@ fn categories(column: &Column, classes: usize) -> Result<ClassBreaks, Finding> {
     values.truncate(shown);
     let (values, counts) = values.into_iter().unzip();
     Ok(ClassBreaks::Categories {
+        column: column.name().to_owned(),
         values,
         counts,
         other: (others > 0).then_some(others),
@@ -471,6 +477,7 @@ mod tests {
                 counts,
                 other,
                 nulls,
+                ..
             } => (values, counts, other, nulls),
             other => panic!("{other:?}"),
         }
