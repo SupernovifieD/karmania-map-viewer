@@ -227,6 +227,11 @@ impl WarpBuilder {
         }
     }
 
+    /// How many tiles are added.
+    pub(crate) fn added(&self) -> usize {
+        self.warp.tile_triangles.len()
+    }
+
     /// Adds the mesh of the next tile after those already added.
     pub(crate) fn add(&mut self, part: WarpTile) {
         let warp = &mut self.warp;

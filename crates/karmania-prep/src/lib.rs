@@ -20,6 +20,7 @@ pub mod drawable;
 pub mod frame;
 pub mod grid;
 pub mod jenks;
+pub mod job;
 pub mod lines;
 pub mod mesh;
 pub mod origin;
@@ -41,6 +42,7 @@ pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use grid::{
     GridBuffers, GridLayout, GridPlacement, GridWarp, Tile, grid_buffers, grid_image, tiles,
 };
+pub use job::{PrepareJob, PrepareResult, PrepareStep, RenderBuffers};
 pub use lines::{LinesBuffers, lines_buffers};
 pub use mesh::{MeshBuffers, mesh_buffers};
 pub use origin::{Frame, FrameSource, origin_near};

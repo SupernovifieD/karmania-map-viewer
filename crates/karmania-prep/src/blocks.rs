@@ -74,6 +74,15 @@ impl BlocksBuilder {
         self.next >= self.count
     }
 
+    /// The fraction of the blocks done, from 0 to 1.
+    pub(crate) fn fraction(&self) -> f64 {
+        if self.count == 0 {
+            1.0
+        } else {
+            self.next as f64 / self.count as f64
+        }
+    }
+
     /// The buffers.
     pub(crate) fn finish(self, blocks: &Blocks) -> BlocksBuffers {
         let [dx, dy, dz] = blocks.lattice.spacing;

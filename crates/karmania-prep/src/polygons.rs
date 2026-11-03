@@ -127,6 +127,14 @@ impl PolygonsFill {
         self.next >= count
     }
 
+    /// The fraction of the polygons done, from 0 to 1.
+    pub(crate) fn fraction(&self, polygons: &Polygons) -> f64 {
+        match polygons.polygon_count() {
+            Some(count) if count > 0 => self.next as f64 / count as f64,
+            _ => 1.0,
+        }
+    }
+
     /// The buffers, with the finding for the polygons that were not filled in added to `findings`.
     pub(crate) fn finish(self, findings: &mut Findings) -> PolygonsBuffers {
         if self.unfilled.count > 0 {

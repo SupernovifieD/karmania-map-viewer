@@ -3279,3 +3279,28 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   (a square, a square with a hole, a line and a bow tie that are not filled, a triangle) in budgets of 0, 1, 4, 5,
   13 and 1,000 vertices, and blocks (60 blocks turned 30 degrees) in budgets of 0 to 1,000, give the same bits and
   findings. The others are one step each (lines, mesh, surface triangles) or a tile each (the warp).
+- Step 13.18c (the prepare job). `PrepareJob::new(dataset, frame, max_texture_size)`, `step(dataset, budget)` and
+  `cancel()`: the job does one stage, or a part of one, in each step and says `Progress { fraction }`, `Done(result)` or
+  `Cancelled`; dropping it stops it too. **It does not keep the dataset**: each step is given the same one (the
+  engine's registry holds the datasets, and cloning a million points or four million cells to make a job would
+  cost more than it saves), and a step given a dataset of another kind is `Cancelled`. A dataset that is
+  changed in between and keeps its kind is not noticed; the engine removes the job when it removes a dataset.
+  **What a step does**: positions (points, lines, mesh, polygons) are converted `budget` at a time (`Projector`);
+  lines and mesh then finish in the same step (one pass); polygons go on to triangles and outlines, `budget` vertices
+  at a time; a flat grid in the map's system is placed at once, a warped one is a tile a step; a surface converts its
+  centres `budget` at a time and then makes its triangles; blocks are `budget` at a time. The first step
+  also decides whether the dataset is drawn (`drawable`), so a dataset that is not drawn is `Done(NotDrawn)` at
+  once with the reasons, and the findings of `drawable` that go with a dataset that is drawn (two local grids in
+  other units) come with its buffers. A budget of 0 moves by one. **Progress** goes from 0 to 1 and never down
+  (checked at every step of every kind): converting positions is the first 80 % of a polygon set, which has
+  more to do, and the whole of a points set. `PrepareResult::Drawn { buffers, findings }` carries
+  findings besides the buffers, which the contract's `{status: "drawn", buffers}` did not: a dataset that is
+  drawn can still have positions that could not be converted, polygons only outlined, and the like.
+  **Cancellation** is `cancel()`: it gives back what the job holds (`held()` is 0) and every later step is
+  `Cancelled`, as it is after `Done`. Tests, with the one-shot functions as the judge: one dataset of each of the seven
+  kinds (points, lines, polygons, mesh, a warped grid, a surface, blocks) in longitude and latitude, with positions that cannot be
+  converted, a bow tie, a missing elevation, in budgets of 0, 1, 3, 17 and a million give the same result, compared
+  by their printed form (two buffers with a NaN in the same place are not `==`: a NaN is not equal to itself); the
+  step counts (40 points 5 at a time take at least 8, a million at once takes 1, a warped grid of 6 tiles takes 6);
+  every reason a dataset is not drawn; cancellation and a dataset of another kind. Two mutations were tried and
+  caught: the budget ignored, and the findings of `drawable` dropped.
