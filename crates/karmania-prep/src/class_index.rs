@@ -289,10 +289,15 @@ mod tests {
         // By categories too: the four values of the first layer, and none of the others.
         let cats =
             crate::classify::classify_dataset(&dataset, "v", Method::Categories, 20).unwrap();
-        let ClassBreaks::Categories { values, counts, .. } = &cats else {
+        let ClassBreaks::Categories {
+            values: shown,
+            counts,
+            ..
+        } = &cats
+        else {
             panic!("categories")
         };
-        assert_eq!((values.len(), counts.iter().sum::<u64>()), (4, 4));
+        assert_eq!((shown.len(), counts.iter().sum::<u64>()), (4, 4));
         assert_eq!(class_index_of(&dataset, &cats).unwrap().len(), 4);
         // A grid of one layer, and every other shape, are as before: every row.
         let flat = Dataset::new(
