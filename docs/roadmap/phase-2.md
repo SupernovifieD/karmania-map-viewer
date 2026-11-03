@@ -215,7 +215,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 13.19a What the worker keeps between requests (`Preparer`: the frame and the jobs), the
     JSON forms of the class breaks, and `Registry::datasets`.
   - [x] 13.19b The exports of the wasm `Kernel`, with typed arrays, and a test in Node.
-- [ ] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol
+- [x] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol
   types; a test that transferred buffers are detached on the sending side;
   real-worker tests. Split to stay under the commit size guideline:
   - [x] 13.20a The public types (`display.ts`) and the strict checks of what the kernel gives
@@ -224,7 +224,7 @@ or releasing, and whenever the brief says to stop.
     buffers of a result in the transfer list.
   - [x] 13.20c The client and the engine's methods, with their checks of misuse, and the test that
     the buffers are detached on the sending side.
-  - [ ] 13.20d The real-worker tests in the browser.
+  - [x] 13.20d The real-worker tests in the browser.
 - [ ] 13.21 `scripts/generate-fixtures` also writes a 1,000,000-block model CSV
   (not committed). Ignored Rust timing tests for preparing 1M points, 4M cells
   and 1M blocks; results in `docs/perf.md`.

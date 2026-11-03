@@ -3396,3 +3396,20 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   drops the job in the kernel; a dataset that is not drawn; misuse; the methods after `dispose`. Mutation tried: with
   the transfer list emptied (the buffers copied) the test of the sending side fails. The type tests of `api.test.ts`
   list the methods of the engine, so a method cannot be added or dropped without it saying so.
+- Step 13.20d (the real worker, in a browser). The engine's browser suite has the pattern the phase-1 steps set: a
+  scenario that takes an engine and returns plain data, run in the page through the real worker and again in
+  Node through the in-process channel, and the two reports have to be equal in every detail ("the same data gives
+  the same result everywhere"). `runDisplay` loads 3,000 points in longitude and latitude (one off the Earth, one
+  column with nulls), three squares, and a 90 by 40 grid, and reports: the frame (the UTM zone of the data, source
+  `auto`, and the one finding that says so); the points as a `Float32Array` with its length, its first position
+  and how many could not be placed (one, counted by `crs.transform.not_finite`); the polygons' triangles and outline;
+  the grid warped in 32-cell textures (six tiles, a mesh for each, no placement); the classes by all four methods
+  with the class index's tally compared to the counts; a prepare of 300,000 points that is stopped by an
+  `AbortSignal` at its first report of progress (rejects with `AbortError`) and the one after it that works with
+  progress that only goes up. The browser test checks those values and then the equality with Node; both pass, so the
+  conversion of positions and the classes are bit-for-bit the same in Chromium and in Node. Two mistakes of mine in
+  the scenario were found by running it in the browser: the count of positions that could not be placed
+  (NaN is in x and y, not z, so counting NaNs and dividing by 3 gave 0.67), and the third of the three "squares",
+  which I had written as a bow tie by swapping two y values, and which the polygon check rightly reported as
+  outline-only (`display.polygons.outline_only`). The engine's whole browser suite (14 tests) passes. Timing is not
+  asserted: a prepare that stops in some number of milliseconds would be a test of the machine.

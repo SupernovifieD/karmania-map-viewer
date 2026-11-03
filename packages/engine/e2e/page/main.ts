@@ -5,8 +5,8 @@
  * test.
  */
 import { createEngine, points } from '../../src/index.js';
-import { runCrs, runFixture } from '../scenarios.js';
-import type { CrsReport, FixtureCase, FixtureReport } from '../scenarios.js';
+import { runCrs, runDisplay, runFixture } from '../scenarios.js';
+import type { CrsReport, DisplayReport, FixtureCase, FixtureReport } from '../scenarios.js';
 import type { ImportMapping } from '../../src/types.js';
 
 /** What loading a dataset made in the page came to. */
@@ -56,6 +56,7 @@ export interface Scenarios {
   readonly twoEngines: () => Promise<TwoEngines>;
   readonly afterDispose: () => Promise<AfterDispose>;
   readonly crs: () => Promise<CrsReport>;
+  readonly display: () => Promise<DisplayReport>;
 }
 
 declare global {
@@ -227,6 +228,15 @@ async function crsInPage(): Promise<CrsReport> {
   }
 }
 
+async function displayInPage(): Promise<DisplayReport> {
+  const engine = createEngine();
+  try {
+    return await runDisplay(engine);
+  } finally {
+    engine.dispose();
+  }
+}
+
 window.karmaniaTest = {
   loadPoints,
   startWithModuleAt,
@@ -235,4 +245,5 @@ window.karmaniaTest = {
   twoEngines,
   afterDispose,
   crs: crsInPage,
+  display: displayInPage,
 };

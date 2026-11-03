@@ -6,7 +6,8 @@
  */
 import type { Engine, ImportPhase } from '../src/api.js';
 import { mappingFrom } from '../src/test-support/mapping.js';
-import { points } from '../src/builders.js';
+import { grid, points, polygons } from '../src/builders.js';
+import type { RenderBuffers } from '../src/display.js';
 import type { CrsInfo, CrsRef, Kind } from '../src/types.js';
 
 /** Gets a sample file by name. */
@@ -205,5 +206,199 @@ export async function runCrs(engine: Engine): Promise<CrsReport> {
     byCode: byCode.map((found) => found.code),
     misuse,
     loaded,
+  };
+}
+
+/** What preparing and classifying a few datasets came to, in plain data: the same in every environment. */
+export interface DisplayReport {
+  /** The map's coordinate system and the origin, and what the choice said. */
+  readonly frame: {
+    readonly crs: string;
+    readonly origin: readonly number[];
+    readonly source: string;
+  };
+  readonly frameFindings: readonly string[];
+  /** For each dataset: its kind, whether each typed array is the kind it has to be, and what is in them. */
+  readonly points: PointsReport;
+  readonly polygons: {
+    readonly triangles: number;
+    readonly outline: number;
+    readonly findings: readonly string[];
+  };
+  readonly warpedGrid: {
+    readonly tiles: number;
+    readonly tileTriangles: readonly number[];
+    readonly placement: boolean;
+  };
+  /** Classes of a column: bounds and counts, and whether the class index's tally is the same. */
+  readonly classes: readonly {
+    readonly method: string;
+    readonly breaks: string;
+    readonly indexAgrees: boolean;
+  }[];
+  /** What happened to a big prepare that was stopped, and to the next one. */
+  readonly stopped: { readonly outcome: string; readonly nextWorks: boolean };
+  /** How many reports of progress a big prepare made, and whether they only went up. */
+  readonly progress: { readonly reports: boolean; readonly ascending: boolean };
+}
+
+interface PointsReport {
+  readonly isFloat32: boolean;
+  readonly length: number;
+  readonly firstThree: readonly number[];
+  readonly notPlaced: number;
+  readonly findings: readonly string[];
+}
+
+const GEOGRAPHIC: CrsRef = { kind: 'epsg', code: 4326 };
+
+function buffersOf(result: Awaited<ReturnType<Engine['prepare']>>): RenderBuffers {
+  if (result.status !== 'drawn') {
+    throw new Error(`not drawn: ${result.findings.map((f) => f.code).join(', ')}`);
+  }
+  return result.buffers;
+}
+
+/** Loads some data in longitude and latitude, prepares and classifies it, and reports what came out. */
+export async function runDisplay(engine: Engine): Promise<DisplayReport> {
+  const count = 3_000;
+  const loaded = async (input: Parameters<Engine['load']>[0]): Promise<number> => {
+    const result = await engine.load(input);
+    if (result.status !== 'loaded') throw new Error('blocked');
+    return result.summaries[0]?.id ?? -1;
+  };
+  const wells = await loaded(
+    points({
+      name: 'Wells',
+      crs: GEOGRAPHIC,
+      x: Array.from({ length: count }, (_, i) => 57 + (i % 100) * 0.001),
+      // The last position is off the Earth.
+      y: Array.from({ length: count }, (_, i) =>
+        i === count - 1 ? 95 : 25 + Math.floor(i / 100) * 0.001,
+      ),
+      attributes: {
+        grade: Array.from({ length: count }, (_, i) => (i % 7 === 3 ? null : (i % 40) * 1.5)),
+      },
+    }),
+  );
+  const leases = await loaded(
+    polygons({
+      name: 'Leases',
+      crs: GEOGRAPHIC,
+      x: [57, 57.1, 57.1, 57, 57.2, 57.3, 57.3, 57.2, 57.4, 57.5, 57.5, 57.4],
+      y: [25, 25, 25.1, 25.1, 25, 25, 25.1, 25.1, 25, 25, 25.1, 25.1],
+      ringOffsets: [0, 4, 8, 12],
+      polygonOffsets: [0, 1, 2, 3],
+    }),
+  );
+  const surface = await loaded(
+    grid({
+      name: 'Grid',
+      crs: GEOGRAPHIC,
+      origin: [57, 25, 0],
+      spacing: [0.01, 0.01, 1],
+      dims: [90, 40, 1],
+      values: { value: Array.from({ length: 3_600 }, (_, i) => i) },
+    }),
+  );
+
+  const choice = await engine.chooseFrame();
+  if (choice.frame === null) throw new Error('no frame');
+  const { frame } = choice;
+  const prepare = (id: number, maxTextureSize?: number) =>
+    engine.prepare(id, { frame, ...(maxTextureSize === undefined ? {} : { maxTextureSize }) });
+
+  const pointsResult = await prepare(wells);
+  const pointBuffers = buffersOf(pointsResult);
+  if (pointBuffers.kind !== 'points') throw new Error('not points');
+  const positions = pointBuffers.positions;
+  const pointsReport: PointsReport = {
+    isFloat32: positions instanceof Float32Array,
+    length: positions.length,
+    firstThree: Array.from(positions.slice(0, 3)).map((n) => Math.round(n * 100) / 100),
+    // A position that cannot be placed has NaN for x and for y, and its height as it was.
+    notPlaced: Array.from(positions).filter((n, i) => i % 3 === 0 && Number.isNaN(n)).length,
+    findings: pointsResult.findings.map((f) => `${f.code} x${String(f.count)}`),
+  };
+
+  const polygonResult = await prepare(leases);
+  const polygonBuffers = buffersOf(polygonResult);
+  if (polygonBuffers.kind !== 'polygons') throw new Error('not polygons');
+
+  const gridBuffers = buffersOf(await prepare(surface, 32));
+  if (gridBuffers.kind !== 'grid' || gridBuffers.warp === undefined) throw new Error('not warped');
+
+  const classes: DisplayReport['classes'][number][] = [];
+  for (const method of ['equal', 'quantile', 'jenks', 'categories'] as const) {
+    const classified = await engine.classify(wells, 'grade', method, 5);
+    if (classified.status !== 'classified') throw new Error('not classified');
+    const { breaks } = classified;
+    const index = await engine.classIndex(wells, breaks);
+    const counts = [...breaks.counts];
+    if (breaks.kind === 'categories' && breaks.other !== undefined) counts.push(breaks.other);
+    const tally = counts.map(() => 0);
+    let none = 0;
+    for (const c of index) {
+      if (c === 255) none += 1;
+      else tally[c] = (tally[c] ?? 0) + 1;
+    }
+    classes.push({
+      method,
+      breaks: JSON.stringify(breaks),
+      indexAgrees: JSON.stringify(tally) === JSON.stringify(counts) && none === breaks.nulls,
+    });
+  }
+
+  // A prepare that is stopped as soon as it is under way, and one after it.
+  const big = await loaded(
+    points({
+      name: 'Big',
+      crs: { kind: 'epsg', code: 32640 },
+      x: Array.from({ length: 300_000 }, (_, i) => 500_000 + (i % 1_000)),
+      y: Array.from({ length: 300_000 }, (_, i) => 2_700_000 + Math.floor(i / 1_000)),
+    }),
+  );
+  const controller = new AbortController();
+  let outcome = 'prepared';
+  try {
+    await engine.prepare(
+      big,
+      { frame },
+      {
+        signal: controller.signal,
+        onProgress: () => {
+          controller.abort();
+        },
+      },
+    );
+  } catch (error) {
+    outcome = error instanceof Error ? error.name : String(error);
+  }
+  const fractions: number[] = [];
+  const again = await engine.prepare(
+    big,
+    { frame },
+    { onProgress: (p) => fractions.push(p.fraction) },
+  );
+  return {
+    frame: { crs: JSON.stringify(frame.mapCrs), origin: frame.origin, source: frame.source },
+    frameFindings: choice.findings.map((f) => f.code),
+    points: pointsReport,
+    polygons: {
+      triangles: polygonBuffers.triangles.length / 3,
+      outline: polygonBuffers.outline.length / 2,
+      findings: polygonResult.findings.map((f) => f.code),
+    },
+    warpedGrid: {
+      tiles: gridBuffers.tiles.length,
+      tileTriangles: Array.from(gridBuffers.warp.tileTriangles),
+      placement: 'placement' in gridBuffers,
+    },
+    classes,
+    stopped: { outcome, nextWorks: again.status === 'drawn' },
+    progress: {
+      reports: fractions.length >= 2,
+      ascending: fractions.every((f, i) => i === 0 || f >= (fractions[i - 1] ?? 0)),
+    },
   };
 }
