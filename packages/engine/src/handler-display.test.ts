@@ -238,6 +238,50 @@ describe('prepare', () => {
     expect(reply.transfer).toStrictEqual([]);
   });
 
+  it('refuses a frame that is not one, before the kernel is asked, and does not say a different failure is a removal', async () => {
+    const harness = await ready();
+    const dataset = await loadPoints(harness, 5);
+    const frame = await chosenFrame(harness);
+    // Found by the review of the milestone: a frame with an origin that is not a number gave "drawn" and positions that were all NaN.
+    const bad = { ...frame, origin: [Number.NaN, 0, 0] } as unknown as Frame;
+    const reply = await harness.settle({
+      type: 'prepare',
+      id: id(),
+      params: { dataset, frame: bad },
+    });
+    expect(errorMessage(reply)).toMatch(/frame\.origin\[0\]: expected a finite number/);
+    const odd = { mapCrs: 1, origin: [0, 0, 0], source: 'auto' } as unknown as Frame;
+    expect(
+      errorMessage(
+        await harness.settle({ type: 'prepare', id: id(), params: { dataset, frame: odd } }),
+      ),
+    ).toMatch(/frame\.mapCrs/);
+  });
+
+  it('does not call an error that is not a removal a removal', async () => {
+    // The kernel finishes the job and then the answer is wrong (as a bug in the bindings would make it): the job is gone, but the
+    // dataset was not removed, and the message must be the real one (found by the review of the milestone).
+    const module = testKernelModule();
+    const spy: KernelModule = {
+      ...module,
+      createKernel: () => {
+        const kernel = wrapKernel(module.createKernel());
+        const { stepPrepare } = kernel;
+        kernel.stepPrepare = (job, budget) => {
+          const step = stepPrepare(job, budget) as { status: string };
+          return step.status === 'done' ? { status: 'done', result: { status: 'bogus' } } : step;
+        };
+        return kernel;
+      },
+    };
+    const harness = await ready(() => spy);
+    const dataset = await loadPoints(harness, 5);
+    const frame = await chosenFrame(harness);
+    const reply = await harness.settle({ type: 'prepare', id: id(), params: { dataset, frame } });
+    expect(errorMessage(reply)).toMatch(/expected drawn or not_drawn/);
+    expect(errorMessage(reply)).not.toMatch(/removed/);
+  });
+
   it('refuses what is misuse', async () => {
     const harness = await ready();
     const dataset = await loadPoints(harness, 5);
@@ -251,7 +295,7 @@ describe('prepare', () => {
       /largest texture must be a whole number/,
     );
     expect(errorMessage(await send({ dataset: 9_999 }))).toMatch(/no dataset with that id/);
-    expect(errorMessage(await send({ frame: { mapCrs: 1 } }))).toMatch(/frame is not valid/);
+    expect(errorMessage(await send({ frame: { mapCrs: 1 } }))).toMatch(/frame: missing "origin"/);
   });
 });
 

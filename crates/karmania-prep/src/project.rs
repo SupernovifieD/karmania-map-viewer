@@ -88,7 +88,8 @@ impl Projector {
 /// the positions).
 ///
 /// A position that is not finite, or that cannot be converted, stays in its place as NaN (so that the
-/// numbers of the elements do not change) and the renderer leaves it out; the ones that could not be
+/// numbers of the elements do not change), and so does a number too large for an `f32` once it is made relative to
+/// the origin, which is infinite and not NaN: the renderer leaves out any coordinate that is not finite; the ones that could not be
 /// converted are counted in a `crs.transform.not_finite` finding. Heights are not converted.
 ///
 /// # Errors
