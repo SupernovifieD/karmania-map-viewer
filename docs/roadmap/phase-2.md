@@ -222,7 +222,7 @@ or releasing, and whenever the brief says to stop.
     (`display-check.ts`), tested against the built kernel and against values wrong in one way each.
   - [x] 13.20b The protocol (requests, progress of a prepare) and the worker's handler, with the
     buffers of a result in the transfer list.
-  - [ ] 13.20c The client and the engine's methods, with their checks of misuse, and the test that
+  - [x] 13.20c The client and the engine's methods, with their checks of misuse, and the test that
     the buffers are detached on the sending side.
   - [ ] 13.20d The real-worker tests in the browser.
 - [ ] 13.21 `scripts/generate-fixtures` also writes a 1,000,000-block model CSV

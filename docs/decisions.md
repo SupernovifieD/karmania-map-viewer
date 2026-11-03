@@ -3379,3 +3379,20 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   while it is prepared; a dataset that is not drawn; the classes and their index; every misuse. The exhaustiveness checks
   of `protocol.test.ts` (a request type cannot be added without being covered there) were extended, and the test harness
   does not take a `prepareProgress` for the end of a request.
+- Step 13.20c (the client and the engine's methods). `Engine` has `chooseFrame(preferred?)`, `prepare(id, { frame,
+  maxTextureSize? }, { signal?, onProgress? })`, `classify(id, column, method, classes)` and `classIndex(id,
+  breaks)`, as the brief's signatures, plus the two things the brief did not have and its contracts needed (decisions
+  of steps 13.10, 13.17 and 13.19b): `maxTextureSize`, and `classify` resolving with `{ status: "classified" |
+  "not_classified" }`. Each waits for the worker to be ready, then asks it; the page can have as many engines as it
+  likes and each has its own frame. The client gets one more kind of reply, `prepareProgress`, passed to
+  `onProgress` of the call (`onPrepareProgress` of the request: the import's `onProgress` is typed for its own
+  phases). `AbortSignal` is as for an import: aborting asks the worker to stop, and the promise rejects with the
+  signal's reason (an `AbortError`); a signal already aborted rejects without sending. After `dispose` all four
+  reject with `EngineDisposedError`. Misuse is refused in the worker (step 13.20b) and comes back as an
+  `EngineError` with its message. **Tests over a real message channel** (`engine-display.test.ts`, 8): the frame in
+  each state; a prepare of 350,000 points with progress; **that the buffers are handed over: the arrays the worker
+  made, kept by a spy on the kernel, are empty on the worker's side once the result has arrived** (the arrays
+  and their `ArrayBuffer`s have a length of 0) **and whole on the page's**, the same for the class index; a stop by the signal that
+  drops the job in the kernel; a dataset that is not drawn; misuse; the methods after `dispose`. Mutation tried: with
+  the transfer list emptied (the buffers copied) the test of the sending side fails. The type tests of `api.test.ts`
+  list the methods of the engine, so a method cannot be added or dropped without it saying so.

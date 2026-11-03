@@ -15,6 +15,8 @@ export type {
   ImportPhase,
   ImportProgress,
   LoadOptions,
+  PrepareOptions,
+  PrepareParams,
 } from './api.js';
 export { CLASS_METHODS, DRAW_STATUSES, FRAME_SOURCES, NO_CLASS } from './display.js';
 export type {
