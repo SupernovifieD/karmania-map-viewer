@@ -236,7 +236,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
   own, and the claims about the length of a step are corrected.
 - [x] 13.F4 Gate fix: removing the last dataset drops the frame in the kernel itself.
-- [ ] 13.F5 Gate fix: the mesh of a warped tile is cut along `i` and along `j` by what each side needs.
+- [x] 13.F5 Gate fix: the mesh of a warped tile is cut along `i` and along `j` by what each side needs.
 - [ ] 13.F6 Gate fix: the finding for two local grids says that heights are drawn as given.
 - [ ] 13.F7 Gate fix: the classes and the class index of a grid with several layers are those of the first
   layer, the one that is drawn.

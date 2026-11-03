@@ -3493,3 +3493,13 @@ reviewer and reproduced here by a test that failed before the fix.
   (and the waiting origin of step 13.F2) when none remains, and the kernel's `remove` calls it. Tests: in `Preparer` (one of two
   removed keeps it, the last drops it, a dataset in another zone starts afresh) and through the built kernel in Node, written first
   and seen to fail (the frame was still UTM 40).
+- Step 13.F5 (thin tiles of a warped grid). Minor. The mesh of a tile was cut into `n` by `n` parts with `n` no more than the cells of its
+  SHORTER side, so a strip a cell wide stayed one quad: a grid of 2,000 x 1 cells in degrees warped to UTM was 4 vertices and
+  `display.grid.warp_rough`, and the 1 x 4,096 strip left by a 4,097 x 4,097 grid in textures of 4,096 was 0.17 cell off at the middle of its
+  edge, over the 0.1 of the brief, with an open seam to its neighbour of 1.4 to 3.1 m. **Fix**: the tile is cut into `ni` by `nj` parts, along `i`
+  and along `j`, each doubled together and limited by the cells of the tile in its own direction and by 256 (`WarpTile::parts` is
+  `[ni, nj]`). Inside a tile neighbouring parts still share their vertices; between two tiles each mesh follows the same curve with parts
+  of its own, so a seam is open by at most the two errors, 0.2 cell (stated in the doc of `warp_tile`). Tests, which measure with
+  `Transformer::convert` and not with the code under test, in cells: a 2,000 x 1 row and a 1 x 4,096 column in degrees are not rough, are
+  cut along their length and not across, and are within a tenth of a cell (by 5 % of it) at the middle of every part; every tile of a
+  4,097 x 4,097 grid in 4,096 textures (the tile, both strips and the corner) is as good. Both fail under the old rule (a mutation).
