@@ -96,7 +96,8 @@ impl PolygonsFill {
     }
 
     /// Starts as [`PolygonsFill::new`], with polygons of more than `limit` vertices, or of more than `work_limit` vertices
-    /// times rings, outlined and not filled.
+    /// times rings, outlined and not filled. The words of the finding always give the real limit of vertices, whatever limit is
+    /// given here, which only the tests do.
     pub(crate) fn with_limits(positions: Vec<f32>, limit: usize, work_limit: u64) -> Self {
         let mut unfilled = Finding::new(
             FindingCode::DisplayPolygonsOutlineOnly,

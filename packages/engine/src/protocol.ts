@@ -102,7 +102,10 @@ export interface Requests {
     };
     readonly result: ClassifyResult;
   };
-  /** The class of every element of a dataset under class breaks: one byte each, handed over. */
+  /**
+   * The class of every element of a dataset that is drawn (the cells of the first layer of a grid of several layers)
+   * under class breaks: one byte each, handed over.
+   */
   readonly classIndex: {
     readonly params: { readonly dataset: number; readonly breaks: ClassBreaks };
     readonly result: Uint8Array;

@@ -242,7 +242,8 @@ impl Kernel {
     }
 
     /// The class of every element of a dataset under `breaks` (what `classify` gave), as a `Uint8Array`
-    /// with one byte for each element: the class, or 255 for an element with no value.
+    /// with one byte for each element that is drawn (every element, but for a grid of several layers, of which only the
+    /// first is drawn, the cells of that layer): the class, or 255 for an element with no value.
     ///
     /// # Errors
     ///

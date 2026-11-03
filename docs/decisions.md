@@ -3572,3 +3572,12 @@ randomised checks of the classes, of the origin and of 48 shapes of warp tile, w
   the last the largest. Tests, seen to fail first: the two columns and 4,000 random ranges of 1 to 20 units at magnitudes from 1e-300 to 1e300 (and the
   largest and smallest floats) in 1, 2, 3, 7 and 12 classes must have bounds that are finite, never go down, begin at the smallest value and end at the largest, with a
   count for each class; and the reviewer's column through the built kernel and the engine's own check (it fails with the old formula: "bounds[2]: expected a finite number").
+- Step 13.F13 (the small things of the second review). (1) **Words left behind by step 13.F7** (nit): "one byte for each element" stayed in the docs of the kernel's `classIndex`, of
+  `class_index`, of the protocol and of the kernel interface; each now says "each element that is drawn" and names the grid of several layers. (2) **The doc of
+  `Engine.chooseFrame`** did not say that an origin that was waiting (step 13.F2) is made when a dataset can be drawn, which a caller that has already prepared layers
+  needs to know: it says so, and that layers prepared against an origin of 0 have to be prepared again when the frame it gets back has another. (3) **Other steps that cannot be cut**: a rough warp
+  tile (235 ms for 256 x 256 parts) is one step too; the handler's comment and `docs/perf.md` list it (step 13.F11). (4) **A record that was false**: the commit of step 13.F7 (`cbee551`) says that
+  130 tests and `pnpm check` pass, and it did not build with its tests (a binding I added to a test shadowed an array); the commit after it (`14b4474`) says so, and this is the record: it was
+  committed and pushed because the check and the commit were one command that did not stop on the check's failure. Every commit since is chained to a passing check. (5) **Not changed**: the words of
+  the finding of `with_limits` name the real limit even for a test's smaller one (documented); `checkedFrame` throws a `ContractError` with a path message where other misuse is a `TypeError` with a
+  sentence, and the text reaches the page unchanged, which is what matters.
