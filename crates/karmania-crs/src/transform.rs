@@ -84,6 +84,20 @@ impl Transformer {
     /// as examples (their 0-based vertex index). A position that was not finite to begin with is
     /// left as it is and not counted: validation reports those.
     pub fn convert_in_place(&self, xyz: &mut [f64], findings: &mut Findings) {
+        self.convert_chunk_in_place(xyz, 0, findings);
+    }
+
+    /// Converts a part of a longer list of positions in place, as [`Transformer::convert_in_place`] does
+    /// the whole: `xyz` starts at the position numbered `first_vertex` of the list, so that the examples
+    /// of a finding are numbered in the list and not in the part. The findings of the parts merge into the
+    /// one `crs.transform.not_finite` that the whole would have given, with the same counts and, since the
+    /// parts are done in order, the same first examples.
+    pub fn convert_chunk_in_place(
+        &self,
+        xyz: &mut [f64],
+        first_vertex: u64,
+        findings: &mut Findings,
+    ) {
         if self.is_identity() {
             return;
         }
@@ -101,7 +115,7 @@ impl Transformer {
                 (*x, *y) = (f64::NAN, f64::NAN);
                 failed += 1;
                 if examples.len() < karmania_core::MAX_EXAMPLES {
-                    examples.push(Location::default().with_vertex(index as u64));
+                    examples.push(Location::default().with_vertex(first_vertex + index as u64));
                 }
             }
         }
@@ -644,5 +658,46 @@ mod tests {
         assert!(section.contains(&format!("- Example: {}", finding.message)));
         let hint = finding.hint.as_deref().unwrap_or_default();
         assert!(section.contains(&format!("- Hint: {hint}")));
+    }
+
+    #[test]
+    fn positions_converted_in_parts_give_the_same_values_and_the_same_finding_as_all_at_once() {
+        let t = transformer(epsg(4326), epsg(32640));
+        // 40 positions: every 7th has a latitude that is not on the Earth.
+        let original: Vec<f64> = (0..40)
+            .flat_map(|i| {
+                [
+                    57.0 + f64::from(i) * 0.01,
+                    if i % 7 == 3 { 95.0 } else { 25.0 },
+                    f64::from(i),
+                ]
+            })
+            .collect();
+        let mut whole = original.clone();
+        let mut whole_findings = Findings::new();
+        t.convert_in_place(&mut whole, &mut whole_findings);
+        for part in [1, 3, 7, 13, 40] {
+            let mut parts = original.clone();
+            let mut findings = Findings::new();
+            for (n, chunk) in parts.chunks_mut(part * 3).enumerate() {
+                t.convert_chunk_in_place(chunk, (n * part) as u64, &mut findings);
+            }
+            let same = parts
+                .iter()
+                .zip(&whole)
+                .all(|(a, b)| a.to_bits() == b.to_bits());
+            assert!(same, "values, parts of {part}");
+            assert_eq!(findings, whole_findings, "findings, parts of {part}");
+        }
+        let finding = &whole_findings.as_slice()[0];
+        assert_eq!(finding.count, 6);
+        assert_eq!(
+            finding
+                .examples
+                .iter()
+                .map(|e| e.vertex)
+                .collect::<Vec<_>>(),
+            [3, 10, 17, 24, 31, 38].map(Some)
+        );
     }
 }

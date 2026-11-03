@@ -46,7 +46,7 @@ pub use mesh::{MeshBuffers, mesh_buffers};
 pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
 pub use polygons::{PolygonsBuffers, polygons_buffers};
-pub use project::{Prepared, project};
+pub use project::{Prepared, Projector, project};
 pub use stats::{
     Category, ColumnStats, DISTINCT_LIMIT, Distinct, category_at, column_stats,
     column_stats_with_limit,
