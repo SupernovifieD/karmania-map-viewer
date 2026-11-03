@@ -230,6 +230,20 @@ or releasing, and whenever the brief says to stop.
   and 1M blocks; results in `docs/perf.md`.
 - [x] 13.21a A faster count of distinct values, since the timing of 13.21 found categories over a
   4,000,000-cell column slower than the restyle target.
+- [x] 13.F1 Gate fix: quantile classes of a column with two values, or with most rows at one value, are
+  not collapsed to one class.
+- [ ] 13.F2 Gate fix: a frame made when nothing was drawable gets its origin from the first dataset that is.
+- [ ] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
+  own, and the claims about the length of a step are corrected.
+- [ ] 13.F4 Gate fix: removing the last dataset drops the frame in the kernel itself.
+- [ ] 13.F5 Gate fix: the mesh of a warped tile is cut along `i` and along `j` by what each side needs.
+- [ ] 13.F6 Gate fix: the finding for two local grids says that heights are drawn as given.
+- [ ] 13.F7 Gate fix: the classes and the class index of a grid with several layers are those of the first
+  layer, the one that is drawn.
+- [ ] 13.F8 Gate fix: the browser and Node reports of display preparation compare the bytes of the buffers.
+- [ ] 13.F9 Gate fix: a test of the sample of natural breaks that is not a multiple of its stride.
+- [ ] 13.F10 Gate fix: small things (words about NaN and infinity, the module doc of `stats`, the frame
+  checked before a prepare starts, the error of a job that is gone).
 - [ ] 13.G Gate.
 
 ## M14: Scene document (@karmania/scene)

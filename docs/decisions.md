@@ -3438,3 +3438,24 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   of every cell (it sorts 4,000,000 numbers). **The margin is thin for WebAssembly**, which is usually 1.5 to 2 times slower and has the
   transfer and the upload to add, so it is for M16's measurement to say; if quantiles miss there, a selection of the bounds by
   partitioning, which needs no full sort, is the place to look. The numbers before and after are in `docs/perf.md`.
+
+## M13 gate
+
+The review of the milestone (a fresh subagent, on `e24c1d0`, after `pnpm test:e2e` 629 + 14, `test:visual` 102, `test:axe` 102 and
+`pnpm perf` had passed) found no blocker, three majors and minors and nits. Each is a sub-step below, found by the
+reviewer and reproduced here by a test that failed before the fix.
+
+- Step 13.F1 (quantile classes collapsed). **Major.** A column with two different values, or most rows at one value, was one
+  class for 4 or more quantile classes (500 zeros and 500 ones in 4 classes gave bounds `[0, 1]` and one class of 1,000; 900
+  zeros and 100 ones gave one class for any number), because the rule of step 13.16a that keeps the largest value as a class
+  of its own only matched an exact tail (`below < max, max, max`), and when three or more bounds were the maximum, or when
+  most were the minimum, the dedup removed every class but one. A column of two values is not a constant, which the brief's
+  "a constant column gives one class" covers. **Fix**: the largest value is a class of its own, `[max, max]`, whenever a bound
+  before the last is already the maximum (however many), and also when the bounds are reduced to the smallest and the largest and more
+  than one class was asked for (so 900 zeros and 100 ones in 3 classes are `[0, 1, 1]`, counts 900 and 100); one class asked for is one
+  class, and a constant column is still one. Tests: six two-valued columns by 2 to 7 classes and by equal intervals, quantiles and
+  natural breaks must have at least two non-empty classes; the exact answers for two of them; 300 zeros, 300 ones and 400 twos in five
+  classes (three bounds at the maximum with classes left below). Two mutations: no split when reduced to two bounds
+  (three tests fail) and the old tail-only rule (the last test fails; it did not fail before that test was added, which is why it was added).
+  Two tests of 13.16a pinned `[1, 1, 1, 1, 5]` in three classes as one class of five, which is the behaviour found wrong, and were
+  changed to `[1, 5, 5]` with counts 4 and 1, with the reason in them.

@@ -145,7 +145,7 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
             let mut bounds = vec![min];
             bounds.extend(jenks::natural_breaks(&used, classes));
             bounds.push(max);
-            without_empty_classes(bounds)
+            without_empty_classes(bounds, classes)
         }
     };
     let mut counts = vec![0; bounds.len() - 1];
@@ -189,17 +189,24 @@ fn categories(column: &Column, classes: usize) -> Result<ClassBreaks, Finding> {
 }
 
 /// Removes a bound equal to the one before it, which would be a class with no range; at least two bounds
-/// stay (the smallest and the largest, equal for a column of one value). The exception is the top: when
-/// the largest value is a class of its own (after a class that is not empty) the last two bounds stay
-/// equal, `[max, max]`, which [`class_of`] puts exactly the values equal to the largest in. A class at the
-/// bottom cannot be kept the same way: `[min, min)` holds nothing.
-fn without_empty_classes(mut bounds: Vec<f64>) -> Vec<f64> {
-    let top_alone = matches!(bounds.as_slice(), [.., below, a, b] if a == b && below < a);
+/// stay (the smallest and the largest, equal for a column of one value).
+///
+/// The largest value gets a class of its own, `[max, max]`, which [`class_of`] puts exactly the values equal
+/// to the largest in, in two cases: when a bound before the last is the largest value already (a value that
+/// stands alone at the top, or that many rows share, however many bounds it takes), and when the bounds are
+/// reduced to the smallest and the largest and more than one class was asked for: two different values are
+/// not a constant column, and a column that is mostly one value has most of its quantile bounds equal and
+/// would otherwise be one class. A class at the bottom cannot be kept the same way: `[min, min)` holds nothing.
+fn without_empty_classes(mut bounds: Vec<f64>, classes: usize) -> Vec<f64> {
+    let (Some(&min), Some(&max)) = (bounds.first(), bounds.last()) else {
+        return bounds;
+    };
+    let top_alone = min < max && bounds.len() >= 3 && bounds[bounds.len() - 2] == max;
     bounds.dedup();
-    if let (true, Some(&max)) = (top_alone, bounds.last()) {
+    // A column of one value (one bound left) is one class, `[v, v]`.
+    let reduced = bounds.len() == 2 && min < max && classes >= 2;
+    if top_alone || reduced || bounds.len() == 1 {
         bounds.push(max);
-    } else if bounds.len() == 1 {
-        bounds.extend(bounds.first().copied());
     }
     bounds
 }
@@ -222,7 +229,7 @@ fn equal_bounds(values: &[f64], classes: usize) -> Vec<f64> {
     let step = max / n - min / n;
     let mut bounds: Vec<f64> = (0..classes).map(|k| min + step * k as f64).collect();
     bounds.push(max);
-    without_empty_classes(bounds)
+    without_empty_classes(bounds, classes)
 }
 
 /// Quantiles of `sorted` (not empty): the bound `k` is the value `floor(k * n / classes)` places from the
@@ -241,7 +248,7 @@ fn quantile_bounds(sorted: &[f64], classes: usize) -> Vec<f64> {
         .filter_map(|k| at(k * n / classes as u128))
         .collect();
     bounds.extend(sorted.last());
-    without_empty_classes(bounds)
+    without_empty_classes(bounds, classes)
 }
 
 /// Divides the column of `dataset` called `column` into `classes` classes by `method`: see [`classify`].
@@ -384,7 +391,9 @@ mod tests {
     #[test]
     fn values_that_many_rows_share_make_fewer_classes_not_empty_ones() {
         let (bounds, counts, _) = ranges(&floats(&[1.0, 1.0, 1.0, 1.0, 5.0]), Method::Quantile, 3);
-        assert_eq!((bounds, counts), (vec![1.0, 5.0], vec![5]));
+        // Two different values are two classes, the larger in a class of its own (step 13.F1; the first version
+        // of this test pinned one class of five, which the review of the milestone found wrong).
+        assert_eq!((bounds, counts), (vec![1.0, 5.0, 5.0], vec![4, 1]));
         let (bounds, counts, _) = ranges(
             &floats(&[1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0]),
             Method::Quantile,
@@ -459,9 +468,11 @@ mod tests {
         with_outlier.push(1000.0);
         let (bounds, counts, _) = ranges(&floats(&with_outlier), Method::Jenks, 2);
         assert_eq!((bounds, counts), (vec![1.0, 1000.0, 1000.0], vec![10, 1]));
-        // Nothing of the kind at the bottom: that class could hold nothing.
+        // Nothing of the kind at the bottom (that class could hold nothing), but the largest value is split off.
         let (bounds, counts, _) = ranges(&floats(&[1.0, 1.0, 1.0, 1.0, 5.0]), Method::Quantile, 3);
-        assert_eq!((bounds, counts), (vec![1.0, 5.0], vec![5]));
+        // Two different values are two classes, the larger in a class of its own (step 13.F1; the first version
+        // of this test pinned one class of five, which the review of the milestone found wrong).
+        assert_eq!((bounds, counts), (vec![1.0, 5.0, 5.0], vec![4, 1]));
     }
 
     #[test]
@@ -697,6 +708,61 @@ mod tests {
         assert_eq!(
             error.message,
             "The dataset has no column named grade, so nothing can be coloured by it."
+        );
+    }
+
+    /// A column of `zeros` zeros and `ones` ones.
+    fn two_values(zeros: usize, ones: usize) -> Column {
+        let mut v = vec![0.0; zeros];
+        v.extend(std::iter::repeat_n(1.0, ones));
+        floats(&v)
+    }
+
+    #[test]
+    fn a_column_of_two_values_is_never_one_class_when_more_were_asked_for() {
+        // Found by the review of the milestone: with most rows at one value, three or more quantile bounds
+        // were equal and the dedup took every class but one. Two different values are not a constant.
+        for (zeros, ones) in [
+            (500, 500),
+            (900, 100),
+            (100, 900),
+            (10, 5),
+            (1, 999),
+            (999, 1),
+        ] {
+            for classes in 2..=7 {
+                for method in [Method::Equal, Method::Quantile, Method::Jenks] {
+                    let (bounds, counts, _) = ranges(&two_values(zeros, ones), method, classes);
+                    let nonempty = counts.iter().filter(|&&n| n > 0).count();
+                    assert!(
+                        nonempty >= 2,
+                        "{zeros} zeros, {ones} ones, {classes} classes, {method:?}: {bounds:?} {counts:?}"
+                    );
+                    assert_eq!(counts.iter().sum::<u64>(), (zeros + ones) as u64);
+                }
+            }
+        }
+        // One class is what one class asked for, and a constant column still gives one.
+        assert_eq!(ranges(&two_values(900, 100), Method::Quantile, 1).1, [1000]);
+        assert_eq!(ranges(&two_values(10, 0), Method::Quantile, 5).1, [10]);
+        // The shape of the answer: the zeros below, the ones in a class of their own.
+        let (bounds, counts, _) = ranges(&two_values(900, 100), Method::Quantile, 3);
+        assert_eq!((bounds, counts), (vec![0.0, 1.0, 1.0], vec![900, 100]));
+        let (bounds, counts, _) = ranges(&two_values(500, 500), Method::Quantile, 5);
+        assert_eq!((bounds, counts), (vec![0.0, 1.0, 1.0], vec![500, 500]));
+    }
+
+    #[test]
+    fn the_largest_value_is_its_own_class_however_many_bounds_it_takes_and_others_stay() {
+        // 300 zeros, 300 ones, 400 twos in five classes: the bounds are 0, 0, 1, 2, 2 and 2, and the
+        // twos, which take three of them, are a class of their own above the zeros and the ones.
+        let mut v = vec![0.0; 300];
+        v.extend(std::iter::repeat_n(1.0, 300));
+        v.extend(std::iter::repeat_n(2.0, 400));
+        let (bounds, counts, _) = ranges(&floats(&v), Method::Quantile, 5);
+        assert_eq!(
+            (bounds, counts),
+            (vec![0.0, 1.0, 2.0, 2.0], vec![300, 300, 400])
         );
     }
 }
