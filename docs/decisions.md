@@ -2983,3 +2983,23 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   unreachable for a loaded dataset. Reprojected lines and polygon edges are straight between their
   reprojected vertices and long edges are not densified (recorded, as section 9.2 asks; the geodesic
   is out of scope).
+- Step 13.4c (choosing the frame for the datasets). `karmania_prep::choose_frame(previous, preferred,
+  datasets)` gives `{frame, drawable, findings}`. The rules, where the brief leaves them to the code:
+  no datasets means no frame (so the map's system goes when the last dataset is removed, and only
+  then); a `preferred` system is the person's choice (source `user`), keeps the origin if it is the
+  system the map is in already, and otherwise works the origin out again from the first dataset that is
+  drawn in it (0 if none is); with neither, `previous` is kept for as long as any dataset is loaded,
+  even if the first dataset is the one removed; with no `previous`, the first dataset that has a
+  system and a position gives the map's system (`map_crs_for`). The origin is the centre of that
+  dataset's extent in the map's system: its own extent if it is in it, and otherwise the extent of its
+  3 x 3 sample points (corners, middles of the sides, centre) converted, z unchanged. That is an
+  approximation of the extent of the converted data, and only decides which multiple of 1,000 map
+  units the origin is. The contract of section 11.3 is extended by one field: `findings`, the map's own
+  info findings (the UTM zone chosen), returned once, when the frame is chosen; a kept frame returns
+  none, so the page keeps what it was told. `drawable` has one entry per dataset in the order given,
+  with the dataset's id. A dataset with no system or no position is skipped for the choice and listed
+  with its own reason (`crs.missing`, `display.extent.none`); if none is usable there is no frame.
+  One test of the extent found a wrong expectation of mine (zone 40 is west of the central
+  meridian of zone 41, so its easting falls to about -40,000 there) and one comment of mine that said
+  a figure I had not worked out; the code was right in both and the test now states the bounds it was
+  checked against (an easting near 530,000 and a northing near 2,790,000 for 57.3 E, 25.2 N).
