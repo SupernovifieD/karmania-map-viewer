@@ -3486,3 +3486,10 @@ reviewer and reproduced here by a test that failed before the fix.
   failed before the fix): a polygon of 100,001 vertices is outlined, its square neighbour is filled, and the finding has the
   count, the example and the words; the limit counts the vertices of the rings of one polygon together, and shows its edge with a small limit
   (8 against 7 and 9). Mutation: the limit ignored (both tests fail).
+- Step 13.F4 (the frame outlived the last dataset). Minor. The frame was dropped only if `chooseFrame` happened to run while nothing was
+  loaded, so a page that removed dataset A (UTM 40), loaded B (UTM 41) and then asked got A's system and origin, with B reprojected
+  into it, although section 9.1 says the origin changes "when the last dataset is removed". It worked only if the page asked
+  between every removal and the next load. **Fix**: `Preparer::removed(dataset, remaining)` stops the jobs on the dataset and drops the frame
+  (and the waiting origin of step 13.F2) when none remains, and the kernel's `remove` calls it. Tests: in `Preparer` (one of two
+  removed keeps it, the last drops it, a dataset in another zone starts afresh) and through the built kernel in Node, written first
+  and seen to fail (the frame was still UTM 40).

@@ -104,6 +104,17 @@ impl Preparer {
         self.jobs.remove(&job).is_some()
     }
 
+    /// A dataset was removed and `remaining` are loaded: stops the jobs on it, and drops the frame if it was the
+    /// last, so that the next dataset starts afresh (section 9.1: the origin changes "when the last dataset is
+    /// removed"). This does not wait for [`Preparer::choose_frame`] to be called with no datasets.
+    pub fn removed(&mut self, dataset: DatasetId, remaining: usize) {
+        self.forget_dataset(dataset);
+        if remaining == 0 {
+            self.frame = None;
+            self.origin_waiting = false;
+        }
+    }
+
     /// Stops the jobs that are preparing `dataset`, which is being removed.
     pub fn forget_dataset(&mut self, dataset: DatasetId) {
         self.jobs.retain(|_, (id, _)| *id != dataset);
@@ -267,5 +278,27 @@ mod tests {
         assert_eq!(first.origin, [0.0; 3]);
         let b = at(2, &[(700_000.0, 3_000_000.0)]);
         assert_eq!(p.choose_frame(None, &[&a, &b]).frame, Some(first));
+    }
+
+    #[test]
+    fn removing_the_last_dataset_drops_the_frame_without_choose_frame_being_called() {
+        let a = at(1, &[(512_000.0, 4_012_000.0)]);
+        let mut p = Preparer::new();
+        let first = p.choose_frame(None, &[&a]).frame.unwrap();
+        // One of two datasets goes: the frame stays.
+        p.removed(DatasetId(9), 1);
+        assert_eq!(p.frame(), Some(&first));
+        // The last goes: no frame, and a dataset in another zone starts afresh.
+        p.removed(DatasetId(1), 0);
+        assert_eq!(p.frame(), None);
+        let b = points(
+            Some(CrsRef::Epsg { code: 32641 }),
+            &[(300_000.0, 4_000_000.0)],
+        );
+        let again = p.choose_frame(None, &[&b]).frame.unwrap();
+        assert_eq!(
+            (again.map_crs, again.origin),
+            (CrsRef::Epsg { code: 32641 }, [300_000.0, 4_000_000.0, 0.0])
+        );
     }
 }

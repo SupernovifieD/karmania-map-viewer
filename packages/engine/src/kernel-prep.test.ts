@@ -168,6 +168,26 @@ describe('chooseFrame', () => {
     expect(frameOf(kernel)).toStrictEqual(frame);
   });
 
+  it('drops the frame itself when the last dataset is removed, without chooseFrame being asked in between', () => {
+    // Found by the review of the milestone: the frame was dropped only if chooseFrame happened to run while
+    // nothing was loaded, so a page that removed A and loaded B and then asked got A's system and origin.
+    const kernel = createKernel();
+    const a = points(kernel, UTM40, [[512_000, 4_012_000]]);
+    expect(frameOf(kernel).mapCrs).toStrictEqual(UTM40);
+    expect(kernel.remove(a)).toBe(true);
+    const b = points(kernel, { kind: 'epsg', code: 32641 }, [[300_000, 4_000_000]]);
+    const frame = frameOf(kernel);
+    expect(frame.mapCrs).toStrictEqual({ kind: 'epsg', code: 32641 });
+    expect(frame.origin).toStrictEqual([300_000, 4_000_000, 0]);
+    expect(frame.source).toBe('auto');
+    expect(asArray(asObject(kernel.chooseFrame()).drawable)).toHaveLength(1);
+    // Removing one of two datasets does not drop it.
+    const c = points(kernel, { kind: 'epsg', code: 32641 }, [[310_000, 4_010_000]]);
+    expect(kernel.remove(b)).toBe(true);
+    expect(frameOf(kernel)).toStrictEqual(frame);
+    expect(kernel.remove(c)).toBe(true);
+  });
+
   it('throws for a preferred system that is not one', () => {
     expect(() => createKernel().chooseFrame({ kind: 'nonsense' })).toThrow(/not valid/);
   });

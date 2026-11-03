@@ -131,8 +131,9 @@ impl Kernel {
     /// Unloads a dataset. Returns whether there was one with that id.
     pub fn remove(&mut self, dataset: u32) -> bool {
         let id = DatasetId(u64::from(dataset));
-        self.prep.forget_dataset(id);
-        self.inner.registry_mut().remove(id)
+        let removed = self.inner.registry_mut().remove(id);
+        self.prep.removed(id, self.inner.registry().len());
+        removed
     }
 
     /// Chooses the coordinate system the map is drawn in and says which datasets are drawn in it, as
