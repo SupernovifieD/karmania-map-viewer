@@ -7,6 +7,8 @@
 
 use karmania_core::{Column, ColumnType, Finding, FindingCode, Value};
 
+use crate::jenks;
+
 /// The most classes: the class index is one byte, and 255 means no value.
 pub const MAX_CLASSES: usize = 254;
 
@@ -17,6 +19,8 @@ pub enum Method {
     Equal,
     /// Quantiles, exact, from the sorted values: about as many values in each class.
     Quantile,
+    /// Natural breaks (Jenks), found from an evenly strided sample of at most 10,000 values.
+    Jenks,
 }
 
 /// Classes of a column, and how many rows are in each.
@@ -27,11 +31,17 @@ pub enum ClassBreaks {
         /// `classes + 1` numbers, ascending: class `c` is from `bounds[c]` up to, but not including,
         /// `bounds[c + 1]`, and the last class includes its upper bound. There can be fewer classes than were
         /// asked for, when the values do not make that many different ranges (a column of one value has one).
+        /// The last two bounds are equal when the largest value is a class of its own (a value that stands
+        /// alone, or that many rows share): that class is `[max, max]`.
         bounds: Vec<f64>,
         /// How many rows are in each class.
         counts: Vec<u64>,
         /// How many rows have no value to put in a class: null, or not a finite number.
         nulls: u64,
+        /// For natural breaks of a column with more than 10,000 values: how many values the breaks were found
+        /// from (an evenly strided sample of the rows, so the same every time), which the legend says. `None`
+        /// when every value was used. The counts are always of every row.
+        sampled: Option<u64>,
     },
 }
 
@@ -84,11 +94,22 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
     if values.is_empty() {
         return Err(no_values(column));
     }
+    let mut sampled = None;
     let bounds = match method {
         Method::Equal => equal_bounds(&values, classes),
         Method::Quantile => {
             values.sort_unstable_by(f64::total_cmp);
             quantile_bounds(&values, classes)
+        }
+        Method::Jenks => {
+            let (min, max) = extent(&values);
+            let mut used = jenks::sample(&values);
+            sampled = (used.len() < values.len()).then_some(used.len() as u64);
+            used.sort_unstable_by(f64::total_cmp);
+            let mut bounds = vec![min];
+            bounds.extend(jenks::natural_breaks(&used, classes));
+            bounds.push(max);
+            without_empty_classes(bounds)
         }
     };
     let mut counts = vec![0; bounds.len() - 1];
@@ -101,28 +122,40 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
         bounds,
         counts,
         nulls,
+        sampled,
     })
 }
 
 /// Removes a bound equal to the one before it, which would be a class with no range; at least two bounds
-/// stay (the smallest and the largest, equal for a column of one value).
+/// stay (the smallest and the largest, equal for a column of one value). The exception is the top: when
+/// the largest value is a class of its own (after a class that is not empty) the last two bounds stay
+/// equal, `[max, max]`, which [`class_of`] puts exactly the values equal to the largest in. A class at the
+/// bottom cannot be kept the same way: `[min, min)` holds nothing.
 fn without_empty_classes(mut bounds: Vec<f64>) -> Vec<f64> {
+    let top_alone = matches!(bounds.as_slice(), [.., below, a, b] if a == b && below < a);
     bounds.dedup();
-    if bounds.len() == 1 {
-        bounds.push(bounds[0]);
+    if let (true, Some(&max)) = (top_alone, bounds.last()) {
+        bounds.push(max);
+    } else if bounds.len() == 1 {
+        bounds.extend(bounds.first().copied());
     }
     bounds
+}
+
+/// The smallest and the largest of `values` (not empty).
+fn extent(values: &[f64]) -> (f64, f64) {
+    values
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| {
+            (lo.min(v), hi.max(v))
+        })
 }
 
 /// Equal steps from the smallest to the largest of `values` (not empty, finite). The step is worked out as
 /// `max / n - min / n` so that a range wider than a float does not overflow; the last bound is the
 /// largest value itself.
 fn equal_bounds(values: &[f64], classes: usize) -> Vec<f64> {
-    let (min, max) = values
-        .iter()
-        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| {
-            (lo.min(v), hi.max(v))
-        });
+    let (min, max) = extent(values);
     let n = classes as f64;
     let step = max / n - min / n;
     let mut bounds: Vec<f64> = (0..classes).map(|k| min + step * k as f64).collect();
@@ -191,6 +224,7 @@ mod tests {
                 bounds,
                 counts,
                 nulls,
+                ..
             } => (bounds, counts, nulls),
         }
     }
@@ -308,5 +342,59 @@ mod tests {
         let nothing = Column::without_nulls("grade", ColumnData::Float64(vec![f64::NAN]));
         let error = classify(&nothing, Method::Quantile, 5).unwrap_err();
         assert_eq!(error.code.as_str(), "classes.column.no_values");
+    }
+
+    #[test]
+    fn the_largest_value_can_be_a_class_of_its_own() {
+        // Rows that share the largest value, and a value that stands alone at the top.
+        let shared = floats(&[1.0, 2.0, 3.0, 10.0, 10.0, 10.0, 10.0, 10.0]);
+        let (bounds, counts, _) = ranges(&shared, Method::Quantile, 3);
+        assert_eq!(
+            (bounds, counts),
+            (vec![1.0, 3.0, 10.0, 10.0], vec![2, 1, 5])
+        );
+        let mut with_outlier: Vec<f64> = (1..=10).map(f64::from).collect();
+        with_outlier.push(1000.0);
+        let (bounds, counts, _) = ranges(&floats(&with_outlier), Method::Jenks, 2);
+        assert_eq!((bounds, counts), (vec![1.0, 1000.0, 1000.0], vec![10, 1]));
+        // Nothing of the kind at the bottom: that class could hold nothing.
+        let (bounds, counts, _) = ranges(&floats(&[1.0, 1.0, 1.0, 1.0, 5.0]), Method::Quantile, 3);
+        assert_eq!((bounds, counts), (vec![1.0, 5.0], vec![5]));
+    }
+
+    #[test]
+    fn natural_breaks_split_the_groups_and_say_when_they_were_found_from_a_sample() {
+        let c = floats(&[1.0, 2.0, 3.0, 10.0, 11.0, 12.0, 100.0, 101.0, 102.0]);
+        let ClassBreaks::Ranges {
+            bounds,
+            counts,
+            sampled,
+            ..
+        } = classify(&c, Method::Jenks, 3).unwrap();
+        assert_eq!(
+            (bounds, counts, sampled),
+            (vec![1.0, 10.0, 100.0, 102.0], vec![3, 3, 3], None)
+        );
+        // 30,000 values in three tight groups, one after the other (not turn and turn about: a stride of
+        // 3 would then see one group only): the breaks are those of a sample, the counts are of every row.
+        let long: Vec<f64> = (0..30_000)
+            .map(|i| [0.0, 50.0, 90.0][i / 10_000] + (i % 100) as f64 / 100.0)
+            .collect();
+        let ClassBreaks::Ranges {
+            bounds,
+            counts,
+            sampled,
+            ..
+        } = classify(&floats(&long), Method::Jenks, 3).unwrap();
+        assert_eq!(sampled, Some(10_000));
+        assert_eq!(counts, [10_000, 10_000, 10_000]);
+        assert!(
+            (50.0..51.0).contains(&bounds[1]) && (90.0..91.0).contains(&bounds[2]),
+            "{bounds:?}"
+        );
+        assert!(
+            bounds[0] < 1.0 && bounds[3] > 90.0,
+            "the first and last bounds are of every value: {bounds:?}"
+        );
     }
 }

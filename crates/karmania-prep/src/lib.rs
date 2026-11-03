@@ -18,6 +18,7 @@ pub mod classify;
 pub mod drawable;
 pub mod frame;
 pub mod grid;
+pub mod jenks;
 pub mod lines;
 pub mod mesh;
 pub mod origin;
