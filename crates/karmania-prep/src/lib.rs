@@ -15,6 +15,7 @@
 pub mod choice;
 pub mod drawable;
 pub mod frame;
+pub mod lines;
 pub mod origin;
 pub mod points;
 pub mod project;
@@ -24,6 +25,7 @@ mod testutil;
 pub use choice::{DrawableEntry, FrameChoice, choose_frame};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
+pub use lines::{LinesBuffers, lines_buffers};
 pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
 pub use project::{Prepared, project};
