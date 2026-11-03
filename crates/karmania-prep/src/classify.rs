@@ -236,14 +236,23 @@ fn extent(values: &[f64]) -> (f64, f64) {
         })
 }
 
-/// Equal steps from the smallest to the largest of `values` (not empty, finite). The step is worked out as
-/// `max / n - min / n` so that a range wider than a float does not overflow; the last bound is the
-/// largest value itself.
+/// Equal steps from the smallest to the largest of `values` (not empty, finite): the bound `k` is `min * (1 - k / n) +
+/// max * (k / n)`, which does not overflow for a range wider than a float (`max - min` does), and each is held between
+/// the one before it and the largest value, because rounding can put a bound a few units in the last place above
+/// the next, or above the largest, when the range is a few of them wide (found by the second review of the milestone: the
+/// bounds went down, and the engine refused them). The first bound is the smallest value itself and the last the
+/// largest.
 fn equal_bounds(values: &[f64], classes: usize) -> Vec<f64> {
     let (min, max) = extent(values);
     let n = classes as f64;
-    let step = max / n - min / n;
-    let mut bounds: Vec<f64> = (0..classes).map(|k| min + step * k as f64).collect();
+    let mut bounds = Vec::with_capacity(classes + 1);
+    bounds.push(min);
+    for k in 1..classes {
+        let t = k as f64 / n;
+        let bound = min * (1.0 - t) + max * t;
+        let before = bounds.last().copied().unwrap_or(min);
+        bounds.push(bound.clamp(before, max));
+    }
     bounds.push(max);
     without_empty_classes(bounds, classes)
 }
@@ -793,5 +802,53 @@ mod tests {
             (bounds, counts),
             (vec![0.0, 1.0, 2.0, 2.0], vec![300, 300, 400])
         );
+    }
+
+    #[test]
+    fn equal_bounds_never_descend_and_never_overflow_for_a_range_of_a_few_ulps_or_wider_than_a_float()
+     {
+        // Found by the second review of the milestone: `min + step * k` can round above `max` when the range is a few ulps
+        // wide, so that the bounds went down and the engine refused the result (a ContractError), and a range wider than a
+        // float gave NaN or an infinite bound for one class and for three.
+        let up = |x: f64, n: u32| (0..n).fold(x, |v, _| f64::from_bits(v.to_bits() + 1));
+        let mut cases: Vec<Vec<f64>> = vec![
+            vec![2.67, up(2.67, 1), 2.67, up(2.67, 1), 2.67],
+            vec![-1.7e308, 1.7e308, 0.0],
+            vec![f64::MIN, f64::MAX],
+            vec![-1.0e-320, 1.0e-320],
+        ];
+        let mut seed = 5_u64;
+        let mut next = move || {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            seed >> 33
+        };
+        for _ in 0..4_000 {
+            let magnitude = 10_f64.powi((next() % 600) as i32 - 300);
+            let low = magnitude * (1.0 + (next() % 1_000) as f64 / 1_000.0);
+            cases.push(vec![low, up(low, 1 + (next() % 20) as u32)]);
+        }
+        for values in &cases {
+            for classes in [1, 2, 3, 7, 12] {
+                let (bounds, counts, _) = ranges(&floats(values), Method::Equal, classes);
+                let (min, max) = extent(values);
+                assert!(
+                    bounds.iter().all(|b| b.is_finite()),
+                    "{values:?} in {classes}: {bounds:?}"
+                );
+                assert!(
+                    bounds.windows(2).all(|w| w[0] <= w[1]),
+                    "{values:?} in {classes}: {bounds:?}"
+                );
+                assert_eq!(
+                    (bounds[0], bounds[bounds.len() - 1]),
+                    (min, max),
+                    "{values:?} in {classes}"
+                );
+                assert_eq!(counts.iter().sum::<u64>(), values.len() as u64);
+                assert_eq!(counts.len(), bounds.len() - 1);
+            }
+        }
     }
 }

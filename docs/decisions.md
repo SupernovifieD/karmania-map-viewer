@@ -3563,3 +3563,12 @@ randomised checks of the classes, of the origin and of 48 shapes of warp tile, w
   seconds during which the worker hears no request to stop. **This is the owner's**: lowering the limit of vertices to 50,000 would bring a jagged star to 0.6 to 0.75 s and would outline the
   polygons of 50,000 to 100,000 vertices that fill in a third of a second; it is left at 100,000. The ignored timing tests now cover the shapes (`the_longest_step_for_polygons_that_are_hard_to_fill`) and the
   smooth ring only up to the limit.
+- Step 13.F12 (equal bounds that went down). Minor, and older than the review. `min + step * k` of equal intervals can round above the largest value, or above
+  the next bound, when the range is a few units in the last place wide: the column 2.67, 2.67 and the number after it, in 7 classes (the default of grids and blocks,
+  section 11.6), gave bounds that went down, and the engine's check refused them with a ContractError, so the page saw an error for a legitimate column; a
+  random search of ranges of 1 to 20 units over many magnitudes found it in 200,000 trials, only for equal intervals. A range wider than a float gave NaN or an infinite bound
+  (`[-1.7e308, 1.7e308, 0]` in 1 and in 3 classes), which the decision of step 13.15 claimed it did not (`max / n - min / n` overflows for one class and for `step * k`).
+  **Fix**: the bound `k` is `min * (1 - k/n) + max * (k/n)`, which does not overflow, held between the bound before it and the largest value; the first is the smallest value and
+  the last the largest. Tests, seen to fail first: the two columns and 4,000 random ranges of 1 to 20 units at magnitudes from 1e-300 to 1e300 (and the
+  largest and smallest floats) in 1, 2, 3, 7 and 12 classes must have bounds that are finite, never go down, begin at the smallest value and end at the largest, with a
+  count for each class; and the reviewer's column through the built kernel and the engine's own check (it fails with the old formula: "bounds[2]: expected a finite number").

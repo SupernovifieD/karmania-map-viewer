@@ -4,6 +4,7 @@
  * engine treats anything that crosses the boundary.
  */
 import { describe, expect, it } from 'vitest';
+import { checkedClassifyResult } from './display-check.js';
 import { createKernel, type TestKernelInstance } from './test-support/kernel.js';
 import type { CrsRef, KernelColumn } from './types.js';
 
@@ -470,6 +471,44 @@ describe('classify and classIndex', () => {
     const jenks = asObject(asObject(kernel.classify(id, 'grade', 'jenks', 3)).breaks);
     expect(jenks.sampled).toBeUndefined();
     expect(asArray(jenks.bounds)).toHaveLength(4);
+  });
+
+  it('gives bounds that the engine accepts for a column a few units in the last place wide, or wider than a float', () => {
+    // Found by the second review of the milestone: equal intervals of 2.67 and the number after it gave bounds that went down,
+    // and the engine's check refused them as a ContractError, for a column that is legitimate.
+    const kernel = createKernel();
+    const next =
+      new Float64Array(new BigUint64Array([BigInt('0x4005570A3D70A3D7') + 1n]).buffer)[0] ?? 0;
+    const narrow = points(
+      kernel,
+      UTM40,
+      [
+        [1, 1],
+        [2, 2],
+        [3, 3],
+        [4, 4],
+        [5, 5],
+      ],
+      [floatColumn('v', [2.67, next, 2.67, next, 2.67])],
+    );
+    const wide = points(
+      kernel,
+      UTM40,
+      [
+        [1, 1],
+        [2, 2],
+        [3, 3],
+      ],
+      [floatColumn('v', [-1.7e308, 1.7e308, 0])],
+    );
+    for (const [id, classes] of [
+      [narrow, 7],
+      [wide, 1],
+      [wide, 3],
+    ] as const) {
+      const result = checkedClassifyResult(kernel.classify(id, 'v', 'equal', classes));
+      expect(result.status).toBe('classified');
+    }
   });
 
   it('counts categories, with the rest as Other, the strings and numbers themselves', () => {

@@ -246,7 +246,7 @@ or releasing, and whenever the brief says to stop.
   checked before a prepare starts, the error of a job that is gone).
 - [x] 13.F11 Gate fix, second review: the cost of holes bounds a polygon too (vertices times rings), and what
   the limits do and do not bound is said as it was measured.
-- [ ] 13.F12 Gate fix, second review: equal-interval bounds never descend and never overflow.
+- [x] 13.F12 Gate fix, second review: equal-interval bounds never descend and never overflow.
 - [ ] 13.F13 Gate fix, second review: stale words ("one byte for each element", the other kinds of step that cannot
   be cut, the `chooseFrame` doc, the unused word of a test) and the record of the commit that did not build.
 - [ ] 13.G Gate.
