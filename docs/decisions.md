@@ -3196,3 +3196,30 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   area, in `docs/validation-codes.md`: `classes.column.not_numeric` (text, truth values and categories are
   not divided into ranges) and `classes.column.no_values`. Not here: natural breaks and categories
   (step 13.16).
+- Step 13.16a (natural breaks). `Method::Jenks` divides the values into the classes that make the values in each as
+  alike as can be: the split of the sorted values into `k` runs with the least sum of squared distances from
+  each run's mean (Fisher's exact method, the one-dimensional `k`-means). The brief (11.4) says to find them from
+  "a deterministic, evenly strided sample of at most 10,000 values": the sample is the values at the rows
+  `floor(i * n / 10,000)`, in row order, no random number. The first and last bound are the smallest and
+  largest value of **every** row, the breaks between are found from the sample (each a value that was given:
+  the value a class starts at), and the counts are of every row, by `class_of`. The result says how big the
+  sample was (`sampled`, `None` if every value was used), for the legend's tooltip, which is the brief's
+  ask; this adds one field to the `ClassBreaks` of 11.4. **Speed**: the textbook dynamic programme is
+  `k * n * n / 2` (10,000 values and 12 classes is about 600 million steps; not timed here); the cost
+  of a run satisfies the quadrangle inequality, so the best start of the last class only moves one way as
+  the end moves, and a divide and conquer finds all of them in about `k * n * log n` steps (1.7 million for the same). The time of
+  the real thing is for step 13.21. It is
+  checked against trying every split, for 300 random sets of 4 to 12 values and 2 to 4 classes (the cost of the
+  split found is the least there is, and the breaks are different values that were given). Ties go to the
+  earliest start, and only `+ - * /` are used, which every platform computes the same, so the breaks are the
+  same everywhere. The sums are taken from the first value so that coordinates in the millions keep
+  their digits (a test). **A limit of an even stride**, which the brief asks for and which is recorded: a
+  column that repeats with a period that divides the stride (rows in groups turn and turn about, with a
+  stride of 3) gives a sample of one group, and the breaks are then those of that group; my first test did
+  exactly that and found it. Data in blocks, or in no pattern, is sampled fairly. **A change to the rule
+  of step 13.15**: when the largest value is a class of its own (a value that stands alone at the top, or that
+  many rows share) the last two bounds stay equal, `[max, max]`, and `class_of` puts exactly those values in
+  it. Dropping the second bound, as every equal bound had been, would have merged that class with the one
+  below: Jenks of ten values from 1 to 10 and a 1000 into two classes would have come out as one. A class at the
+  bottom cannot be kept the same way (`[min, min)` holds nothing), so it is still dropped. Tests: the outlier,
+  shared top values, and the bottom.
