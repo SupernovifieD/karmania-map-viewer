@@ -3003,3 +3003,16 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   meridian of zone 41, so its easting falls to about -40,000 there) and one comment of mine that said
   a figure I had not worked out; the code was right in both and the test now states the bounds it was
   checked against (an easting near 530,000 and a northing near 2,790,000 for 57.3 E, 25.2 N).
+- Step 13.5 (points buffers). `karmania_prep::project` takes the positions of a dataset to the frame: converted
+  to the map's system in `f64` (nothing is cloned when the system is the same), then `position - origin`
+  as `f32`; every kind but grids and blocks will use it. `points_buffers(positions, own, frame)` gives
+  `PointsBuffers { positions }` (`x y z` interleaved, `3 * n` values, in point order, so a point's number
+  is its row's) with the findings made on the way (`Prepared<T>`). A position that is not finite, or that
+  the new system cannot place, stays in its place as NaN, so the numbers of the elements, the class
+  indices and the selection stay as they are, and the renderer of M16 has to leave a point with a NaN
+  position out; the ones that could not be converted are counted by `crs.transform.not_finite` (a
+  warning, from step 12.8) with the first 20 vertex numbers. Each kind's function takes its geometry and
+  the dataset's system and not the dataset, so that it cannot be given the wrong kind; the kind is
+  chosen by `prepare` (step 13.18), after `drawable` has said the dataset is drawn. The first try had a
+  function of the dataset that said "wrong kind" with the code `display.extent.none`, which is not what
+  that code means, and was replaced before it was committed.

@@ -161,7 +161,7 @@ fn local_grids_assumed(from: Units, to: Units) -> Finding {
 }
 
 /// The reason the transformer gave, as the reason the dataset is not drawn.
-fn not_convertible(cause: &Finding) -> Finding {
+pub(crate) fn not_convertible(cause: &Finding) -> Finding {
     Finding::new(
         FindingCode::DisplayCrsNotConvertible,
         format!("Not drawn: {}", cause.message),

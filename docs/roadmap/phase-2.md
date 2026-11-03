@@ -181,7 +181,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 13.4b `drawable(map_crs, dataset)` and the display findings.
   - [x] 13.4c `choose_frame`: the frame and the drawable list of every dataset, with the rule that the
     map CRS stays until it is changed or the last dataset is removed.
-- [ ] 13.5 Points buffers.
+- [x] 13.5 Points buffers.
 - [ ] 13.6 Lines buffers.
 - [ ] 13.7 Add the earcut port (dependency-only).
 - [ ] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
