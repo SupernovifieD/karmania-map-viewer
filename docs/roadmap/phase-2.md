@@ -220,7 +220,7 @@ or releasing, and whenever the brief says to stop.
   real-worker tests. Split to stay under the commit size guideline:
   - [x] 13.20a The public types (`display.ts`) and the strict checks of what the kernel gives
     (`display-check.ts`), tested against the built kernel and against values wrong in one way each.
-  - [ ] 13.20b The protocol (requests, progress of a prepare) and the worker's handler, with the
+  - [x] 13.20b The protocol (requests, progress of a prepare) and the worker's handler, with the
     buffers of a result in the transfer list.
   - [ ] 13.20c The client and the engine's methods, with their checks of misuse, and the test that
     the buffers are detached on the sending side.

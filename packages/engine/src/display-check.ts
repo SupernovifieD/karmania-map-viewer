@@ -324,3 +324,29 @@ export function checkedClassifyResult(value: unknown, path = 'classifyResult'): 
 export function checkedClassMethod(value: unknown, path = 'method'): ClassMethod {
   return checkedOneOf(value, path, CLASS_METHODS) as ClassMethod;
 }
+
+/** What a step of a prepare answered: progress, a result, or that the job is gone. */
+export type CheckedPrepareStep =
+  | { readonly status: 'progress'; readonly fraction: number }
+  | { readonly status: 'done'; readonly result: PrepareResult }
+  | { readonly status: 'cancelled' };
+
+export function checkedPrepareStep(value: unknown, path = 'prepareStep'): CheckedPrepareStep {
+  const status = checkedObject(value, path, ['status'], ['fraction', 'result'])['status'];
+  if (status === 'progress') {
+    const o = checkedObject(value, path, ['status', 'fraction']);
+    const fraction = checkedNumber(o['fraction'], `${path}.fraction`);
+    if (fraction < 0 || fraction > 1)
+      throw new ContractError(`${path}.fraction`, 'expected 0 to 1');
+    return { status: 'progress', fraction };
+  }
+  if (status === 'done') {
+    const o = checkedObject(value, path, ['status', 'result']);
+    return { status: 'done', result: checkedPrepareResult(o['result'], `${path}.result`) };
+  }
+  if (status === 'cancelled') {
+    checkedObject(value, path, ['status']);
+    return { status: 'cancelled' };
+  }
+  throw new ContractError(`${path}.status`, 'expected progress, done or cancelled');
+}

@@ -26,6 +26,10 @@ describe('the types of messages', () => {
         case 'load':
         case 'rows':
         case 'remove':
+        case 'chooseFrame':
+        case 'prepare':
+        case 'classify':
+        case 'classIndex':
         case 'cancel':
           return message.type;
         default:
@@ -37,6 +41,7 @@ describe('the types of messages', () => {
         case 'result':
           return message.request;
         case 'progress':
+        case 'prepareProgress':
         case 'error':
         case 'cancelled':
           return message.type;
@@ -59,6 +64,16 @@ describe('what the worker accepts', () => {
     load: { input: {} },
     rows: { dataset: 1, start: 0, count: 10 },
     remove: { dataset: 1 },
+    chooseFrame: {},
+    prepare: {
+      dataset: 1,
+      frame: { mapCrs: { kind: 'local', units: 'm' }, origin: [0, 0, 0], source: 'auto' },
+    },
+    classify: { dataset: 1, column: 'grade', method: 'equal', classes: 5 },
+    classIndex: {
+      dataset: 1,
+      breaks: { kind: 'ranges', column: 'g', bounds: [0, 1], counts: [1], nulls: 0 },
+    },
   };
 
   it('takes each type of request with its id and parameters', () => {
@@ -98,6 +113,7 @@ describe('what the main thread accepts', () => {
     const accepted: FromWorker[] = [
       { type: 'result', id: 1, request: 'remove', result: true },
       { type: 'progress', id: 1, progress: { phase: 'reading', fraction: 0.5 } },
+      { type: 'prepareProgress', id: 1, progress: { fraction: 0.5 } },
       { type: 'error', id: 1, error: { name: 'Error', message: 'no' } },
       { type: 'error', id: 1, error: { name: 'Error', message: 'no', stack: 'at x' } },
       { type: 'cancelled', id: 1 },
@@ -118,6 +134,10 @@ describe('what the main thread accepts', () => {
       { type: 'progress', id: 1, progress: { phase: 'chewing', fraction: 0.5 } },
       { type: 'progress', id: 1, progress: { phase: 'parsing', fraction: '1' } },
       { type: 'progress', id: 1 },
+      { type: 'prepareProgress', id: 1 },
+      { type: 'prepareProgress', id: 1, progress: { fraction: '0.5' } },
+      { type: 'prepareProgress', id: 1, progress: { fraction: 1.5 } },
+      { type: 'prepareProgress', id: 1, progress: { fraction: -0.1 } },
       { type: 'error', id: 1, error: { name: 'Error' } },
       { type: 'error', id: 1, error: 'no' },
       { type: 'hello', id: 1 },

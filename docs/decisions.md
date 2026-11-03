@@ -3356,3 +3356,26 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   shapes passes the second: what the built kernel gives for a dataset of each of the seven kinds passes, and
   26 values that are wrong in one way each are refused with the message that says how. The first version of the test
   took one step per dataset and a polygon set needs two; the test was changed, not the check.
+- Step 13.20b (the protocol and the worker's handler). Four requests are added, `chooseFrame`, `prepare`, `classify`
+  and `classIndex`, each typed once in `Requests` (so its reply is typed too), and a message of its own for the progress of
+  a prepare, `prepareProgress { id, progress: { fraction } }`: the import's progress carries a phase, a prepare has
+  none, and a union by `type` is clearer than a progress that is sometimes one and sometimes the other. The handler
+  **steps a prepare**: `startPrepare`, then `stepPrepare` with a budget of 100,000 positions, polygon vertices or blocks
+  (a tile of a warped grid is a step of its own), checking each answer, posting the fraction at most once for each whole
+  percent, and **yielding to the event loop between steps** (`setTimeout(0)`, as the import does) so that other
+  requests and a request to stop are heard within a step: a step takes well under a tenth of a second. Stopped,
+  it cancels the job in the kernel and answers `cancelled`. **If the dataset is removed in the meantime** the kernel stops the job,
+  the next step finds none, and the handler says "The dataset was removed while it was being prepared", not the
+  kernel's "no prepare with that id". The buffers of a drawn result go in the transfer list
+  (`transferablesOfResult`, every `ArrayBuffer` under the typed arrays, each once), as does the class index; a result
+  that is not drawn has nothing to hand over. The largest texture defaults to 4,096 when the page does not say, and must
+  be a whole number of 1 or more; a dataset or a number of classes that is not a whole number, a column that is not
+  a string and a method that is not one of the four are misuse, which the handler refuses before the kernel is asked.
+  Tests (`handler-display.test.ts`, the real kernel in Node): the frame; 350,000 points prepared in steps with their progress
+  (at least two reports, never going down) and their buffers in the transfer list; **that other requests are heard between
+  steps, shown by the order in which the kernel is called** (my first version looked at the order of the replies, which
+  passed even with the yield removed, since a shorter request is answered first by promises alone; it was
+  rewritten and now fails without the yield); a stop that drops the job and hands nothing over; a dataset removed
+  while it is prepared; a dataset that is not drawn; the classes and their index; every misuse. The exhaustiveness checks
+  of `protocol.test.ts` (a request type cannot be added without being covered there) were extended, and the test harness
+  does not take a `prepareProgress` for the end of a request.

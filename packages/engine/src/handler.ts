@@ -5,6 +5,14 @@
  * is a few lines that connect it to the worker's scope.
  */
 import {
+  checkedClassBreaks,
+  checkedClassifyResult,
+  checkedClassMethod,
+  checkedFrameChoice,
+  checkedPrepareStep,
+} from './display-check.js';
+import type { PrepareResult } from './display.js';
+import {
   checkedCrsInfo,
   checkedCrsInfoList,
   checkedImportStatus,
@@ -18,6 +26,7 @@ import type { KernelApi, KernelModule, LoadKernelModule } from './kernel-module.
 import { parseToWorker } from './protocol.js';
 import type { FromWorker, RequestMessage, Requests } from './protocol.js';
 import type { ImportPhase } from './api.js';
+import { transferablesOfResult } from './transfer.js';
 import type { LoadResult, Page, Preview } from './types.js';
 
 /** What the handler needs from its surroundings. */
@@ -35,6 +44,16 @@ export interface WorkerHandler {
 
 /** How many rows an import parses before it lets other messages through. */
 const IMPORT_BUDGET_ROWS = 50_000;
+
+/**
+ * How much of a prepare is done in one step: positions, polygon vertices or blocks (a tile of a warped
+ * grid is a step of its own). A step takes well under a tenth of a second, so a request to stop or any
+ * other request is heard that soon.
+ */
+const PREPARE_BUDGET = 100_000;
+
+/** The largest texture, in cells on a side, a grid is cut for when the page does not say: the one WebGL2 guarantees twice over. */
+const DEFAULT_MAX_TEXTURE_SIZE = 4_096;
 
 /** The largest whole number the kernel takes for an EPSG code or a limit (an unsigned 32 bit number). */
 const MAX_UINT32 = 4_294_967_295;
@@ -210,6 +229,57 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
     }
   }
 
+  /** Posts how far a prepare is, at most once for each whole percent. */
+  function prepareReporter(id: number): (fraction: number) => void {
+    let lastPercent = -1;
+    return (fraction) => {
+      const percent = Math.floor(Math.min(Math.max(fraction, 0), 1) * 100);
+      if (percent !== lastPercent) {
+        lastPercent = percent;
+        post({ type: 'prepareProgress', id, progress: { fraction: percent / 100 } }, []);
+      }
+    };
+  }
+
+  async function runPrepare(
+    id: number,
+    params: Requests['prepare']['params'],
+  ): Promise<PrepareResult> {
+    const { kernel } = await ready();
+    throwIfStopped(id);
+    const dataset = requireWholeNumber(params.dataset, 'The dataset');
+    const maxTextureSize = requireWholeNumber(
+      params.maxTextureSize ?? DEFAULT_MAX_TEXTURE_SIZE,
+      'The largest texture',
+    );
+    if (maxTextureSize < 1) {
+      throw new TypeError('The largest texture must be at least 1 cell on a side.');
+    }
+    const job = kernel.startPrepare(dataset, params.frame, maxTextureSize);
+    const report = prepareReporter(id);
+    try {
+      for (;;) {
+        throwIfStopped(id);
+        const step = checkedPrepareStep(kernel.stepPrepare(job, PREPARE_BUDGET));
+        if (step.status === 'done') {
+          return step.result;
+        }
+        if (step.status === 'cancelled') {
+          throw new Error('The dataset was removed while it was being prepared.');
+        }
+        report(step.fraction);
+        await yieldToEventLoop();
+      }
+    } catch (error) {
+      // Whatever stopped the prepare, what it had made is dropped. If the job is gone already (the
+      // dataset was removed in the meantime) say that and not the kernel's "no prepare with that id".
+      if (!kernel.cancelPrepare(job) && !(error instanceof Cancelled)) {
+        throw new Error('The dataset was removed while it was being prepared.', { cause: error });
+      }
+      throw error;
+    }
+  }
+
   async function execute(message: RequestMessage): Promise<Outgoing> {
     const { id } = message;
     switch (message.type) {
@@ -283,6 +353,51 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         const { kernel } = await ready();
         const removed = kernel.remove(message.params.dataset);
         return { reply: { type: 'result', id, request: 'remove', result: removed }, transfer: [] };
+      }
+      case 'chooseFrame': {
+        const { kernel } = await ready();
+        const { preferred } = message.params;
+        const choice = checkedFrameChoice(kernel.chooseFrame(preferred));
+        return {
+          reply: { type: 'result', id, request: 'chooseFrame', result: choice },
+          transfer: [],
+        };
+      }
+      case 'prepare': {
+        const result = await runPrepare(id, message.params);
+        return {
+          reply: { type: 'result', id, request: 'prepare', result },
+          transfer: transferablesOfResult(result),
+        };
+      }
+      case 'classify': {
+        const { kernel } = await ready();
+        const { dataset, column, method, classes } = message.params;
+        if (typeof column !== 'string') {
+          throw new TypeError('The column must be a string.');
+        }
+        const found = kernel.classify(
+          requireWholeNumber(dataset, 'The dataset'),
+          column,
+          checkedClassMethod(method),
+          requireWholeNumber(classes, 'The number of classes'),
+        );
+        return {
+          reply: { type: 'result', id, request: 'classify', result: checkedClassifyResult(found) },
+          transfer: [],
+        };
+      }
+      case 'classIndex': {
+        const { kernel } = await ready();
+        const { dataset, breaks } = message.params;
+        const index = kernel.classIndex(
+          requireWholeNumber(dataset, 'The dataset'),
+          checkedClassBreaks(breaks),
+        );
+        return {
+          reply: { type: 'result', id, request: 'classIndex', result: index },
+          transfer: index.buffer instanceof ArrayBuffer ? [index.buffer] : [],
+        };
       }
       default:
         return assertNever(message);
