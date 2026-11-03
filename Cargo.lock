@@ -123,6 +123,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "karmania-prep"
+version = "0.1.0"
+dependencies = [
+ "karmania-core",
+ "karmania-crs",
+]
+
+[[package]]
 name = "karmania-wasm"
 version = "0.1.0"
 dependencies = [

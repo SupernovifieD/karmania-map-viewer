@@ -2909,3 +2909,14 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   `pnpm check`), so it should not fail by itself on the runner; that is to be read in the run of this commit,
   as nothing of it can run elsewhere.
 
+
+## M13: display preparation
+
+- Step 13.1 (the crate). `karmania-prep` depends on `karmania-core` and `karmania-crs`, forbids
+  unsafe code and has the workspace lints, with one test that it builds against both. It adds no
+  third-party dependency (the earcut port comes at step 13.7). It is a member of the workspace
+  and in `[workspace.dependencies]`; `karmania-wasm` will use it from step 13.19. The list of
+  crates in `docs/conventions.md` names it. Per the owner's instruction for this milestone, each
+  step is checked with `pnpm check` (lint included) and the full gate (end-to-end, visual and axe
+  runs, the independent review) is run once, at the end of the milestone, before the pull request is
+  merged.

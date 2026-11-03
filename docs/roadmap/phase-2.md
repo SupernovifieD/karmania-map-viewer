@@ -170,7 +170,7 @@ or releasing, and whenever the brief says to stop.
 
 ## M13: Display preparation (karmania-prep)
 
-- [ ] 13.1 Crate karmania-prep (depends on core and crs), forbid unsafe.
+- [x] 13.1 Crate karmania-prep (depends on core and crs), forbid unsafe.
 - [ ] 13.2 Frame choice (section 9.2 of the brief) with the info finding for the
   UTM choice. Tests: projected, local, geographic north and south, zone edges.
 - [ ] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
