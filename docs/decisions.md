@@ -3459,3 +3459,15 @@ reviewer and reproduced here by a test that failed before the fix.
   (three tests fail) and the old tail-only rule (the last test fails; it did not fail before that test was added, which is why it was added).
   Two tests of 13.16a pinned `[1, 1, 1, 1, 5]` in three classes as one class of five, which is the behaviour found wrong, and were
   changed to `[1, 5, 5]` with counts 4 and 1, with the reason in them.
+- Step 13.F2 (an origin that stayed at 0). **Major.** When the person chose a system in which nothing was drawable (a local
+  grid is loaded and UTM 40 is chosen), the frame had the origin 0, and the rule that the frame is kept while any dataset is loaded
+  then kept that origin for good: a dataset in UTM 40 loaded afterwards was drawn, but 1 cm apart came out as the same `f32` (the
+  reviewer's points at 512000.01 and 512000.02 gave x of 512000 and 512000.03). Section 9.1's origin is the centre of the extent
+  of the **first drawable** dataset, which here arrives later. This is the state the map CRS dialog of M17 reaches with its
+  "What changes" list. **Fix**: the `Preparer` remembers whether the origin was made from a dataset
+  (`choose_frame_tracking` returns whether it is still waiting), and the first call after a dataset can be drawn makes it from that
+  dataset, once; from then on it is kept, as the rule says (a test: a third dataset, and choosing the same system again, do
+  not move it). Whether it is waiting is a flag and not "the origin is 0", because 0 is also the right origin of a dataset
+  centred on it, which another dataset must not move (a test). The source stays `user`. Tests: in `Preparer` (fails before: the origin
+  stayed `[0, 0, 0]`; with the flag never set, fails again), and through the built kernel in Node (`kernel-prep.test.ts`, the
+  prepared positions 1 cm apart are two numbers).

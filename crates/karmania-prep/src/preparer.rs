@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use karmania_core::{CrsRef, Dataset, DatasetId};
 
-use crate::choice::{FrameChoice, choose_frame};
+use crate::choice::{FrameChoice, choose_frame_tracking};
 use crate::job::{PrepareJob, PrepareStep};
 use crate::origin::Frame;
 
@@ -13,6 +13,9 @@ use crate::origin::Frame;
 #[derive(Default)]
 pub struct Preparer {
     frame: Option<Frame>,
+    /// Whether the origin of `frame` was made when no dataset could be drawn in it, so that it is 0 and
+    /// not the centre of a dataset (see [`choose_frame_tracking`]).
+    origin_waiting: bool,
     jobs: BTreeMap<u32, (DatasetId, PrepareJob)>,
     /// The identifier the next job gets. Identifiers are never reused.
     next: u32,
@@ -24,6 +27,7 @@ impl Preparer {
     pub fn new() -> Self {
         Self {
             frame: None,
+            origin_waiting: false,
             jobs: BTreeMap::new(),
             next: 1,
         }
@@ -43,8 +47,14 @@ impl Preparer {
         preferred: Option<CrsRef>,
         datasets: &[&Dataset],
     ) -> FrameChoice {
-        let choice = choose_frame(self.frame.as_ref(), preferred, datasets);
+        let (choice, waiting) = choose_frame_tracking(
+            self.frame.as_ref(),
+            preferred,
+            datasets,
+            self.origin_waiting,
+        );
         self.frame = choice.frame;
+        self.origin_waiting = waiting;
         choice
     }
 
@@ -206,5 +216,56 @@ mod tests {
             p.step(c, Some(&other), 1),
             Some(PrepareStep::Done(_))
         ));
+    }
+
+    #[test]
+    fn a_frame_made_when_nothing_was_drawable_gets_its_origin_from_the_first_dataset_that_is() {
+        // Found by the review of the milestone: a person chooses a system in which nothing is drawn (here a
+        // local grid is loaded and UTM 40 is chosen), the origin is 0, and a dataset loaded later in UTM 40
+        // kept that origin for good, so that points 1 cm apart came out as the same f32.
+        let local = CrsRef::Local {
+            units: karmania_core::Units::Metre,
+        };
+        let mut a = points(Some(local), &[(1.0, 1.0)]);
+        a.id = DatasetId(1);
+        let mut p = Preparer::new();
+        p.choose_frame(None, &[&a]);
+        let chosen = p.choose_frame(Some(UTM40), &[&a]).frame.unwrap();
+        assert_eq!((chosen.map_crs, chosen.origin), (UTM40, [0.0; 3]));
+
+        let b = at(2, &[(512_000.01, 4_012_345.01), (512_000.02, 4_012_345.02)]);
+        let frame = p.choose_frame(None, &[&a, &b]).frame.unwrap();
+        assert_eq!(frame.map_crs, UTM40);
+        assert_eq!(frame.origin, [512_000.0, 4_012_000.0, 0.0]);
+        assert_eq!(frame.source, FrameSource::User, "still the person's choice");
+        // The two points 1 cm apart stay apart once rebased.
+        let (x, y) = (
+            frame.rebase([512_000.01, 4_012_345.01, 0.0]),
+            frame.rebase([512_000.02, 4_012_345.02, 0.0]),
+        );
+        assert!(x[0] < y[0] && x[1] < y[1], "{x:?} {y:?}");
+
+        // From then on it is kept, as the rule says: another dataset does not move it.
+        let c = at(3, &[(300_000.0, 4_000_000.0)]);
+        assert_eq!(p.choose_frame(None, &[&a, &b, &c]).frame, Some(frame));
+        // Choosing the same system again does not move it either.
+        assert_eq!(
+            p.choose_frame(Some(UTM40), &[&a, &b, &c])
+                .frame
+                .map(|f| f.origin),
+            Some(frame.origin)
+        );
+    }
+
+    #[test]
+    fn an_origin_that_was_made_from_a_dataset_is_never_made_again_even_if_it_is_zero() {
+        // A dataset centred on the origin of its system: the origin is 0 because that is the centre, and a
+        // dataset that comes later does not move it.
+        let a = at(1, &[(-100.0, -100.0), (100.0, 100.0)]);
+        let mut p = Preparer::new();
+        let first = p.choose_frame(None, &[&a]).frame.unwrap();
+        assert_eq!(first.origin, [0.0; 3]);
+        let b = at(2, &[(700_000.0, 3_000_000.0)]);
+        assert_eq!(p.choose_frame(None, &[&a, &b]).frame, Some(first));
     }
 }

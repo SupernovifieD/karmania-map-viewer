@@ -232,7 +232,7 @@ or releasing, and whenever the brief says to stop.
   4,000,000-cell column slower than the restyle target.
 - [x] 13.F1 Gate fix: quantile classes of a column with two values, or with most rows at one value, are
   not collapsed to one class.
-- [ ] 13.F2 Gate fix: a frame made when nothing was drawable gets its origin from the first dataset that is.
+- [x] 13.F2 Gate fix: a frame made when nothing was drawable gets its origin from the first dataset that is.
 - [ ] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
   own, and the claims about the length of a step are corrected.
 - [ ] 13.F4 Gate fix: removing the last dataset drops the frame in the kernel itself.
