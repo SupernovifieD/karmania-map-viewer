@@ -3027,3 +3027,15 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   offsets are malformed, which validation refuses to load, is skipped and not a panic. Lines are straight
   between their converted vertices: long edges are not densified (section 9.2, recorded in step 13.4b).
   The vertex-number arithmetic is checked, since a 32-bit WebAssembly `usize` would wrap.
+- Step 13.7 (the earcut port). The brief names `earcut` and `earcutr` and says to pick one and record why. Chosen:
+  `earcut` (georust), because it tracks the current Mapbox earcut (3.2.3), is generic over `f32` and
+  `f64`, is `no_std`, reuses its buffers across polygons, and is maintained (four releases between
+  2026-04-21 and 2026-11-02); `earcutr` is a port of earcut 2.x, `f64` only, and has not been released since
+  2025-05-29. Both licences are in the policy. Version 0.4.11, not 0.4.12: 0.4.12 was published on
+  2026-11-02, the day before this step, and changes the code that bridges holes (a diff against 0.4.11
+  showed that and a dev-dependency change, nothing else), so the version that has been out for three
+  months is used, and the newer one can be taken in a step of its own. A release build of `karmania-prep`
+  for `wasm32-unknown-unknown` builds. The crate brings `num-traits` and `autocfg` (licences checked
+  in `cargo metadata`). Its code is derived in part from Mapbox's, under ISC, which asks that the
+  notice be kept in all copies: it is in `THIRD_PARTY_NOTICES.md` (not yet in a build, as for the EPSG
+  notice: steps 23.5, 23.6 and 24.5). Dependency only: nothing calls it before step 13.8.

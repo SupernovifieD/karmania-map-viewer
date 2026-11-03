@@ -183,7 +183,7 @@ or releasing, and whenever the brief says to stop.
     map CRS stays until it is changed or the last dataset is removed.
 - [x] 13.5 Points buffers.
 - [x] 13.6 Lines buffers.
-- [ ] 13.7 Add the earcut port (dependency-only).
+- [x] 13.7 Add the earcut port (dependency-only).
 - [ ] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
   the "outline only" warning; collinear and degenerate cases.
 - [ ] 13.9 Mesh buffers.
