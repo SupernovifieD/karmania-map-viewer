@@ -228,7 +228,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.21 `scripts/generate-fixtures` also writes a 1,000,000-block model CSV
   (not committed). Ignored Rust timing tests for preparing 1M points, 4M cells
   and 1M blocks; results in `docs/perf.md`.
-- [ ] 13.21a A faster count of distinct values, since the timing of 13.21 found categories over a
+- [x] 13.21a A faster count of distinct values, since the timing of 13.21 found categories over a
   4,000,000-cell column slower than the restyle target.
 - [ ] 13.G Gate.
 

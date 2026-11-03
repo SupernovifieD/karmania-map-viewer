@@ -3426,3 +3426,15 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   step 13.21a. The brief's pnpm perf (the browser performance project of the app) is run at the gate. The timing file
   allows `expect` and `panic` for the whole file (the workspace denies them, `clippy.toml` allows them in tests, and clippy
   does not count helper functions outside a `#[test]` as tests).
+- Step 13.21a (a faster count of the distinct values). The timing of step 13.21 found categories over a 4,000,000-cell column
+  at 275 to 321 ms to classify, over the restyle target with the class of every cell (0.34 to 0.40 s against 0.3 s). The
+  counting was in ordered maps (about 11 comparisons a row) and the order is only needed once, at the end, so the
+  counts are now in hash maps with a hasher of our own (`FastHasher`: no random state, one round of the finaliser of
+  splitmix64) keyed by the bits of the number, with -0 taken as 0 and a NaN never getting there, or by the text, and the
+  distinct values are **sorted once at the end** by `total_cmp` or by bytes, which every value being different makes a total order
+  that does not depend on how the map was filled: the result is the same as before, and the 119 tests of the crate, which
+  include the same column in two orders, -0 against 0 and the order of text, pass unchanged. Categories take 59 to 71 ms to
+  classify (4.5 times faster) and the restyle test passes: the slowest method is now quantiles, 0.18 to 0.21 s with the class
+  of every cell (it sorts 4,000,000 numbers). **The margin is thin for WebAssembly**, which is usually 1.5 to 2 times slower and has the
+  transfer and the upload to add, so it is for M16's measurement to say; if quantiles miss there, a selection of the bounds by
+  partitioning, which needs no full sort, is the place to look. The numbers before and after are in `docs/perf.md`.

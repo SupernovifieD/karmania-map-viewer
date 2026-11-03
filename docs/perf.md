@@ -303,16 +303,28 @@ for all but one in 97), the classification and then the class of every cell, in 
 | Natural breaks (a sample of 10,000) | 96 + 66 | 87 + 62 | 78 + 70 |
 | Categories (about 2,000 different values) | 321 + 75 | 286 + 65 | 275 + 62 |
 
-**The restyle target is missed for categories**: 0.34 to 0.40 s for the classification and the class of every
-cell, against 0.3 s for the whole restyle, in native code, before the transfer to the page, the upload of a
-texture and the drawing, and before WebAssembly's slowdown. The other three methods take 0.13 to 0.19 s, so
-they have room but not much. The test (`new_classes_for_four_million_cells`) fails on this machine for that
-reason, as it should. The brief says to stop and report a target that is missed after reasonable effort, and
-not to relax it; the first effort is the next step (13.21a), which makes the count of distinct values faster
-(an ordered map costs about 11 comparisons a value, and the order is only needed at the end), and the
-numbers above are those from before it. Not measured here and left to M16: the same in WebAssembly, the
-page's side (receiving 4,000,000 bytes, uploading them as a texture), and a column of integer codes (the usual
-case for categories, with a few distinct values, which a 2,000-value column is not).
+**The restyle target was missed for categories**, in the first three runs above: 0.34 to 0.40 s for the
+classification and the class of every cell, against 0.3 s for the whole restyle, in native code, before the transfer
+to the page, the upload of a texture and the drawing, and before WebAssembly's slowdown. The brief says to stop
+and report a target that is missed after reasonable effort, and not to relax it; the first effort was step 13.21a,
+which counts the distinct values in a hash map with a fast hash and sorts them once at the end (the ordered map it
+replaces cost about 11 comparisons a row, and the order is only needed at the end). The same test, three runs after it:
+
+| Method | Run 1 | Run 2 | Run 3 |
+| --- | ---: | ---: | ---: |
+| Equal intervals | 83 + 69 | 72 + 74 | 74 + 57 |
+| Quantiles | 118 + 65 | 127 + 66 | 145 + 62 |
+| Natural breaks (a sample of 10,000) | 84 + 70 | 74 + 59 | 63 + 63 |
+| Categories (about 2,000 different values) | 71 + 83 | 59 + 67 | 67 + 91 |
+
+Categories now take 0.13 to 0.16 s (the classification 4.5 times faster), and the slowest method is quantiles, at
+0.18 to 0.21 s (it sorts 4,000,000 numbers), which is inside the 0.3 s natively and leaves about 0.1 s for everything
+else; the test passes. **That margin is thin**: WebAssembly is usually 1.5 to 2 times slower than native code, and the
+transfer and the upload come on top, so whether a restyle by quantiles meets 0.3 s in the browser is for the
+measurement of milestone M16 to say, and if it does not, the quantiles are the place to look (a selection of the
+bounds by partitioning the values, which needs no full sort). Not measured here and left to M16: the same in WebAssembly,
+the page's side, and a column of integer codes (the usual case for categories, with a few distinct values, which a
+column of 2,000 is not).
 
 What the numbers say about the steps: the longest step of any kind is the one that makes the triangles of a
 surface (180 ms, one step for 4,000,000 cells), which is how long the worker cannot hear a stop while it
