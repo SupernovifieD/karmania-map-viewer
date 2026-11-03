@@ -198,10 +198,10 @@ or releasing, and whenever the brief says to stop.
 - [x] 13.14 Column statistics: count, nulls, finite min and max, distinct values
   with counts up to a limit; deterministic.
 - [x] 13.15 Class breaks: equal intervals and quantiles.
-- [ ] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
+- [x] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
   categories with "Other". Split to stay under the commit size guideline:
   - [x] 13.16a Natural breaks (Jenks) from an evenly strided sample of at most 10,000 values.
-  - [ ] 13.16b Categories: up to 20 values by count, ties by value, the rest as "Other".
+  - [x] 13.16b Categories: up to 20 values by count, ties by value, the rest as "Other".
 - [ ] 13.17 Class index per element (u8, 255 = no value) for every kind.
 - [ ] 13.18 PrepareJob with step(budget) and cancellation for large datasets.
 - [ ] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed

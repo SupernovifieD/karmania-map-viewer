@@ -3223,3 +3223,19 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   below: Jenks of ten values from 1 to 10 and a 1000 into two classes would have come out as one. A class at the
   bottom cannot be kept the same way (`[min, min)` holds nothing), so it is still dropped. Tests: the outlier,
   shared top values, and the bottom.
+- Step 13.16b (categories). `Method::Categories` gives `ClassBreaks::Categories { values, counts, other, nulls
+  }` (the contract's `kind: "categories"`): the most common values of the column, one class each, up to the
+  number of classes asked for and never more than 20 (`MAX_CATEGORIES`), most common first, **ties in
+  ascending order of value** (the counts come from `column_stats`, which lists values in ascending order,
+  and a stable sort by count keeps that order), and the rows with any other value together as `other`
+  ("Other", `None` when there is no such row). `nulls` counts the rows with no value, nulls and non-finite
+  numbers. Any kind of column can be shown as categories: text, truth values, labels of a categorical
+  column, and integers or floats as the number they are (an integer column of codes is a usual case).
+  The number of classes asked for is the number of values shown: with 5 classes the five most common
+  values and "Other" (the brief does not say whether "Other" counts as one of the classes; this keeps the
+  style editor's "Classes" the number of colours of values and the palette one longer if there is an
+  "Other"). A column with more than 10,000 distinct values (`DISTINCT_LIMIT`, step 13.14) cannot be
+  counted and gives the new warning `classes.column.too_many_values`, which says to divide it into
+  ranges instead; a column with no value gives `classes.column.no_values`. Tests: counts with ties and "Other"
+  worked out by hand (granite 4, basalt 2, shale 2, chert 1, coal 1), numbers with a null, non-finite
+  numbers, truth values, labels, the limit of 20, 0 classes taken as 1, too many values, no values.

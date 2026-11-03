@@ -168,6 +168,8 @@ finding_codes! {
     ClassesColumnNoValues => "classes.column.no_values", Warning, None;
     /// The column to classify by ranges is not made of numbers.
     ClassesColumnNotNumeric => "classes.column.not_numeric", Warning, None;
+    /// The column has too many different values to be shown as categories.
+    ClassesColumnTooManyValues => "classes.column.too_many_values", Warning, None;
     /// The EPSG code is not one of the coordinate systems Karmania knows.
     CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
