@@ -15,3 +15,14 @@ pub(crate) fn to_js<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, JsError
         .serialize(&serializer)
         .map_err(|error| JsError::new(&error.to_string()))
 }
+
+/// Like [`to_js`], except that a field the Rust side has as `None` and does not skip is `null` and not
+/// `undefined`: for the results whose contract says `| null`.
+pub(crate) fn to_js_with_nulls<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, JsError> {
+    let serializer = serde_wasm_bindgen::Serializer::new()
+        .serialize_maps_as_objects(true)
+        .serialize_missing_as_null(true);
+    value
+        .serialize(&serializer)
+        .map_err(|error| JsError::new(&error.to_string()))
+}

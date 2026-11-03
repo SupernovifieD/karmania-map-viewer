@@ -5,7 +5,7 @@
 //! value is decided in one place, [`class_of`], and the counts below and the class index of step 13.17
 //! both use it, so the legend's numbers are those of the picture.
 
-use karmania_core::{Column, ColumnType, Finding, FindingCode, Value};
+use karmania_core::{Column, ColumnType, Dataset, Finding, FindingCode, Value};
 use serde::{Deserialize, Serialize};
 
 use crate::jenks;
@@ -244,6 +244,33 @@ fn quantile_bounds(sorted: &[f64], classes: usize) -> Vec<f64> {
     without_empty_classes(bounds)
 }
 
+/// Divides the column of `dataset` called `column` into `classes` classes by `method`: see [`classify`].
+///
+/// # Errors
+///
+/// The findings of [`classify`], and `classes.column.missing` if the dataset has no such column.
+pub fn classify_dataset(
+    dataset: &Dataset,
+    column: &str,
+    method: Method,
+    classes: usize,
+) -> Result<ClassBreaks, Finding> {
+    let found = dataset
+        .attributes
+        .column(column)
+        .ok_or_else(|| column_missing(column))?;
+    classify(found, method, classes)
+}
+
+/// The finding for a column that a dataset does not have.
+pub(crate) fn column_missing(name: &str) -> Finding {
+    Finding::new(
+        FindingCode::ClassesColumnMissing,
+        format!("The dataset has no column named {name}, so nothing can be coloured by it."),
+    )
+    .with_hint("Colour by a column the dataset has, or draw the layer in a single colour.")
+}
+
 fn not_numeric(column: &Column) -> Finding {
     let kind = match column.column_type() {
         ColumnType::Utf8 => "text",
@@ -286,7 +313,7 @@ fn no_values(column: &Column) -> Finding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use karmania_core::{ColumnData, Validity};
+    use karmania_core::{ColumnData, DatasetId, Table, Validity};
 
     fn floats(values: &[f64]) -> Column {
         Column::without_nulls("v", ColumnData::Float64(values.to_vec()))
@@ -647,5 +674,29 @@ mod tests {
                 method
             );
         }
+    }
+
+    #[test]
+    fn a_column_of_a_dataset_is_classified_by_name_and_a_missing_one_is_a_finding() {
+        let table = Table::from_columns(
+            vec![floats(&[1.0, 2.0, 3.0])],
+            &mut karmania_core::Findings::new(),
+        )
+        .unwrap();
+        let dataset = Dataset::new(
+            DatasetId(1),
+            "d",
+            None,
+            karmania_core::Geometry::Points(karmania_core::Positions::default()),
+            table,
+        );
+        let breaks = classify_dataset(&dataset, "v", Method::Equal, 3).unwrap();
+        assert!(matches!(&breaks, ClassBreaks::Ranges { column, .. } if column == "v"));
+        let error = classify_dataset(&dataset, "grade", Method::Equal, 3).unwrap_err();
+        assert_eq!(error.code.as_str(), "classes.column.missing");
+        assert_eq!(
+            error.message,
+            "The dataset has no column named grade, so nothing can be coloured by it."
+        );
     }
 }
