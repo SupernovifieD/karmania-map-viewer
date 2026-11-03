@@ -384,18 +384,130 @@ fn one_big_polygon(vertices: usize) -> Dataset {
     )
 }
 
-/// How long one step takes when it has to triangulate a single polygon of many vertices: the worker hears
-/// nothing for that long, because a polygon is not cut into steps.
+/// How long one step takes when it has to triangulate a single smooth polygon of many vertices, up to the limit of the
+/// crate: the worker hears nothing for that long, because a polygon is not cut into steps. A smooth ring is the easy
+/// case; the hard ones are in `the_longest_step_for_polygons_that_are_hard_to_fill`.
 #[test]
 #[ignore = "timing; run in a release build with --ignored"]
 fn the_longest_step_for_one_large_polygon() {
-    for vertices in [25_000, 50_000, 100_000, 200_000, 400_000] {
+    // Up to the limit of the crate (100,000 vertices); more is only outlined, which takes a few milliseconds.
+    for vertices in [25_000, 50_000, 100_000] {
         let dataset = one_big_polygon(vertices);
         let timed = prepare(&dataset, frame(UTM40, [500_000.0, 2_750_000.0, 0.0]), 4096);
         println!(
             "one polygon of {vertices} vertices: {:.0} ms in {} steps (longest {:.0} ms)",
             timed.seconds * 1000.0,
             timed.steps,
+            timed.longest_ms
+        );
+    }
+}
+
+/// One polygon of the shape named: a jagged star (the radius of each vertex is uncorrelated, within a fraction of
+/// 50 km), a comb (teeth that go in and out), or a square with `holes` square holes. Returns the dataset and its
+/// number of vertices.
+fn shaped_polygon(shape: &str, size: usize) -> Dataset {
+    let mut rng = Lcg(21);
+    let (mut x, mut y, mut rings) = (Vec::new(), Vec::new(), vec![0_u32]);
+    match shape {
+        "star" => {
+            for i in 0..size {
+                let angle = std::f64::consts::TAU * i as f64 / size as f64;
+                let radius = 50_000.0 * (0.5 + (rng.next() % 1_000) as f64 / 1_000.0);
+                x.push(500_000.0 + radius * angle.cos());
+                y.push(2_750_000.0 + radius * angle.sin());
+            }
+        }
+        "comb" => {
+            // A rectangle 100 km wide whose top edge is `size / 2` teeth.
+            let teeth = size / 2;
+            x.push(450_000.0);
+            y.push(2_700_000.0);
+            x.push(550_000.0);
+            y.push(2_700_000.0);
+            for t in (0..teeth).rev() {
+                let left = 450_000.0 + 100_000.0 * t as f64 / teeth as f64;
+                let right = 450_000.0 + 100_000.0 * (t as f64 + 0.5) / teeth as f64;
+                x.extend([right, right, left]);
+                y.extend([2_800_000.0, 2_750_000.0, 2_750_000.0]);
+            }
+        }
+        _ => {
+            // `size` holes in a square of 100 km, each a square of 100 m on a grid.
+            for (px, py) in [
+                (450_000.0, 2_700_000.0),
+                (550_000.0, 2_700_000.0),
+                (550_000.0, 2_800_000.0),
+                (450_000.0, 2_800_000.0),
+            ] {
+                x.push(px);
+                y.push(py);
+            }
+            rings.push(4);
+            let side = (size as f64).sqrt().ceil() as usize;
+            for h in 0..size {
+                let (cx, cy) = (
+                    451_000.0 + (h % side) as f64 * 90_000.0 / side as f64,
+                    2_701_000.0 + (h / side) as f64 * 90_000.0 / side as f64,
+                );
+                for (dx, dy) in [(0.0, 0.0), (0.0, 20.0), (20.0, 20.0), (20.0, 0.0)] {
+                    x.push(cx + dx);
+                    y.push(cy + dy);
+                }
+                rings.push(x.len() as u32);
+            }
+        }
+    }
+    if rings.len() == 1 {
+        rings.push(x.len() as u32);
+    }
+    let positions = Positions::from_xyz(&x, &y, None, &mut Findings::new()).expect("lengths");
+    let polygon_offsets = vec![0, (rings.len() - 1) as u32];
+    Dataset::new(
+        DatasetId(6),
+        shape,
+        Some(UTM40),
+        Geometry::Polygons(karmania_core::Polygons {
+            positions,
+            ring_offsets: rings,
+            polygon_offsets,
+        }),
+        Table::empty(),
+    )
+}
+
+/// The longest step for one polygon of each shape that is hard for `earcut`: the review found that its time depends on the
+/// shape and on the holes, not on the number of vertices alone.
+#[test]
+#[ignore = "timing; run in a release build with --ignored"]
+fn the_longest_step_for_polygons_that_are_hard_to_fill() {
+    for (shape, size) in [
+        ("star", 25_000),
+        ("star", 50_000),
+        ("star", 100_000),
+        ("comb", 10_000),
+        ("comb", 25_000),
+        ("comb", 50_000),
+        ("holes", 2_500),
+        ("holes", 5_000),
+        ("holes", 6_000),
+        ("holes", 10_000),
+    ] {
+        let dataset = shaped_polygon(shape, size);
+        let vertices = dataset
+            .element_count()
+            .map_or(0, |_| match &dataset.geometry {
+                Geometry::Polygons(p) => p.positions.len(),
+                _ => 0,
+            });
+        let timed = prepare(&dataset, frame(UTM40, [500_000.0, 2_750_000.0, 0.0]), 4096);
+        let filled = match drawn(&timed) {
+            karmania_prep::RenderBuffers::Polygons(p) => !p.triangles.is_empty(),
+            _ => false,
+        };
+        println!(
+            "{shape} {size}: {vertices} vertices, filled {filled}, {:.0} ms (longest step {:.0} ms)",
+            timed.seconds * 1000.0,
             timed.longest_ms
         );
     }

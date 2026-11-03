@@ -3542,3 +3542,24 @@ reviewer and reproduced here by a test that failed before the fix.
   reviewer said it is not reachable: the `u32::try_from(..).unwrap_or(u32::MAX)` of the warp and the surface (`dataset.too_large` stops 134 million
   cells long before a count reaches 4 billion; it would matter only if that limit were raised). The surface triangle's colour from its lowest-numbered corner
   (the reviewer's N6) is the disclosed design choice of step 13.12, for the owner.
+
+## M13 gate, second round
+
+The second review (a fresh subagent, on `b2c0329`, the head after the ten fixes of the first round, with the whole gate rerun and green on it) found no blocker,
+one major, one minor and seven nits; it judged F1, F2, F4, F5, F7, F8, F9 and F10 correct and complete as far as it could break them (it ran
+randomised checks of the classes, of the origin and of 48 shapes of warp tile, with no violation) and F6 correct with its question to the owner still open.
+
+- Step 13.F11 (the limit of step 13.F3 did not bound the step). **Major.** Step 13.F3 capped a filled polygon at 100,000 vertices and said that the step is then bounded
+  (the handler's comment, `docs/perf.md`, the record and the commit). The review showed that the time of `earcut` depends on the shape and on the holes, not on the vertices
+  alone, and it was reproduced here natively: a square with 24,000 holes (96,000 vertices) took 18.7 s in one step; a jagged star of 100,000 vertices 3.3 to 4.6 s; a comb of
+  75,000 vertices 6.6 to 9.7 s; a smooth ring of 100,000 vertices 0.14 to 0.22 s. And the "670 ms and 3.3 s" of the earlier figures for 200,000 and 400,000 vertices could no longer be
+  reproduced by the committed test, whose rows over the limit only time the outline. **What was done**: (1) a second limit, on **work**: the vertices times the rings of a polygon
+  (the exterior and the holes) at most 150,000,000, because the cost of holes is predictable (about 4 ns for each unit of the product: 10,000 holes with 40,000 vertices 1.5 s, and the limit
+  is 6,000 holes of four vertices, 0.5 to 0.7 s); more is outlined only with `display.polygons.too_detailed`, whose message now says "too detailed to fill in (more than 100,000 vertices, or too many
+  holes for their size)" (`docs/validation-codes.md` changed with it). A test at the edge with small limits (64 against 63) and with the real limits (7,000 holes are outlined, their 28,004 sides
+  all in the outline), which fails without the limit (a mutation). (2) The jagged and comb-like rings are **not** bounded, and no limit that is deterministic and cheap does it: the
+  concave vertices do not predict the time (the smooth ring has as many), and the time itself must not decide what is drawn (section 8). So the comment of the handler, `docs/perf.md` (a table of the
+  measured shapes, natively, two runs) and this record say that the limits bound a smooth ring and the holes and **do not bound** a jagged ring: at 100,000 vertices that is several
+  seconds during which the worker hears no request to stop. **This is the owner's**: lowering the limit of vertices to 50,000 would bring a jagged star to 0.6 to 0.75 s and would outline the
+  polygons of 50,000 to 100,000 vertices that fill in a third of a second; it is left at 100,000. The ignored timing tests now cover the shapes (`the_longest_step_for_polygons_that_are_hard_to_fill`) and the
+  smooth ring only up to the limit.

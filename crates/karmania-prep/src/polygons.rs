@@ -9,13 +9,25 @@ use crate::origin::Frame;
 use crate::project::{Prepared, project};
 
 /// The most vertices of one polygon (its rings, holes included) that are triangulated: 100,000. More than
-/// this is drawn as an outline only, with `display.polygons.too_detailed`. A polygon is one step of a
-/// prepare, which cannot be cut, and the time `earcut` takes grows faster than the size of the polygon:
-/// measured natively, 20 ms for 25,000 vertices, 140 ms for 100,000, 670 ms for 200,000 and 3.3 s for
-/// 400,000 (the review of the milestone saw 9.5 s for 1,000,000 in WebAssembly), and the worker hears nothing,
-/// not a request to stop, while it works. The limit also keeps the nodes of `earcut` (40 bytes each under a
-/// 32-bit offset) far from the size at which it panics.
+/// this is drawn as an outline only, with `display.polygons.too_detailed`.
+///
+/// A polygon is one step of a prepare, which cannot be cut, and the worker hears nothing, not a request to
+/// stop, while `earcut` works on it. Its time depends on the shape and not on the number of vertices alone (the
+/// second review of the milestone, and the ignored timing tests `the_longest_step_for_one_large_polygon` and
+/// `the_longest_step_for_polygons_that_are_hard_to_fill`): natively, a smooth ring of 100,000 vertices takes
+/// 30 to 340 ms, a jagged one (a star whose radius is uncorrelated from vertex to vertex) 3.3 s, a comb of 75,000
+/// vertices 6.6 s; and holes cost about 4 ns for each vertex and each ring (see [`MAX_FILL_WORK`]). So this limit
+/// does **not** bound the step: a pathological ring at the limit takes seconds. It is the largest size at which a
+/// smooth polygon, which is nearly every polygon of a map, is filled in a third of a second or less, and
+/// it keeps the nodes of `earcut` (40 bytes each under a 32-bit offset) far from the size at which it panics.
 const MAX_FILLED_VERTICES: usize = 100_000;
+
+/// The most work in one polygon, as its vertices times its rings (the exterior and the holes): 150,000,000,
+/// which is 6,000 holes of four vertices. More is drawn as an outline only, with `display.polygons.too_detailed`.
+/// `earcut` joins every hole to the polygon, and the time of that grows with the holes and the vertices together: natively
+/// 85 ms at 10,000 vertices and 2,500 holes, 370 ms at 20,000 and 5,000, 1.5 s at 40,000 and 10,000, and 18.7 s at
+/// 96,000 and 24,000 (about 4 ns for each unit of the product). The limit is about half a second for holes.
+const MAX_FILL_WORK: u64 = 150_000_000;
 
 /// How far the area of the triangles may be from the area of the polygon (as a fraction of it) before
 /// the triangulation is taken to be wrong, which it is for a polygon that crosses itself.
@@ -72,17 +84,20 @@ pub(crate) struct PolygonsFill {
     too_detailed: Finding,
     /// The most vertices of a polygon that are triangulated.
     limit: usize,
+    /// The most vertices times rings of a polygon that are triangulated.
+    work_limit: u64,
     next: usize,
 }
 
 impl PolygonsFill {
     /// Starts with the `positions` of the vertices on the map.
     pub(crate) fn new(positions: Vec<f32>) -> Self {
-        Self::with_limit(positions, MAX_FILLED_VERTICES)
+        Self::with_limits(positions, MAX_FILLED_VERTICES, MAX_FILL_WORK)
     }
 
-    /// Starts as [`PolygonsFill::new`], with polygons of more than `limit` vertices outlined and not filled.
-    pub(crate) fn with_limit(positions: Vec<f32>, limit: usize) -> Self {
+    /// Starts as [`PolygonsFill::new`], with polygons of more than `limit` vertices, or of more than `work_limit` vertices
+    /// times rings, outlined and not filled.
+    pub(crate) fn with_limits(positions: Vec<f32>, limit: usize, work_limit: u64) -> Self {
         let mut unfilled = Finding::new(
             FindingCode::DisplayPolygonsOutlineOnly,
             "Some polygons could not be filled in, so only their outlines are drawn.",
@@ -94,7 +109,7 @@ impl PolygonsFill {
         let mut too_detailed = Finding::new(
             FindingCode::DisplayPolygonsTooDetailed,
             format!(
-                "Some polygons have more than {} vertices, which is too many to fill in, so only their outlines are drawn.",
+                "Some polygons are too detailed to fill in (more than {} vertices, or too many holes for their size), so only their outlines are drawn.",
                 karmania_core::text::format_count(MAX_FILLED_VERTICES as u64)
             ),
         )
@@ -112,6 +127,7 @@ impl PolygonsFill {
             unfilled,
             too_detailed,
             limit,
+            work_limit,
             next: 0,
         }
     }
@@ -142,7 +158,8 @@ impl PolygonsFill {
                 outline_ring(&mut self.buffers, range.clone(), number);
             }
             let vertices: usize = ranges.iter().map(ExactSizeIterator::len).sum();
-            if vertices > self.limit {
+            let work = vertices as u64 * ranges.len() as u64;
+            if vertices > self.limit || work > self.work_limit {
                 self.too_detailed.count += 1;
                 self.too_detailed
                     .add_example(Location::default().with_element(u64::from(number)));
@@ -602,7 +619,7 @@ mod tests {
         assert_eq!(finding.examples[0].element, Some(1));
         assert_eq!(
             finding.message,
-            "Some polygons have more than 100,000 vertices, which is too many to fill in, so only their outlines are drawn."
+            "Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn."
         );
     }
 
@@ -623,7 +640,7 @@ mod tests {
             };
             let p = polygons(&[&rings]);
             let positions = project(&p.positions, LOCAL, &frame(), &mut Findings::new()).unwrap();
-            let mut fill = PolygonsFill::with_limit(positions, limit);
+            let mut fill = PolygonsFill::with_limits(positions, limit, u64::MAX);
             fill.advance(&p, usize::MAX);
             let mut findings = Findings::new();
             let buffers = fill.finish(&mut findings);
@@ -633,5 +650,59 @@ mod tests {
                 "limit {limit}, {outer} + {hole}"
             );
         }
+    }
+
+    /// A square with `holes` small square holes, as the rings of one polygon.
+    fn square_with_holes(holes: usize) -> Polygons {
+        let hole_rings: Vec<Vec<(f64, f64)>> = (0..holes)
+            .map(|h| {
+                let (x, y) = (1.0 + (h % 50) as f64 * 2.0, 1.0 + (h / 50) as f64 * 2.0);
+                vec![(x, y), (x, y + 1.0), (x + 1.0, y + 1.0), (x + 1.0, y)]
+            })
+            .collect();
+        let exterior = vec![(0.0, 0.0), (200.0, 0.0), (200.0, 200.0), (0.0, 200.0)];
+        let mut rings: Vec<&[(f64, f64)]> = vec![&exterior];
+        rings.extend(hole_rings.iter().map(Vec::as_slice));
+        polygons(&[&rings])
+    }
+
+    #[test]
+    fn a_polygon_with_too_many_holes_for_its_size_is_outlined_only() {
+        // Found by the second review of the milestone: a polygon of 96,000 vertices and 24,000 holes was filled, in 18.7 s of one
+        // step, because the limit counted vertices only. The work is the vertices times the rings.
+        // At the edge, with a small limit: 3 holes make 16 vertices in 4 rings, which is 64.
+        for (work_limit, filled) in [(64, true), (63, false)] {
+            let p = square_with_holes(3);
+            let positions = project(&p.positions, LOCAL, &frame(), &mut Findings::new()).unwrap();
+            let mut fill = PolygonsFill::with_limits(positions, usize::MAX, work_limit);
+            fill.advance(&p, usize::MAX);
+            let mut findings = Findings::new();
+            let buffers = fill.finish(&mut findings);
+            assert_eq!(
+                !buffers.triangles.is_empty(),
+                filled,
+                "work limit {work_limit}"
+            );
+            assert_eq!(
+                findings
+                    .iter()
+                    .any(|f| f.code.as_str() == "display.polygons.too_detailed"),
+                !filled
+            );
+        }
+        // With the real limits: 7,000 holes are 28,004 vertices in 7,001 rings, almost 200 million, over 150 million.
+        let out = prepare(&square_with_holes(7_000));
+        assert!(out.buffers.triangles.is_empty());
+        assert_eq!(
+            out.buffers.outline.len() / 2,
+            28_004,
+            "every side of every ring is outlined"
+        );
+        assert_eq!(
+            out.findings.as_slice()[0].code.as_str(),
+            "display.polygons.too_detailed"
+        );
+        // And a polygon with few holes is filled as before.
+        assert!(!prepare(&square_with_holes(3)).buffers.triangles.is_empty());
     }
 }

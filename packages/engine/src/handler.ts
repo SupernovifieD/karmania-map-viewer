@@ -48,9 +48,12 @@ const IMPORT_BUDGET_ROWS = 50_000;
 
 /**
  * How much of a prepare is done in one step: positions, polygon vertices or blocks (a tile of a warped
- * grid is a step of its own). Most steps take under 0.1 s, but two cannot be cut: the triangulation of one
- * polygon (up to 100,000 vertices) and the triangles of a surface, which in WebAssembly on a 1.1 GHz laptop
- * took up to about 0.4 s each (docs/perf.md). A request to stop, or any other request, is heard between steps.
+ * grid is a step of its own). Most steps take under 0.1 s, but some cannot be cut: the triangulation of one
+ * polygon, the triangles of a surface of 4,000,000 cells (0.45 s in WebAssembly on a 1.1 GHz laptop) and a rough
+ * warp tile. The time of a polygon depends on its shape: a smooth ring at the limit of 100,000 vertices took
+ * 0.2 to 0.4 s, holes at the limit of the kernel's work cap about 0.5 to 0.7 s, and a jagged ring or a comb of
+ * tens of thousands of vertices several seconds (docs/perf.md): the limits do not bound those. A request to stop,
+ * or any other request, is heard between steps, so it waits for the step that is running.
  */
 const PREPARE_BUDGET = 100_000;
 
