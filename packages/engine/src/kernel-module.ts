@@ -27,7 +27,7 @@ export interface KernelApi {
     method: string,
     classes: number,
   ) => unknown;
-  /** The class of every element under class breaks, one byte each. */
+  /** The class of every element that is drawn under class breaks, one byte each. */
   readonly classIndex: (datasetId: number, breaks: unknown) => Uint8Array;
   /** Releases the kernel's memory. */
   readonly free: () => void;

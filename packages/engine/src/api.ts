@@ -150,7 +150,11 @@ export interface Engine {
    * Chooses the coordinate system the map is drawn in, and says which of the loaded datasets are drawn in
    * it. The frame stays for as long as any dataset is loaded: call this again after loading or removing,
    * and to change it with `preferred`, the system a person chose. `frame` is `null` when nothing is
-   * loaded. A dataset that is not drawn stays loaded, and its findings say why.
+   * loaded. A dataset that is not drawn stays loaded, and its findings say why. The origin is the centre of
+   * the first dataset that is drawn in the map's system and is made once: if the person chose a system in
+   * which nothing was drawn, it is 0, and the first call after a dataset can be drawn makes it, and then it
+   * stays. A caller that has prepared layers against an origin of 0 has to prepare them again when the
+   * origin in the frame it gets back is not the one it prepared them with.
    */
   chooseFrame(preferred?: CrsRef): Promise<FrameChoice>;
 

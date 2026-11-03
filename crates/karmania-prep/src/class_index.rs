@@ -1,4 +1,4 @@
-//! The class of every element: one byte each, for the renderer to look a colour up by.
+//! The class of every element that is drawn: one byte each, for the renderer to look a colour up by.
 
 use karmania_core::{Column, Dataset, Finding};
 
@@ -46,7 +46,8 @@ pub fn class_index_rows(column: &Column, breaks: &ClassBreaks, rows: usize) -> V
 
 /// The class of each element of `dataset` under `breaks`, by the column the breaks are of. An attribute
 /// table has one row for each element, whatever the shape, so this is one byte per point, line, polygon,
-/// triangle, cell (in lattice order, `i` fastest) or block.
+/// triangle, cell (in lattice order, `i` fastest) or block, except that a grid of several layers, of which
+/// only the first is drawn, has the cells of that layer (see [`drawn_rows`]).
 ///
 /// # Errors
 ///
