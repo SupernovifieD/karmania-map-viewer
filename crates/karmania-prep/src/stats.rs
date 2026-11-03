@@ -177,16 +177,28 @@ pub fn column_stats(column: &Column) -> ColumnStats {
     column_stats_with_limit(column, DISTINCT_LIMIT)
 }
 
+/// The statistics of the first `rows` rows of `column` (all of them if it has fewer), counting at most
+/// [`DISTINCT_LIMIT`] distinct values: for a grid of several layers, of which the first is what is drawn.
+#[must_use]
+pub fn column_stats_rows(column: &Column, rows: usize) -> ColumnStats {
+    stats_of(column, rows, DISTINCT_LIMIT)
+}
+
 /// The statistics of `column`, counting at most `limit` distinct values.
 #[must_use]
 pub fn column_stats_with_limit(column: &Column, limit: usize) -> ColumnStats {
+    stats_of(column, column.len(), limit)
+}
+
+fn stats_of(column: &Column, rows: usize, limit: usize) -> ColumnStats {
+    let rows = rows.min(column.len());
     let mut counts = Counts::default();
     let (mut nulls, mut non_finite) = (0_u64, 0_u64);
     let mut range: Option<(f64, f64)> = None;
     let mut widen = |v: f64| {
         range = Some(range.map_or((v, v), |(lo, hi)| (lo.min(v), hi.max(v))));
     };
-    for row in 0..column.len() {
+    for row in 0..rows {
         match column.get(row) {
             None => nulls += 1,
             Some(Value::Float64(v)) if !v.is_finite() => non_finite += 1,
@@ -206,7 +218,7 @@ pub fn column_stats_with_limit(column: &Column, limit: usize) -> ColumnStats {
         }
     }
     ColumnStats {
-        count: column.len() as u64,
+        count: rows as u64,
         nulls,
         non_finite,
         range,

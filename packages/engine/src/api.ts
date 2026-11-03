@@ -177,7 +177,8 @@ export interface Engine {
 
   /**
    * The class of every element of a dataset under class breaks `classify` gave: one byte each, 255 for
-   * an element with no value. The array is handed over, not copied.
+   * an element with no value. For a grid of several layers, of which only the first is drawn, the elements are
+   * the cells of that layer, and so are those `classify` counts. The array is handed over, not copied.
    */
   classIndex(id: number, breaks: ClassBreaks): Promise<Uint8Array>;
 
