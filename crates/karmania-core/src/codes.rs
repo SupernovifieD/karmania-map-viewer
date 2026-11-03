@@ -188,6 +188,8 @@ finding_codes! {
     DisplayCrsNotConvertible => "display.crs.not_convertible", Warning, None;
     /// A dataset is not drawn because none of its positions can be placed on the map.
     DisplayExtentNone => "display.extent.none", Warning, None;
+    /// Some polygons could not be filled in, so only their outlines are drawn.
+    DisplayPolygonsOutlineOnly => "display.polygons.outline_only", Warning, None;
     /// The map's coordinate system was chosen from data in longitude and latitude: a UTM zone.
     DisplayFrameUtmChosen => "display.frame.utm_chosen", Info, None;
     /// The X, Y and Z coordinate lists have different lengths.
