@@ -8,9 +8,13 @@
 use karmania_core::{Column, ColumnType, Finding, FindingCode, Value};
 
 use crate::jenks;
+use crate::stats::{Category, DISTINCT_LIMIT, Distinct, column_stats};
 
 /// The most classes: the class index is one byte, and 255 means no value.
 pub const MAX_CLASSES: usize = 254;
+
+/// The most values shown as categories before the rest are "Other".
+pub const MAX_CATEGORIES: usize = 20;
 
 /// How a column of numbers is divided into ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +25,8 @@ pub enum Method {
     Quantile,
     /// Natural breaks (Jenks), found from an evenly strided sample of at most 10,000 values.
     Jenks,
+    /// Categories: the values that most rows have (up to 20), and the rest as "Other".
+    Categories,
 }
 
 /// Classes of a column, and how many rows are in each.
@@ -42,6 +48,18 @@ pub enum ClassBreaks {
         /// from (an evenly strided sample of the rows, so the same every time), which the legend says. `None`
         /// when every value was used. The counts are always of every row.
         sampled: Option<u64>,
+    },
+    /// The values that most rows have, one class each, and the rest together.
+    Categories {
+        /// The values, the most common first; rows that have the same number of each are in ascending order
+        /// of value (numbers by value, text by its bytes, false before true). A categorical column gives its labels.
+        values: Vec<Category>,
+        /// How many rows have each of `values`.
+        counts: Vec<u64>,
+        /// How many rows have a value that is not in `values`: the class "Other"; `None` when there is none.
+        other: Option<u64>,
+        /// How many rows have no value: null, or not a finite number.
+        nulls: u64,
     },
 }
 
@@ -83,6 +101,9 @@ fn numbers(column: &Column) -> (Vec<f64>, u64) {
 /// A finding: `classes.column.not_numeric` for a column of text, truth values or categories, and
 /// `classes.column.no_values` for a column with no finite number.
 pub fn classify(column: &Column, method: Method, classes: usize) -> Result<ClassBreaks, Finding> {
+    if method == Method::Categories {
+        return categories(column, classes);
+    }
     let classes = classes.clamp(1, MAX_CLASSES);
     if !matches!(
         column.column_type(),
@@ -101,6 +122,8 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
             values.sort_unstable_by(f64::total_cmp);
             quantile_bounds(&values, classes)
         }
+        // Handled above, before the numbers of the column are taken; here so that the match is whole.
+        Method::Categories => return categories(column, classes),
         Method::Jenks => {
             let (min, max) = extent(&values);
             let mut used = jenks::sample(&values);
@@ -123,6 +146,30 @@ pub fn classify(column: &Column, method: Method, classes: usize) -> Result<Class
         counts,
         nulls,
         sampled,
+    })
+}
+
+/// The most common values of `column` as classes, up to `classes` (from 1 to [`MAX_CATEGORIES`]), and the
+/// rest as "Other".
+fn categories(column: &Column, classes: usize) -> Result<ClassBreaks, Finding> {
+    let stats = column_stats(column);
+    let Distinct::Values(mut values) = stats.distinct else {
+        return Err(too_many_values(column));
+    };
+    if values.is_empty() {
+        return Err(no_values(column));
+    }
+    // The values come in ascending order, and a stable sort keeps that order among those with the same count.
+    values.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    let shown = classes.clamp(1, MAX_CATEGORIES).min(values.len());
+    let others: u64 = values.iter().skip(shown).map(|(_, n)| n).sum();
+    values.truncate(shown);
+    let (values, counts) = values.into_iter().unzip();
+    Ok(ClassBreaks::Categories {
+        values,
+        counts,
+        other: (others > 0).then_some(others),
+        nulls: stats.nulls + stats.non_finite,
     })
 }
 
@@ -198,6 +245,18 @@ fn not_numeric(column: &Column) -> Finding {
     .with_hint("Colour by categories instead, or by a column of numbers.")
 }
 
+fn too_many_values(column: &Column) -> Finding {
+    Finding::new(
+        FindingCode::ClassesColumnTooManyValues,
+        format!(
+            "The column {} has more than {} different values, so they cannot be shown as categories.",
+            column.name(),
+            karmania_core::text::format_count(DISTINCT_LIMIT as u64)
+        ),
+    )
+    .with_hint("Divide the column into ranges instead.")
+}
+
 fn no_values(column: &Column) -> Finding {
     Finding::new(
         FindingCode::ClassesColumnNoValues,
@@ -226,6 +285,7 @@ mod tests {
                 nulls,
                 ..
             } => (bounds, counts, nulls),
+            other => panic!("{other:?}"),
         }
     }
 
@@ -370,7 +430,10 @@ mod tests {
             counts,
             sampled,
             ..
-        } = classify(&c, Method::Jenks, 3).unwrap();
+        } = classify(&c, Method::Jenks, 3).unwrap()
+        else {
+            panic!("ranges")
+        };
         assert_eq!(
             (bounds, counts, sampled),
             (vec![1.0, 10.0, 100.0, 102.0], vec![3, 3, 3], None)
@@ -385,7 +448,10 @@ mod tests {
             counts,
             sampled,
             ..
-        } = classify(&floats(&long), Method::Jenks, 3).unwrap();
+        } = classify(&floats(&long), Method::Jenks, 3).unwrap()
+        else {
+            panic!("ranges")
+        };
         assert_eq!(sampled, Some(10_000));
         assert_eq!(counts, [10_000, 10_000, 10_000]);
         assert!(
@@ -395,6 +461,129 @@ mod tests {
         assert!(
             bounds[0] < 1.0 && bounds[3] > 90.0,
             "the first and last bounds are of every value: {bounds:?}"
+        );
+    }
+
+    fn categories(c: &Column, classes: usize) -> (Vec<Category>, Vec<u64>, Option<u64>, u64) {
+        match classify(c, Method::Categories, classes).unwrap() {
+            ClassBreaks::Categories {
+                values,
+                counts,
+                other,
+                nulls,
+            } => (values, counts, other, nulls),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    fn text(items: &[&str]) -> Column {
+        Column::without_nulls(
+            "rock",
+            ColumnData::Utf8(items.iter().map(|s| (*s).to_string()).collect()),
+        )
+    }
+
+    fn named(items: &[&str]) -> Vec<Category> {
+        items
+            .iter()
+            .map(|s| Category::Text((*s).to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn the_most_common_values_come_first_with_ties_in_order_of_value_and_the_rest_are_other() {
+        // granite 4, basalt 2, shale 2, chert 1, coal 1: two shown, three rows more than that are other.
+        let c = text(&[
+            "shale", "granite", "chert", "granite", "basalt", "granite", "shale", "granite",
+            "basalt", "coal",
+        ]);
+        let (values, counts, other, nulls) = categories(&c, 2);
+        assert_eq!(
+            (values, counts, other, nulls),
+            (named(&["granite", "basalt"]), vec![4, 2], Some(4), 0)
+        );
+        let (values, counts, other, _) = categories(&c, 3);
+        assert_eq!(
+            (values, counts, other),
+            (
+                named(&["granite", "basalt", "shale"]),
+                vec![4, 2, 2],
+                Some(2)
+            )
+        );
+        // Every value shown: no "Other" class.
+        let (values, counts, other, _) = categories(&c, 20);
+        assert_eq!(values.len(), 5);
+        assert_eq!((counts.iter().sum::<u64>(), other), (10, None));
+        assert_eq!(
+            values[3..],
+            named(&["chert", "coal"]),
+            "equal counts in order of value"
+        );
+    }
+
+    #[test]
+    fn numbers_truth_values_and_labels_are_categories_too_and_empty_rows_are_nulls() {
+        let ints = Column::new(
+            "code",
+            ColumnData::Int64(vec![3, 1, 3, 2, 3, 1, 9]),
+            Validity::from_flags([true, true, true, true, true, true, false]),
+        )
+        .unwrap();
+        let (values, counts, other, nulls) = categories(&ints, 2);
+        assert_eq!(
+            (values, counts, other, nulls),
+            (
+                vec![Category::Number(3.0), Category::Number(1.0)],
+                vec![3, 2],
+                Some(1),
+                1
+            )
+        );
+        let floats_with_nan = floats(&[0.5, f64::NAN, 0.5, f64::INFINITY]);
+        let (_, counts, _, nulls) = categories(&floats_with_nan, 5);
+        assert_eq!((counts, nulls), (vec![2], 2));
+        let bools = Column::without_nulls("flag", ColumnData::Bool(vec![true, false, true]));
+        assert_eq!(
+            categories(&bools, 5).0,
+            vec![Category::Bool(true), Category::Bool(false)]
+        );
+        let labels = Column::without_nulls(
+            "kind",
+            ColumnData::Categorical {
+                codes: vec![1, 0, 1],
+                dictionary: vec!["ore".into(), "rock".into()],
+            },
+        );
+        assert_eq!(categories(&labels, 5).0, named(&["rock", "ore"]));
+    }
+
+    #[test]
+    fn at_most_twenty_are_shown_and_a_column_with_too_many_or_no_values_gives_a_finding() {
+        let many: Vec<String> = (0..30).map(|i| format!("v{i:02}")).collect();
+        let c = Column::without_nulls("v", ColumnData::Utf8(many));
+        let (values, _, other, _) = categories(&c, 254);
+        assert_eq!((values.len(), other), (MAX_CATEGORIES, Some(10)));
+        assert_eq!(categories(&c, 0).0.len(), 1, "0 is taken as 1");
+        let ids = Column::without_nulls("sample_id", ColumnData::Int64((0..10_001).collect()));
+        let error = classify(&ids, Method::Categories, 5).unwrap_err();
+        assert_eq!(error.code.as_str(), "classes.column.too_many_values");
+        assert_eq!(
+            error.message,
+            "The column sample_id has more than 10,000 different values, so they cannot be shown as categories."
+        );
+        let nothing = Column::new(
+            "v",
+            ColumnData::Utf8(vec!["a".into()]),
+            Validity::from_flags([false]),
+        )
+        .unwrap();
+        assert_eq!(
+            classify(&nothing, Method::Categories, 5)
+                .unwrap_err()
+                .code
+                .as_str(),
+            "classes.column.no_values"
         );
     }
 }

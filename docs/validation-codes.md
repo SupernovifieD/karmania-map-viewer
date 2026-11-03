@@ -95,6 +95,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Colour by categories instead, or by a column of numbers.
 - Example: The column rock is text, not numbers, so it cannot be divided into ranges.
 
+## `classes.column.too_many_values`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} has more than {limit} different values, so they cannot be shown as categories.
+- Hint: Divide the column into ranges instead.
+- Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
+
 ## `crs.code.unknown`
 
 - Severity: warning
