@@ -271,4 +271,26 @@ mod tests {
         let breaks = natural_breaks(&sorted, 12);
         assert_eq!(breaks.len(), 11);
     }
+
+    #[test]
+    fn the_sample_is_the_rows_at_floor_i_n_over_the_size_also_when_the_stride_is_not_a_whole_number()
+     {
+        // Found by the review of the milestone: the only test used 30,000 values, an exact multiple of the stride, so that
+        // `i * (n / size)` and `i * n / size` were the same, and a sampler that took the first 10,000 rows of 15,000 passed.
+        for n in [10_001_usize, 12_345, 15_000, 19_999, 30_001] {
+            let rows: Vec<f64> = (0..n).map(|i| i as f64).collect();
+            let sample = sample(&rows);
+            assert_eq!(sample.len(), SAMPLE_SIZE, "{n}");
+            for (i, &row) in sample.iter().enumerate() {
+                assert_eq!(row as usize, i * n / SAMPLE_SIZE, "{n}: sample {i}");
+            }
+            // Evenly spread: from the first row to near the last, never past it.
+            assert_eq!(sample[0], 0.0);
+            assert!(
+                sample[SAMPLE_SIZE - 1] >= (n - 2 * n.div_ceil(SAMPLE_SIZE)) as f64
+                    && sample[SAMPLE_SIZE - 1] < n as f64,
+                "{n}"
+            );
+        }
+    }
 }

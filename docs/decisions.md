@@ -3526,3 +3526,8 @@ reviewer and reproduced here by a test that failed before the fix.
   meshes of the warped grid, and the browser's report, from the real worker in Chromium, must equal Node's. It does (the test passed at the first run
   after the hashes were added), so the statement is now true of those arrays: the conversion by `proj4rs` in WebAssembly, the triangulation and the warp give the same bytes
   in Chromium and in Node, for this data. It is one data set, not a proof for all.
+- Step 13.F9 (the sampler of natural breaks, tested only where it cannot go wrong). Minor. The reviewer changed `i * n / 10,000` to `i * (n / 10,000)` in the sample
+  of step 13.16a and all the tests passed, because the one test of the sample used 30,000 values, an exact multiple of the stride, where the two are the
+  same; with the change, 15,000 values would be sampled by their first 10,000 rows and not evenly. A test now takes 10,001, 12,345, 15,000, 19,999 and 30,001
+  values (each value is its own row number), requires the sample to be exactly the rows `floor(i * n / 10,000)`, and to run from the first row to
+  near the last. The reviewer's mutation fails it.
