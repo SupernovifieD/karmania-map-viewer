@@ -12,9 +12,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod drawable;
 pub mod frame;
 pub mod origin;
+#[cfg(test)]
+mod testutil;
 
+pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use origin::{Frame, FrameSource, origin_near};
 

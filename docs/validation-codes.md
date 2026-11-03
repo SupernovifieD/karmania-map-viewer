@@ -279,6 +279,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Move those values to the attribute table, or remove them.
 - Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
 
+## `display.blocks.other_crs`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: a block model is drawn only in the map's own coordinate system, and this one is in {system} while the map is in {map system}.
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: Not drawn: a block model is drawn only in the map's own coordinate system, and this one is in EPSG:32640 while the map is in EPSG:32641.
+
+## `display.crs.local_grids_assumed`
+
+- Severity: info
+- Step: none
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from {units} to {map units}.
+- Hint: If they are different grids, their positions will not line up.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its positions are scaled from feet to metres.
+
+## `display.crs.not_convertible`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: {the reason the positions cannot be converted to the map's coordinate system}
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: Not drawn: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+
+## `display.extent.none`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: none of the positions of this dataset can be placed on the map.
+- Hint: Check the positions and the coordinate system of the data.
+- Example: Not drawn: none of the positions of this dataset can be placed on the map.
+
 ## `display.frame.utm_chosen`
 
 - Severity: info

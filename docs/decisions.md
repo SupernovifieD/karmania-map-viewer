@@ -2961,3 +2961,25 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   the definitions), 4978 (geocentric) and 4807 (grads) is its own map system. The map in an unknown code
   has no units to measure in, so the scale bar of M17 will have to be absent for it, like a geographic
   map: to be written down there.
+- Step 13.4b (drawability). `karmania_prep::drawable(map_crs, dataset)` gives `{status: drawn | not_drawn,
+  reprojected, findings}` by the rules of section 9.2, in the order the brief lists them and documented in
+  the module: the same system is drawn as it is (for every kind, an unknown code included); a block model
+  in any other system is not drawn; two local grids in other units are drawn, scaled, with an info finding
+  that they are taken to be the same grid; a local grid and an EPSG system are not drawn; two EPSG systems
+  are drawn, reprojected, if `Transformer::new` can build the conversion (a grid in another system is drawn
+  as a warped image, step 13.10), and otherwise are not drawn, with the transformer's own message as the
+  reason. Five finding codes, all in `docs/validation-codes.md`: `display.blocks.other_crs`,
+  `display.crs.local_grids_assumed` (info), `display.crs.not_convertible`, `display.extent.none`, and
+  (from step 13.2) `display.frame.utm_chosen` (info); a dataset with no system gets the existing
+  `crs.missing`. One code, `display.crs.not_convertible`, carries the three causes the transformer knows
+  (an unknown code, a system that cannot be built, a local grid against an EPSG system) in its message,
+  as `crs.transform.unsupported` carries its reason, and every hint says "Change the map's coordinate
+  system to the one this dataset is in", which is the way out in each case. Two local grids in the
+  same units are the same system, so rule 1 draws them with no finding: the brief puts "same CRS" first and
+  `CrsRef` cannot tell two mine grids apart, so the assumption is silent there; recorded, not changed.
+  `reprojected` is true for scaling too. The findings do not name the dataset (the legend and the summary
+  show them beside it). Not decided here and left to step 13.4c: which dataset is the first. A dataset
+  with no finite position is not drawn (`display.extent.none`), which the engine's validation makes
+  unreachable for a loaded dataset. Reprojected lines and polygon edges are straight between their
+  reprojected vertices and long edges are not densified (recorded, as section 9.2 asks; the geodesic
+  is out of scope).
