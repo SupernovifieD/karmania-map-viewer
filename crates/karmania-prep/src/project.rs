@@ -16,6 +16,73 @@ pub struct Prepared<T> {
     pub findings: Findings,
 }
 
+/// Positions of a dataset taken to the frame a few at a time: the work of [`project`] in parts, so that a
+/// long list can be done in steps (a job that can be stopped between them). Done in parts of any size it
+/// gives the same numbers and the same findings as all at once.
+pub struct Projector {
+    transformer: Transformer,
+    out: Vec<f32>,
+    done: usize,
+}
+
+impl Projector {
+    /// A projector from the system `own` to the frame's map system.
+    ///
+    /// # Errors
+    ///
+    /// A `display.crs.not_convertible` finding if the two systems cannot be converted between.
+    pub fn new(own: CrsRef, frame: &Frame) -> Result<Self, Finding> {
+        let transformer =
+            Transformer::new(own, frame.map_crs).map_err(|cause| not_convertible(&cause))?;
+        Ok(Self {
+            transformer,
+            out: Vec::new(),
+            done: 0,
+        })
+    }
+
+    /// Does the next `budget` positions (at least one) of `positions`, which have to be the same list each
+    /// time. Returns whether every position is done.
+    pub fn advance(
+        &mut self,
+        positions: &Positions,
+        frame: &Frame,
+        budget: usize,
+        findings: &mut Findings,
+    ) -> bool {
+        let all = positions.as_slice();
+        let total = positions.len();
+        if self.out.capacity() == 0 {
+            self.out.reserve_exact(total.saturating_mul(3));
+        }
+        let end = self.done.saturating_add(budget.max(1)).min(total);
+        let part = all.get(self.done * 3..end * 3).unwrap_or(&[]);
+        if self.transformer.is_identity() {
+            self.out.extend(frame.rebase_all(part));
+        } else {
+            let mut xyz = part.to_vec();
+            self.transformer
+                .convert_chunk_in_place(&mut xyz, self.done as u64, findings);
+            self.out.extend(frame.rebase_all(&xyz));
+        }
+        self.done = end;
+        self.done >= total
+    }
+
+    /// How many positions are done.
+    #[must_use]
+    pub fn done(&self) -> usize {
+        self.done
+    }
+
+    /// The positions done so far, relative to the origin, `x y z` interleaved: all of them once
+    /// [`Projector::advance`] has said so.
+    #[must_use]
+    pub fn finish(self) -> Vec<f32> {
+        self.out
+    }
+}
+
 /// `positions` of a dataset in `own`, converted to the frame's map system in `f64` and then made
 /// relative to the origin as `f32` (interleaved `x y z`, `3 * positions.len()` values, in the order of
 /// the positions).
@@ -34,14 +101,9 @@ pub fn project(
     frame: &Frame,
     findings: &mut Findings,
 ) -> Result<Vec<f32>, Finding> {
-    let transformer =
-        Transformer::new(own, frame.map_crs).map_err(|cause| not_convertible(&cause))?;
-    if transformer.is_identity() {
-        return Ok(frame.rebase_all(positions.as_slice()));
-    }
-    let mut xyz = positions.as_slice().to_vec();
-    transformer.convert_in_place(&mut xyz, findings);
-    Ok(frame.rebase_all(&xyz))
+    let mut projector = Projector::new(own, frame)?;
+    projector.advance(positions, frame, usize::MAX, findings);
+    Ok(projector.finish())
 }
 
 #[cfg(test)]
@@ -122,5 +184,59 @@ mod tests {
         assert_eq!(out, [1.0, 2.0, 3.0]);
         let error = project(&p, local, &frame(UTM40, [0.0; 3]), &mut Findings::new()).unwrap_err();
         assert_eq!(error.code.as_str(), "display.crs.not_convertible");
+    }
+
+    #[test]
+    fn done_in_parts_of_any_size_the_positions_and_findings_are_those_of_all_at_once() {
+        // 50 positions in longitude and latitude, some off the Earth, into zone 40.
+        let xy: Vec<(f64, f64)> = (0..50)
+            .map(|i| {
+                (
+                    57.0 + f64::from(i) * 0.02,
+                    if i % 9 == 4 {
+                        95.0
+                    } else {
+                        25.0 + f64::from(i) * 0.01
+                    },
+                )
+            })
+            .collect();
+        let p = positions(&xy);
+        let map = frame(UTM40, [530_000.0, 2_790_000.0, 0.0]);
+        let geographic = CrsRef::Epsg { code: 4326 };
+        let mut whole_findings = Findings::new();
+        let whole = project(&p, geographic, &map, &mut whole_findings).unwrap();
+        for budget in [0, 1, 4, 7, 49, 50, 1_000] {
+            let mut findings = Findings::new();
+            let mut projector = Projector::new(geographic, &map).unwrap();
+            let mut steps = 0;
+            while !projector.advance(&p, &map, budget, &mut findings) {
+                steps += 1;
+                assert!(steps <= 50, "a budget of {budget} must move forward");
+            }
+            assert_eq!(projector.done(), 50);
+            let parts = projector.finish();
+            assert!(
+                parts
+                    .iter()
+                    .zip(&whole)
+                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                "budget {budget}"
+            );
+            assert_eq!(findings, whole_findings, "budget {budget}");
+        }
+        assert_eq!(whole_findings.as_slice()[0].count, 6);
+    }
+
+    #[test]
+    fn nothing_to_do_is_done_at_once_and_a_system_that_cannot_be_converted_is_an_error() {
+        let none = positions(&[]);
+        let mut projector = Projector::new(UTM40, &frame(UTM40, [0.0; 3])).unwrap();
+        assert!(projector.advance(&none, &frame(UTM40, [0.0; 3]), 10, &mut Findings::new()));
+        assert!(projector.finish().is_empty());
+        let local = CrsRef::Local {
+            units: Units::Metre,
+        };
+        assert!(Projector::new(local, &frame(UTM40, [0.0; 3])).is_err());
     }
 }

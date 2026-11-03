@@ -3259,3 +3259,12 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   dataset does not have is the new warning `classes.column.missing` (`docs/validation-codes.md`). The
   grid's index is one byte for each cell in lattice order; cutting it into the tiles of step 13.10 is the
   renderer's, which has `tiles` and the size.
+- Step 13.18a (positions in parts). A job that can be stopped between steps needs the one long loop of preparing, the
+  conversion and rebasing of every position, in parts. `Projector` does `project` a budget of positions at a time
+  (`advance(positions, frame, budget, findings)`, at least one, says whether all are done; `finish` gives the buffer),
+  and `project` is now `Projector` run to the end. `Transformer::convert_chunk_in_place(xyz, first_vertex,
+  findings)` is `convert_in_place` for a part of a longer list: the failed positions are numbered in the list, not
+  in the part. Tested with the whole thing as the judge: 40 and 50 positions with some off the Earth, converted
+  in parts of 1, 3, 4, 7, 13, 40 and more, give the same bits and findings (counts and examples: the findings of
+  the parts merge into the one the whole gives, because the parts are in order and findings merge on code and
+  message). A budget of 0 moves one position, as the import jobs' do.
