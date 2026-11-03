@@ -13,8 +13,10 @@
 #![forbid(unsafe_code)]
 
 pub mod frame;
+pub mod origin;
 
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
+pub use origin::{Frame, FrameSource, origin_near};
 
 #[cfg(test)]
 mod tests {
