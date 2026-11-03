@@ -53,42 +53,87 @@ pub fn polygons_buffers(
 ) -> Result<Prepared<PolygonsBuffers>, Finding> {
     let mut findings = Findings::new();
     let positions = project(&polygons.positions, own, frame, &mut findings)?;
-    let mut buffers = PolygonsBuffers {
-        positions,
-        triangles: Vec::new(),
-        triangle_polygon: Vec::new(),
-        outline: Vec::new(),
-        outline_polygon: Vec::new(),
-    };
-    let mut earcut = Earcut::<f64>::new();
-    let mut unfilled = Finding::new(
-        FindingCode::DisplayPolygonsOutlineOnly,
-        "Some polygons could not be filled in, so only their outlines are drawn.",
-    )
-    .with_hint(
-        "Check that no ring crosses itself or another ring, and that each polygon has some area.",
-    );
-    unfilled.count = 0;
-    for polygon in 0..polygons.polygon_count().unwrap_or(0) {
-        let (Some(rings), Ok(number)) = (polygons.ring_range(polygon), u32::try_from(polygon))
-        else {
-            continue;
-        };
-        let ranges: Vec<_> = rings
-            .filter_map(|ring| polygons.vertex_range(ring))
-            .collect();
-        for range in &ranges {
-            outline_ring(&mut buffers, range.clone(), number);
-        }
-        if !fill(&mut buffers, &mut earcut, &ranges, number) {
-            unfilled.count += 1;
-            unfilled.add_example(Location::default().with_element(u64::from(number)));
-        }
-    }
-    if unfilled.count > 0 {
-        findings.add(unfilled);
-    }
+    let mut fill = PolygonsFill::new(positions);
+    fill.advance(polygons, usize::MAX);
+    let buffers = fill.finish(&mut findings);
     Ok(Prepared { buffers, findings })
+}
+
+/// Polygons made into triangles and outlines a few at a time, so that a long list can be done in steps.
+/// Done in steps of any size it gives the same buffers and finding as all at once.
+pub(crate) struct PolygonsFill {
+    buffers: PolygonsBuffers,
+    earcut: Earcut<f64>,
+    unfilled: Finding,
+    next: usize,
+}
+
+impl PolygonsFill {
+    /// Starts with the `positions` of the vertices on the map.
+    pub(crate) fn new(positions: Vec<f32>) -> Self {
+        let mut unfilled = Finding::new(
+            FindingCode::DisplayPolygonsOutlineOnly,
+            "Some polygons could not be filled in, so only their outlines are drawn.",
+        )
+        .with_hint(
+            "Check that no ring crosses itself or another ring, and that each polygon has some area.",
+        );
+        unfilled.count = 0;
+        Self {
+            buffers: PolygonsBuffers {
+                positions,
+                triangles: Vec::new(),
+                triangle_polygon: Vec::new(),
+                outline: Vec::new(),
+                outline_polygon: Vec::new(),
+            },
+            earcut: Earcut::new(),
+            unfilled,
+            next: 0,
+        }
+    }
+
+    /// Does polygons until `budget` vertices (at least one polygon) have been done. Returns whether every
+    /// polygon is done.
+    pub(crate) fn advance(&mut self, polygons: &Polygons, budget: usize) -> bool {
+        let count = polygons.polygon_count().unwrap_or(0);
+        let mut spent = 0_usize;
+        while self.next < count && spent < budget.max(1) {
+            let polygon = self.next;
+            self.next += 1;
+            let (Some(rings), Ok(number)) = (polygons.ring_range(polygon), u32::try_from(polygon))
+            else {
+                continue;
+            };
+            let ranges: Vec<_> = rings
+                .filter_map(|ring| polygons.vertex_range(ring))
+                .collect();
+            spent = spent.saturating_add(
+                ranges
+                    .iter()
+                    .map(ExactSizeIterator::len)
+                    .sum::<usize>()
+                    .max(1),
+            );
+            for range in &ranges {
+                outline_ring(&mut self.buffers, range.clone(), number);
+            }
+            if !fill(&mut self.buffers, &mut self.earcut, &ranges, number) {
+                self.unfilled.count += 1;
+                self.unfilled
+                    .add_example(Location::default().with_element(u64::from(number)));
+            }
+        }
+        self.next >= count
+    }
+
+    /// The buffers, with the finding for the polygons that were not filled in added to `findings`.
+    pub(crate) fn finish(self, findings: &mut Findings) -> PolygonsBuffers {
+        if self.unfilled.count > 0 {
+            findings.add(self.unfilled);
+        }
+        self.buffers
+    }
 }
 
 /// The position of vertex `vertex` as `f64`, if it has one on the map.
@@ -456,5 +501,35 @@ mod tests {
         // About 20 km by 22 km: 0.2 degrees of longitude at 25 N is 20.2 km and 0.2 of latitude 22.1 km.
         let area = filled_area(&out.buffers);
         assert!((4.2e8..4.7e8).contains(&area), "{area}");
+    }
+
+    #[test]
+    fn polygons_done_a_few_vertices_at_a_time_are_those_done_all_at_once() {
+        // A mix: a square, a square with a hole, a line (not filled), a bow tie (not filled), a triangle.
+        let triangle = [(20.0, 0.0), (30.0, 0.0), (25.0, 8.0)];
+        let line = [(0.0, 0.0), (5.0, 0.0), (10.0, 0.0)];
+        let bow_tie = [(0.0, 0.0), (10.0, 10.0), (10.0, 0.0), (0.0, 10.0)];
+        let p = polygons(&[
+            &[&SQUARE, &HOLE],
+            &[&line],
+            &[&bow_tie],
+            &[&triangle],
+            &[&SQUARE],
+        ]);
+        let whole = prepare(&p);
+        for budget in [0, 1, 4, 5, 13, 1_000] {
+            let mut findings = Findings::new();
+            let positions = project(&p.positions, LOCAL, &frame(), &mut findings).unwrap();
+            let mut fill = PolygonsFill::new(positions);
+            let mut steps = 0;
+            while !fill.advance(&p, budget) {
+                steps += 1;
+                assert!(steps <= 5, "a budget of {budget} must move forward");
+            }
+            let buffers = fill.finish(&mut findings);
+            assert_eq!(buffers, whole.buffers, "budget {budget}");
+            assert_eq!(findings, whole.findings, "budget {budget}");
+        }
+        assert_eq!(whole.findings.as_slice()[0].count, 2);
     }
 }

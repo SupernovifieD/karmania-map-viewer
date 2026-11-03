@@ -53,7 +53,24 @@ pub fn surface_buffers(
     own: CrsRef,
     frame: &Frame,
 ) -> Result<Prepared<SurfaceBuffers>, Finding> {
-    let [nx, ny, layers] = lattice.dims;
+    let mut findings = layers_hidden(lattice.dims[2]);
+    let centres = surface_positions(lattice, elevations);
+    let positions = project(&centres, own, frame, &mut findings)?;
+    let (triangles, triangle_cell) = surface_triangles(lattice, &positions);
+    Ok(Prepared {
+        buffers: SurfaceBuffers {
+            positions,
+            triangles,
+            triangle_cell,
+        },
+        findings,
+    })
+}
+
+/// The centre of every cell of the first layer of the grid, in cell order, in the grid's own system, with
+/// the elevation from `elevations` as its height (NaN if the cell has none).
+pub(crate) fn surface_positions(lattice: &Lattice, elevations: &Column) -> Positions {
+    let [nx, ny, _] = lattice.dims;
     let cells = nx as usize * ny as usize;
     let mut xyz = Vec::with_capacity(cells * 3);
     for j in 0..ny {
@@ -64,13 +81,13 @@ pub fn surface_buffers(
             xyz.extend([x, y, z]);
         }
     }
-    let mut findings = layers_hidden(layers);
-    let positions = project(
-        &Positions::from_interleaved(xyz, true),
-        own,
-        frame,
-        &mut findings,
-    )?;
+    Positions::from_interleaved(xyz, true)
+}
+
+/// The triangles of the surface and the cell each takes its colour from (see [`SurfaceBuffers`]), given the
+/// `positions` of the cell centres on the map.
+pub(crate) fn surface_triangles(lattice: &Lattice, positions: &[f32]) -> (Vec<u32>, Vec<u32>) {
+    let [nx, ny, _] = lattice.dims;
     let present = |cell: usize| {
         positions
             .get(cell * 3..cell * 3 + 3)
@@ -91,14 +108,7 @@ pub fn surface_buffers(
             }
         }
     }
-    Ok(Prepared {
-        buffers: SurfaceBuffers {
-            positions,
-            triangles,
-            triangle_cell,
-        },
-        findings,
-    })
+    (triangles, triangle_cell)
 }
 
 #[cfg(test)]
