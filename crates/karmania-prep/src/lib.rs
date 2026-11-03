@@ -22,6 +22,7 @@ pub mod origin;
 pub mod points;
 pub mod polygons;
 pub mod project;
+pub mod surface;
 #[cfg(test)]
 mod testutil;
 pub mod warp;
@@ -38,6 +39,7 @@ pub use origin::{Frame, FrameSource, origin_near};
 pub use points::{PointsBuffers, points_buffers};
 pub use polygons::{PolygonsBuffers, polygons_buffers};
 pub use project::{Prepared, project};
+pub use surface::{SurfaceBuffers, surface_buffers};
 
 #[cfg(test)]
 mod tests {

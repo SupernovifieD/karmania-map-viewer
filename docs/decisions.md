@@ -3130,3 +3130,22 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   that finding is now public in `karmania-crs` (`transform::not_finite`), so that the message is written once:
   findings merge on code and message. A grid whose system cannot be converted to the map's is the error
   `display.crs.not_convertible`, as for the other kinds. `GridLayout` is no longer `Copy`.
+- Step 13.12 (the surface of a grid with elevations from a column). `surface_buffers(lattice, elevations, own,
+  frame)` gives `SurfaceBuffers { positions, triangles, triangle_cell }`: a vertex at the centre of every cell
+  of the first layer, in cell order (`i` fastest), so a vertex's number is its cell's; every square of four
+  neighbouring centres is two triangles, `(i, j) (i + 1, j) (i + 1, j + 1)` and `(i, j) (i + 1, j + 1)
+  (i, j + 1)`, kept only if all three corners exist. A cell has no elevation if its value is null or is not
+  finite (an integer column is read as a number); its vertex has NaN for its height and no triangle uses it
+  ("cells with no value left out"). The centres are converted to the map's system (rotation included, by the
+  lattice's own `cell_centre`) and the heights are given, not converted, as the brief says; a centre the
+  conversion cannot place is NaN in x and y and counted by `crs.transform.not_finite`. The renderer takes a
+  vertex with any coordinate that is not finite to be absent. **The rule for the colour**, which the brief
+  leaves open ("colour is per cell (nearest)", with one cell number for each triangle): a triangle takes the
+  colour of the cell with the lowest number among its three corners, that is the lowest `j` and then the
+  lowest `i`. That is deterministic and simple to state, and it is not symmetric: the cells along the far
+  edges of the grid (the last row and column) are never the lowest corner of a triangle, so their own colour
+  shows only through the triangles they are corners of (which take a neighbour's). A symmetric rule would
+  need more triangles than the contract has; the owner may ask for one. Recorded, as the brief asks, that
+  **the surface is linear between the centres, for display**: it says nothing of the ground between them.
+  Only the first layer of a grid with several is drawn (`display.grid.layers_hidden`, as for the image).
+  A column shorter than the grid leaves the cells it does not reach without an elevation.
