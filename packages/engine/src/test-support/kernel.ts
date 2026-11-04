@@ -61,6 +61,17 @@ export interface TestKernelInstance {
   readonly rows: (datasetId: number, start: number, count: number) => unknown;
   readonly summary: (datasetId: number) => unknown;
   readonly remove: (datasetId: number) => boolean;
+  readonly chooseFrame: (preferred?: unknown) => unknown;
+  readonly startPrepare: (datasetId: number, frame: unknown, maxTextureSize: number) => number;
+  readonly stepPrepare: (jobId: number, budget: number) => unknown;
+  readonly cancelPrepare: (jobId: number) => boolean;
+  readonly classify: (
+    datasetId: number,
+    column: string,
+    method: string,
+    classes: number,
+  ) => unknown;
+  readonly classIndex: (datasetId: number, breaks: unknown) => Uint8Array;
   readonly free: () => void;
 }
 
@@ -77,6 +88,14 @@ export function createKernel(): TestKernelInstance {
     rows: (datasetId, start, count) => kernel.rows(datasetId, start, count) as unknown,
     summary: (datasetId) => kernel.summary(datasetId) as unknown,
     remove: (datasetId) => kernel.remove(datasetId),
+    chooseFrame: (preferred) => kernel.chooseFrame(preferred) as unknown,
+    startPrepare: (datasetId, frame, maxTextureSize) =>
+      kernel.startPrepare(datasetId, frame, maxTextureSize),
+    stepPrepare: (jobId, budget) => kernel.stepPrepare(jobId, budget) as unknown,
+    cancelPrepare: (jobId) => kernel.cancelPrepare(jobId),
+    classify: (datasetId, column, method, classes) =>
+      kernel.classify(datasetId, column, method, classes) as unknown,
+    classIndex: (datasetId, breaks) => kernel.classIndex(datasetId, breaks),
     free: () => {
       kernel.free();
     },
@@ -108,6 +127,14 @@ export function wrapKernel(kernel: KernelApi): { -readonly [K in keyof KernelApi
     load: (input) => kernel.load(input),
     rows: (dataset, start, count) => kernel.rows(dataset, start, count),
     remove: (dataset) => kernel.remove(dataset),
+    chooseFrame: (preferred) => kernel.chooseFrame(preferred),
+    startPrepare: (dataset, frame, maxTextureSize) =>
+      kernel.startPrepare(dataset, frame, maxTextureSize),
+    stepPrepare: (job, budget) => kernel.stepPrepare(job, budget),
+    cancelPrepare: (job) => kernel.cancelPrepare(job),
+    classify: (dataset, column, method, classes) =>
+      kernel.classify(dataset, column, method, classes),
+    classIndex: (dataset, breaks) => kernel.classIndex(dataset, breaks),
     free: () => {
       kernel.free();
     },

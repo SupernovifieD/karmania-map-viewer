@@ -1,15 +1,18 @@
 //! The kernel object: the loaded datasets and the imports in progress.
 
-use karmania_core::DatasetId;
+use js_sys::Uint8Array;
+use karmania_core::{CrsRef, DatasetId};
 use karmania_crs::Definitions;
 use karmania_io::kernel::Kernel as CoreKernel;
 use karmania_io::mapping::ImportMapping;
+use karmania_prep::{ClassBreaks, Frame, Method, Preparer, class_index_of, classify_dataset};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use crate::convert::to_js;
+use crate::convert::{to_js, to_js_with_nulls};
 use crate::input::{DatasetInput, read_dataset};
 use crate::page::page_to_js;
+use crate::prepare::step_to_js;
 
 /// The kernel behind the bindings: it asks the EPSG definitions which codes are longitude and
 /// latitude systems and which are not in them, so that validation checks the coordinates of
@@ -27,6 +30,7 @@ fn core_kernel() -> CoreKernel {
 #[wasm_bindgen]
 pub struct Kernel {
     inner: CoreKernel,
+    prep: Preparer,
 }
 
 #[wasm_bindgen]
@@ -37,6 +41,7 @@ impl Kernel {
     pub fn new() -> Kernel {
         Kernel {
             inner: core_kernel(),
+            prep: Preparer::new(),
         }
     }
 
@@ -125,9 +130,137 @@ impl Kernel {
 
     /// Unloads a dataset. Returns whether there was one with that id.
     pub fn remove(&mut self, dataset: u32) -> bool {
-        self.inner
-            .registry_mut()
-            .remove(DatasetId(u64::from(dataset)))
+        let id = DatasetId(u64::from(dataset));
+        let removed = self.inner.registry_mut().remove(id);
+        self.prep.removed(id, self.inner.registry().len());
+        removed
+    }
+
+    /// Chooses the coordinate system the map is drawn in and says which datasets are drawn in it, as
+    /// `{ frame, drawable, findings }`: `frame` is `{ mapCrs, origin, source }` or `null` when nothing
+    /// is loaded; `drawable` has `{ id, status: "drawn" | "not_drawn", reprojected, findings }` for each
+    /// dataset in the order they were loaded; `findings` are about the choice itself (the UTM zone). The
+    /// frame is kept: it stays while any dataset is loaded, so call this again after loading or
+    /// removing. `preferred` is a `CrsRef` the person chose, or `undefined` / `null`.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `preferred` is not a `CrsRef`.
+    #[wasm_bindgen(js_name = chooseFrame)]
+    pub fn choose_frame(&mut self, preferred: JsValue) -> Result<JsValue, JsError> {
+        let preferred: Option<CrsRef> = if preferred.is_undefined() || preferred.is_null() {
+            None
+        } else {
+            Some(serde_wasm_bindgen::from_value(preferred).map_err(|error| {
+                JsError::new(&format!(
+                    "the preferred coordinate system is not valid: {error}"
+                ))
+            })?)
+        };
+        let datasets = self.inner.registry().datasets();
+        to_js_with_nulls(&self.prep.choose_frame(preferred, &datasets))
+    }
+
+    /// Starts preparing a dataset for drawing and returns the job's id. `frame` is the `{ mapCrs,
+    /// origin, source }` that `chooseFrame` gave; `maxTextureSize` is the largest texture the graphics
+    /// card takes, in cells on a side. Nothing is done until `stepPrepare`.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id or `frame` does not have the shape of a frame.
+    #[wasm_bindgen(js_name = startPrepare)]
+    pub fn start_prepare(
+        &mut self,
+        dataset: u32,
+        frame: JsValue,
+        max_texture_size: u32,
+    ) -> Result<u32, JsError> {
+        let frame: Frame = serde_wasm_bindgen::from_value(frame)
+            .map_err(|error| JsError::new(&format!("the frame is not valid: {error}")))?;
+        let found = self
+            .inner
+            .registry()
+            .dataset(DatasetId(u64::from(dataset)))
+            .ok_or_else(|| JsError::new("there is no dataset with that id"))?;
+        Ok(self.prep.start(found, frame, max_texture_size))
+    }
+
+    /// Does the next part of a prepare: up to `budget` positions, polygon vertices, cells or blocks (at
+    /// least one), or a tile of a warped grid. Returns `{ status: "progress", fraction }`, `{ status:
+    /// "cancelled" }` (the dataset was removed) or `{ status: "done", result }`, where `result` is `{
+    /// status: "drawn", buffers, findings }` with typed arrays in `buffers`, or `{ status: "not_drawn",
+    /// findings }`. After `done` or `cancelled` the job no longer exists.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no job with that id: it never existed, it is over or it was cancelled.
+    #[wasm_bindgen(js_name = stepPrepare)]
+    pub fn step_prepare(&mut self, job: u32, budget: u32) -> Result<JsValue, JsError> {
+        let no_job = || JsError::new("there is no prepare with that id");
+        let dataset = self.prep.dataset_of(job).ok_or_else(no_job)?;
+        let found = self.inner.registry().dataset(dataset);
+        let budget = usize::try_from(budget).unwrap_or(usize::MAX);
+        let step = self.prep.step(job, found, budget).ok_or_else(no_job)?;
+        step_to_js(&step)
+    }
+
+    /// Stops a prepare and drops what it has made. Returns whether there was one.
+    #[wasm_bindgen(js_name = cancelPrepare)]
+    pub fn cancel_prepare(&mut self, job: u32) -> bool {
+        self.prep.cancel(job)
+    }
+
+    /// Divides a column of a dataset into classes. `method` is `"equal"`, `"quantile"`, `"jenks"` or
+    /// `"categories"`. Returns `{ status: "classified", breaks }`, where `breaks` is `{ kind: "ranges",
+    /// column, bounds, counts, nulls, sampled? }` or `{ kind: "categories", column, values, counts,
+    /// other?, nulls }`, or `{ status: "not_classified", findings }` when the column cannot be classified.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id or `method` is not one of the four.
+    pub fn classify(
+        &self,
+        dataset: u32,
+        column: &str,
+        method: &str,
+        classes: u32,
+    ) -> Result<JsValue, JsError> {
+        let found = self
+            .inner
+            .registry()
+            .dataset(DatasetId(u64::from(dataset)))
+            .ok_or_else(|| JsError::new("there is no dataset with that id"))?;
+        let method: Method = serde_wasm_bindgen::from_value(JsValue::from_str(method))
+            .map_err(|_| JsError::new("the method is not equal, quantile, jenks or categories"))?;
+        let classes = usize::try_from(classes).unwrap_or(usize::MAX);
+        match classify_dataset(found, column, method, classes) {
+            Ok(breaks) => to_js(&Classified::Classified { breaks }),
+            Err(finding) => to_js(&Classified::NotClassified {
+                findings: vec![finding],
+            }),
+        }
+    }
+
+    /// The class of every element of a dataset under `breaks` (what `classify` gave), as a `Uint8Array`
+    /// with one byte for each element that is drawn (every element, but for a grid of several layers, of which only the
+    /// first is drawn, the cells of that layer): the class, or 255 for an element with no value.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id, `breaks` is not a set of class breaks, or the dataset
+    /// has no column of the name the breaks give.
+    #[wasm_bindgen(js_name = classIndex)]
+    pub fn class_index(&self, dataset: u32, breaks: JsValue) -> Result<Uint8Array, JsError> {
+        let found = self
+            .inner
+            .registry()
+            .dataset(DatasetId(u64::from(dataset)))
+            .ok_or_else(|| JsError::new("there is no dataset with that id"))?;
+        let breaks: ClassBreaks = serde_wasm_bindgen::from_value(breaks)
+            .map_err(|error| JsError::new(&format!("the class breaks are not valid: {error}")))?;
+        let index =
+            class_index_of(found, &breaks).map_err(|finding| JsError::new(&finding.message))?;
+        Ok(Uint8Array::from(index.as_slice()))
     }
 
     /// Loads a dataset made from arrays. `input` is one object: `{ kind, name, crs,
@@ -150,6 +283,18 @@ impl Kernel {
         };
         to_js(&result)
     }
+}
+
+/// What `classify` answers.
+#[derive(serde::Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum Classified {
+    Classified {
+        breaks: ClassBreaks,
+    },
+    NotClassified {
+        findings: Vec<karmania_core::Finding>,
+    },
 }
 
 impl Default for Kernel {

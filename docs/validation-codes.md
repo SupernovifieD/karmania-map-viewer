@@ -79,6 +79,38 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Block positions start at 0 and must be lower than the number of cells on each axis.
 - Example: Some blocks are outside the model, which has 2 x 3 x 4 cells.
 
+## `classes.column.missing`
+
+- Severity: warning
+- Step: none
+- Message: The dataset has no column named {name}, so nothing can be coloured by it.
+- Hint: Colour by a column the dataset has, or draw the layer in a single colour.
+- Example: The dataset has no column named grade, so nothing can be coloured by it.
+
+## `classes.column.no_values`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} has no value that can be put in a class: every entry is empty or not a finite number.
+- Hint: Colour by another column, or draw the layer in a single colour.
+- Example: The column grade has no value that can be put in a class: every entry is empty or not a finite number.
+
+## `classes.column.not_numeric`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} is {type}, not numbers, so it cannot be divided into ranges.
+- Hint: Colour by categories instead, or by a column of numbers.
+- Example: The column rock is text, not numbers, so it cannot be divided into ranges.
+
+## `classes.column.too_many_values`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} has more than {limit} different values, so they cannot be shown as categories.
+- Hint: Divide the column into ranges instead.
+- Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
+
 ## `crs.code.unknown`
 
 - Severity: warning
@@ -278,6 +310,78 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Message: Per-vertex attributes are only used for lines and meshes, so they are ignored for {things}.
 - Hint: Move those values to the attribute table, or remove them.
 - Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
+
+## `display.blocks.other_crs`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: a block model is drawn only in the map's own coordinate system, and this one is in {system} while the map is in {map system}.
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: Not drawn: a block model is drawn only in the map's own coordinate system, and this one is in EPSG:32640 while the map is in EPSG:32641.
+
+## `display.crs.local_grids_assumed`
+
+- Severity: info
+- Step: none
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {units} to {map units}; heights are drawn as given.
+- Hint: If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given.
+
+## `display.crs.not_convertible`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: {the reason the positions cannot be converted to the map's coordinate system}
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: Not drawn: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+
+## `display.extent.none`
+
+- Severity: warning
+- Step: none
+- Message: Not drawn: none of the positions of this dataset can be placed on the map.
+- Hint: Check the positions and the coordinate system of the data.
+- Example: Not drawn: none of the positions of this dataset can be placed on the map.
+
+## `display.frame.utm_chosen`
+
+- Severity: info
+- Step: none
+- Message: The map is drawn in {name} (EPSG:{code}): the data is in longitude and latitude, and its centre is at {longitude}, {latitude}.
+- Hint: Change the map's coordinate system if another one suits the data better.
+- Example: The map is drawn in WGS 84 / UTM zone 40N (EPSG:32640): the data is in longitude and latitude, and its centre is at 57.30° E, 25.20° N.
+
+## `display.grid.layers_hidden`
+
+- Severity: warning
+- Step: none
+- Message: The grid has {layers} layers, and only the first is drawn.
+- Hint: Split the layers into separate grids to see the others.
+- Example: The grid has 3 layers, and only the first is drawn.
+
+## `display.grid.warp_rough`
+
+- Severity: warning
+- Step: none
+- Message: The grid is warped so much that its picture may be off by more than a tenth of a cell.
+- Hint: Change the map's coordinate system to the one this dataset is in.
+- Example: The grid is warped so much that its picture may be off by more than a tenth of a cell.
+
+## `display.polygons.outline_only`
+
+- Severity: warning
+- Step: none
+- Message: Some polygons could not be filled in, so only their outlines are drawn.
+- Hint: Check that no ring crosses itself or another ring, and that each polygon has some area.
+- Example: Some polygons could not be filled in, so only their outlines are drawn.
+
+## `display.polygons.too_detailed`
+
+- Severity: warning
+- Step: none
+- Message: Some polygons are too detailed to fill in (more than {limit} vertices, or too many holes for their size), so only their outlines are drawn.
+- Hint: Simplify the polygons, or split them into smaller ones, to fill them in.
+- Example: Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn.
 
 ## `file.empty`
 

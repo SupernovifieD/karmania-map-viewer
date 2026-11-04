@@ -2,9 +2,26 @@
  * The engine's public interface: what `createEngine` makes and what its methods take
  * and give. The data types they use are in `types.ts` and `inputs.ts`.
  */
+import type {
+  ClassBreaks,
+  ClassifyResult,
+  ClassMethod,
+  Frame,
+  FrameChoice,
+  PrepareProgress,
+  PrepareResult,
+} from './display.js';
 import type { DatasetInput } from './inputs.js';
 import { PHASES } from './types.js';
-import type { CrsInfo, ImportMapping, LoadResult, Page, Preview, Summary } from './types.js';
+import type {
+  CrsInfo,
+  CrsRef,
+  ImportMapping,
+  LoadResult,
+  Page,
+  Preview,
+  Summary,
+} from './types.js';
 
 /** Where the engine's files are, when they are not where the bundler put them. */
 export interface EngineOptions {
@@ -42,6 +59,22 @@ export interface LoadOptions {
    * that has started cannot be interrupted and finishes.
    */
   readonly signal?: AbortSignal;
+}
+
+/** What `prepare` is told: the frame to draw in, and the graphics card's limit on a texture. */
+export interface PrepareParams {
+  /** The frame from `chooseFrame`. */
+  readonly frame: Frame;
+  /** The largest texture the graphics card takes, in cells on a side. Defaults to 4,096. */
+  readonly maxTextureSize?: number;
+}
+
+/** Optional parts of `prepare`. */
+export interface PrepareOptions {
+  /** Aborting stops the prepare, drops what it has made and rejects with the signal's reason. */
+  readonly signal?: AbortSignal;
+  /** Called, from the main thread, as the prepare advances. */
+  readonly onProgress?: (progress: PrepareProgress) => void;
 }
 
 /** What the engine announces, by event name, with what each listener receives. */
@@ -112,6 +145,46 @@ export interface Engine {
 
   /** Unloads a dataset. */
   remove(id: number): Promise<void>;
+
+  /**
+   * Chooses the coordinate system the map is drawn in, and says which of the loaded datasets are drawn in
+   * it. The frame stays for as long as any dataset is loaded: call this again after loading or removing,
+   * and to change it with `preferred`, the system a person chose. `frame` is `null` when nothing is
+   * loaded. A dataset that is not drawn stays loaded, and its findings say why. The origin is the centre of
+   * the first dataset that is drawn in the map's system and is made once: if the person chose a system in
+   * which nothing was drawn, it is 0, and the first call after a dataset can be drawn makes it, and then it
+   * stays. A caller that has prepared layers against an origin of 0 has to prepare them again when the
+   * origin in the frame it gets back is not the one it prepared them with.
+   */
+  chooseFrame(preferred?: CrsRef): Promise<FrameChoice>;
+
+  /**
+   * Prepares a dataset for drawing in a frame: converts its positions, triangulates, rebases to the
+   * frame's origin and cuts a grid into textures, in steps in the worker so that the page stays
+   * responsive. The buffers of the result are handed over, not copied, and are the caller's to keep.
+   * A dataset that cannot be drawn in the frame resolves with `status: "not_drawn"` and the reasons.
+   */
+  prepare(id: number, params: PrepareParams, options?: PrepareOptions): Promise<PrepareResult>;
+
+  /**
+   * Divides a column of a dataset into classes (`equal` intervals, `quantile`s, natural breaks as
+   * `jenks`, or `categories`), with how many rows are in each. A column that cannot be classified (text
+   * by ranges, a column with no values) resolves with `status: "not_classified"` and the reason. The
+   * number of classes is a whole number from 1 to 254; categories show at most 20 values.
+   */
+  classify(
+    id: number,
+    column: string,
+    method: ClassMethod,
+    classes: number,
+  ): Promise<ClassifyResult>;
+
+  /**
+   * The class of every element of a dataset under class breaks `classify` gave: one byte each, 255 for
+   * an element with no value. For a grid of several layers, of which only the first is drawn, the elements are
+   * the cells of that layer, and so are those `classify` counts. The array is handed over, not copied.
+   */
+  classIndex(id: number, breaks: ClassBreaks): Promise<Uint8Array>;
 
   /** Calls `listener` whenever the event happens. Returns the function that stops that. */
   on<E extends EngineEvent>(event: E, listener: (payload: EngineEvents[E]) => void): () => void;

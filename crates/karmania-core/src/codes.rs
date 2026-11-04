@@ -164,6 +164,14 @@ finding_codes! {
     MappingSourceDuplicate => "mapping.source.duplicate", Error, Some(WizardStep::Mapping);
     /// The mapping names a column that is not in the file.
     MappingSourceUnknown => "mapping.source.unknown", Error, Some(WizardStep::Mapping);
+    /// The dataset has no column of the name given, so nothing can be classified by it.
+    ClassesColumnMissing => "classes.column.missing", Warning, None;
+    /// The column to classify has no number that can be put in a class.
+    ClassesColumnNoValues => "classes.column.no_values", Warning, None;
+    /// The column to classify by ranges is not made of numbers.
+    ClassesColumnNotNumeric => "classes.column.not_numeric", Warning, None;
+    /// The column has too many different values to be shown as categories.
+    ClassesColumnTooManyValues => "classes.column.too_many_values", Warning, None;
     /// The EPSG code is not one of the coordinate systems Karmania knows.
     CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.
@@ -180,6 +188,24 @@ finding_codes! {
     CrsTransformUnsupported => "crs.transform.unsupported", Error, None;
     /// Some positions could not be converted to the other coordinate system.
     CrsTransformNotFinite => "crs.transform.not_finite", Warning, None;
+    /// A block model is not drawn because it is not in the map's coordinate system.
+    DisplayBlocksOtherCrs => "display.blocks.other_crs", Warning, None;
+    /// Two local grids are taken to be the same grid, and one is scaled to the units of the other.
+    DisplayCrsLocalGridsAssumed => "display.crs.local_grids_assumed", Info, None;
+    /// A grid with several layers is drawn from its first layer only.
+    DisplayGridLayersHidden => "display.grid.layers_hidden", Warning, None;
+    /// A grid is warped so much that its picture may be off by more than a tenth of a cell.
+    DisplayGridWarpRough => "display.grid.warp_rough", Warning, None;
+    /// A dataset is not drawn because its positions cannot be converted to the map's coordinate system.
+    DisplayCrsNotConvertible => "display.crs.not_convertible", Warning, None;
+    /// A dataset is not drawn because none of its positions can be placed on the map.
+    DisplayExtentNone => "display.extent.none", Warning, None;
+    /// Some polygons could not be filled in, so only their outlines are drawn.
+    DisplayPolygonsOutlineOnly => "display.polygons.outline_only", Warning, None;
+    /// Some polygons have too many vertices to be filled in, so only their outlines are drawn.
+    DisplayPolygonsTooDetailed => "display.polygons.too_detailed", Warning, None;
+    /// The map's coordinate system was chosen from data in longitude and latitude: a UTM zone.
+    DisplayFrameUtmChosen => "display.frame.utm_chosen", Info, None;
     /// The X, Y and Z coordinate lists have different lengths.
     DatasetCoordinatesLengthMismatch => "dataset.coordinates.length_mismatch", Error, None;
     /// The per-vertex table does not have one row per vertex.

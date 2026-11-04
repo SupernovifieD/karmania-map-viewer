@@ -5,6 +5,15 @@
  * is a few lines that connect it to the worker's scope.
  */
 import {
+  checkedClassBreaks,
+  checkedClassifyResult,
+  checkedClassMethod,
+  checkedFrame,
+  checkedFrameChoice,
+  checkedPrepareStep,
+} from './display-check.js';
+import type { PrepareResult } from './display.js';
+import {
   checkedCrsInfo,
   checkedCrsInfoList,
   checkedImportStatus,
@@ -18,6 +27,7 @@ import type { KernelApi, KernelModule, LoadKernelModule } from './kernel-module.
 import { parseToWorker } from './protocol.js';
 import type { FromWorker, RequestMessage, Requests } from './protocol.js';
 import type { ImportPhase } from './api.js';
+import { transferablesOfResult } from './transfer.js';
 import type { LoadResult, Page, Preview } from './types.js';
 
 /** What the handler needs from its surroundings. */
@@ -36,6 +46,20 @@ export interface WorkerHandler {
 /** How many rows an import parses before it lets other messages through. */
 const IMPORT_BUDGET_ROWS = 50_000;
 
+/**
+ * How much of a prepare is done in one step: positions, polygon vertices or blocks (a tile of a warped
+ * grid is a step of its own). Most steps take under 0.1 s, but some cannot be cut: the triangulation of one
+ * polygon, the triangles of a surface of 4,000,000 cells (0.45 s in WebAssembly on a 1.1 GHz laptop) and a rough
+ * warp tile. The time of a polygon depends on its shape: at 100,000 vertices a ragged coastline took 0.1 to 0.2 s,
+ * a plain circle 4.3 s, an ellipse 6.2 s, a jagged star or a comb several seconds, and holes at the limit of the
+ * kernel's work cap 0.4 to 0.7 s (docs/perf.md, natively): the limits do not bound those. A request to stop,
+ * or any other request, is heard between steps, so it waits for the step that is running.
+ */
+const PREPARE_BUDGET = 100_000;
+
+/** The largest texture, in cells on a side, a grid is cut for when the page does not say: the one WebGL2 guarantees twice over. */
+const DEFAULT_MAX_TEXTURE_SIZE = 4_096;
+
 /** The largest whole number the kernel takes for an EPSG code or a limit (an unsigned 32 bit number). */
 const MAX_UINT32 = 4_294_967_295;
 
@@ -45,6 +69,11 @@ function requireWholeNumber(value: unknown, what: string): number {
     throw new TypeError(`${what} must be a whole number from 0 to ${String(MAX_UINT32)}.`);
   }
   return value;
+}
+
+/** Whether an error is the kernel's answer to a step of a prepare that no longer exists. */
+function isNoSuchPrepare(error: unknown): boolean {
+  return error instanceof Error && /no prepare with that id/.test(error.message);
 }
 
 /** Thrown inside a request to unwind it when the main thread asked for it to stop. */
@@ -210,6 +239,59 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
     }
   }
 
+  /** Posts how far a prepare is, at most once for each whole percent. */
+  function prepareReporter(id: number): (fraction: number) => void {
+    let lastPercent = -1;
+    return (fraction) => {
+      const percent = Math.floor(Math.min(Math.max(fraction, 0), 1) * 100);
+      if (percent !== lastPercent) {
+        lastPercent = percent;
+        post({ type: 'prepareProgress', id, progress: { fraction: percent / 100 } }, []);
+      }
+    };
+  }
+
+  async function runPrepare(
+    id: number,
+    params: Requests['prepare']['params'],
+  ): Promise<PrepareResult> {
+    const { kernel } = await ready();
+    throwIfStopped(id);
+    const dataset = requireWholeNumber(params.dataset, 'The dataset');
+    const maxTextureSize = requireWholeNumber(
+      params.maxTextureSize ?? DEFAULT_MAX_TEXTURE_SIZE,
+      'The largest texture',
+    );
+    if (maxTextureSize < 1) {
+      throw new TypeError('The largest texture must be at least 1 cell on a side.');
+    }
+    // A frame with an origin that is not a number would give positions that are all NaN and no word about it.
+    const job = kernel.startPrepare(dataset, checkedFrame(params.frame, 'frame'), maxTextureSize);
+    const report = prepareReporter(id);
+    try {
+      for (;;) {
+        throwIfStopped(id);
+        const step = checkedPrepareStep(kernel.stepPrepare(job, PREPARE_BUDGET));
+        if (step.status === 'done') {
+          return step.result;
+        }
+        if (step.status === 'cancelled') {
+          throw new Error('The dataset was removed while it was being prepared.');
+        }
+        report(step.fraction);
+        await yieldToEventLoop();
+      }
+    } catch (error) {
+      // Whatever stopped the prepare, what it had made is dropped. If the job is gone already because the dataset was
+      // removed in the meantime, the kernel says "no prepare with that id": say that in words. Any other error is
+      // not a removal and is passed on as it is, even if the job is gone (it had finished).
+      if (!kernel.cancelPrepare(job) && isNoSuchPrepare(error)) {
+        throw new Error('The dataset was removed while it was being prepared.', { cause: error });
+      }
+      throw error;
+    }
+  }
+
   async function execute(message: RequestMessage): Promise<Outgoing> {
     const { id } = message;
     switch (message.type) {
@@ -283,6 +365,51 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         const { kernel } = await ready();
         const removed = kernel.remove(message.params.dataset);
         return { reply: { type: 'result', id, request: 'remove', result: removed }, transfer: [] };
+      }
+      case 'chooseFrame': {
+        const { kernel } = await ready();
+        const { preferred } = message.params;
+        const choice = checkedFrameChoice(kernel.chooseFrame(preferred));
+        return {
+          reply: { type: 'result', id, request: 'chooseFrame', result: choice },
+          transfer: [],
+        };
+      }
+      case 'prepare': {
+        const result = await runPrepare(id, message.params);
+        return {
+          reply: { type: 'result', id, request: 'prepare', result },
+          transfer: transferablesOfResult(result),
+        };
+      }
+      case 'classify': {
+        const { kernel } = await ready();
+        const { dataset, column, method, classes } = message.params;
+        if (typeof column !== 'string') {
+          throw new TypeError('The column must be a string.');
+        }
+        const found = kernel.classify(
+          requireWholeNumber(dataset, 'The dataset'),
+          column,
+          checkedClassMethod(method),
+          requireWholeNumber(classes, 'The number of classes'),
+        );
+        return {
+          reply: { type: 'result', id, request: 'classify', result: checkedClassifyResult(found) },
+          transfer: [],
+        };
+      }
+      case 'classIndex': {
+        const { kernel } = await ready();
+        const { dataset, breaks } = message.params;
+        const index = kernel.classIndex(
+          requireWholeNumber(dataset, 'The dataset'),
+          checkedClassBreaks(breaks),
+        );
+        return {
+          reply: { type: 'result', id, request: 'classIndex', result: index },
+          transfer: index.buffer instanceof ArrayBuffer ? [index.buffer] : [],
+        };
       }
       default:
         return assertNever(message);

@@ -3,6 +3,7 @@
  * replies into promises. It knows nothing about what the requests mean.
  */
 import type { ImportProgress } from './api.js';
+import type { PrepareProgress } from './display.js';
 import { EngineDisposedError, EngineError } from './errors.js';
 import { parseFromWorker } from './protocol.js';
 import type { RequestType, Requests, ResultMessage } from './protocol.js';
@@ -60,6 +61,8 @@ export interface RequestOptions {
   readonly transfer?: readonly Transferable[];
   /** Called with the progress the worker reports for this request, if it reports any. */
   readonly onProgress?: (progress: ImportProgress) => void;
+  /** Called with how far a prepare has got, for a request that is one. */
+  readonly onPrepareProgress?: (progress: PrepareProgress) => void;
 }
 
 /** Sends requests to a worker and returns its answers. */
@@ -99,6 +102,7 @@ interface Pending {
   readonly settle: (reply: ResultMessage) => void;
   readonly fail: (error: Error) => void;
   readonly progress: (progress: ImportProgress) => void;
+  readonly prepareProgress: (progress: PrepareProgress) => void;
   readonly cancelled: () => void;
 }
 
@@ -141,6 +145,9 @@ export function createKernelClient(port: ClientPort): KernelClient {
       case 'progress':
         waiting.progress(reply.progress);
         return;
+      case 'prepareProgress':
+        waiting.prepareProgress(reply.progress);
+        return;
     }
   });
 
@@ -157,7 +164,7 @@ export function createKernelClient(port: ClientPort): KernelClient {
       options: RequestOptions = {},
     ) =>
       new Promise<Requests[T]['result']>((resolve, reject) => {
-        const { signal, transfer = [], onProgress } = options;
+        const { signal, transfer = [], onProgress, onPrepareProgress } = options;
         if (unusable !== undefined) {
           reject(unusable);
           return;
@@ -193,6 +200,9 @@ export function createKernelClient(port: ClientPort): KernelClient {
           },
           progress: (progress) => {
             onProgress?.(progress);
+          },
+          prepareProgress: (progress) => {
+            onPrepareProgress?.(progress);
           },
           cancelled: () => {
             finish();

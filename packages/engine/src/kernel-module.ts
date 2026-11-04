@@ -12,6 +12,23 @@ export interface KernelApi {
   readonly load: (input: unknown) => unknown;
   readonly rows: (datasetId: number, start: number, count: number) => unknown;
   readonly remove: (datasetId: number) => boolean;
+  /** Chooses the map's coordinate system and says which datasets are drawn in it. */
+  readonly chooseFrame: (preferred: unknown) => unknown;
+  /** Starts preparing a dataset for drawing; returns the job's id. */
+  readonly startPrepare: (datasetId: number, frame: unknown, maxTextureSize: number) => number;
+  /** Does the next part of a prepare. */
+  readonly stepPrepare: (jobId: number, budget: number) => unknown;
+  /** Stops a prepare; says whether there was one. */
+  readonly cancelPrepare: (jobId: number) => boolean;
+  /** Divides a column into classes. */
+  readonly classify: (
+    datasetId: number,
+    column: string,
+    method: string,
+    classes: number,
+  ) => unknown;
+  /** The class of every element that is drawn under class breaks, one byte each. */
+  readonly classIndex: (datasetId: number, breaks: unknown) => Uint8Array;
   /** Releases the kernel's memory. */
   readonly free: () => void;
 }

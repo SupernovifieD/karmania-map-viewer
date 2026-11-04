@@ -10,6 +10,7 @@ import type {
   EngineOptions,
   ImportOptions,
   LoadOptions,
+  PrepareOptions,
 } from './api.js';
 import { createKernelClient, workerPort } from './client.js';
 import type { ClientPort } from './client.js';
@@ -161,6 +162,42 @@ export function createEngineOnPort(
       assertUsable();
       await started;
       return pages.window(id, start, count);
+    },
+
+    chooseFrame: async (preferred) => {
+      assertUsable();
+      await started;
+      return client.request('chooseFrame', preferred === undefined ? {} : { preferred });
+    },
+
+    prepare: async (id, params, prepareOptions: PrepareOptions = {}) => {
+      assertUsable();
+      await started;
+      const { signal, onProgress } = prepareOptions;
+      return client.request(
+        'prepare',
+        {
+          dataset: id,
+          frame: params.frame,
+          ...(params.maxTextureSize === undefined ? {} : { maxTextureSize: params.maxTextureSize }),
+        },
+        {
+          ...(signal === undefined ? {} : { signal }),
+          ...(onProgress === undefined ? {} : { onPrepareProgress: onProgress }),
+        },
+      );
+    },
+
+    classify: async (id, column, method, classes) => {
+      assertUsable();
+      await started;
+      return client.request('classify', { dataset: id, column, method, classes });
+    },
+
+    classIndex: async (id, breaks) => {
+      assertUsable();
+      await started;
+      return client.request('classIndex', { dataset: id, breaks });
     },
 
     remove: async (id) => {
