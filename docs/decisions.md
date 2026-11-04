@@ -2909,3 +2909,732 @@ The fifth review (a fresh subagent, on `ddfe3c4`) found one major, two minors an
   `pnpm check`), so it should not fail by itself on the runner; that is to be read in the run of this commit,
   as nothing of it can run elsewhere.
 
+
+## M13: display preparation
+
+- Step 13.1 (the crate). `karmania-prep` depends on `karmania-core` and `karmania-crs`, forbids
+  unsafe code and has the workspace lints, with one test that it builds against both. It adds no
+  third-party dependency (the earcut port comes at step 13.7). It is a member of the workspace
+  and in `[workspace.dependencies]`; `karmania-wasm` will use it from step 13.19. The list of
+  crates in `docs/conventions.md` names it. Per the owner's instruction for this milestone, each
+  step is checked with `pnpm check` (lint included) and the full gate (end-to-end, visual and axe
+  runs, the independent review) is run once, at the end of the milestone, before the pull request is
+  merged.
+- Step 13.2 (the map's coordinate system). `karmania_prep::frame` has `utm_crs(longitude, latitude)` and
+  `map_crs_for(crs, extent)`, the rule of section 9.2 of the brief. A local grid, or a projected EPSG
+  system that is in the definitions, is its own map system; a geographic system in degrees gives the
+  WGS 84 / UTM zone of the centre of its extent (zone `floor((lon + 180) / 6) + 1`, EPSG 326xx at the
+  equator and north, 327xx south), with the info finding `display.frame.utm_chosen` that names the zone
+  and the centre. Decided where the brief is silent, and tested: a longitude of 180 is the meridian of
+  -180, so it is in zone 1 and never in a 61st zone, and a longitude outside -180 to 180 wraps round the
+  globe; a latitude of exactly 0 (or -0) is north; there are no special zones for Norway or Svalbard
+  (the brief says so), and UTM is used as far as proj4rs takes it, outside its usual 80 S to 84 N too.
+  A dataset across the antimeridian has its centre on the other side of the globe (the middle of -179
+  and 179 is 0), so it gets that zone: not handled, and the person can change the map's system. A
+  system that cannot give a map system gives none: a code that is not in the definitions, a geocentric
+  system, a system of another kind, and a geographic one in grads (which the transformer refuses).
+  Such a dataset is not drawn (step 13.4); the brief's "its own CRS if projected" is read as needing
+  the definitions to say so, because an unknown code could be anything.
+- Step 13.3 (the origin, and rebasing). `karmania_prep::origin` has `Frame { map_crs, origin, source }`
+  (JSON `{"mapCrs":{...},"origin":[x,y,z],"source":"auto"|"user"}`, the contract of section 11.3),
+  `origin_near` and `Frame::rebase` / `rebase_all`. The origin is the centre of the extent of the first
+  drawable dataset in the map CRS, x and y rounded to the nearest 1,000 map units and z to the nearest
+  100, halves away from zero (`f64::round`), and a position sent to the GPU is `(position - origin)`
+  worked out in `f64` and then rounded once to `f32`. Where the brief is silent: for a map in longitude
+  and latitude (a person may choose one, section 9.2) the origin of x and y is rounded to a whole degree,
+  not to 1,000 degrees, which would put it at 0 and leave an `f32` at 100 degrees 0.85 m coarse; a
+  centre that is not finite gives 0 on that axis. The precision test of section 9.1 is in the unit tests:
+  from 0 to 99,999 map units from the origin, on both sides, two points 1 cm apart stay apart and each
+  is within 5 mm of where it should be (an `f32` between 65,536 and 131,072 is 7.8 mm coarse, so 1 cm is
+  kept and 2 cm is not at the very edge of the promise); and the same pair at a northing of 4,012,345 m is
+  the same `f32` without the origin (the grid there is 0.25 m), which is why there is one. It is a test
+  of numbers, not yet of a picture (step 16.13 repeats it on screen). `serde` and `serde_json` (dev) are
+  added to `karmania-prep`; both were already in the lock file.
+- Step 13.4a (a correction of step 13.2). Step 13.2 gave no map system to a dataset whose code is not
+  in the definitions, a geocentric system or a geographic one in grads, and said they would not be
+  drawn. That contradicts the message of `crs.code.unknown` (step 12.11): "the data can only be drawn
+  on a map that uses the same code", and the order of the rules of section 9.2, whose first line is
+  "same CRS: drawn". `map_crs_for` now gives the system itself for everything that is not longitude and
+  latitude in degrees (a local grid, a projected system, an unknown code, a geocentric one, grads): the
+  first dataset needs nothing converted. What is converted, or not, for the datasets that come after
+  it is `drawable`'s (step 13.4b). The test that said "none" is now a test that each of 99,999 (not in
+  the definitions), 4978 (geocentric) and 4807 (grads) is its own map system. The map in an unknown code
+  has no units to measure in, so the scale bar of M17 will have to be absent for it, like a geographic
+  map: to be written down there.
+- Step 13.4b (drawability). `karmania_prep::drawable(map_crs, dataset)` gives `{status: drawn | not_drawn,
+  reprojected, findings}` by the rules of section 9.2, in the order the brief lists them and documented in
+  the module: the same system is drawn as it is (for every kind, an unknown code included); a block model
+  in any other system is not drawn; two local grids in other units are drawn, scaled, with an info finding
+  that they are taken to be the same grid; a local grid and an EPSG system are not drawn; two EPSG systems
+  are drawn, reprojected, if `Transformer::new` can build the conversion (a grid in another system is drawn
+  as a warped image, step 13.10), and otherwise are not drawn, with the transformer's own message as the
+  reason. Five finding codes, all in `docs/validation-codes.md`: `display.blocks.other_crs`,
+  `display.crs.local_grids_assumed` (info), `display.crs.not_convertible`, `display.extent.none`, and
+  (from step 13.2) `display.frame.utm_chosen` (info); a dataset with no system gets the existing
+  `crs.missing`. One code, `display.crs.not_convertible`, carries the three causes the transformer knows
+  (an unknown code, a system that cannot be built, a local grid against an EPSG system) in its message,
+  as `crs.transform.unsupported` carries its reason, and every hint says "Change the map's coordinate
+  system to the one this dataset is in", which is the way out in each case. Two local grids in the
+  same units are the same system, so rule 1 draws them with no finding: the brief puts "same CRS" first and
+  `CrsRef` cannot tell two mine grids apart, so the assumption is silent there; recorded, not changed.
+  `reprojected` is true for scaling too. The findings do not name the dataset (the legend and the summary
+  show them beside it). Not decided here and left to step 13.4c: which dataset is the first. A dataset
+  with no finite position is not drawn (`display.extent.none`), which the engine's validation makes
+  unreachable for a loaded dataset. Reprojected lines and polygon edges are straight between their
+  reprojected vertices and long edges are not densified (recorded, as section 9.2 asks; the geodesic
+  is out of scope).
+- Step 13.4c (choosing the frame for the datasets). `karmania_prep::choose_frame(previous, preferred,
+  datasets)` gives `{frame, drawable, findings}`. The rules, where the brief leaves them to the code:
+  no datasets means no frame (so the map's system goes when the last dataset is removed, and only
+  then); a `preferred` system is the person's choice (source `user`), keeps the origin if it is the
+  system the map is in already, and otherwise works the origin out again from the first dataset that is
+  drawn in it (0 if none is); with neither, `previous` is kept for as long as any dataset is loaded,
+  even if the first dataset is the one removed; with no `previous`, the first dataset that has a
+  system and a position gives the map's system (`map_crs_for`). The origin is the centre of that
+  dataset's extent in the map's system: its own extent if it is in it, and otherwise the extent of its
+  3 x 3 sample points (corners, middles of the sides, centre) converted, z unchanged. That is an
+  approximation of the extent of the converted data, and only decides which multiple of 1,000 map
+  units the origin is. The contract of section 11.3 is extended by one field: `findings`, the map's own
+  info findings (the UTM zone chosen), returned once, when the frame is chosen; a kept frame returns
+  none, so the page keeps what it was told. `drawable` has one entry per dataset in the order given,
+  with the dataset's id. A dataset with no system or no position is skipped for the choice and listed
+  with its own reason (`crs.missing`, `display.extent.none`); if none is usable there is no frame.
+  One test of the extent found a wrong expectation of mine (zone 40 is west of the central
+  meridian of zone 41, so its easting falls to about -40,000 there) and one comment of mine that said
+  a figure I had not worked out; the code was right in both and the test now states the bounds it was
+  checked against (an easting near 530,000 and a northing near 2,790,000 for 57.3 E, 25.2 N).
+- Step 13.5 (points buffers). `karmania_prep::project` takes the positions of a dataset to the frame: converted
+  to the map's system in `f64` (nothing is cloned when the system is the same), then `position - origin`
+  as `f32`; every kind but grids and blocks will use it. `points_buffers(positions, own, frame)` gives
+  `PointsBuffers { positions }` (`x y z` interleaved, `3 * n` values, in point order, so a point's number
+  is its row's) with the findings made on the way (`Prepared<T>`). A position that is not finite, or that
+  the new system cannot place, stays in its place as NaN, so the numbers of the elements, the class
+  indices and the selection stay as they are, and the renderer of M16 has to leave a point with a NaN
+  position out; the ones that could not be converted are counted by `crs.transform.not_finite` (a
+  warning, from step 12.8) with the first 20 vertex numbers. Each kind's function takes its geometry and
+  the dataset's system and not the dataset, so that it cannot be given the wrong kind; the kind is
+  chosen by `prepare` (step 13.18), after `drawable` has said the dataset is drawn. The first try had a
+  function of the dataset that said "wrong kind" with the code `display.extent.none`, which is not what
+  that code means, and was replaced before it was committed.
+- Step 13.6 (lines buffers). `lines_buffers(lines, own, frame)` gives `LinesBuffers { positions, segments,
+  segment_line }`: the positions of every vertex of the dataset, in vertex order, as for points; a pair of
+  0-based vertex numbers for every two neighbouring vertices of a line, so a line of `n` vertices has
+  `n - 1` segments and a line of fewer than two has none (`lines.line.too_short` already says so, as a
+  warning); and the 0-based number of the line of each segment (the row of its attributes, which the
+  renderer needs for one colour per line and for selection). A segment with an end that has no position on
+  the map (NaN: a vertex that could not be converted) is left out, which breaks the line there and leaves
+  the other segments as they were; the vertices stay in their places, so no number changes. A line whose
+  offsets are malformed, which validation refuses to load, is skipped and not a panic. Lines are straight
+  between their converted vertices: long edges are not densified (section 9.2, recorded in step 13.4b).
+  The vertex-number arithmetic is checked, since a 32-bit WebAssembly `usize` would wrap.
+- Step 13.7 (the earcut port). The brief names `earcut` and `earcutr` and says to pick one and record why. Chosen:
+  `earcut` (georust), because it tracks the current Mapbox earcut (3.2.3), is generic over `f32` and
+  `f64`, is `no_std`, reuses its buffers across polygons, and is maintained (four releases between
+  2026-04-21 and 2026-11-02); `earcutr` is a port of earcut 2.x, `f64` only, and has not been released since
+  2025-05-29. Both licences are in the policy. Version 0.4.11, not 0.4.12: 0.4.12 was published on
+  2026-11-02, the day before this step, and changes the code that bridges holes (a diff against 0.4.11
+  showed that and a dev-dependency change, nothing else), so the version that has been out for three
+  months is used, and the newer one can be taken in a step of its own. A release build of `karmania-prep`
+  for `wasm32-unknown-unknown` builds. The crate brings `num-traits` and `autocfg` (licences checked
+  in `cargo metadata`). Its code is derived in part from Mapbox's, under ISC, which asks that the
+  notice be kept in all copies: it is in `THIRD_PARTY_NOTICES.md` (not yet in a build, as for the EPSG
+  notice: steps 23.5, 23.6 and 24.5). Dependency only: nothing calls it before step 13.8.
+- Step 13.8 (polygons). `polygons_buffers(polygons, own, frame)` gives `PolygonsBuffers { positions, triangles,
+  triangle_polygon, outline, outline_polygon }`: the positions of every vertex as for the other kinds;
+  three vertex numbers per triangle and the polygon's number for each triangle; and a pair of vertex
+  numbers for every side of every ring (the closing side included, holes too) with the polygon's number.
+  A MultiPolygon is already one polygon per part (step 3.14), so a polygon here is one exterior ring and
+  its holes. Each polygon is triangulated alone with `earcut` on the converted, rebased positions
+  (`f32` taken as `f64`, so the triangles tile exactly what is drawn), with a reused `Earcut`. Earcut
+  does not say when it has failed, so the triangles are checked: the sum of their areas has to be the
+  area of the polygon (exterior minus holes, shoelace) to within 1e-6 of it, and neither may be 0. A
+  polygon that fails (a symmetric bow tie, which has area 0 by the shoelace formula, a ring on one line,
+  a ring that is one point, a vertex with no position on the map, rings that are not one after another
+  in the vertex list, or more than 16,000,000 vertices) has an outline and no triangles, and one
+  `display.polygons.outline_only` warning (a new code, in `docs/validation-codes.md`) counts them, with the
+  first 20 polygon numbers as examples. The tolerance is not claimed to find every wrong fill: a ring
+  that crosses itself and happens to keep its area is filled as earcut fills it, as every earcut user's
+  is. `earcut` is a dependency with `unsafe` inside (it forbids nothing; our crate does) and with
+  documented panics for a hole index past the data and for 4 billion bytes of nodes, which are made
+  impossible here (the hole indices come from the rings, which are one after another and counted, and
+  the size is limited to 16,000,000 vertices per polygon); a test runs 3,000 random rings and holes on a
+  5 x 5 grid, which repeat vertices, run along one line and cross, and checks that nothing panics, every
+  index is in range and what is filled has area, and 482 of them are filled (measured, with a bound of 100 in the test, so that a change that left almost all of them unfilled would fail it). Counter-clockwise
+  triangles: earcut gives them so for either direction of the ring, a test pins it (an orientation fix I
+  first wrote could not be made to fail by any test, so it was removed). Outline segments touching a
+  vertex with no position are left out. The ring-by-ring outline is not a hairline of the polygon's own
+  edge: the renderer draws it 1 px wide (section 9.3).
+- Step 13.9 (mesh buffers). `mesh_buffers(mesh, own, frame)` gives `MeshBuffers { positions, triangles }`:
+  the positions of every vertex as for the other kinds, and the three vertex numbers of every triangle, in
+  triangle order, so triangle `t` is row `t` of the attributes (one colour per triangle, section 9.3). The
+  vertices are not duplicated: flat shading is the renderer's, from the derivatives in the fragment shader.
+  A triangle that cannot be drawn (a vertex number that does not exist, which validation refuses; a corner
+  with no position on the map) is kept in its place as `0, 0, 0`, which has no area, and is not removed,
+  because removing it would change the number of every triangle after it, and with it the class indices
+  and the selection; a trailing partial triangle (also refused by validation) is left out. No new finding:
+  the causes are findings already (`mesh.indices.*` from validation, `crs.transform.not_finite` from the
+  conversion). Edges are straight between the converted vertices, as for lines and polygons.
+- Step 13.10 (grid image placement and tiles). `grid_image(lattice, elevation, own, frame, max_texture_size)`
+  gives `GridBuffers { layout, size: [nx, ny], tiles }` for a flat grid in the map's system or in a local
+  grid (scaled by the ratio of the units, as `drawable` says): the placement is the lattice moved to map
+  units and relative to the frame's origin (`origin` of the outer corner of cell 0, with z the elevation
+  of the grid's plane, `spacing` of a cell along `i` and `j`, and `rotation` in degrees counter-clockwise
+  about +Z at the origin, the lattice's own convention), and the tiles cut the `nx` by `ny` cells into
+  rectangles of at most `max_texture_size` on a side, row by row from `j = 0`, the last of a row and of a
+  column taking what is left, so that together they cover every cell once (a test checks that for several
+  sizes, by counting the cells each tile covers). A grid in another system than the map's, which is not a
+  local grid, gives `None`: it is warped, step 13.11. The values are not in the buffers: the renderer is
+  given one class index per cell (step 13.17), cut up by the tiles. **The contract of section 11.4 gains
+  one input**: the GPU's largest texture is the renderer's to say, so `prepare(id, { frame, maxTextureSize })`
+  takes it, with 4,096 as the default when the page does not say (the guaranteed minimum of WebGL2 is
+  2,048; this is wired at step 13.19). A size of 0 is taken as 1. Where the brief is silent: a grid with
+  more than one layer is drawn from its first layer only, with a new warning, `display.grid.layers_hidden`,
+  because the picture is of one layer and said so; elevations that are not finite are 0.
+- Step 13.11a (the mesh of a warped tile). `warp_tile(lattice, tile, elevation, transformer, frame)` gives the mesh of
+  one texture of a grid in another system: `positions` (where each vertex goes, relative to the frame's origin),
+  `uvs` (from 0 to 1 across the tile's texture, `u` along `i`), `triangles`, and how it was cut. The tile
+  is cut into `n` by `n` equal parts, `n` = 1, 2, 4, ..., until the mesh is within 0.1 cell (the brief's
+  figure) of the exact conversion at the middle of every part. "Middle" is taken as the centre of a part
+  and the middles of its four sides, compared with what the triangles of that part give there (the average of
+  its two corners on a side, of the corners of the diagonal at the centre, which is the diagonal the triangles
+  are cut along). A cell's size on the map is that of the shorter side of a cell at the middle of the tile. Equal
+  parts, not a tree that is cut finer where it is needed, because neighbouring parts of different fineness
+  leave cracks at their edges (a vertex of the finer one is not on the edge of the coarser) and a nearest-
+  sampled picture shows cracks as holes; with equal parts the neighbours share their vertices, which are
+  computed by the same expression, so they are the same bits. The cost: a tile is as fine as its worst
+  place needs it. `n` is at most the cells of the short side of the tile and 256; if the mesh is still not
+  within a tenth of a cell it is `rough`, and the step after this says so with a finding. A vertex the
+  conversion cannot place is NaN and the triangles that use it are left out (`unplaced` counts them). Measured
+  and tested, with the conversion itself as the judge and not the code under test: a grid of 600 by 400
+  cells of 0.01 degrees (6 by 4 degrees, about 1 km a cell) from longitude and latitude to zone 40 needs 8 by 8
+  parts and its worst middle is 98 m off, a tenth of a cell being 100 m (with one part it is far off, which
+  the test also checks, so that it cannot pass for want of a need); across a zone change, a grid of 10 m cells
+  20 km across at the edge of zone 40 on the map of zone 41 has its corners where the conversion puts them
+  (within 1 cm) and is turned by 2.3 to 2.7 degrees, which is the two grids' convergences (about 1.26
+  degrees each, longitude difference times the sine of the latitude), and needs 2 by 2 parts (measured: the
+  mapping is not a rotation and a scale to within 1 m over 20 km, which is a tenth of a 10 m cell; a first
+  version of this record said one part, which was a guess, and the test now requires more than one); a grid north of the pole is left out where it cannot be placed;
+  and a whole world of 0.0036-degree cells in one tile is `rough`. The tile is not yet taken from a
+  grid, nor given a layout: step 13.11b.
+- Step 13.11b (the warp of a whole grid). `grid_buffers(lattice, elevation, own, frame, max_texture_size)` is the
+  entry for a flat grid: the image of step 13.10 if the grid is in the map's system or a local grid, otherwise
+  one mesh for each tile (`warp_tile`), laid one after another in `GridLayout::Warp(GridWarp { positions,
+  uvs, triangles, tile_triangles })`; `tile_triangles[t]` is how many triangles tile `t` has, so the
+  renderer takes the next that many, with the texture of tile `t`, and the vertex numbers run on from tile
+  to tile. This extends the contract of section 11.4 (`warp: { positions, uvs, triangles }`) by the one list that
+  says which triangles belong to which texture, which tiling needs. Two findings: `display.grid.warp_rough`
+  (new, a warning, in `docs/validation-codes.md`) when any tile's mesh is not within a tenth of a cell of the
+  conversion at the finest cut, and the existing `crs.transform.not_finite` for vertices the conversion
+  cannot place, counted as vertices with no examples (the finding's own words, "some positions are outside
+  the area where the new coordinate system can place them", are true of mesh vertices too). The constructor of
+  that finding is now public in `karmania-crs` (`transform::not_finite`), so that the message is written once:
+  findings merge on code and message. A grid whose system cannot be converted to the map's is the error
+  `display.crs.not_convertible`, as for the other kinds. `GridLayout` is no longer `Copy`.
+- Step 13.12 (the surface of a grid with elevations from a column). `surface_buffers(lattice, elevations, own,
+  frame)` gives `SurfaceBuffers { positions, triangles, triangle_cell }`: a vertex at the centre of every cell
+  of the first layer, in cell order (`i` fastest), so a vertex's number is its cell's; every square of four
+  neighbouring centres is two triangles, `(i, j) (i + 1, j) (i + 1, j + 1)` and `(i, j) (i + 1, j + 1)
+  (i, j + 1)`, kept only if all three corners exist. A cell has no elevation if its value is null or is not
+  finite (an integer column is read as a number); its vertex has NaN for its height and no triangle uses it
+  ("cells with no value left out"). The centres are converted to the map's system (rotation included, by the
+  lattice's own `cell_centre`) and the heights are given, not converted, as the brief says; a centre the
+  conversion cannot place is NaN in x and y and counted by `crs.transform.not_finite`. The renderer takes a
+  vertex with any coordinate that is not finite to be absent. **The rule for the colour**, which the brief
+  leaves open ("colour is per cell (nearest)", with one cell number for each triangle): a triangle takes the
+  colour of the cell with the lowest number among its three corners, that is the lowest `j` and then the
+  lowest `i`. That is deterministic and simple to state, and it is not symmetric: the cells along the far
+  edges of the grid (the last row and column) are never the lowest corner of a triangle, so their own colour
+  shows only through the triangles they are corners of (which take a neighbour's). A symmetric rule would
+  need more triangles than the contract has; the owner may ask for one. Recorded, as the brief asks, that
+  **the surface is linear between the centres, for display**: it says nothing of the ground between them.
+  Only the first layer of a grid with several is drawn (`display.grid.layers_hidden`, as for the image).
+  A column shorter than the grid leaves the cells it does not reach without an elevation.
+- Step 13.13 (block buffers). `blocks_buffers(blocks, own, frame)` gives `BlocksBuffers { centres, spacing, rotation
+  }`: the centre of every block in block order (dense: lattice order; sparse: the order given, so a block's
+  number is its row's), `x y z` relative to the frame's origin with the lattice's rotation already
+  applied to the centre; the block size `[dx, dy, dz]` along the block's own axes; and the rotation in
+  degrees counter-clockwise about +Z, that each box is turned by about its own centre. Blocks are drawn only in
+  the map's own system (section 9.2: "blocks are not warped in phase 2"), so a different system, two local
+  grids in other units included, is the error `display.blocks.other_crs`, the same finding as `drawable`'s
+  (it is one function). A block that is not in the lattice (validation refuses it) has a centre of NaN
+  and keeps its number; a trailing partial triplet is not a block. The centres are worked out one at a time
+  with the lattice's own `cell_centre`, which finds the sine and cosine of the rotation each time; if that
+  costs too much it shows in step 13.21's timing of a million blocks. Which faces to draw for a dense model is
+  the renderer's (section 9.6 leaves it to a measure).
+- Step 13.14 (column statistics). `column_stats(column)` gives `ColumnStats { count, nulls, non_finite, range,
+  distinct }` in one pass. `count` is the rows; `nulls` the real nulls (a categorical code that is not in
+  its dictionary has no label to count and is taken as a null; validation refuses such data); `non_finite`
+  the NaN and infinite values of a float column, which are data and not null, and are in neither the range
+  nor the distinct values; `range` the smallest and largest finite number of a float or integer column;
+  `distinct` every distinct value with its count, **in ascending order by value** (numbers by
+  `f64::total_cmp` with -0 taken as 0, text by its bytes, false before true), kept in ordered maps so
+  that the result does not depend on the order of the rows or on a hash (a test gives the same column in two
+  orders). Integers are counted as the number they are, as `f64`, which is exact up to 2^53 and the JSON the
+  engine hands out has no other number. A column with more than 10,000 distinct values (`DISTINCT_LIMIT`) is
+  `Distinct::TooMany` and lists none: the counting stops there, and everything else is still exact; the
+  categories method of step 13.16 says "too many values" for such a column. A value already counted does
+  not count against the limit. The limit is the code's, not the brief's, which says "up to a limit" and
+  does not give one.
+- Step 13.15 (class breaks: equal intervals and quantiles). `classify(column, method, classes)` gives
+  `ClassBreaks::Ranges { bounds, counts, nulls }` (the contract's `kind: "ranges"`) or a finding. **Bounds**:
+  `classes + 1` ascending numbers; class `c` runs from `bounds[c]` up to but not including `bounds[c + 1]`, and the
+  last class includes its upper bound. Equal intervals are `min + k * step` with the last bound the largest
+  value itself (the step is `max / n - min / n`, which does not overflow for a range wider than a float).
+  Quantiles are exact, from the sorted values, and every bound is a value of the column, not an
+  interpolation between two (section 1: Karmania never invents values): bound `k` is the value
+  `floor(k * n / classes)` places from the start, which puts a value that is a bound in the class above it
+  and gives 2, 3, 2, 3 rows in four classes of ten. **Fewer classes than asked**: bounds that come out
+  equal (many rows with one value, or steps too small for a float) are one bound, so a class never has no
+  range, and a column of one value has one class with the bounds `[v, v]`, as the brief says; the legend and the
+  style editor must read the number of classes from the result, not from what was asked. **One function
+  decides a class**: `class_of(bounds, value)` is the last class that starts at or below the value (below the
+  first bound is the first class, above the last is the last, so a number is always in one), the counts
+  here use it, and step 13.17's class index will too, so that the legend's counts are those of the picture
+  (section 9.3). `nulls` counts the rows that have no value to put in a class: nulls and values that are not
+  finite numbers (they all get 255 in the class index). The number of classes is taken from 1 to 254 (the
+  index is a byte, 255 meaning no value; the style editor offers 3 to 12). Two new warnings in the `classes`
+  area, in `docs/validation-codes.md`: `classes.column.not_numeric` (text, truth values and categories are
+  not divided into ranges) and `classes.column.no_values`. Not here: natural breaks and categories
+  (step 13.16).
+- Step 13.16a (natural breaks). `Method::Jenks` divides the values into the classes that make the values in each as
+  alike as can be: the split of the sorted values into `k` runs with the least sum of squared distances from
+  each run's mean (Fisher's exact method, the one-dimensional `k`-means). The brief (11.4) says to find them from
+  "a deterministic, evenly strided sample of at most 10,000 values": the sample is the values at the rows
+  `floor(i * n / 10,000)`, in row order, no random number. The first and last bound are the smallest and
+  largest value of **every** row, the breaks between are found from the sample (each a value that was given:
+  the value a class starts at), and the counts are of every row, by `class_of`. The result says how big the
+  sample was (`sampled`, `None` if every value was used), for the legend's tooltip, which is the brief's
+  ask; this adds one field to the `ClassBreaks` of 11.4. **Speed**: the textbook dynamic programme is
+  `k * n * n / 2` (10,000 values and 12 classes is about 600 million steps; not timed here); the cost
+  of a run satisfies the quadrangle inequality, so the best start of the last class only moves one way as
+  the end moves, and a divide and conquer finds all of them in about `k * n * log n` steps (1.7 million for the same). The time of
+  the real thing is for step 13.21. It is
+  checked against trying every split, for 300 random sets of 4 to 12 values and 2 to 4 classes (the cost of the
+  split found is the least there is, and the breaks are different values that were given). Ties go to the
+  earliest start, and only `+ - * /` are used, which every platform computes the same, so the breaks are the
+  same everywhere. The sums are taken from the first value so that coordinates in the millions keep
+  their digits (a test). **A limit of an even stride**, which the brief asks for and which is recorded: a
+  column that repeats with a period that divides the stride (rows in groups turn and turn about, with a
+  stride of 3) gives a sample of one group, and the breaks are then those of that group; my first test did
+  exactly that and found it. Data in blocks, or in no pattern, is sampled fairly. **A change to the rule
+  of step 13.15**: when the largest value is a class of its own (a value that stands alone at the top, or that
+  many rows share) the last two bounds stay equal, `[max, max]`, and `class_of` puts exactly those values in
+  it. Dropping the second bound, as every equal bound had been, would have merged that class with the one
+  below: Jenks of ten values from 1 to 10 and a 1000 into two classes would have come out as one. A class at the
+  bottom cannot be kept the same way (`[min, min)` holds nothing), so it is still dropped. Tests: the outlier,
+  shared top values, and the bottom.
+- Step 13.16b (categories). `Method::Categories` gives `ClassBreaks::Categories { values, counts, other, nulls
+  }` (the contract's `kind: "categories"`): the most common values of the column, one class each, up to the
+  number of classes asked for and never more than 20 (`MAX_CATEGORIES`), most common first, **ties in
+  ascending order of value** (the counts come from `column_stats`, which lists values in ascending order,
+  and a stable sort by count keeps that order), and the rows with any other value together as `other`
+  ("Other", `None` when there is no such row). `nulls` counts the rows with no value, nulls and non-finite
+  numbers. Any kind of column can be shown as categories: text, truth values, labels of a categorical
+  column, and integers or floats as the number they are (an integer column of codes is a usual case).
+  The number of classes asked for is the number of values shown: with 5 classes the five most common
+  values and "Other" (the brief does not say whether "Other" counts as one of the classes; this keeps the
+  style editor's "Classes" the number of colours of values and the palette one longer if there is an
+  "Other"). A column with more than 10,000 distinct values (`DISTINCT_LIMIT`, step 13.14) cannot be
+  counted and gives the new warning `classes.column.too_many_values`, which says to divide it into
+  ranges instead; a column with no value gives `classes.column.no_values`. Tests: counts with ties and "Other"
+  worked out by hand (granite 4, basalt 2, shale 2, chert 1, coal 1), numbers with a null, non-finite
+  numbers, truth values, labels, the limit of 20, 0 classes taken as 1, too many values, no values.
+- Step 13.17 (the class index). `class_index(column, breaks)` gives one byte for each row of the column, in row
+  order, and `class_index_of(dataset, breaks)` the same for a dataset by the column the breaks name: **one
+  byte for each element, whatever the shape**, because an attribute table has one row for each point, line,
+  polygon, triangle, cell (in lattice order, `i` fastest) or block; a test makes one dataset of each of the six
+  shapes and checks the length against `element_count`. A range is the class `class_of` says, the function the counts
+  of `classify` use; a category is its place in the list, "Other" is the place after the list (for any
+  other value, if there is an Other class), and **255 (`NO_VALUE`) is a row with no value to put in a class**
+  (a null, a number that is not finite, a categorical code outside its dictionary), a column that is not of the
+  kind the breaks are for, and a value in no class (breaks of another column, no Other). The ranges and the
+  categories of section 9.3 say "the legend's counts come from the same computation, so they match what is
+  drawn": a test classifies a column with repeats, nulls and non-finite numbers by every method and 1, 3, 5 and 12
+  classes, tallies the class index, and requires the tally to equal the counts, the Other count and the nulls
+  of `classify` (it fails if either side is changed: "Other" given no class, and the value of a range shifted by
+  0.4, each tried). **The contract of section 11.4 is extended**: `ClassBreaks` carries `column`, the name of the
+  column it is of, because `engine.classIndex(id, breaks)` takes no column and could not otherwise know
+  which to use; `classify` fills it in. The shared `category_at` (in `stats`) gives the category of a row
+  for the counts and for the index, so that the two cannot read a value differently. A column that the
+  dataset does not have is the new warning `classes.column.missing` (`docs/validation-codes.md`). The
+  grid's index is one byte for each cell in lattice order; cutting it into the tiles of step 13.10 is the
+  renderer's, which has `tiles` and the size.
+- Step 13.18a (positions in parts). A job that can be stopped between steps needs the one long loop of preparing, the
+  conversion and rebasing of every position, in parts. `Projector` does `project` a budget of positions at a time
+  (`advance(positions, frame, budget, findings)`, at least one, says whether all are done; `finish` gives the buffer),
+  and `project` is now `Projector` run to the end. `Transformer::convert_chunk_in_place(xyz, first_vertex,
+  findings)` is `convert_in_place` for a part of a longer list: the failed positions are numbered in the list, not
+  in the part. Tested with the whole thing as the judge: 40 and 50 positions with some off the Earth, converted
+  in parts of 1, 3, 4, 7, 13, 40 and more, give the same bits and findings (counts and examples: the findings of
+  the parts merge into the one the whole gives, because the parts are in order and findings merge on code and
+  message). A budget of 0 moves one position, as the import jobs' do.
+- Step 13.18b (the one-shot functions from parts). The job of step 13.18c needs each kind's work in pieces it can
+  step through. Nothing changes for a caller of the one-shot functions: each is now the pieces run to the end,
+  and its tests, unchanged, are what shows it (the 106 that existed pass; two are new). The pieces: `lines_segments(lines,
+  positions)` and `mesh_triangles(mesh, positions)` (work done once the positions are), `PolygonsFill`
+  (polygons a few vertices at a time, at least one polygon a step, the finding for the polygons not filled in
+  added at the end), `BlocksBuilder` (blocks a few at a time), `surface_positions` and `surface_triangles` (the
+  centres, then the triangles, with `Projector` between), and `WarpBuilder` (the meshes put together a tile at a
+  time). Two of them can be stepped by a budget, so each has a test with the whole as the judge: polygons
+  (a square, a square with a hole, a line and a bow tie that are not filled, a triangle) in budgets of 0, 1, 4, 5,
+  13 and 1,000 vertices, and blocks (60 blocks turned 30 degrees) in budgets of 0 to 1,000, give the same bits and
+  findings. The others are one step each (lines, mesh, surface triangles) or a tile each (the warp).
+- Step 13.18c (the prepare job). `PrepareJob::new(dataset, frame, max_texture_size)`, `step(dataset, budget)` and
+  `cancel()`: the job does one stage, or a part of one, in each step and says `Progress { fraction }`, `Done(result)` or
+  `Cancelled`; dropping it stops it too. **It does not keep the dataset**: each step is given the same one (the
+  engine's registry holds the datasets, and cloning a million points or four million cells to make a job would
+  cost more than it saves), and a step given a dataset of another kind is `Cancelled`. A dataset that is
+  changed in between and keeps its kind is not noticed; the engine removes the job when it removes a dataset.
+  **What a step does**: positions (points, lines, mesh, polygons) are converted `budget` at a time (`Projector`);
+  lines and mesh then finish in the same step (one pass); polygons go on to triangles and outlines, `budget` vertices
+  at a time; a flat grid in the map's system is placed at once, a warped one is a tile a step; a surface converts its
+  centres `budget` at a time and then makes its triangles; blocks are `budget` at a time. The first step
+  also decides whether the dataset is drawn (`drawable`), so a dataset that is not drawn is `Done(NotDrawn)` at
+  once with the reasons, and the findings of `drawable` that go with a dataset that is drawn (two local grids in
+  other units) come with its buffers. A budget of 0 moves by one. **Progress** goes from 0 to 1 and never down
+  (checked at every step of every kind): converting positions is the first 80 % of a polygon set, which has
+  more to do, and the whole of a points set. `PrepareResult::Drawn { buffers, findings }` carries
+  findings besides the buffers, which the contract's `{status: "drawn", buffers}` did not: a dataset that is
+  drawn can still have positions that could not be converted, polygons only outlined, and the like.
+  **Cancellation** is `cancel()`: it gives back what the job holds (`held()` is 0) and every later step is
+  `Cancelled`, as it is after `Done`. Tests, with the one-shot functions as the judge: one dataset of each of the seven
+  kinds (points, lines, polygons, mesh, a warped grid, a surface, blocks) in longitude and latitude, with positions that cannot be
+  converted, a bow tie, a missing elevation, in budgets of 0, 1, 3, 17 and a million give the same result, compared
+  by their printed form (two buffers with a NaN in the same place are not `==`: a NaN is not equal to itself); the
+  step counts (40 points 5 at a time take at least 8, a million at once takes 1, a warped grid of 6 tiles takes 6);
+  every reason a dataset is not drawn; cancellation and a dataset of another kind. Two mutations were tried and
+  caught: the budget ignored, and the findings of `drawable` dropped.
+- Step 13.19a (what the worker keeps). The frame has to be remembered between requests (it stays while any dataset is
+  loaded, section 9.1) and a prepare is a job that is stepped, so something has to hold them. It is `Preparer`
+  in `karmania-prep`, not the wasm crate, which the brief says has no logic of its own and which cannot be
+  tested without JavaScript: `choose_frame(preferred, datasets)` keeps the frame it returns, `start`, `step`,
+  `cancel` and `forget_dataset` run the jobs under identifiers that are never reused, like the imports'. A job
+  that is done or cancelled is forgotten by the step that says so (a later step is `None`, which the bindings
+  turn into a thrown error, as for an import that is over), and a step with no dataset (it was removed in the
+  meantime) cancels the job. `Registry::datasets()` (in `karmania-io`) gives the datasets in load order, which
+  the frame's "first dataset" needs. The JSON of the contract: `ClassBreaks` is `{kind: "ranges" |
+  "categories", column, ...}` with `sampled` and `other` left out when there are none, a `Category` is the number,
+  the string or the boolean itself (untagged), `Method` is `equal`, `quantile`, `jenks` or `categories`, `Tile`
+  is `{i0, j0, nx, ny}`; tested by writing and reading them back. The typed arrays are not serde's: they are made
+  by the bindings (step 13.19b).
+- Step 13.19b (the exports of the kernel). The wasm `Kernel` gains `chooseFrame(preferred?)`, `startPrepare(dataset, frame,
+  maxTextureSize)`, `stepPrepare(job, budget)`, `cancelPrepare(job)`, `classify(dataset, column, method,
+  classes)` and `classIndex(dataset, breaks)`; `remove` also stops the jobs on the dataset. **They only translate**: the
+  frame and the jobs are `Preparer`'s (step 13.19a) and the classes are `classify_dataset`'s, so the bindings
+  hold no state of their own beyond the `Preparer`. **Typed arrays**: every array of a buffer is made with
+  `Float32Array::from` or `Uint32Array::from`, a copy in the JavaScript heap with an `ArrayBuffer` of its own, not a
+  view of the module's memory, so the worker can post it as a transferable and the page gets it without a second
+  copy. A test transfers a result's positions with `structuredClone(..., { transfer })` and checks that the
+  sender's buffer is detached afterwards, and that `buffer.byteLength` is the array's own (not the module's
+  memory). The results: `chooseFrame` gives `{ frame, drawable, findings }` with `frame: null` (the
+  contract's `| null`; the serializer is told to write a missing field as `null`, which the other results, whose
+  absent fields are `undefined` by design, do not need); `stepPrepare` gives `{ status: "progress", fraction }`, `{
+  status: "done", result }` or `{ status: "cancelled" }`, with `result` `{ status: "drawn", buffers, findings }` (a
+  grid's `placement` or `warp`, never both; `size`; `tiles`) or `{ status: "not_drawn", findings }`; `classify`
+  gives `{ status: "classified", breaks }` or `{ status: "not_classified", findings }` (**the contract of 11.4 said
+  `Promise<ClassBreaks>`; a column that cannot be classified is a data problem, so a finding and not a throw**);
+  `classIndex` gives a `Uint8Array`, and throws for breaks that are not breaks or of a column the dataset
+  does not have (misuse: breaks come from `classify` of the same dataset). A step of a job that is over, cancelled or
+  whose dataset was removed throws "there is no prepare with that id", as a step of an import that is over does. **Tested in
+  Node against the built module** (`kernel-prep.test.ts`, 18 tests): the frame in each of its states, the typed
+  arrays of every kind of buffer (a dataset of each of the six shapes, a warped grid with six tiles), the budget
+  and the progress, positions that cannot be converted, a dataset that is not drawn, cancellation and removal, the
+  classes by every method, and the legend's counts against the tally of the class index. 17 passed at the first run;
+  the one failure was a count I had worked out wrongly by hand (the result, 5 and 6, was right: 0 to 8 are below 11).
+  **Size of the module** after this step: 5,628,971 bytes, 714,570 gzipped (`gzip -9`), 461,828 more than at the start of
+  the phase (252,742), against the rule's 1 MB; the row for `docs/perf.md` is the gate's.
+- Step 13.20a (the types and their checks). `display.ts` is the public type of display preparation: `Frame`,
+  `FrameChoice` and `DrawableEntry`, `RenderBuffers` (a union by `kind`, every typed array named and typed, a
+  grid with exactly one of `placement` and `warp`), `PrepareResult`, `ClassBreaks`, `ClassifyResult`, the
+  constants `FRAME_SOURCES`, `DRAW_STATUSES`, `CLASS_METHODS` and `NO_CLASS` (255), and are exported from the package.
+  `display-check.ts` is what the engine does to anything that crosses from the kernel, as `contract-check.ts` does for the
+  rest: it rejects a key that is not in the type, a typed array of the wrong kind (`Float32Array` for positions,
+  `Uint32Array` for indices, a plain array is refused), and lists that do not match each other (a line number for each
+  segment, a cell for each triangle, a warp whose tiles' triangles add up to its triangles, bounds that go down,
+  a count for each class); a dataset that is not drawn, or a column that is not classified, has to say why. Tested in
+  both directions, because a check that accepts everything passes the first and one that rejects some wrong
+  shapes passes the second: what the built kernel gives for a dataset of each of the seven kinds passes, and
+  26 values that are wrong in one way each are refused with the message that says how. The first version of the test
+  took one step per dataset and a polygon set needs two; the test was changed, not the check.
+- Step 13.20b (the protocol and the worker's handler). Four requests are added, `chooseFrame`, `prepare`, `classify`
+  and `classIndex`, each typed once in `Requests` (so its reply is typed too), and a message of its own for the progress of
+  a prepare, `prepareProgress { id, progress: { fraction } }`: the import's progress carries a phase, a prepare has
+  none, and a union by `type` is clearer than a progress that is sometimes one and sometimes the other. The handler
+  **steps a prepare**: `startPrepare`, then `stepPrepare` with a budget of 100,000 positions, polygon vertices or blocks
+  (a tile of a warped grid is a step of its own), checking each answer, posting the fraction at most once for each whole
+  percent, and **yielding to the event loop between steps** (`setTimeout(0)`, as the import does) so that other
+  requests and a request to stop are heard within a step: a step takes well under a tenth of a second. Stopped,
+  it cancels the job in the kernel and answers `cancelled`. **If the dataset is removed in the meantime** the kernel stops the job,
+  the next step finds none, and the handler says "The dataset was removed while it was being prepared", not the
+  kernel's "no prepare with that id". The buffers of a drawn result go in the transfer list
+  (`transferablesOfResult`, every `ArrayBuffer` under the typed arrays, each once), as does the class index; a result
+  that is not drawn has nothing to hand over. The largest texture defaults to 4,096 when the page does not say, and must
+  be a whole number of 1 or more; a dataset or a number of classes that is not a whole number, a column that is not
+  a string and a method that is not one of the four are misuse, which the handler refuses before the kernel is asked.
+  Tests (`handler-display.test.ts`, the real kernel in Node): the frame; 350,000 points prepared in steps with their progress
+  (at least two reports, never going down) and their buffers in the transfer list; **that other requests are heard between
+  steps, shown by the order in which the kernel is called** (my first version looked at the order of the replies, which
+  passed even with the yield removed, since a shorter request is answered first by promises alone; it was
+  rewritten and now fails without the yield); a stop that drops the job and hands nothing over; a dataset removed
+  while it is prepared; a dataset that is not drawn; the classes and their index; every misuse. The exhaustiveness checks
+  of `protocol.test.ts` (a request type cannot be added without being covered there) were extended, and the test harness
+  does not take a `prepareProgress` for the end of a request.
+- Step 13.20c (the client and the engine's methods). `Engine` has `chooseFrame(preferred?)`, `prepare(id, { frame,
+  maxTextureSize? }, { signal?, onProgress? })`, `classify(id, column, method, classes)` and `classIndex(id,
+  breaks)`, as the brief's signatures, plus the two things the brief did not have and its contracts needed (decisions
+  of steps 13.10, 13.17 and 13.19b): `maxTextureSize`, and `classify` resolving with `{ status: "classified" |
+  "not_classified" }`. Each waits for the worker to be ready, then asks it; the page can have as many engines as it
+  likes and each has its own frame. The client gets one more kind of reply, `prepareProgress`, passed to
+  `onProgress` of the call (`onPrepareProgress` of the request: the import's `onProgress` is typed for its own
+  phases). `AbortSignal` is as for an import: aborting asks the worker to stop, and the promise rejects with the
+  signal's reason (an `AbortError`); a signal already aborted rejects without sending. After `dispose` all four
+  reject with `EngineDisposedError`. Misuse is refused in the worker (step 13.20b) and comes back as an
+  `EngineError` with its message. **Tests over a real message channel** (`engine-display.test.ts`, 8): the frame in
+  each state; a prepare of 350,000 points with progress; **that the buffers are handed over: the arrays the worker
+  made, kept by a spy on the kernel, are empty on the worker's side once the result has arrived** (the arrays
+  and their `ArrayBuffer`s have a length of 0) **and whole on the page's**, the same for the class index; a stop by the signal that
+  drops the job in the kernel; a dataset that is not drawn; misuse; the methods after `dispose`. Mutation tried: with
+  the transfer list emptied (the buffers copied) the test of the sending side fails. The type tests of `api.test.ts`
+  list the methods of the engine, so a method cannot be added or dropped without it saying so.
+- Step 13.20d (the real worker, in a browser). The engine's browser suite has the pattern the phase-1 steps set: a
+  scenario that takes an engine and returns plain data, run in the page through the real worker and again in
+  Node through the in-process channel, and the two reports have to be equal in every detail ("the same data gives
+  the same result everywhere"). `runDisplay` loads 3,000 points in longitude and latitude (one off the Earth, one
+  column with nulls), three squares, and a 90 by 40 grid, and reports: the frame (the UTM zone of the data, source
+  `auto`, and the one finding that says so); the points as a `Float32Array` with its length, its first position
+  and how many could not be placed (one, counted by `crs.transform.not_finite`); the polygons' triangles and outline;
+  the grid warped in 32-cell textures (six tiles, a mesh for each, no placement); the classes by all four methods
+  with the class index's tally compared to the counts; a prepare of 300,000 points that is stopped by an
+  `AbortSignal` at its first report of progress (rejects with `AbortError`) and the one after it that works with
+  progress that only goes up. The browser test checks those values and then the equality with Node; both pass, so the
+  conversion of positions and the classes are bit-for-bit the same in Chromium and in Node. Two mistakes of mine in
+  the scenario were found by running it in the browser: the count of positions that could not be placed
+  (NaN is in x and y, not z, so counting NaNs and dividing by 3 gave 0.67), and the third of the three "squares",
+  which I had written as a bow tie by swapping two y values, and which the polygon check rightly reported as
+  outline-only (`display.polygons.outline_only`). The engine's whole browser suite (14 tests) passes. Timing is not
+  asserted: a prepare that stops in some number of milliseconds would be a test of the machine.
+- Step 13.21 (the fixtures and the timings). `scripts/generate-fixtures` also writes `blocks-1m.csv`, a dense model of
+  100 x 100 x 100 blocks of 10 m in the columns of `fixtures/blocks.csv` (30.4 MB, from a fixed seed, in the ignored
+  directory). `crates/karmania-prep/tests/timing.rs` has ignored timing tests, as the readers' do, for 1,000,000 points
+  (in the map's system and converted from longitude and latitude), 4,000,000 cells (as an image, warped from
+  degrees, as a surface), 1,000,000 blocks, and new classes for 4,000,000 cells by every method, each prepared as the
+  worker does, a job stepped 100,000 at a time. The results are in `docs/perf.md`: preparing is a small part of every target
+  (15 to 300 ms against 1.5 s and 3 s, natively), **and one target is missed**: new classes for 4,000,000 cells take
+  0.13 to 0.19 s by ranges and 0.34 to 0.40 s by categories (about 2,000 distinct values), against the restyle's 0.3 s, in native
+  code and before the transfer and the drawing. The brief says to stop and report a miss after reasonable effort and not to
+  relax it, so the test asserts the target and fails for categories on this machine, and the first effort is
+  step 13.21a. The brief's pnpm perf (the browser performance project of the app) is run at the gate. The timing file
+  allows `expect` and `panic` for the whole file (the workspace denies them, `clippy.toml` allows them in tests, and clippy
+  does not count helper functions outside a `#[test]` as tests).
+- Step 13.21a (a faster count of the distinct values). The timing of step 13.21 found categories over a 4,000,000-cell column
+  at 275 to 321 ms to classify, over the restyle target with the class of every cell (0.34 to 0.40 s against 0.3 s). The
+  counting was in ordered maps (about 11 comparisons a row) and the order is only needed once, at the end, so the
+  counts are now in hash maps with a hasher of our own (`FastHasher`: no random state, one round of the finaliser of
+  splitmix64) keyed by the bits of the number, with -0 taken as 0 and a NaN never getting there, or by the text, and the
+  distinct values are **sorted once at the end** by `total_cmp` or by bytes, which every value being different makes a total order
+  that does not depend on how the map was filled: the result is the same as before, and the 119 tests of the crate, which
+  include the same column in two orders, -0 against 0 and the order of text, pass unchanged. Categories take 59 to 71 ms to
+  classify (4.5 times faster) and the restyle test passes: the slowest method is now quantiles, 0.18 to 0.21 s with the class
+  of every cell (it sorts 4,000,000 numbers). **The margin is thin for WebAssembly**, which is usually 1.5 to 2 times slower and has the
+  transfer and the upload to add, so it is for M16's measurement to say; if quantiles miss there, a selection of the bounds by
+  partitioning, which needs no full sort, is the place to look. The numbers before and after are in `docs/perf.md`.
+
+## M13 gate
+
+The review of the milestone (a fresh subagent, on `e24c1d0`, after `pnpm test:e2e` 629 + 14, `test:visual` 102, `test:axe` 102 and
+`pnpm perf` had passed) found no blocker, three majors and minors and nits. Each is a sub-step below, found by the
+reviewer and reproduced here by a test that failed before the fix.
+
+- Step 13.F1 (quantile classes collapsed). **Major.** A column with two different values, or most rows at one value, was one
+  class for 4 or more quantile classes (500 zeros and 500 ones in 4 classes gave bounds `[0, 1]` and one class of 1,000; 900
+  zeros and 100 ones gave one class for any number), because the rule of step 13.16a that keeps the largest value as a class
+  of its own only matched an exact tail (`below < max, max, max`), and when three or more bounds were the maximum, or when
+  most were the minimum, the dedup removed every class but one. A column of two values is not a constant, which the brief's
+  "a constant column gives one class" covers. **Fix**: the largest value is a class of its own, `[max, max]`, whenever a bound
+  before the last is already the maximum (however many), and also when the bounds are reduced to the smallest and the largest and more
+  than one class was asked for (so 900 zeros and 100 ones in 3 classes are `[0, 1, 1]`, counts 900 and 100); one class asked for is one
+  class, and a constant column is still one. Tests: six two-valued columns by 2 to 7 classes and by equal intervals, quantiles and
+  natural breaks must have at least two non-empty classes; the exact answers for two of them; 300 zeros, 300 ones and 400 twos in five
+  classes (three bounds at the maximum with classes left below). Two mutations: no split when reduced to two bounds
+  (three tests fail) and the old tail-only rule (the last test fails; it did not fail before that test was added, which is why it was added).
+  Two tests of 13.16a pinned `[1, 1, 1, 1, 5]` in three classes as one class of five, which is the behaviour found wrong, and were
+  changed to `[1, 5, 5]` with counts 4 and 1, with the reason in them.
+- Step 13.F2 (an origin that stayed at 0). **Major.** When the person chose a system in which nothing was drawable (a local
+  grid is loaded and UTM 40 is chosen), the frame had the origin 0, and the rule that the frame is kept while any dataset is loaded
+  then kept that origin for good: a dataset in UTM 40 loaded afterwards was drawn, but 1 cm apart came out as the same `f32` (the
+  reviewer's points at 512000.01 and 512000.02 gave x of 512000 and 512000.03). Section 9.1's origin is the centre of the extent
+  of the **first drawable** dataset, which here arrives later. This is the state the map CRS dialog of M17 reaches with its
+  "What changes" list. **Fix**: the `Preparer` remembers whether the origin was made from a dataset
+  (`choose_frame_tracking` returns whether it is still waiting), and the first call after a dataset can be drawn makes it from that
+  dataset, once; from then on it is kept, as the rule says (a test: a third dataset, and choosing the same system again, do
+  not move it). Whether it is waiting is a flag and not "the origin is 0", because 0 is also the right origin of a dataset
+  centred on it, which another dataset must not move (a test). The source stays `user`. Tests: in `Preparer` (fails before: the origin
+  stayed `[0, 0, 0]`; with the flag never set, fails again), and through the built kernel in Node (`kernel-prep.test.ts`, the
+  prepared positions 1 cm apart are two numbers).
+- Step 13.F3 (one polygon, one long step). **Major.** A polygon is one step of a prepare (earcut cannot be stopped), and the time it
+  takes grows faster than the polygon: natively 140 ms for 100,000 vertices, 670 ms for 200,000, 3.3 s for 400,000 (a new ignored
+  timing test, `the_longest_step_for_one_large_polygon`); the reviewer saw 9.5 s for 1,000,000 in WebAssembly. For that time the worker hears no
+  request to stop, no removal and no other request. The cap was 16,000,000 vertices, chosen to keep `earcut` from panicking and not for time.
+  **Fix**: a polygon of more than 100,000 vertices (its rings, holes included) is outlined and not filled, with a finding of its own,
+  `display.polygons.too_detailed` ("Some polygons have more than 100,000 vertices, which is too many to fill in, so only their outlines
+  are drawn", hint: simplify or split them; in `docs/validation-codes.md`), because the advice of `display.polygons.outline_only`
+  (check that no ring crosses itself) is wrong for them. A fill of a polygon at the limit takes 140 ms natively, 373 ms in WebAssembly on
+  this machine. **Also corrected**: the claims that "a step takes well under a tenth of a second" (the handler's comment, the record of step
+  13.20b) and that the longest step of any kind is the surface's 180 ms were false; in WebAssembly the two steps that cannot be cut, one polygon
+  at the limit and the triangles of a surface of 4,000,000 cells, take 373 and 445 ms here (measured in Node), and the comment and
+  `docs/perf.md` now say so. The surface's step could be cut by rows and is not: it is left as a known limit. Tests (the first
+  failed before the fix): a polygon of 100,001 vertices is outlined, its square neighbour is filled, and the finding has the
+  count, the example and the words; the limit counts the vertices of the rings of one polygon together, and shows its edge with a small limit
+  (8 against 7 and 9). Mutation: the limit ignored (both tests fail).
+- Step 13.F4 (the frame outlived the last dataset). Minor. The frame was dropped only if `chooseFrame` happened to run while nothing was
+  loaded, so a page that removed dataset A (UTM 40), loaded B (UTM 41) and then asked got A's system and origin, with B reprojected
+  into it, although section 9.1 says the origin changes "when the last dataset is removed". It worked only if the page asked
+  between every removal and the next load. **Fix**: `Preparer::removed(dataset, remaining)` stops the jobs on the dataset and drops the frame
+  (and the waiting origin of step 13.F2) when none remains, and the kernel's `remove` calls it. Tests: in `Preparer` (one of two
+  removed keeps it, the last drops it, a dataset in another zone starts afresh) and through the built kernel in Node, written first
+  and seen to fail (the frame was still UTM 40).
+- Step 13.F5 (thin tiles of a warped grid). Minor. The mesh of a tile was cut into `n` by `n` parts with `n` no more than the cells of its
+  SHORTER side, so a strip a cell wide stayed one quad: a grid of 2,000 x 1 cells in degrees warped to UTM was 4 vertices and
+  `display.grid.warp_rough`, and the 1 x 4,096 strip left by a 4,097 x 4,097 grid in textures of 4,096 was 0.17 cell off at the middle of its
+  edge, over the 0.1 of the brief, with an open seam to its neighbour of 1.4 to 3.1 m. **Fix**: the tile is cut into `ni` by `nj` parts, along `i`
+  and along `j`, each doubled together and limited by the cells of the tile in its own direction and by 256 (`WarpTile::parts` is
+  `[ni, nj]`). Inside a tile neighbouring parts still share their vertices; between two tiles each mesh follows the same curve with parts
+  of its own, so a seam is open by at most the two errors, 0.2 cell (stated in the doc of `warp_tile`). Tests, which measure with
+  `Transformer::convert` and not with the code under test, in cells: a 2,000 x 1 row and a 1 x 4,096 column in degrees are not rough, are
+  cut along their length and not across, and are within a tenth of a cell (by 5 % of it) at the middle of every part; every tile of a
+  4,097 x 4,097 grid in 4,096 textures (the tile, both strips and the corner) is as good. Both fail under the old rule (a mutation).
+- Step 13.F6 (heights of two local grids). Minor. A local grid in feet drawn on a map in metres had its x and y scaled and its heights not (a
+  height of 328.084 stayed 328.084, so in 3D it is stretched 3.28 times), and `display.crs.local_grids_assumed` said "its positions are scaled".
+  The behaviour is what section 9.1 says ("Z is never reprojected; it is drawn as given") and what step 12.8 pinned in a test of the
+  transformer (z is not touched), so it is **kept**, and the finding is made true: "its horizontal positions are scaled from feet to
+  metres; heights are drawn as given", with the hint that if its heights are in the same units they will look stretched. Documented in
+  `docs/validation-codes.md`. A test pins both the heights and the words. **This is the owner's to decide**: the core's own
+  doc says the coordinates of a dataset are "in the units of its CRS with Z up", which for a local grid in feet would make the
+  heights feet too, and scaling them would be the other consistent choice; it needs a change to the transformer's test of 12.8, which this
+  step does not make.
+- Step 13.F7 (classes of a grid with several layers). Minor. A 2 x 2 x 2 grid was classified over its 8 rows and its class index had 8 entries, while the
+  picture is of the first layer, 4 cells (`display.grid.layers_hidden`), so the legend's counts were not the picture's (section 9.3).
+  **Fix**: `classify_dataset` and `class_index_of` work on `drawn_rows(dataset)`, which is the `nx * ny` cells of the first layer for a grid and
+  every row for any other shape, through `classify_rows`, `class_index_rows` and `column_stats_rows` (the column-level functions
+  keep their meaning: every row). The contract of step 13.17, "one byte for each element", is now "for each element that is drawn"; the doc of
+  `Engine.classIndex` says so. Test, seen to fail first (counts `[6, 2]` over 8 rows): the counts, the bounds and the index by ranges and by categories
+  are those of the first layer, and a grid of one layer and another shape are as before.
+- Step 13.F8 (the browser and Node, bit for bit). Minor. The record of step 13.20d and its commit said that conversion and classification are "bit for bit the
+  same in Chromium and in Node", but the report that the two are compared on had the first position rounded to 0.01, the length of the array and
+  a count of NaNs; only the class breaks (as JSON) were compared exactly. **Fix**: the report also has a hash (FNV-1a, 32 bits) of every byte of the
+  positions of the points, of the positions, triangles and outline of the polygons, and of the positions, uvs and triangles of the
+  meshes of the warped grid, and the browser's report, from the real worker in Chromium, must equal Node's. It does (the test passed at the first run
+  after the hashes were added), so the statement is now true of those arrays: the conversion by `proj4rs` in WebAssembly, the triangulation and the warp give the same bytes
+  in Chromium and in Node, for this data. It is one data set, not a proof for all.
+- Step 13.F9 (the sampler of natural breaks, tested only where it cannot go wrong). Minor. The reviewer changed `i * n / 10,000` to `i * (n / 10,000)` in the sample
+  of step 13.16a and all the tests passed, because the one test of the sample used 30,000 values, an exact multiple of the stride, where the two are the
+  same; with the change, 15,000 values would be sampled by their first 10,000 rows and not evenly. A test now takes 10,001, 12,345, 15,000, 19,999 and 30,001
+  values (each value is its own row number), requires the sample to be exactly the rows `floor(i * n / 10,000)`, and to run from the first row to
+  near the last. The reviewer's mutation fails it.
+- Step 13.F10 (small things of the review). (1) **A frame that is not a frame** (nit): `startPrepare` took a frame with an origin of NaN and answered "drawn" with positions
+  that were all NaN, and no word. The handler now checks the frame with `checkedFrame` before the kernel is asked (an origin has to be three finite numbers,
+  the system and the source valid); a test, seen to fail first. (2) **A removal that was not one** (nit): when the job was gone, the handler called any
+  error "The dataset was removed while it was being prepared", so a contract error on the last step would have been hidden. It does that only for the
+  kernel's "no prepare with that id" now; a test (a kernel that finishes the job and then answers wrongly) fails before and passes. The older misuse
+  test of a bad frame has the new, more precise words of the check. (3) **Words** (nits): the buffers of points and the projection said NaN for a position with none, and
+  a number too large for `f32` once it is relative to the origin is infinite (x of 1e300 gave plus and minus infinity), so the doc says that any coordinate that is not
+  finite is no position and the renderer takes it so (`isFinite`); the module doc of `stats` still said ordered maps after step 13.21a. Not changed, as the
+  reviewer said it is not reachable: the `u32::try_from(..).unwrap_or(u32::MAX)` of the warp and the surface (`dataset.too_large` stops 134 million
+  cells long before a count reaches 4 billion; it would matter only if that limit were raised). The surface triangle's colour from its lowest-numbered corner
+  (the reviewer's N6) is the disclosed design choice of step 13.12, for the owner.
+
+## M13 gate, second round
+
+The second review (a fresh subagent, on `b2c0329`, the head after the ten fixes of the first round, with the whole gate rerun and green on it) found no blocker,
+one major, one minor and seven nits; it judged F1, F2, F4, F5, F7, F8, F9 and F10 correct and complete as far as it could break them (it ran
+randomised checks of the classes, of the origin and of 48 shapes of warp tile, with no violation) and F6 correct with its question to the owner still open.
+
+- Step 13.F11 (the limit of step 13.F3 did not bound the step). **Major.** Step 13.F3 capped a filled polygon at 100,000 vertices and said that the step is then bounded
+  (the handler's comment, `docs/perf.md`, the record and the commit). The review showed that the time of `earcut` depends on the shape and on the holes, not on the vertices
+  alone, and it was reproduced here natively: a square with 24,000 holes (96,000 vertices) took 18.7 s in one step; a jagged star of 100,000 vertices 3.3 to 4.6 s; a comb of
+  75,000 vertices 6.6 to 9.7 s; a smooth ring of 100,000 vertices 0.14 to 0.22 s. And the "670 ms and 3.3 s" of the earlier figures for 200,000 and 400,000 vertices could no longer be
+  reproduced by the committed test, whose rows over the limit only time the outline. **What was done**: (1) a second limit, on **work**: the vertices times the rings of a polygon
+  (the exterior and the holes) at most 150,000,000, because the cost of holes is predictable (about 4 ns for each unit of the product: 10,000 holes with 40,000 vertices 1.5 s, and the limit
+  is 6,000 holes of four vertices, 0.5 to 0.7 s); more is outlined only with `display.polygons.too_detailed`, whose message now says "too detailed to fill in (more than 100,000 vertices, or too many
+  holes for their size)" (`docs/validation-codes.md` changed with it). A test at the edge with small limits (64 against 63) and with the real limits (7,000 holes are outlined, their 28,004 sides
+  all in the outline), which fails without the limit (a mutation). (2) The jagged and comb-like rings are **not** bounded, and no limit that is deterministic and cheap does it: the
+  concave vertices do not predict the time (the smooth ring has as many), and the time itself must not decide what is drawn (section 8). So the comment of the handler, `docs/perf.md` (a table of the
+  measured shapes, natively, two runs) and this record say that the limits bound a smooth ring and the holes and **do not bound** a jagged ring: at 100,000 vertices that is several
+  seconds during which the worker hears no request to stop. **This is the owner's**: lowering the limit of vertices to 50,000 would bring a jagged star to 0.6 to 0.75 s and would outline the
+  polygons of 50,000 to 100,000 vertices that fill in a third of a second; it is left at 100,000. The ignored timing tests now cover the shapes (`the_longest_step_for_polygons_that_are_hard_to_fill`) and the
+  smooth ring only up to the limit.
+- Step 13.F12 (equal bounds that went down). Minor, and older than the review. `min + step * k` of equal intervals can round above the largest value, or above
+  the next bound, when the range is a few units in the last place wide: the column 2.67, 2.67 and the number after it, in 7 classes (the default of grids and blocks,
+  section 11.6), gave bounds that went down, and the engine's check refused them with a ContractError, so the page saw an error for a legitimate column; a
+  random search of ranges of 1 to 20 units over many magnitudes found it in 200,000 trials, only for equal intervals. A range wider than a float gave NaN or an infinite bound
+  (`[-1.7e308, 1.7e308, 0]` in 1 and in 3 classes), which the decision of step 13.15 claimed it did not (`max / n - min / n` overflows for one class and for `step * k`).
+  **Fix**: the bound `k` is `min * (1 - k/n) + max * (k/n)`, which does not overflow, held between the bound before it and the largest value; the first is the smallest value and
+  the last the largest. Tests, seen to fail first: the two columns and 4,000 random ranges of 1 to 20 units at magnitudes from 1e-300 to 1e300 (and the
+  largest and smallest floats) in 1, 2, 3, 7 and 12 classes must have bounds that are finite, never go down, begin at the smallest value and end at the largest, with a
+  count for each class; and the reviewer's column through the built kernel and the engine's own check (it fails with the old formula: "bounds[2]: expected a finite number").
+- Step 13.F13 (the small things of the second review). (1) **Words left behind by step 13.F7** (nit): "one byte for each element" stayed in the docs of the kernel's `classIndex`, of
+  `class_index`, of the protocol and of the kernel interface; each now says "each element that is drawn" and names the grid of several layers. (2) **The doc of
+  `Engine.chooseFrame`** did not say that an origin that was waiting (step 13.F2) is made when a dataset can be drawn, which a caller that has already prepared layers
+  needs to know: it says so, and that layers prepared against an origin of 0 have to be prepared again when the frame it gets back has another. (3) **Other steps that cannot be cut**: a rough warp
+  tile (235 ms for 256 x 256 parts) is one step too; the handler's comment and `docs/perf.md` list it (step 13.F11). (4) **A record that was false**: the commit of step 13.F7 (`cbee551`) says that
+  130 tests and `pnpm check` pass, and it did not build with its tests (a binding I added to a test shadowed an array); the commit after it (`14b4474`) says so, and this is the record: it was
+  committed and pushed because the check and the commit were one command that did not stop on the check's failure. Every commit since is chained to a passing check. (5) **Not changed**: the words of
+  the finding of `with_limits` name the real limit even for a test's smaller one (documented); `checkedFrame` throws a `ContractError` with a path message where other misuse is a `TypeError` with a
+  sentence, and the text reaches the page unchanged, which is what matters.
+
+## M13 gate, third round
+
+The third review (a fresh subagent, on `9ee8bfb`, with the whole gate rerun and green on it) found no blocker, one claim that was wrong, one regression from the second round's fix, one
+document that a record said was changed and was not, an understated bound, and nits. It judged F11, F12 (the formula's behaviour) and F13 correct in what they do, with
+159,360 combinations of column, method, classes and nulls agreeing between the counts, `class_of` and the class index and 60,000 random degenerate polygons without a panic.
+
+- Step 13.F14 (the slow polygon is a plain curve). The claim of steps 13.F3 and 13.F11, in the comments, in `docs/perf.md` and in the records, that the limit of 100,000 vertices is "the size at which a smooth
+  polygon, which is nearly every polygon of a map, fills in about a third of a second", was wrong. The ring that was timed and called smooth is a circle with random noise of 4 % in its radius, which
+  is **ragged**, as a coastline is, and it is quick; a ring that is smooth in the sense of a densely sampled curve is the slow one. Measured here, natively, in one step, at 100,000 vertices: a ragged ring 0.14 to
+  0.22 s, a plain circle 4.3 s, an ellipse 6.2 s, a jagged star 3.3 to 3.8 s, and a ring that crosses itself 10.7 s (which is then refused and only outlined, so all of it wasted); at 50,000 a plain circle
+  is 0.9 s and an ellipse 1.5 s. The ignored timing test has those shapes now. **What was changed**: the word (ragged and not smooth), "nearly every polygon of a map" gone, the table of `docs/perf.md` with the new rows
+  (the numbers are this run's, with the ranges of earlier runs), and the options for the owner stated as they are: (1) leave it, disclosed; (2) a lower limit, which does not bound a plain curve (50,000 vertices is 0.9 s
+  for a circle) and would outline ragged boundaries that fill quickly, so the earlier record's reason for it was wrong, and (3) a count of the work inside `earcut` that gives up at a budget, which the reviewer
+  tried in a scratch copy of the crate (a counter that ticks once for each step of the main loop, node of the hash visited, edge tested and cut tried, which depends on the data and not on a clock; about 200 million ticks was
+  about half a second natively for the circle, the ellipse, the star and the comb, and ordinary rings were far below it) and which needs a few lines in `earcut`'s own source, so a copy or a fork of a dependency:
+  the owner's. **Earlier records that later steps superseded, without an entry of their own saying so**: the 16,000,000 vertices of step 13.8 (now 100,000 and the work limit, steps 13.F3 and 13.F11); "a step takes well
+  under a tenth of a second" in step 13.20b (not so, step 13.F3); the formula `max / n - min / n` of step 13.15, which does not overflow for one class (step 13.F12); the rows of 200,000 and 400,000 vertices of step 13.F3
+  (they only time the outline since then). The record of step 13.F13 in the roadmap named "the unused word of a test", which no commit changed; the line is corrected.
+- Step 13.F15 (a regression of step 13.F12: bounds that are not clean). Minor. The formula of step 13.F12, `min * (1 - t) + max * t`, no longer gave exact bounds for integer data whose width
+  divides evenly, as the older `min + step * k` did: the reviewer counted, over 336,439 integer ranges in 2 to 12 classes, 106,257 misses (31.6 %) against 7,608 (2.3 %) before, and with the default of 7
+  classes over 0 to 100 + 7k 34.8 % against 12.8 %. Examples: -200 to -188 in 6 classes gave -198.00000000000003, 0 to 77 in 11 gave 63.00000000000001, integers 1 to 15 in 7 gave 6.999999999999999,
+  so a value on a bound fell in the class below it, against the rule of step 13.15 ("a value that is a bound starts the class above it") and the label of the legend; by the reviewer's count, 1,735
+  of 53,244 such values against 54 before. **Fix**: when the range (`max - min`) is finite the bound is `min + (range / n) * k`, exact where the width divides evenly; only when the range is wider than a
+  float, and so infinite, is it the blend, which cannot overflow; each bound is still held between the one before it and the largest value (step 13.F12). The test of 13.F12 only checked that the
+  bounds are finite, never go down, begin and end at the values and have a count each, which the regression passed, and the exactness of `[0, 2, 4, 6, 8, 10]` held only because the smallest value is 0
+  and 10 x 0.6 rounds to 6. **New test, seen to fail first** (`-198.00000000000003`): for eight minimums (-200 to 1,000), widths 1 to 400 and 2 to 12 classes with the width divisible by the classes, a column of
+  every integer has the bounds `min + step * k` exactly, each bound is in the class it starts (`class_of`), and the counts add up; and the three examples of the review. The test of 13.F12 (4,000
+  random ranges of 1 to 20 units, the largest and smallest floats, in 1 to 12 classes) and the kernel test in Node still pass with it.
+- Step 13.F16 (what step 13.F11 said it did, and a budget in vertices). Three things. (1) **`docs/validation-codes.md`** (minor): the record and the commit of step 13.F11 say that the message of
+  `display.polygons.too_detailed` was changed there, and `git show e1b851e --stat` does not list the file; it still said "have more than {limit} vertices, which is too many to fill in". The code said the
+  new words. The test of the core that compares the registry with the document only checks that every code is documented with a severity, a step and a hint, so nothing caught it. The Message and the Example
+  are now the words of the code. (2) **A step charged in vertices** (minor): `PolygonsFill::advance` added up vertices, so one step packed polygons up to 100,000 vertices, and five polygons of 5,500 holes
+  (110,020 vertices, each under the work limit) took 2.0 s in one step against 0.42 s for one. A polygon now costs its vertices plus a thousandth of its work (vertices times rings), at least 1 (`step_cost`), so
+  that such polygons go to a step one at a time, and a polygon of ordinary rings costs what it did. Test, seen to fail with the old accounting: three polygons of 300 holes (cost 1,566 each) with a budget of
+  1,500 are done in three steps, and the buffers are those of all at once. Not changed: one polygon of any shape is still one step (step 13.F14). (3) **Nits of the test with the real limits**: its exterior was 200 by
+  200, so the holes from the 5,000th on lay outside it and the polygon would have been refused as `outline_only` without the limit, which made the test catch a mutation only by its finding code; the exterior is
+  400 by 400 now, every hole inside, and removing the real work limit fails the test on its first assertion (tried). The stale figures in a test's comment ("0.14 s for 100,000 vertices, 3.3 s for 400,000") are
+  replaced by the measured plain circle.
+
+## M13 gate, fourth round
+
+The fourth review (a fresh subagent, on `d1aa9f2`, with the whole gate green on it) found nothing that must be fixed. It confirmed, with its own property test over 178,761 combinations of column
+(integers, decimals, a few units in the last place, subnormal, huge, constant, mostly one value; with nulls, NaN and infinities), method (equal, quantile, natural breaks) and 1 to 254 classes, in debug (with
+overflow checks) and in release, that the bounds are finite, never go down, begin and end at the values, and that the counts, `class_of` and the class index agree; exact bounds for 28,416 integer ranges that
+divide evenly; that a step of polygons always makes progress and gives the buffers and findings of all at once for budgets from 0 to `usize::MAX`; that `docs/validation-codes.md` says what the code says; and that the
+numbers of the polygon table in `docs/perf.md` have the same shape and order of magnitude when timed again (a plain circle of 100,000 vertices 4.6 s against 4.3 s, a comb 6.7 s, a self-crossing ring 10.7 s).
+
+- Step 13.F17 (two parts of `equal_bounds` that no test pinned). Nit, sure. Removing the hold between the bounds (`bound.clamp(before, max)`) passed every test of the crate, because the formula of step 13.F15 no longer
+  rounds above the largest value for the ranges the test of 13.F12 draws; and using `min + (range / n) * k` for every range, so that an infinite range gives an infinite step clamped to the largest value, passed too.
+  Both parts are needed: for the column `[0, 5 of the smallest numbers]` in 7 classes, `range / n` rounds to one of them and the sixth bound is 6 of them, above the largest value (`[0, 5e-324, 1e-323, 1.5e-323,
+  2e-323, 2.5e-323, 3e-323, 2.5e-323]` without the hold), and for `[-1.7e308, 0, 1.7e308]` in 3 classes the finite formula gives bounds `[min, max, max]` and counts `[2, 1]`. **Tests, only test code**: that column is now one of
+  the cases of the test of 13.F12, and a test of its own asks for three classes with the bounds one third of the way, each within 1e-12. Seen to fail with each part removed (the first test with the hold removed,
+  the second with the finite formula for every range) and to pass with the code as it is. No code outside `#[cfg(test)]` changed, so the build the gate was run on is the build that is merged.
+  **Nits of the review left as they are**, none of which can be reached: a second `let vertices` that repeats the first in `polygons.rs` (`PolygonsFill::advance`); `polygons_buffers` ignores whether the budget `usize::MAX`
+  finished the job, which only matters on a target where `usize` has 32 bits and the total cost passes 4.29 billion, and the stepped path used by the wasm exports loops until the job says it is done; and the message of
+  `d1aa9f2` says a polygon of ordinary rings "costs what it did", when it costs about a thousandth more for each ring.

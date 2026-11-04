@@ -9,10 +9,13 @@ import type {
   ImportPhase,
   ImportProgress,
   LoadOptions,
+  PrepareOptions,
+  PrepareParams,
 } from './api.js';
+import type { FrameChoice, PrepareResult } from './display.js';
 import { assertNever } from './exhaustive.js';
 import type { DatasetInput } from './inputs.js';
-import type { CrsInfo, Phase, Summary } from './types.js';
+import type { CrsInfo, CrsRef, Phase, Summary } from './types.js';
 
 function wording(phase: ImportPhase): string {
   switch (phase) {
@@ -48,6 +51,10 @@ function inertEngine(): Engine {
     searchCrs: unavailable,
     rows: unavailable,
     remove: unavailable,
+    chooseFrame: unavailable,
+    prepare: unavailable,
+    classify: unavailable,
+    classIndex: unavailable,
     on: () => () => undefined,
     dispose: () => undefined,
   };
@@ -65,7 +72,7 @@ describe('the engine interface', () => {
     expectTypeOf<EngineEvents>().toHaveProperty('datasets');
   });
 
-  it('has the methods of the briefs: those of phase 1, and the two EPSG lookups of phase 2', () => {
+  it('has the methods of the briefs: those of phase 1, the two EPSG lookups, and display preparation', () => {
     expectTypeOf<Engine['load']>().parameter(0).toEqualTypeOf<DatasetInput>();
     expectTypeOf<Engine['datasets']>().returns.toEqualTypeOf<readonly Summary[]>();
     expectTypeOf<Engine['crsInfo']>().toEqualTypeOf<
@@ -74,13 +81,24 @@ describe('the engine interface', () => {
     expectTypeOf<Engine['searchCrs']>().toEqualTypeOf<
       (query: string, limit: number) => Promise<readonly CrsInfo[]>
     >();
+    expectTypeOf<Engine['chooseFrame']>().toEqualTypeOf<
+      (preferred?: CrsRef) => Promise<FrameChoice>
+    >();
+    expectTypeOf<Engine['prepare']>().toEqualTypeOf<
+      (id: number, params: PrepareParams, options?: PrepareOptions) => Promise<PrepareResult>
+    >();
+    expectTypeOf<Engine['classIndex']>().returns.toEqualTypeOf<Promise<Uint8Array>>();
     expect(Object.keys(inertEngine()).sort()).toEqual([
+      'chooseFrame',
+      'classIndex',
+      'classify',
       'crsInfo',
       'datasets',
       'dispose',
       'importFiles',
       'load',
       'on',
+      'prepare',
       'preview',
       'remove',
       'rows',

@@ -170,39 +170,94 @@ or releasing, and whenever the brief says to stop.
 
 ## M13: Display preparation (karmania-prep)
 
-- [ ] 13.1 Crate karmania-prep (depends on core and crs), forbid unsafe.
-- [ ] 13.2 Frame choice (section 9.2 of the brief) with the info finding for the
+- [x] 13.1 Crate karmania-prep (depends on core and crs), forbid unsafe.
+- [x] 13.2 Frame choice (section 9.2 of the brief) with the info finding for the
   UTM choice. Tests: projected, local, geographic north and south, zone edges.
-- [ ] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
-- [ ] 13.4 Drawability per dataset (9.2) with display findings; documented.
-- [ ] 13.5 Points buffers.
-- [ ] 13.6 Lines buffers.
-- [ ] 13.7 Add the earcut port (dependency-only).
-- [ ] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
+- [x] 13.3 Rebasing to f32 against the origin; the precision test of 9.1.
+- [x] 13.4 Drawability per dataset (9.2) with display findings; documented. Split to stay under the
+  commit size guideline:
+  - [x] 13.4a A correction of 13.2: every system that is not longitude and latitude in degrees is its
+    own map system, an unknown code included.
+  - [x] 13.4b `drawable(map_crs, dataset)` and the display findings.
+  - [x] 13.4c `choose_frame`: the frame and the drawable list of every dataset, with the rule that the
+    map CRS stays until it is changed or the last dataset is removed.
+- [x] 13.5 Points buffers.
+- [x] 13.6 Lines buffers.
+- [x] 13.7 Add the earcut port (dependency-only).
+- [x] 13.8 Polygon triangulation with holes and multipolygons; outline buffers;
   the "outline only" warning; collinear and degenerate cases.
-- [ ] 13.9 Mesh buffers.
-- [ ] 13.10 Grid image placement and tiling by a maximum texture size.
-- [ ] 13.11 Grid warp when the grid's CRS differs from the map CRS: subdivide
+- [x] 13.9 Mesh buffers.
+- [x] 13.10 Grid image placement and tiling by a maximum texture size.
+- [x] 13.11 Grid warp when the grid's CRS differs from the map CRS: subdivide
   until the error measured at sub-cell midpoints is under 0.1 cell; test across
-  a UTM zone change.
-- [ ] 13.12 Grid surface buffers (elevations from a column).
-- [ ] 13.13 Block buffers (own CRS only).
-- [ ] 13.14 Column statistics: count, nulls, finite min and max, distinct values
+  a UTM zone change. Split to stay under the commit size guideline:
+  - [x] 13.11a The mesh of one tile: cut finer until the middles of its parts are within 0.1 cell.
+  - [x] 13.11b The warp for a whole grid: the tiles, `GridLayout::Warp`, the findings.
+- [x] 13.12 Grid surface buffers (elevations from a column).
+- [x] 13.13 Block buffers (own CRS only).
+- [x] 13.14 Column statistics: count, nulls, finite min and max, distinct values
   with counts up to a limit; deterministic.
-- [ ] 13.15 Class breaks: equal intervals and quantiles.
-- [ ] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
-  categories with "Other".
-- [ ] 13.17 Class index per element (u8, 255 = no value) for every kind.
-- [ ] 13.18 PrepareJob with step(budget) and cancellation for large datasets.
-- [ ] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
-  arrays as transferables.
-- [ ] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol
+- [x] 13.15 Class breaks: equal intervals and quantiles.
+- [x] 13.16 Class breaks: natural breaks (sampled as 11.4 of the brief says) and
+  categories with "Other". Split to stay under the commit size guideline:
+  - [x] 13.16a Natural breaks (Jenks) from an evenly strided sample of at most 10,000 values.
+  - [x] 13.16b Categories: up to 20 values by count, ties by value, the rest as "Other".
+- [x] 13.17 Class index per element (u8, 255 = no value) for every kind.
+- [x] 13.18 PrepareJob with step(budget) and cancellation for large datasets.
+  Split to stay under the commit size guideline:
+  - [x] 13.18a The projection of positions in parts (`Projector`), and the
+    transformer's `convert_chunk_in_place`, with the same results in parts of any size.
+  - [x] 13.18b The one-shot functions rebuilt from parts that can be stepped (lines, mesh,
+    polygons, blocks, surface and the warped grid), with no change of behaviour.
+  - [x] 13.18c The `PrepareJob` over every kind, and its cancellation.
+- [x] 13.19 wasm exports chooseFrame, prepare, classify, classIndex, with typed
+  arrays as transferables. Split to stay under the commit size guideline:
+  - [x] 13.19a What the worker keeps between requests (`Preparer`: the frame and the jobs), the
+    JSON forms of the class breaks, and `Registry::datasets`.
+  - [x] 13.19b The exports of the wasm `Kernel`, with typed arrays, and a test in Node.
+- [x] 13.20 Engine: chooseFrame(), prepare(), classify(), classIndex(); protocol
   types; a test that transferred buffers are detached on the sending side;
-  real-worker tests.
-- [ ] 13.21 `scripts/generate-fixtures` also writes a 1,000,000-block model CSV
+  real-worker tests. Split to stay under the commit size guideline:
+  - [x] 13.20a The public types (`display.ts`) and the strict checks of what the kernel gives
+    (`display-check.ts`), tested against the built kernel and against values wrong in one way each.
+  - [x] 13.20b The protocol (requests, progress of a prepare) and the worker's handler, with the
+    buffers of a result in the transfer list.
+  - [x] 13.20c The client and the engine's methods, with their checks of misuse, and the test that
+    the buffers are detached on the sending side.
+  - [x] 13.20d The real-worker tests in the browser.
+- [x] 13.21 `scripts/generate-fixtures` also writes a 1,000,000-block model CSV
   (not committed). Ignored Rust timing tests for preparing 1M points, 4M cells
   and 1M blocks; results in `docs/perf.md`.
-- [ ] 13.G Gate.
+- [x] 13.21a A faster count of distinct values, since the timing of 13.21 found categories over a
+  4,000,000-cell column slower than the restyle target.
+- [x] 13.F1 Gate fix: quantile classes of a column with two values, or with most rows at one value, are
+  not collapsed to one class.
+- [x] 13.F2 Gate fix: a frame made when nothing was drawable gets its origin from the first dataset that is.
+- [x] 13.F3 Gate fix: a polygon too detailed to triangulate in one step is outlined only, with a finding of its
+  own, and the claims about the length of a step are corrected.
+- [x] 13.F4 Gate fix: removing the last dataset drops the frame in the kernel itself.
+- [x] 13.F5 Gate fix: the mesh of a warped tile is cut along `i` and along `j` by what each side needs.
+- [x] 13.F6 Gate fix: the finding for two local grids says that heights are drawn as given.
+- [x] 13.F7 Gate fix: the classes and the class index of a grid with several layers are those of the first
+  layer, the one that is drawn.
+- [x] 13.F8 Gate fix: the browser and Node reports of display preparation compare the bytes of the buffers.
+- [x] 13.F9 Gate fix: a test of the sample of natural breaks that is not a multiple of its stride.
+- [x] 13.F10 Gate fix: small things (words about NaN and infinity, the module doc of `stats`, the frame
+  checked before a prepare starts, the error of a job that is gone).
+- [x] 13.F11 Gate fix, second review: the cost of holes bounds a polygon too (vertices times rings), and what
+  the limits do and do not bound is said as it was measured.
+- [x] 13.F12 Gate fix, second review: equal-interval bounds never descend and never overflow.
+- [x] 13.F13 Gate fix, second review: stale words ("one byte for each element", the other kinds of step that cannot
+  be cut, the `chooseFrame` doc) and the record of the commit that did not build.
+- [x] 13.F14 Gate fix, third review: a plain curve is the slow polygon and not the ragged one: the word, the
+  table, the owner's options, and a note of what earlier records the later fixes superseded.
+- [x] 13.F15 Gate fix, third review: equal-interval bounds are exact where the width divides evenly, as they were
+  before step 13.F12.
+- [x] 13.F16 Gate fix, third review: a step of polygons is charged by work and not by vertices, the validation-codes
+  document says what step 13.F11 said it did, and the test with the real limits has its holes inside.
+- [x] 13.F17 Gate fix, fourth review: two tests for `equal_bounds` (the hold between bounds, and the blend for a range
+  wider than a float), each seen to fail when its part of the code is removed.
+- [x] 13.G Gate.
 
 ## M14: Scene document (@karmania/scene)
 

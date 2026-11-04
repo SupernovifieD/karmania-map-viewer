@@ -1,7 +1,7 @@
 //! WebAssembly bindings for Karmania.
 //!
 //! This crate only translates between JavaScript and the Rust kernel
-//! (`karmania-core`, `karmania-io` and `karmania-crs`): it converts arguments and results and
+//! (`karmania-core`, `karmania-io`, `karmania-crs` and `karmania-prep`): it converts arguments and results and
 //! holds no logic of its own. Built with `scripts/build-wasm` for use from a
 //! module Web Worker.
 //!
@@ -14,6 +14,7 @@ mod crs;
 mod input;
 mod kernel;
 mod page;
+mod prepare;
 mod preview;
 
 pub use crs::{crs_info, search_crs};

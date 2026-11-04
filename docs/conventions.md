@@ -10,7 +10,8 @@ for AI assistants are in `AGENTS.md`.
 
 Rust:
 
-- Crates are `karmania-core`, `karmania-io`, `karmania-crs` and `karmania-wasm`. Modules,
+- Crates are `karmania-core`, `karmania-io`, `karmania-crs`, `karmania-prep` and
+  `karmania-wasm`. Modules,
   functions and variables use `snake_case`; types and enum variants use
   `UpperCamelCase`; constants use `SCREAMING_SNAKE_CASE`.
 - Units and conventions go in the doc comment of every public item (for

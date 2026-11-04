@@ -262,3 +262,106 @@ quoted string of each definition, against about 50 ms if every definition were r
 12.4). In WebAssembly in Node (step 12.F7, the definitions as a table, going through 6,184 definitions
 and not trying 65,536 codes): a median of 1.75 ms per search over 50 searches; in a browser it is not
 measured here.
+
+## Preparing for drawing (step 13.21)
+
+Section 9.6 of the Phase 2 brief sets the targets for loading a file and drawing its first frame: under
+1.5 s for 1,000,000 points, 1.5 s for a grid of 4,000,000 cells, 3 s for 1,000,000 blocks, and new classes
+visible under 300 ms for the grid. Preparing the data for the renderer is a part of each. These are the
+timings of that part alone, natively in a release build (not WebAssembly, which is slower, and not reading
+the file, uploading to the graphics card or drawing, which the browser measurements of milestone M16 will add):
+
+```
+scripts/generate-fixtures
+cargo test -p karmania-prep --release --test timing -- --ignored --nocapture --test-threads=1
+```
+
+`scripts/generate-fixtures` now also writes `fixtures/generated/blocks-1m.csv` (a dense model of 100 x 100 x
+100 blocks of 10 m, 30.4 MB, from a fixed seed, not committed). The timing tests make their data in memory
+from fixed seeds, like those of the readers, so making it is not timed, and prepare a dataset as the worker
+does, a job stepped 100,000 positions, vertices or blocks at a time (a tile of a warped grid is a step); the
+longest step is the longest the worker cannot hear a request to stop. Three runs, on the machine named at the
+top of this file (1.1 GHz, so a slow one):
+
+| What | Run 1 | Run 2 | Run 3 | Longest step | Brief's target |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1,000,000 points in the map's system | 19 ms | 15 ms | 14 ms | 5 to 7 ms | 1.5 s (all of loading) |
+| 1,000,000 points converted from longitude and latitude | 281 ms | 253 ms | 297 ms | 31 to 53 ms | 1.5 s |
+| 4,000,000 cells as an image (placed) | 0 ms | 0 ms | 0 ms | 0 ms | 1.5 s |
+| 4,000,000 cells warped from degrees (4 by 4 degrees) | 1 ms | 1 ms | 1 ms | 1 ms | 1.5 s |
+| 4,000,000 cells as a surface (a vertex and two triangles for each) | 366 ms | 433 ms | 370 ms | 164 to 194 ms | 1.5 s |
+| 1,000,000 blocks | 29 ms | 32 ms | 41 ms | 3 to 5 ms | 3 s |
+
+An image of cells has almost nothing to prepare (its placement and its tiles), so the time of a grid is in
+what is done to it afterwards: the class of every cell. New classes for the same 4,000,000 cells (a value
+for all but one in 97), the classification and then the class of every cell, in milliseconds:
+
+| Method | Run 1 | Run 2 | Run 3 |
+| --- | ---: | ---: | ---: |
+| Equal intervals | 58 + 69 | 65 + 66 | 102 + 56 |
+| Quantiles | 117 + 73 | 125 + 66 | 109 + 68 |
+| Natural breaks (a sample of 10,000) | 96 + 66 | 87 + 62 | 78 + 70 |
+| Categories (about 2,000 different values) | 321 + 75 | 286 + 65 | 275 + 62 |
+
+**The restyle target was missed for categories**, in the first three runs above: 0.34 to 0.40 s for the
+classification and the class of every cell, against 0.3 s for the whole restyle, in native code, before the transfer
+to the page, the upload of a texture and the drawing, and before WebAssembly's slowdown. The brief says to stop
+and report a target that is missed after reasonable effort, and not to relax it; the first effort was step 13.21a,
+which counts the distinct values in a hash map with a fast hash and sorts them once at the end (the ordered map it
+replaces cost about 11 comparisons a row, and the order is only needed at the end). The same test, three runs after it:
+
+| Method | Run 1 | Run 2 | Run 3 |
+| --- | ---: | ---: | ---: |
+| Equal intervals | 83 + 69 | 72 + 74 | 74 + 57 |
+| Quantiles | 118 + 65 | 127 + 66 | 145 + 62 |
+| Natural breaks (a sample of 10,000) | 84 + 70 | 74 + 59 | 63 + 63 |
+| Categories (about 2,000 different values) | 71 + 83 | 59 + 67 | 67 + 91 |
+
+Categories now take 0.13 to 0.16 s (the classification 4.5 times faster), and the slowest method is quantiles, at
+0.18 to 0.21 s (it sorts 4,000,000 numbers), which is inside the 0.3 s natively and leaves about 0.1 s for everything
+else; the test passes. **That margin is thin**: WebAssembly is usually 1.5 to 2 times slower than native code, and the
+transfer and the upload come on top, so whether a restyle by quantiles meets 0.3 s in the browser is for the
+measurement of milestone M16 to say, and if it does not, the quantiles are the place to look (a selection of the
+bounds by partitioning the values, which needs no full sort). Not measured here and left to M16: the same in WebAssembly,
+the page's side, and a column of integer codes (the usual case for categories, with a few distinct values, which a
+column of 2,000 is not).
+
+What the numbers say about the steps (corrected twice at the gate, steps 13.F3 and 13.F11: the first version said that the longest step
+of any kind was the surface's, 180 ms, and the second that the limit of 100,000 vertices bounds the step of a polygon; neither was so).
+The worker hears a request to stop only between steps, so the longest step is the longest it hears nothing. A conversion of positions
+is stepped 100,000 at a time and its longest step is 30 to 50 ms natively and 83 ms in WebAssembly. Some steps cannot be cut:
+the triangles of a surface (one step for 4,000,000 cells: 180 ms natively, 445 ms in WebAssembly in Node), a rough warp tile (about 235 ms for
+256 x 256 parts), and **the triangulation of one polygon, whose time depends on its shape and not on its size alone**. Natively, in one step
+(`the_longest_step_for_one_large_polygon` and `the_longest_step_for_polygons_that_are_hard_to_fill`; two runs, the second on a busier machine):
+
+| One polygon | Vertices | Longest step, natively |
+| --- | ---: | ---: |
+| A ragged ring (random noise of 4 % in its radius), like a coastline | 25,000 / 50,000 / 100,000 | 20 / 50 to 60 / 140 to 215 ms |
+| A plain circle | 25,000 / 50,000 / 100,000 | 0.43 to 0.47 s / 0.88 s / 4.3 to 4.6 s |
+| An ellipse (50 by 10 km) | 50,000 / 100,000 | 1.5 to 1.7 s / 6.2 to 7.9 s |
+| A jagged star (the radius of each vertex uncorrelated, 25 to 75 km) | 25,000 / 50,000 / 100,000 | 130 to 150 ms / 0.6 to 0.75 s / 3.3 to 4.6 s |
+| A comb (teeth that go in and out) | 15,000 / 37,500 / 75,000 | 0.3 to 0.38 s / 1.8 to 2.2 s / 6.6 to 9.7 s |
+| A ring that crosses itself (points in random order); then only outlined | 50,000 / 100,000 | 3.2 to 3.3 s / 10.7 to 12.8 s |
+| A square with holes (four vertices each) | 10,000 (2,500 holes) / 20,000 (5,000) / 24,000 (6,000) | 85 to 140 ms / 0.37 to 0.5 s / 0.5 to 0.7 s |
+
+The first version of this table called the ragged ring "smooth", and the text said that the limit of 100,000 vertices is the size at which
+"a smooth polygon, which is nearly every polygon of a map" fills in about a third of a second. That was wrong (found by the third review of the
+milestone): a ring that is smooth in the sense of a densely sampled curve, a plain circle, an ellipse, a buffer or a densified outline, is the slow
+case, 4 to 8 s at 100,000 vertices, while a ragged natural boundary is quick. The crate limits two things, and neither bounds the step for every shape. A
+polygon of more than 100,000 vertices is outlined and not filled (`display.polygons.too_detailed`), and so is one whose vertices times its rings is over
+150,000,000 (6,000 holes of four vertices: holes cost about 4 ns for each unit of that product, so the limit is about half a second for one polygon of holes, and the
+reviewer's polygon of 96,000 vertices and 24,000 holes, which took 18.7 s, is now outlined at once). The limit on vertices keeps a ragged natural boundary
+filled and the nodes of `earcut` far from the size at which it panics; **it is not a bound for a plain curve, a jagged ring or a comb**, which at 100,000
+vertices take several seconds in which the worker hears no request to stop. The number of concave vertices does not predict the time, and the time itself cannot decide
+what is drawn (brief section 8). **The owner's options**: (1) leave it as it is, the limit disclosed; (2) lower the limit of vertices: 50,000 would bring a jagged star
+to 0.6 to 0.75 s but not a plain circle (0.9 s) or an ellipse (1.5 s), and would outline the ragged boundaries of 50,000 to 100,000 vertices that fill in a fraction of a second; (3) count the
+work inside `earcut` and give up when a budget is spent. The third review did that in a scratch copy of the crate, with a counter that ticks once for each step of its main loop, each
+node of the z-order hash visited, each edge tested and each cut tried, so that it depends on the data and not on a clock: about 200 million ticks was about half a second natively for the circle, the
+ellipse, the star and the comb, and ordinary rings were far below it (a ragged ring of 100,000 vertices 33 million, a random walk 3 to 16 million). It is a few
+lines in `earcut`'s own source, which would have to be copied into the repository or forked, a decision about a dependency that is the owner's. A polygon of 100,000 vertices in WebAssembly in Node: 373 ms for the ragged circle of the first timing. The
+conversion of 1,000,000 positions from longitude and latitude (about 270 ms natively, 650 ms in WebAssembly) is the one preparing cost that
+is more than a few tens of milliseconds as a whole, and it is a part of drawing data that is not in the map's system. The warp of a grid of
+4,000,000 cells is 1 ms because it is a mesh of about 64 parts, not a picture of cells: the cells are in the texture the renderer is given.
+WebAssembly in Node, one run each, this machine. Not measured: the cost of yielding between steps in a browser, where `setTimeout(0)` is held to about 4 ms after a few nested
+calls, so that a prepare of many steps (the 40 of a surface of 4,000,000 cells, or one for each tile of a very large warped grid) takes that
+much longer than its work.
