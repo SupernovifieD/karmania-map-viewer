@@ -384,9 +384,9 @@ fn one_big_polygon(vertices: usize) -> Dataset {
     )
 }
 
-/// How long one step takes when it has to triangulate a single smooth polygon of many vertices, up to the limit of the
-/// crate: the worker hears nothing for that long, because a polygon is not cut into steps. A smooth ring is the easy
-/// case; the hard ones are in `the_longest_step_for_polygons_that_are_hard_to_fill`.
+/// How long one step takes when it has to triangulate a single ragged polygon (a coastline) of many vertices, up to the limit of
+/// the crate: the worker hears nothing for that long, because a polygon is not cut into steps. A ragged ring is the easy
+/// case; the hard ones, a plain circle among them, are in `the_longest_step_for_polygons_that_are_hard_to_fill`.
 #[test]
 #[ignore = "timing; run in a release build with --ignored"]
 fn the_longest_step_for_one_large_polygon() {
@@ -403,7 +403,7 @@ fn the_longest_step_for_one_large_polygon() {
     }
 }
 
-/// One polygon of the shape named: a jagged star (the radius of each vertex is uncorrelated, within a fraction of
+/// One polygon of the shape named: a plain circle or an ellipse, points in random order (a ring that crosses itself), a jagged star (the radius of each vertex is uncorrelated, within a fraction of
 /// 50 km), a comb (teeth that go in and out), or a square with `holes` square holes. Returns the dataset and its
 /// number of vertices.
 fn shaped_polygon(shape: &str, size: usize) -> Dataset {
@@ -416,6 +416,28 @@ fn shaped_polygon(shape: &str, size: usize) -> Dataset {
                 let radius = 50_000.0 * (0.5 + (rng.next() % 1_000) as f64 / 1_000.0);
                 x.push(500_000.0 + radius * angle.cos());
                 y.push(2_750_000.0 + radius * angle.sin());
+            }
+        }
+        "circle" | "ellipse" => {
+            // A plain circle of 50 km, or an ellipse of 50 by 10 km: a densely sampled smooth curve, as a buffer or a
+            // densified outline is.
+            let minor = if shape == "circle" {
+                50_000.0
+            } else {
+                10_000.0
+            };
+            for i in 0..size {
+                let angle = std::f64::consts::TAU * i as f64 / size as f64;
+                x.push(500_000.0 + 50_000.0 * angle.cos());
+                y.push(2_750_000.0 + minor * angle.sin());
+            }
+        }
+        "crossing" => {
+            // Points in a square in random order: a ring that crosses itself everywhere, which is data that is wrong and
+            // which `earcut` takes the longest over and the checks then refuse.
+            for _ in 0..size {
+                x.push(450_000.0 + (rng.next() % 100_000) as f64);
+                y.push(2_700_000.0 + (rng.next() % 100_000) as f64);
             }
         }
         "comb" => {
@@ -482,6 +504,13 @@ fn shaped_polygon(shape: &str, size: usize) -> Dataset {
 #[ignore = "timing; run in a release build with --ignored"]
 fn the_longest_step_for_polygons_that_are_hard_to_fill() {
     for (shape, size) in [
+        ("circle", 25_000),
+        ("circle", 50_000),
+        ("circle", 100_000),
+        ("ellipse", 50_000),
+        ("ellipse", 100_000),
+        ("crossing", 50_000),
+        ("crossing", 100_000),
         ("star", 25_000),
         ("star", 50_000),
         ("star", 100_000),
