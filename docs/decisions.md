@@ -3600,3 +3600,13 @@ document that a record said was changed and was not, an understated bound, and n
   the owner's. **Earlier records that later steps superseded, without an entry of their own saying so**: the 16,000,000 vertices of step 13.8 (now 100,000 and the work limit, steps 13.F3 and 13.F11); "a step takes well
   under a tenth of a second" in step 13.20b (not so, step 13.F3); the formula `max / n - min / n` of step 13.15, which does not overflow for one class (step 13.F12); the rows of 200,000 and 400,000 vertices of step 13.F3
   (they only time the outline since then). The record of step 13.F13 in the roadmap named "the unused word of a test", which no commit changed; the line is corrected.
+- Step 13.F15 (a regression of step 13.F12: bounds that are not clean). Minor. The formula of step 13.F12, `min * (1 - t) + max * t`, no longer gave exact bounds for integer data whose width
+  divides evenly, as the older `min + step * k` did: the reviewer counted, over 336,439 integer ranges in 2 to 12 classes, 106,257 misses (31.6 %) against 7,608 (2.3 %) before, and with the default of 7
+  classes over 0 to 100 + 7k 34.8 % against 12.8 %. Examples: -200 to -188 in 6 classes gave -198.00000000000003, 0 to 77 in 11 gave 63.00000000000001, integers 1 to 15 in 7 gave 6.999999999999999,
+  so a value on a bound fell in the class below it, against the rule of step 13.15 ("a value that is a bound starts the class above it") and the label of the legend; by the reviewer's count, 1,735
+  of 53,244 such values against 54 before. **Fix**: when the range (`max - min`) is finite the bound is `min + (range / n) * k`, exact where the width divides evenly; only when the range is wider than a
+  float, and so infinite, is it the blend, which cannot overflow; each bound is still held between the one before it and the largest value (step 13.F12). The test of 13.F12 only checked that the
+  bounds are finite, never go down, begin and end at the values and have a count each, which the regression passed, and the exactness of `[0, 2, 4, 6, 8, 10]` held only because the smallest value is 0
+  and 10 x 0.6 rounds to 6. **New test, seen to fail first** (`-198.00000000000003`): for eight minimums (-200 to 1,000), widths 1 to 400 and 2 to 12 classes with the width divisible by the classes, a column of
+  every integer has the bounds `min + step * k` exactly, each bound is in the class it starts (`class_of`), and the counts add up; and the three examples of the review. The test of 13.F12 (4,000
+  random ranges of 1 to 20 units, the largest and smallest floats, in 1 to 12 classes) and the kernel test in Node still pass with it.
