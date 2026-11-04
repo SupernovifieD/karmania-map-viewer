@@ -236,20 +236,26 @@ fn extent(values: &[f64]) -> (f64, f64) {
         })
 }
 
-/// Equal steps from the smallest to the largest of `values` (not empty, finite): the bound `k` is `min * (1 - k / n) +
-/// max * (k / n)`, which does not overflow for a range wider than a float (`max - min` does), and each is held between
-/// the one before it and the largest value, because rounding can put a bound a few units in the last place above
-/// the next, or above the largest, when the range is a few of them wide (found by the second review of the milestone: the
-/// bounds went down, and the engine refused them). The first bound is the smallest value itself and the last the
-/// largest.
+/// Equal steps from the smallest to the largest of `values` (not empty, finite): the bound `k` is `min + (range / n) *
+/// k`, which is exact where the width divides evenly (integers from -200 to -188 in 6 classes give -198, which
+/// the blend `min * (1 - t) + max * t` does not: -198.00000000000003, found by the third review of the milestone). When the
+/// range itself is wider than a float, `max - min` is infinite and the bound is the blend, which cannot overflow. Each
+/// is held between the one before it and the largest value, because rounding can put a bound a few units in the last place
+/// above the next, or above the largest, when the range is a few of them wide (the bounds went down, and the engine refused
+/// them: found by the second review). The first bound is the smallest value itself and the last the largest.
 fn equal_bounds(values: &[f64], classes: usize) -> Vec<f64> {
     let (min, max) = extent(values);
     let n = classes as f64;
+    let range = max - min;
     let mut bounds = Vec::with_capacity(classes + 1);
     bounds.push(min);
     for k in 1..classes {
-        let t = k as f64 / n;
-        let bound = min * (1.0 - t) + max * t;
+        let bound = if range.is_finite() {
+            min + (range / n) * k as f64
+        } else {
+            let t = k as f64 / n;
+            min * (1.0 - t) + max * t
+        };
         let before = bounds.last().copied().unwrap_or(min);
         bounds.push(bound.clamp(before, max));
     }
@@ -849,6 +855,46 @@ mod tests {
                 assert_eq!(counts.iter().sum::<u64>(), values.len() as u64);
                 assert_eq!(counts.len(), bounds.len() - 1);
             }
+        }
+    }
+
+    #[test]
+    fn equal_bounds_are_exact_where_the_width_divides_evenly_and_a_value_on_one_is_in_the_class_above()
+     {
+        // Found by the third review of the milestone, as a regression of step 13.F12: `min * (1 - t) + max * t` gave
+        // -198.00000000000003 for -200 to -188 in 6 classes, 63.00000000000001 for 0 to 77 in 11, and integers 1 to 15 in 7
+        // classes had bounds such as 6.999999999999999, so that a value on a bound fell in the class below it, against the rule of
+        // step 13.15 and the label of the legend.
+        let mut checked = 0;
+        for min in [-200.0, -5.0, 0.0, 1.0, 5.0, 10.0, 100.0, 1_000.0] {
+            for width in 1..=400_u32 {
+                for classes in 2..=12_u32 {
+                    if width % classes != 0 {
+                        continue;
+                    }
+                    let max = min + f64::from(width);
+                    let step = f64::from(width / classes);
+                    let wanted: Vec<f64> =
+                        (0..=classes).map(|k| min + step * f64::from(k)).collect();
+                    // A column of every integer from min to max: each value on a bound is in the class above the bound.
+                    let column =
+                        floats(&(0..=width).map(|i| min + f64::from(i)).collect::<Vec<_>>());
+                    let (bounds, counts, _) = ranges(&column, Method::Equal, classes as usize);
+                    assert_eq!(bounds, wanted, "{min} to {max} in {classes}");
+                    for k in 0..classes {
+                        assert_eq!(class_of(&bounds, wanted[k as usize]), Some(k as usize));
+                    }
+                    assert_eq!(counts.iter().sum::<u64>(), u64::from(width) + 1);
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 1_000, "{checked} ranges checked");
+        // The three examples of the review.
+        for (min, max, classes) in [(-200.0, -188.0, 6), (0.0, 77.0, 11), (1.0, 15.0, 7)] {
+            let column = floats(&[min, max]);
+            let (bounds, _, _) = ranges(&column, Method::Equal, classes);
+            assert!(bounds.iter().all(|b| b.fract() == 0.0), "{bounds:?}");
         }
     }
 }
