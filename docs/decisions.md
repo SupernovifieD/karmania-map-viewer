@@ -3610,3 +3610,13 @@ document that a record said was changed and was not, an understated bound, and n
   and 10 x 0.6 rounds to 6. **New test, seen to fail first** (`-198.00000000000003`): for eight minimums (-200 to 1,000), widths 1 to 400 and 2 to 12 classes with the width divisible by the classes, a column of
   every integer has the bounds `min + step * k` exactly, each bound is in the class it starts (`class_of`), and the counts add up; and the three examples of the review. The test of 13.F12 (4,000
   random ranges of 1 to 20 units, the largest and smallest floats, in 1 to 12 classes) and the kernel test in Node still pass with it.
+- Step 13.F16 (what step 13.F11 said it did, and a budget in vertices). Three things. (1) **`docs/validation-codes.md`** (minor): the record and the commit of step 13.F11 say that the message of
+  `display.polygons.too_detailed` was changed there, and `git show e1b851e --stat` does not list the file; it still said "have more than {limit} vertices, which is too many to fill in". The code said the
+  new words. The test of the core that compares the registry with the document only checks that every code is documented with a severity, a step and a hint, so nothing caught it. The Message and the Example
+  are now the words of the code. (2) **A step charged in vertices** (minor): `PolygonsFill::advance` added up vertices, so one step packed polygons up to 100,000 vertices, and five polygons of 5,500 holes
+  (110,020 vertices, each under the work limit) took 2.0 s in one step against 0.42 s for one. A polygon now costs its vertices plus a thousandth of its work (vertices times rings), at least 1 (`step_cost`), so
+  that such polygons go to a step one at a time, and a polygon of ordinary rings costs what it did. Test, seen to fail with the old accounting: three polygons of 300 holes (cost 1,566 each) with a budget of
+  1,500 are done in three steps, and the buffers are those of all at once. Not changed: one polygon of any shape is still one step (step 13.F14). (3) **Nits of the test with the real limits**: its exterior was 200 by
+  200, so the holes from the 5,000th on lay outside it and the polygon would have been refused as `outline_only` without the limit, which made the test catch a mutation only by its finding code; the exterior is
+  400 by 400 now, every hole inside, and removing the real work limit fails the test on its first assertion (tried). The stale figures in a test's comment ("0.14 s for 100,000 vertices, 3.3 s for 400,000") are
+  replaced by the measured plain circle.

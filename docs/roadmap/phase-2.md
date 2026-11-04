@@ -253,7 +253,7 @@ or releasing, and whenever the brief says to stop.
   table, the owner's options, and a note of what earlier records the later fixes superseded.
 - [x] 13.F15 Gate fix, third review: equal-interval bounds are exact where the width divides evenly, as they were
   before step 13.F12.
-- [ ] 13.F16 Gate fix, third review: a step of polygons is charged by work and not by vertices, the validation-codes
+- [x] 13.F16 Gate fix, third review: a step of polygons is charged by work and not by vertices, the validation-codes
   document says what step 13.F11 said it did, and the test with the real limits has its holes inside.
 - [ ] 13.G Gate.
 
