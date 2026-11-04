@@ -12,14 +12,17 @@ use crate::project::{Prepared, project};
 /// this is drawn as an outline only, with `display.polygons.too_detailed`.
 ///
 /// A polygon is one step of a prepare, which cannot be cut, and the worker hears nothing, not a request to
-/// stop, while `earcut` works on it. Its time depends on the shape and not on the number of vertices alone (the
-/// second review of the milestone, and the ignored timing tests `the_longest_step_for_one_large_polygon` and
-/// `the_longest_step_for_polygons_that_are_hard_to_fill`): natively, a smooth ring of 100,000 vertices takes
-/// 30 to 340 ms, a jagged one (a star whose radius is uncorrelated from vertex to vertex) 3.3 s, a comb of 75,000
-/// vertices 6.6 s; and holes cost about 4 ns for each vertex and each ring (see [`MAX_FILL_WORK`]). So this limit
-/// does **not** bound the step: a pathological ring at the limit takes seconds. It is the largest size at which a
-/// smooth polygon, which is nearly every polygon of a map, is filled in a third of a second or less, and
-/// it keeps the nodes of `earcut` (40 bytes each under a 32-bit offset) far from the size at which it panics.
+/// stop, while `earcut` works on it. Its time depends on the shape and not on the number of vertices alone
+/// (`the_longest_step_for_one_large_polygon` and `the_longest_step_for_polygons_that_are_hard_to_fill`,
+/// natively, 100,000 vertices): a ragged ring (random noise in the radius) 0.14 to 0.22 s, a plain circle 4.3 s,
+/// an ellipse 6.2 s, a jagged star 3.3 to 4.6 s; a comb of 75,000 vertices 6.6 to 9.7 s; and a ring that
+/// crosses itself 10.7 s, which is then refused and outlined, so that all of it is wasted. Holes cost about 4 ns for
+/// each vertex and each ring (see [`MAX_FILL_WORK`]). So this limit does **not** bound the step: a polygon at the
+/// limit takes from a fraction of a second to several seconds, by its shape. It is the size at which a ragged
+/// natural boundary, a coastline, still fills in a quarter of a second or less, and it keeps the nodes of
+/// `earcut` (40 bytes each under a 32-bit offset) far from the size at which it panics. Lowering it to 50,000
+/// would not bound a plain circle either (0.9 s) or an ellipse (1.5 s); a bound for every shape needs a count of the
+/// work inside `earcut` (see docs/decisions.md, step 13.F14).
 const MAX_FILLED_VERTICES: usize = 100_000;
 
 /// The most work in one polygon, as its vertices times its rings (the exterior and the holes): 150,000,000,

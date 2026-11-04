@@ -3581,3 +3581,22 @@ randomised checks of the classes, of the origin and of 48 shapes of warp tile, w
   committed and pushed because the check and the commit were one command that did not stop on the check's failure. Every commit since is chained to a passing check. (5) **Not changed**: the words of
   the finding of `with_limits` name the real limit even for a test's smaller one (documented); `checkedFrame` throws a `ContractError` with a path message where other misuse is a `TypeError` with a
   sentence, and the text reaches the page unchanged, which is what matters.
+
+## M13 gate, third round
+
+The third review (a fresh subagent, on `9ee8bfb`, with the whole gate rerun and green on it) found no blocker, one claim that was wrong, one regression from the second round's fix, one
+document that a record said was changed and was not, an understated bound, and nits. It judged F11, F12 (the formula's behaviour) and F13 correct in what they do, with
+159,360 combinations of column, method, classes and nulls agreeing between the counts, `class_of` and the class index and 60,000 random degenerate polygons without a panic.
+
+- Step 13.F14 (the slow polygon is a plain curve). The claim of steps 13.F3 and 13.F11, in the comments, in `docs/perf.md` and in the records, that the limit of 100,000 vertices is "the size at which a smooth
+  polygon, which is nearly every polygon of a map, fills in about a third of a second", was wrong. The ring that was timed and called smooth is a circle with random noise of 4 % in its radius, which
+  is **ragged**, as a coastline is, and it is quick; a ring that is smooth in the sense of a densely sampled curve is the slow one. Measured here, natively, in one step, at 100,000 vertices: a ragged ring 0.14 to
+  0.22 s, a plain circle 4.3 s, an ellipse 6.2 s, a jagged star 3.3 to 3.8 s, and a ring that crosses itself 10.7 s (which is then refused and only outlined, so all of it wasted); at 50,000 a plain circle
+  is 0.9 s and an ellipse 1.5 s. The ignored timing test has those shapes now. **What was changed**: the word (ragged and not smooth), "nearly every polygon of a map" gone, the table of `docs/perf.md` with the new rows
+  (the numbers are this run's, with the ranges of earlier runs), and the options for the owner stated as they are: (1) leave it, disclosed; (2) a lower limit, which does not bound a plain curve (50,000 vertices is 0.9 s
+  for a circle) and would outline ragged boundaries that fill quickly, so the earlier record's reason for it was wrong, and (3) a count of the work inside `earcut` that gives up at a budget, which the reviewer
+  tried in a scratch copy of the crate (a counter that ticks once for each step of the main loop, node of the hash visited, edge tested and cut tried, which depends on the data and not on a clock; about 200 million ticks was
+  about half a second natively for the circle, the ellipse, the star and the comb, and ordinary rings were far below it) and which needs a few lines in `earcut`'s own source, so a copy or a fork of a dependency:
+  the owner's. **Earlier records that later steps superseded, without an entry of their own saying so**: the 16,000,000 vertices of step 13.8 (now 100,000 and the work limit, steps 13.F3 and 13.F11); "a step takes well
+  under a tenth of a second" in step 13.20b (not so, step 13.F3); the formula `max / n - min / n` of step 13.15, which does not overflow for one class (step 13.F12); the rows of 200,000 and 400,000 vertices of step 13.F3
+  (they only time the outline since then). The record of step 13.F13 in the roadmap named "the unused word of a test", which no commit changed; the line is corrected.

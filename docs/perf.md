@@ -336,21 +336,29 @@ the triangles of a surface (one step for 4,000,000 cells: 180 ms natively, 445 m
 
 | One polygon | Vertices | Longest step, natively |
 | --- | ---: | ---: |
-| A smooth ring (4 % noise in its radius) | 25,000 / 50,000 / 100,000 | 20 / 50 to 60 / 140 to 215 ms |
-| A jagged star (the radius of each vertex uncorrelated, 25 to 75 km) | 25,000 / 50,000 / 100,000 | 130 ms / 0.6 to 0.75 s / 3.3 to 4.6 s |
-| A comb (teeth that go in and out) | 15,000 / 37,500 / 75,000 | 0.3 to 0.36 s / 1.8 to 2.2 s / 6.6 to 9.7 s |
+| A ragged ring (random noise of 4 % in its radius), like a coastline | 25,000 / 50,000 / 100,000 | 20 / 50 to 60 / 140 to 215 ms |
+| A plain circle | 25,000 / 50,000 / 100,000 | 0.43 to 0.47 s / 0.88 s / 4.3 to 4.6 s |
+| An ellipse (50 by 10 km) | 50,000 / 100,000 | 1.5 to 1.7 s / 6.2 to 7.9 s |
+| A jagged star (the radius of each vertex uncorrelated, 25 to 75 km) | 25,000 / 50,000 / 100,000 | 130 to 150 ms / 0.6 to 0.75 s / 3.3 to 4.6 s |
+| A comb (teeth that go in and out) | 15,000 / 37,500 / 75,000 | 0.3 to 0.38 s / 1.8 to 2.2 s / 6.6 to 9.7 s |
+| A ring that crosses itself (points in random order); then only outlined | 50,000 / 100,000 | 3.2 to 3.3 s / 10.7 to 12.8 s |
 | A square with holes (four vertices each) | 10,000 (2,500 holes) / 20,000 (5,000) / 24,000 (6,000) | 85 to 140 ms / 0.37 to 0.5 s / 0.5 to 0.7 s |
 
-The crate limits two things, and neither bounds the step for every shape. A polygon of more than 100,000 vertices is outlined and not
-filled (`display.polygons.too_detailed`), and so is one whose vertices times its rings is over 150,000,000 (6,000 holes of four
-vertices: holes cost about 4 ns for each unit of that product, so the limit is about half a second for holes, and the test of the reviewer's
-polygon, 96,000 vertices and 24,000 holes, which took 18.7 s, is now outlined at once). The limit on vertices is the size at which a smooth polygon, which is
-nearly every polygon of a map, fills in about a third of a second or less; it is **not** a bound for a jagged or comb-like ring, which at
-100,000 vertices takes several seconds (the review measured 2.2 and 3.5 s in WebAssembly for jagged stars), during which the worker hears no
-request to stop. There is no cheap deterministic estimate of that time from the shape (the number of concave vertices, the first thing to try,
-does not predict it: the smooth ring has as many), and the time itself cannot decide what is drawn (brief section 8). A lower limit, 50,000
-vertices, would bring the jagged star to 0.6 to 0.75 s and outline the polygons between 50,000 and 100,000 vertices that fill without trouble:
-that trade is the owner's. A polygon of 100,000 vertices in WebAssembly in Node: 373 ms for the ragged circle of the first timing. The
+The first version of this table called the ragged ring "smooth", and the text said that the limit of 100,000 vertices is the size at which
+"a smooth polygon, which is nearly every polygon of a map" fills in about a third of a second. That was wrong (found by the third review of the
+milestone): a ring that is smooth in the sense of a densely sampled curve, a plain circle, an ellipse, a buffer or a densified outline, is the slow
+case, 4 to 8 s at 100,000 vertices, while a ragged natural boundary is quick. The crate limits two things, and neither bounds the step for every shape. A
+polygon of more than 100,000 vertices is outlined and not filled (`display.polygons.too_detailed`), and so is one whose vertices times its rings is over
+150,000,000 (6,000 holes of four vertices: holes cost about 4 ns for each unit of that product, so the limit is about half a second for one polygon of holes, and the
+reviewer's polygon of 96,000 vertices and 24,000 holes, which took 18.7 s, is now outlined at once). The limit on vertices keeps a ragged natural boundary
+filled and the nodes of `earcut` far from the size at which it panics; **it is not a bound for a plain curve, a jagged ring or a comb**, which at 100,000
+vertices take several seconds in which the worker hears no request to stop. The number of concave vertices does not predict the time, and the time itself cannot decide
+what is drawn (brief section 8). **The owner's options**: (1) leave it as it is, the limit disclosed; (2) lower the limit of vertices: 50,000 would bring a jagged star
+to 0.6 to 0.75 s but not a plain circle (0.9 s) or an ellipse (1.5 s), and would outline the ragged boundaries of 50,000 to 100,000 vertices that fill in a fraction of a second; (3) count the
+work inside `earcut` and give up when a budget is spent. The third review did that in a scratch copy of the crate, with a counter that ticks once for each step of its main loop, each
+node of the z-order hash visited, each edge tested and each cut tried, so that it depends on the data and not on a clock: about 200 million ticks was about half a second natively for the circle, the
+ellipse, the star and the comb, and ordinary rings were far below it (a ragged ring of 100,000 vertices 33 million, a random walk 3 to 16 million). It is a few
+lines in `earcut`'s own source, which would have to be copied into the repository or forked, a decision about a dependency that is the owner's. A polygon of 100,000 vertices in WebAssembly in Node: 373 ms for the ragged circle of the first timing. The
 conversion of 1,000,000 positions from longitude and latitude (about 270 ms natively, 650 ms in WebAssembly) is the one preparing cost that
 is more than a few tens of milliseconds as a whole, and it is a part of drawing data that is not in the map's system. The warp of a grid of
 4,000,000 cells is 1 ms because it is a mesh of about 64 parts, not a picture of cells: the cells are in the texture the renderer is given.

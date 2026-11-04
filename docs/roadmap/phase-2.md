@@ -248,7 +248,13 @@ or releasing, and whenever the brief says to stop.
   the limits do and do not bound is said as it was measured.
 - [x] 13.F12 Gate fix, second review: equal-interval bounds never descend and never overflow.
 - [x] 13.F13 Gate fix, second review: stale words ("one byte for each element", the other kinds of step that cannot
-  be cut, the `chooseFrame` doc, the unused word of a test) and the record of the commit that did not build.
+  be cut, the `chooseFrame` doc) and the record of the commit that did not build.
+- [x] 13.F14 Gate fix, third review: a plain curve is the slow polygon and not the ragged one: the word, the
+  table, the owner's options, and a note of what earlier records the later fixes superseded.
+- [ ] 13.F15 Gate fix, third review: equal-interval bounds are exact where the width divides evenly, as they were
+  before step 13.F12.
+- [ ] 13.F16 Gate fix, third review: a step of polygons is charged by work and not by vertices, the validation-codes
+  document says what step 13.F11 said it did, and the test with the real limits has its holes inside.
 - [ ] 13.G Gate.
 
 ## M14: Scene document (@karmania/scene)
