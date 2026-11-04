@@ -255,6 +255,8 @@ or releasing, and whenever the brief says to stop.
   before step 13.F12.
 - [x] 13.F16 Gate fix, third review: a step of polygons is charged by work and not by vertices, the validation-codes
   document says what step 13.F11 said it did, and the test with the real limits has its holes inside.
+- [x] 13.F17 Gate fix, fourth review: two tests for `equal_bounds` (the hold between bounds, and the blend for a range
+  wider than a float), each seen to fail when its part of the code is removed.
 - [ ] 13.G Gate.
 
 ## M14: Scene document (@karmania/scene)

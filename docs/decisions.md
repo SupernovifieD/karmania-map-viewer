@@ -3620,3 +3620,21 @@ document that a record said was changed and was not, an understated bound, and n
   200, so the holes from the 5,000th on lay outside it and the polygon would have been refused as `outline_only` without the limit, which made the test catch a mutation only by its finding code; the exterior is
   400 by 400 now, every hole inside, and removing the real work limit fails the test on its first assertion (tried). The stale figures in a test's comment ("0.14 s for 100,000 vertices, 3.3 s for 400,000") are
   replaced by the measured plain circle.
+
+## M13 gate, fourth round
+
+The fourth review (a fresh subagent, on `d1aa9f2`, with the whole gate green on it) found nothing that must be fixed. It confirmed, with its own property test over 178,761 combinations of column
+(integers, decimals, a few units in the last place, subnormal, huge, constant, mostly one value; with nulls, NaN and infinities), method (equal, quantile, natural breaks) and 1 to 254 classes, in debug (with
+overflow checks) and in release, that the bounds are finite, never go down, begin and end at the values, and that the counts, `class_of` and the class index agree; exact bounds for 28,416 integer ranges that
+divide evenly; that a step of polygons always makes progress and gives the buffers and findings of all at once for budgets from 0 to `usize::MAX`; that `docs/validation-codes.md` says what the code says; and that the
+numbers of the polygon table in `docs/perf.md` have the same shape and order of magnitude when timed again (a plain circle of 100,000 vertices 4.6 s against 4.3 s, a comb 6.7 s, a self-crossing ring 10.7 s).
+
+- Step 13.F17 (two parts of `equal_bounds` that no test pinned). Nit, sure. Removing the hold between the bounds (`bound.clamp(before, max)`) passed every test of the crate, because the formula of step 13.F15 no longer
+  rounds above the largest value for the ranges the test of 13.F12 draws; and using `min + (range / n) * k` for every range, so that an infinite range gives an infinite step clamped to the largest value, passed too.
+  Both parts are needed: for the column `[0, 5 of the smallest numbers]` in 7 classes, `range / n` rounds to one of them and the sixth bound is 6 of them, above the largest value (`[0, 5e-324, 1e-323, 1.5e-323,
+  2e-323, 2.5e-323, 3e-323, 2.5e-323]` without the hold), and for `[-1.7e308, 0, 1.7e308]` in 3 classes the finite formula gives bounds `[min, max, max]` and counts `[2, 1]`. **Tests, only test code**: that column is now one of
+  the cases of the test of 13.F12, and a test of its own asks for three classes with the bounds one third of the way, each within 1e-12. Seen to fail with each part removed (the first test with the hold removed,
+  the second with the finite formula for every range) and to pass with the code as it is. No code outside `#[cfg(test)]` changed, so the build the gate was run on is the build that is merged.
+  **Nits of the review left as they are**, none of which can be reached: a second `let vertices` that repeats the first in `polygons.rs` (`PolygonsFill::advance`); `polygons_buffers` ignores whether the budget `usize::MAX`
+  finished the job, which only matters on a target where `usize` has 32 bits and the total cost passes 4.29 billion, and the stepped path used by the wasm exports loops until the job says it is done; and the message of
+  `d1aa9f2` says a polygon of ordinary rings "costs what it did", when it costs about a thousandth more for each ring.

@@ -822,6 +822,9 @@ mod tests {
             vec![-1.7e308, 1.7e308, 0.0],
             vec![f64::MIN, f64::MAX],
             vec![-1.0e-320, 1.0e-320],
+            // A range of five of the smallest numbers in 7 classes: `range / n` rounds to one of them, so `min + (range / n) *
+            // k` is 6 of them for the sixth bound, above the largest value, and only the hold between the bounds keeps it down.
+            vec![0.0, f64::from_bits(5)],
         ];
         let mut seed = 5_u64;
         let mut next = move || {
@@ -855,6 +858,23 @@ mod tests {
                 assert_eq!(counts.iter().sum::<u64>(), values.len() as u64);
                 assert_eq!(counts.len(), bounds.len() - 1);
             }
+        }
+    }
+
+    #[test]
+    fn equal_bounds_of_a_range_wider_than_a_float_are_still_equal_steps() {
+        // Found by the fourth review of the milestone: no test told the blend used when `max - min` is infinite from
+        // `min + (range / n) * k`, which clamped to the largest value gives one class too few (bounds `[min, max, max]`,
+        // counts `[2, 1]`) and passed every other test.
+        let (min, max) = (-1.7e308, 1.7e308);
+        let (bounds, counts, _) = ranges(&floats(&[min, 0.0, max]), Method::Equal, 3);
+        assert_eq!((bounds.len(), counts), (4, vec![1, 1, 1]), "{bounds:?}");
+        assert_eq!((bounds[0], bounds[3]), (min, max));
+        for (bound, wanted) in [(bounds[1], min / 3.0), (bounds[2], max / 3.0)] {
+            assert!(
+                ((bound - wanted) / wanted).abs() < 1e-12,
+                "{bound:e} is not {wanted:e}"
+            );
         }
     }
 
