@@ -379,9 +379,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: Some polygons have more than {limit} vertices, which is too many to fill in, so only their outlines are drawn.
+- Message: Some polygons are too detailed to fill in (more than {limit} vertices, or too many holes for their size), so only their outlines are drawn.
 - Hint: Simplify the polygons, or split them into smaller ones, to fill them in.
-- Example: Some polygons have more than 100,000 vertices, which is too many to fill in, so only their outlines are drawn.
+- Example: Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn.
 
 ## `file.empty`
 

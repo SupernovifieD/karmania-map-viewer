@@ -32,6 +32,19 @@ const MAX_FILLED_VERTICES: usize = 100_000;
 /// 96,000 and 24,000 (about 4 ns for each unit of the product). The limit is about half a second for holes.
 const MAX_FILL_WORK: u64 = 150_000_000;
 
+/// What a polygon of `vertices` vertices in `rings` rings costs of the budget of a step: its vertices, and a thousandth of its work
+/// (vertices times rings) besides, so that polygons with many holes, whose time is in the holes, are not packed into one step
+/// five at a time (five polygons of 5,500 holes took 2.0 s in one step when only vertices were counted, 0.42 s each). At least 1.
+fn step_cost(vertices: usize, rings: usize) -> usize {
+    let work = vertices as u64 * rings as u64;
+    vertices
+        .saturating_add(usize::try_from(work / WORK_PER_BUDGET_UNIT).unwrap_or(usize::MAX))
+        .max(1)
+}
+
+/// How much work (vertices times rings) is one unit of the budget of a step.
+const WORK_PER_BUDGET_UNIT: u64 = 1_000;
+
 /// How far the area of the triangles may be from the area of the polygon (as a fraction of it) before
 /// the triangulation is taken to be wrong, which it is for a polygon that crosses itself.
 const AREA_TOLERANCE: f64 = 1e-6;
@@ -151,13 +164,8 @@ impl PolygonsFill {
             let ranges: Vec<_> = rings
                 .filter_map(|ring| polygons.vertex_range(ring))
                 .collect();
-            spent = spent.saturating_add(
-                ranges
-                    .iter()
-                    .map(ExactSizeIterator::len)
-                    .sum::<usize>()
-                    .max(1),
-            );
+            let vertices: usize = ranges.iter().map(ExactSizeIterator::len).sum();
+            spent = spent.saturating_add(step_cost(vertices, ranges.len()));
             for range in &ranges {
                 outline_ring(&mut self.buffers, range.clone(), number);
             }
@@ -605,8 +613,8 @@ mod tests {
 
     #[test]
     fn a_polygon_with_too_many_vertices_is_outlined_only_with_a_finding_of_its_own() {
-        // Found by the review of the milestone: earcut takes longer than its size (0.14 s for 100,000 vertices,
-        // 3.3 s for 400,000) and a polygon is one step, during which the worker hears nothing.
+        // Found by the review of the milestone: earcut takes longer than its size for some shapes (4.3 s for a plain circle of
+        // 100,000 vertices) and a polygon is one step, during which the worker hears nothing; see `MAX_FILLED_VERTICES`.
         let n = MAX_FILLED_VERTICES + 1;
         let out = prepare(&polygons(&[&[&SQUARE], &[&circle(n)]]));
         let b = &out.buffers;
@@ -656,18 +664,24 @@ mod tests {
         }
     }
 
-    /// A square with `holes` small square holes, as the rings of one polygon.
-    fn square_with_holes(holes: usize) -> Polygons {
+    /// `count` polygons, each a square with `holes` small square holes.
+    fn squares_with_holes(holes: usize, count: usize) -> Polygons {
         let hole_rings: Vec<Vec<(f64, f64)>> = (0..holes)
             .map(|h| {
                 let (x, y) = (1.0 + (h % 50) as f64 * 2.0, 1.0 + (h / 50) as f64 * 2.0);
                 vec![(x, y), (x, y + 1.0), (x + 1.0, y + 1.0), (x + 1.0, y)]
             })
             .collect();
-        let exterior = vec![(0.0, 0.0), (200.0, 0.0), (200.0, 200.0), (0.0, 200.0)];
+        // Big enough for every hole to be inside it: the holes of 7,000 reach 100 across and 281 up.
+        let exterior = vec![(0.0, 0.0), (400.0, 0.0), (400.0, 400.0), (0.0, 400.0)];
         let mut rings: Vec<&[(f64, f64)]> = vec![&exterior];
         rings.extend(hole_rings.iter().map(Vec::as_slice));
-        polygons(&[&rings])
+        polygons(&vec![&rings[..]; count])
+    }
+
+    /// A square with `holes` small square holes.
+    fn square_with_holes(holes: usize) -> Polygons {
+        squares_with_holes(holes, 1)
     }
 
     #[test]
@@ -708,5 +722,35 @@ mod tests {
         );
         // And a polygon with few holes is filled as before.
         assert!(!prepare(&square_with_holes(3)).buffers.triangles.is_empty());
+    }
+
+    #[test]
+    fn polygons_with_many_holes_are_charged_by_their_work_so_that_few_go_in_a_step() {
+        // Found by the third review of the milestone: the budget of a step counted vertices, so that five polygons of 5,500 holes,
+        // each under the limit of work, took 2.0 s in one step. A polygon of 300 holes is 1,204 vertices in 301 rings, a work of
+        // 362,404 and so a cost of 1,204 + 362 = 1,566; with a budget of 1,500 that is one polygon to a step, and it was two
+        // when only the vertices (1,204 each) were charged.
+        assert_eq!(step_cost(1_204, 301), 1_566);
+        assert_eq!(
+            step_cost(0, 0),
+            1,
+            "an empty polygon still moves the step on"
+        );
+        let all = squares_with_holes(300, 3);
+        let positions = project(&all.positions, LOCAL, &frame(), &mut Findings::new()).unwrap();
+        let mut fill = PolygonsFill::new(positions);
+        let mut steps = 1;
+        while !fill.advance(&all, 1_500) {
+            steps += 1;
+            assert!(steps < 10, "a step must move on");
+        }
+        assert_eq!(steps, 3, "one polygon to a step");
+        // With a large budget it is one step, and the buffers are those of all at once whatever the budget.
+        let whole = prepare(&all);
+        let positions = project(&all.positions, LOCAL, &frame(), &mut Findings::new()).unwrap();
+        let mut stepped = PolygonsFill::new(positions);
+        while !stepped.advance(&all, 1_500) {}
+        let mut findings = Findings::new();
+        assert_eq!(stepped.finish(&mut findings), whole.buffers);
     }
 }
