@@ -281,7 +281,9 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
     the light and the dark map, and the colours of new layers.
 - [x] 14.5 Default styles (11.6).
-- [ ] 14.6 Commands: layers and visibility.
+- [ ] 14.6 Commands: layers and visibility. Split to stay under the commit size guideline:
+  - [x] 14.6a The empty scene, the ids of new layers, and `addLayers`.
+  - [ ] 14.6b `removeLayersOfDataset`, `setVisible` and `setGroupVisible`.
 - [ ] 14.7 Commands: ordering and groups.
 - [ ] 14.8 Commands: style, contours, view, camera, frame, selection.
 - [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page.

@@ -114,3 +114,14 @@ export function spoil(node: unknown, path: readonly (string | number)[], value: 
 export function problemsAfter(path: readonly (string | number)[], value: unknown): string[] {
   return validateScene(spoil(sampleScene(), path, value)).map((p) => `${p.code} ${p.path}`);
 }
+
+/** A value and everything in it, frozen, so that anything that changes it throws. */
+export function frozen<T>(value: T): T {
+  if (typeof value === 'object' && value !== null) {
+    for (const inside of Object.values(value)) {
+      frozen(inside);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}

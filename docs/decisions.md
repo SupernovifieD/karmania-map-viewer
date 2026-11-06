@@ -3737,3 +3737,12 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   have a single colour like any other layer. (2) **The place in the order is a number the caller gives** (`ordinal`, from 0): the palette has eight colours and starts again after the eighth. How the commands of 14.6 get
   that number from the document, which has no counter, is that entry. Tested kind by kind, with the first-column rules and the wrap of the palette, and by `validateScene` accepting every style made for every kind with and
   without a numeric column; six changes to the code each fail a test (tried).
+- Step 14.6 (commands on layers and visibility, split into 14.6a and 14.6b). **A command is a pure function from a document to the next one**, in files by kind (`commands-layers.ts` here), and never changes what it is
+  given (tested on a deeply frozen document). **A command that names a layer or a group that is not there changes nothing and gives back the very document it was given**, not an error: the person can click on a
+  row an instant after the layer was removed, and a store (step 14.9) can tell that nothing happened because the reference is the same. **Ids**: a layer is `layer-N` and a group `group-N` with N one more than the highest
+  number among the ids that are the same prefix and a number (`ids.ts`), because the document has no counter and the brief fixes its fields; so the number of a layer given up by removing the highest one is given out
+  again, which no one can refer to (the selection is cleared with the layer, step 14.6b). **The colour of a new layer** is that of its number (`layer-1` the first of the palette, `layer-9` the first again), so that it
+  does not depend on how many layers there are now. **`addLayers`** puts a layer at the top of the legend and not in a group, visible, named for the dataset, in the default style; the datasets of one call are as
+  if added one at a time (the last on top). A dataset can have two layers if it is added twice. A dataset is described by the engine's `Summary` (it has `id`, `name`, `kind`, `elementCount`, `columns`, so a summary is
+  passed as it is). **`emptyScene()`** is the document with nothing in it: 2D, no frame, and cameras that are placeholders (a unit scale looking at 0, 0; 3D from 1,000 away at 45 degrees), which the first fit to data
+  (step 14.12) replaces and nothing draws before. Six changes to `addLayers` and the ids each fail a test (tried).

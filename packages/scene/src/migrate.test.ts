@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { migrate } from './migrate.js';
-import { ABSENT, sampleScene, spoil } from './test-support/documents.js';
-
-/** A document and everything in it, frozen, so that anything that changes it throws. */
-function frozen<T>(value: T): T {
-  if (typeof value === 'object' && value !== null) {
-    for (const inside of Object.values(value)) {
-      frozen(inside);
-    }
-    Object.freeze(value);
-  }
-  return value;
-}
+import { ABSENT, frozen, sampleScene, spoil } from './test-support/documents.js';
 
 describe('migrate', () => {
   it('gives back a document of version 1 that is right, the very object, and says it was version 1', () => {
