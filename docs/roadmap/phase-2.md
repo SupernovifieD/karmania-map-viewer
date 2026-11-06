@@ -341,7 +341,7 @@ or releasing, and whenever the brief says to stop.
 
 ## M15: The viewer package (a move, no visible change)
 
-- [ ] 15.1 Package @karmania/viewer, empty, with tests running.
+- [x] 15.1 Package @karmania/viewer, empty, with tests running.
 - [ ] 15.2 Move the map area component and its tests. Every screenshot and e2e
   test unchanged.
 - [ ] 15.3 Move the panel (tabs, resize handle, panel state).
