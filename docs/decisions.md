@@ -3861,3 +3861,10 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   0 and below 180, an exaggeration not above 0; the viewer then leaves the camera as it is. What is returned is a camera that `validateScene` accepts (a test over 2,000 and 500 random cases says so), and in 2D that
   every corner of the extent is inside the map area less the padding with one side touching it (2,000 random extents, headings and sizes). Sixteen different changes to the code each fail a test (tried); the width of the room with a
   padding larger than the width had no case until one for it was added after a mutant passed.
+- Step 14.12c (switching views). **`cameraTo3d({ camera2d, viewport, fov, elevation?, targetZ? })`** and **`cameraTo2d({ camera3d, viewport })`** keep **the centre, the heading and the scale at the centre**: a
+  map area of `H` pixels at `u` map units to a pixel is `H × u` units high, and a camera with a vertical field of view `fov` sees `2 d tan(fov / 2)` units high at a distance `d` from what it looks at, so `d = H u / (2
+  tan(fov / 2))` and the other way round. The 3D camera adds what 2D has not got: **the elevation (45 degrees if none is given, held between -89 and 89) and the field of view**, and the height of the point it looks at
+  (`targetZ`, 0 if none; the viewer gives the middle of the data's heights). 2D to 3D to 2D comes back to the same centre, heading and scale (1,000 random cameras, to 9 digits). The scale matches at the point looked
+  at, across the screen; the ground in front of and behind it is foreshortened by the elevation, as in any perspective view, and no conversion can change that. **The headings are turned into one turn in both
+  directions** (a first version of the test had only headings that were already between 0 and 360, and a change that left them as they were passed, so there is a case with 400 and -30 now). Both are `undefined` for a
+  camera, a map area or a field of view that cannot be used, as the fit cameras are. This completes 14.12. Eleven changes to the code each fail a test (tried).

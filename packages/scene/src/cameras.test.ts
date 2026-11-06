@@ -1,6 +1,7 @@
 import type { BBox } from '@karmania/engine/types';
 import { describe, expect, it } from 'vitest';
-import { fitCamera2d, fitCamera3d } from './cameras.js';
+import { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';
+import type { Camera2d, Camera3d } from './types.js';
 import { validateCamera2d, validateCamera3d } from './validate.js';
 
 const box = (min: [number, number, number], max: [number, number, number]): BBox => ({ min, max });
@@ -233,5 +234,137 @@ describe('fitCamera3d', () => {
     for (const [what, input] of bad) {
       expect(fitCamera3d(input), what).toBeUndefined();
     }
+  });
+});
+
+describe('cameraTo3d and cameraTo2d: switching views', () => {
+  const view: Camera2d = { centre: [512345.12, 4012345.67], unitsPerPixel: 2, heading: 30 };
+  const viewport = { width: 1000, height: 600 };
+
+  it('keeps the centre and the heading, and puts the camera where the map area is as high as it was', () => {
+    const three = cameraTo3d({ camera2d: view, viewport, fov: 60, elevation: 35, targetZ: 12 });
+    expect(three?.target).toEqual([512345.12, 4012345.67, 12]);
+    expect(three).toMatchObject({ heading: 30, elevation: 35, fov: 60 });
+    // 600 pixels of 2 units are 1,200 units high; a field of 60 degrees is 2 tan 30 = 1.1547 high at a distance of 1.
+    expect(three?.distance).toBeCloseTo(1200 / (2 * Math.tan(Math.PI / 6)), 9);
+  });
+
+  it('turns a heading outside 0 to 360 into the same direction in the other view too', () => {
+    expect(cameraTo3d({ camera2d: { ...view, heading: 400 }, viewport, fov: 60 })?.heading).toBe(
+      40,
+    );
+    expect(cameraTo3d({ camera2d: { ...view, heading: -30 }, viewport, fov: 60 })?.heading).toBe(
+      330,
+    );
+  });
+
+  it('puts the 3D camera at the height of the target given, 0 if none, and at 45 degrees if no elevation', () => {
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 45 })).toMatchObject({ elevation: 45 });
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 45 })?.target[2]).toBe(0);
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 45, elevation: 200 })?.elevation).toBe(89);
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 45, targetZ: -30.5 })?.target[2]).toBe(
+      -30.5,
+    );
+  });
+
+  it('turns a 3D camera into the 2D camera with the same centre, heading and scale at what it looks at', () => {
+    const three: Camera3d = {
+      target: [10, 20, 99],
+      distance: 900,
+      heading: 400,
+      elevation: 20,
+      fov: 90,
+    };
+    const two = cameraTo2d({ camera3d: three, viewport });
+    expect(two?.centre).toEqual([10, 20]);
+    expect(two?.heading).toBe(40);
+    // A field of 90 degrees is 2 high at a distance of 1: 1,800 units over 600 pixels.
+    expect(two?.unitsPerPixel).toBeCloseTo(3, 9);
+  });
+
+  it('comes back to where it was: 2D to 3D to 2D, and 3D to 2D to 3D with the same elevation', () => {
+    let state = 3;
+    const next = (): number => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+    for (let i = 0; i < 1000; i += 1) {
+      const camera2d: Camera2d = {
+        centre: [next() * 1e6, next() * 1e7],
+        unitsPerPixel: 10 ** (next() * 6 - 3),
+        heading: next() * 360,
+      };
+      const port = { width: 100 + next() * 2000, height: 100 + next() * 1200 };
+      const fov = 5 + next() * 150;
+      const three = cameraTo3d({
+        camera2d,
+        viewport: port,
+        fov,
+        elevation: 10 + next() * 70,
+        targetZ: next() * 500,
+      });
+      expect(three).toBeDefined();
+      if (three === undefined) {
+        continue;
+      }
+      expect(validateCamera3d(three)).toEqual([]);
+      const back = cameraTo2d({ camera3d: three, viewport: port });
+      expect(back?.centre).toEqual(camera2d.centre);
+      expect(back?.heading).toBeCloseTo(camera2d.heading, 9);
+      expect(back?.unitsPerPixel ?? 0).toBeCloseTo(
+        camera2d.unitsPerPixel,
+        9 - Math.max(0, Math.ceil(Math.log10(camera2d.unitsPerPixel))),
+      );
+      const again = cameraTo3d({
+        camera2d: back ?? camera2d,
+        viewport: port,
+        fov,
+        elevation: three.elevation,
+        targetZ: three.target[2],
+      });
+      expect(again?.distance).toBeCloseTo(three.distance, 6);
+    }
+  });
+
+  it('gives a camera that validateScene accepts', () => {
+    expect(validateCamera3d(cameraTo3d({ camera2d: view, viewport, fov: 45 }))).toEqual([]);
+    expect(
+      validateCamera2d(
+        cameraTo2d({
+          camera3d: { target: [1, 2, 3], distance: 50, heading: 0, elevation: 45, fov: 45 },
+          viewport,
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('is undefined when a camera, the map area or the field of view cannot be used', () => {
+    const three: Camera3d = {
+      target: [0, 0, 0],
+      distance: 100,
+      heading: 0,
+      elevation: 45,
+      fov: 45,
+    };
+    expect(
+      cameraTo3d({ camera2d: { ...view, unitsPerPixel: 0 }, viewport, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      cameraTo3d({ camera2d: { ...view, centre: [NaN, 0] }, viewport, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      cameraTo3d({ camera2d: { ...view, heading: Infinity }, viewport, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      cameraTo3d({ camera2d: view, viewport: { width: 0, height: 600 }, fov: 45 }),
+    ).toBeUndefined();
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 0 })).toBeUndefined();
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 180 })).toBeUndefined();
+    expect(cameraTo3d({ camera2d: view, viewport, fov: 45, targetZ: NaN })).toBeUndefined();
+    expect(cameraTo2d({ camera3d: { ...three, distance: 0 }, viewport })).toBeUndefined();
+    expect(cameraTo2d({ camera3d: { ...three, target: [0, NaN, 0] }, viewport })).toBeUndefined();
+    expect(cameraTo2d({ camera3d: { ...three, fov: 180 }, viewport })).toBeUndefined();
+    expect(cameraTo2d({ camera3d: { ...three, heading: NaN }, viewport })).toBeUndefined();
+    expect(cameraTo2d({ camera3d: three, viewport: { width: 100, height: NaN } })).toBeUndefined();
   });
 });
