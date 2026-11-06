@@ -49,6 +49,11 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    // The scripts run in Node, which has these globals; the plain-JavaScript rules do not know them.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
+  },
+  {
     // Vite, Vitest, Playwright and ESLint require a default export.
     files: ['**/*.config.{js,mjs,cjs,ts,mts}'],
     rules: { 'no-restricted-exports': 'off' },
