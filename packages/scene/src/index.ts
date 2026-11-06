@@ -34,6 +34,15 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export { SCALE_BAR_MAX_PIXELS, scaleBar } from './scale-bar.js';
+export type {
+  NoScaleBar,
+  ScaleBar,
+  ScaleBarInput,
+  ScaleBarModel,
+  ScaleBarReason,
+  ScaleBarUnit,
+} from './scale-bar.js';
 export { northArrow } from './north-arrow.js';
 export type { NorthArrow } from './north-arrow.js';
 export { legendModel } from './legend-model.js';
