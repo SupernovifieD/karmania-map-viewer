@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MAX_PROBLEMS } from './problems.js';
-import { ABSENT, problemsAfter, sampleScene, spoil } from './test-support/documents.js';
+import { ABSENT, layerById, problemsAfter, sampleScene, spoil } from './test-support/documents.js';
 import { validateScene } from './validate.js';
 
 describe('validateScene: the document, the frame, the view and the cameras', () => {
@@ -128,5 +128,52 @@ describe('validateScene: the document, the frame, the view and the cameras', () 
       ...Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`f${String(i)}`, 1])),
     });
     expect(validateScene(bad)).toHaveLength(MAX_PROBLEMS + 1);
+  });
+
+  it('says that a hole in a list is a thing that is missing, not nothing wrong', () => {
+    // JSON has no holes, but an embedder passes JavaScript objects, and `new Array(3)` is a list of three holes.
+    const legend = validateScene({ ...sampleScene(), legend: new Array<unknown>(3) });
+    expect(legend.filter((p) => p.code === 'missing').map((p) => p.path)).toEqual([
+      'legend[0]',
+      'legend[1]',
+      'legend[2]',
+    ]);
+    const centre = new Array<number>(2);
+    centre[1] = 5;
+    const camera = validateScene({
+      ...sampleScene(),
+      camera2d: { ...sampleScene().camera2d, centre },
+    });
+    expect(camera.map((p) => `${p.code} ${p.path}`)).toEqual(['missing camera2d.centre[0]']);
+    const children = new Array<string>(2);
+    children[1] = 'layer-2';
+    const group = { type: 'group' as const, id: 'group-1', name: 'S', collapsed: false, children };
+    const inGroup = validateScene({
+      ...sampleScene(),
+      legend: [{ type: 'layer', id: 'layer-1' }, group],
+    });
+    expect(inGroup.map((p) => `${p.code} ${p.path}`)).toContain('missing legend[1].children[0]');
+  });
+
+  it('does not look each key of the layers up in a list of all the keys, which takes a time in proportion to the square of them', () => {
+    // A check that did that took about 80 seconds for a hundred thousand layers. A timeout cannot catch it (a test that
+    // does not wait is not interrupted), and a clock is not the same on a loaded machine, so this counts what was searched:
+    // no list longer than a handful of fields may be searched, however many layers there are.
+    const base = sampleScene();
+    const layer = layerById(base, 'layer-2');
+    const ids = Array.from({ length: 5000 }, (_, i) => `layer-${String(i + 1)}`);
+    const layers = Object.fromEntries(ids.map((id) => [id, { ...layer, id }]));
+    const legend = ids.map((id) => ({ type: 'layer' as const, id }));
+    const spy = vi.spyOn(Array.prototype, 'includes');
+    try {
+      expect(validateScene({ ...base, layers, legend, selection: null })).toEqual([]);
+      const longest = spy.mock.contexts.reduce<number>(
+        (most, list) => Math.max(most, Array.isArray(list) ? list.length : 0),
+        0,
+      );
+      expect(longest).toBeLessThan(100);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

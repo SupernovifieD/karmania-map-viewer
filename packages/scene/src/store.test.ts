@@ -80,8 +80,12 @@ describe('a scene store', () => {
       calls += 1;
     };
     store.subscribe(listener);
-    store.subscribe(listener);
+    const off = store.subscribe(listener);
     store.dispatch(show(true));
+    expect(calls).toBe(1);
+    // It is one listener: taking it away once takes it away.
+    off();
+    store.dispatch(show(false));
     expect(calls).toBe(1);
   });
 

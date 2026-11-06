@@ -26,7 +26,10 @@ export interface SceneStore {
    * @throws TypeError for a command of a kind that there is not.
    */
   dispatch(command: Command): SceneDocument;
-  /** Adds a listener, and gives the way to take it away again (which may be used more than once). */
+  /**
+   * Adds a listener, and gives the way to take it away again (which may be used more than once). The same function added
+   * twice is one listener, called once, and taking it away once takes it away.
+   */
   subscribe(listener: SceneListener): () => void;
 }
 

@@ -8,9 +8,9 @@ import {
   readBoolean,
   readChoice,
   readList,
+  readNumbers,
   readMap,
   readNumber,
-  readNumbers,
   readRecord,
   readString,
   show,
@@ -163,6 +163,24 @@ describe('the checks a scene document is validated with', () => {
     expect(run((p) => readMap(p, 'layers', [])).problems).toEqual([
       'not_an_object layers: layers must be an object, and it is a list.',
     ]);
+  });
+
+  it('lists at most 100 problems: the cap is the 100 that the decisions say', () => {
+    expect(MAX_PROBLEMS).toBe(100);
+  });
+
+  it('sees a hole in a list as a place where there is nothing, in a list of numbers and in any list', () => {
+    const holes = new Array<unknown>(3);
+    expect(run((p) => readList(p, 'legend', holes)).value).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    const centre = new Array<number>(2);
+    centre[1] = 5;
+    const found = run((p) => readNumbers(p, 'centre', centre, 2));
+    expect(found.value).toBeUndefined();
+    expect(found.problems).toEqual(['missing centre[0]: centre[0] is missing.']);
   });
 
   it('lists at most 100 problems and counts the rest in one last, so a bad document cannot make a huge list', () => {
