@@ -261,7 +261,7 @@ or releasing, and whenever the brief says to stop.
 
 ## M14: Scene document (@karmania/scene)
 
-- [ ] 14.1 Package (pure TypeScript, no DOM lib), Vitest, one test.
+- [x] 14.1 Package (pure TypeScript, no DOM lib), Vitest, one test.
 - [ ] 14.2 Types of section 11.6 of the brief.
 - [ ] 14.3 validateScene() and migrate() with tests.
 - [ ] 14.4 Colour ramps and palettes with sources and licences; sampling to n

@@ -1,0 +1,23 @@
+{
+  "name": "@karmania/scene",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Karmania scene: the scene document, its commands and store, and the models the legend, the furniture and the export are drawn from",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@karmania/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
