@@ -6,7 +6,7 @@ import type { PropertyValues } from 'lit';
 import './dataset-list.js';
 import './dataset-summary.js';
 import type { CrsLookup, RowSource } from './datasets.js';
-import { IMPORT_REQUEST } from './map-area.js';
+import { IMPORT_REQUEST } from '@karmania/viewer/map-area';
 
 /**
  * What the side panel's Data tab holds. With nothing loaded it says so, and offers Import. With
