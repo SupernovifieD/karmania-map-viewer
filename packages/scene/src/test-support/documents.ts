@@ -1,6 +1,6 @@
 /** Documents and ways to spoil them, for the tests of the scene. Not part of the package. */
 import type { Frame } from '@karmania/engine/display';
-import type { SceneDocument } from '../types.js';
+import type { Layer, SceneDocument } from '../types.js';
 import { validateScene } from '../validate.js';
 
 /** The frame of the sample: UTM zone 40 north. */
@@ -124,4 +124,13 @@ export function frozen<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
+}
+
+/** The layer with this id, or an error that says the test asked for one that is not there. */
+export function layerById(doc: SceneDocument, id: string): Layer {
+  const layer = doc.layers[id];
+  if (layer === undefined) {
+    throw new Error(`The test asks for layer ${id}, which is not in the document.`);
+  }
+  return layer;
 }

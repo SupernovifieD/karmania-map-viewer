@@ -3823,3 +3823,13 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   a filled swatch would show what is not on the map). **The grey of "Other", `#8c8c8c`**, is neither a colour of the palette nor on a ramp; against the maps it has 2.84 to 1 (light) and 5.67 to 1 (dark) by an independent
   calculation, so it is under 3 to 1 on the light map like most of the palette, and is made readable by the outline in the same way (step 14.4c). An unknown ramp is a `RangeError` (a document that `validateScene`
   accepts has none). Ten changes to the code each fail a test (tried); two numbers I had written for the grey's contrast before computing them were wrong, and the independent calculation, not the code's own, corrected them.
+- Step 14.10c (the legend model). **`legendModel(doc, { breaks?, drawable? })`** is the legend as data, for the Legend tab (step 19) and for the export (step 22.3) to draw: `entries` in the order of the document
+  (a layer, or a group with its layers), `layerCount`, and `layerCountLabel` (`3 layers`, `1 layer`, `0 layers`: the caption above the list). **A group has `visibility` `all`, `some` or `none`**, worked out from its
+  layers (the tri-state checkbox of section 10.3; the document keeps no such state, and a group with no layer is `none`). **A layer has a `swatch`**: one colour, or the colours of its ramp, which are those of its
+  classes once it is classified and the ramp sampled to the classes asked for until then. **The lines under it (`classes`) are only for a layer coloured by classes that is drawn and has its breaks** (`breaks` is by
+  layer id, from `engine.classify`). **Whether it is drawn** comes from the engine's `FrameChoice.drawable`: a dataset that has an entry that says `not_drawn` is not, and its layer then has a **`notice` in the engine's own
+  words** (an error finding before a warning before anything else, with the hint if it has one) and no lines; a dataset the engine has not mentioned is taken to be drawn (it may still be preparing, which is the chip's
+  business and not a reason to write a notice); a layer that is not drawn keeps its swatch and its on or off state, so that turning it on is still possible and shows nothing until the system is changed. **If the engine
+  gives no finding for a dataset that is not drawn, the notice says so in a sentence of its own** ("This dataset cannot be drawn in the coordinate system of the map."), so that a layer that is not drawn never has no
+  reason. The model does not include the contours section (step 20.6). Ten changes to the code each fail a test (tried); one passed at first because `toEqual` does not tell a missing `hint` from an `undefined` one, and
+  the notices are now compared with `toStrictEqual`.
