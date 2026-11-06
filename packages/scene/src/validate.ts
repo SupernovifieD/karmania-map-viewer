@@ -17,7 +17,7 @@ import {
 } from './problems.js';
 import { checkLayers } from './validate-layers.js';
 import { checkLegend, checkSelection } from './validate-legend.js';
-import { SCENE_VERSION, VERTICAL_EXAGGERATIONS, VIEW_MODES } from './types.js';
+import { SCENE_VERSION, VERTICAL_EXAGGERATIONS, VIEW_MODES, type SceneDocument } from './types.js';
 
 const DOCUMENT_FIELDS = [
   'version',
@@ -131,4 +131,9 @@ export function validateScene(doc: unknown): readonly SceneProblem[] {
   checkLegend(problems, 'legend', doc['legend'], layerIds);
   checkSelection(problems, 'selection', doc['selection'], layerIds);
   return problems.finish();
+}
+
+/** Whether `doc` is a scene document of the version this package reads, with nothing wrong in it. */
+export function isSceneDocument(doc: unknown): doc is SceneDocument {
+  return validateScene(doc).length === 0;
 }

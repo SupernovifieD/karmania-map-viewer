@@ -1,7 +1,9 @@
 /** Public name of this package. */
 export const PACKAGE_NAME = '@karmania/scene';
 
-export { validateScene } from './validate.js';
+export { migrate } from './migrate.js';
+export type { MigrateResult } from './migrate.js';
+export { isSceneDocument, validateScene } from './validate.js';
 export { MAX_PROBLEMS, PROBLEM_CODES } from './problems.js';
 export type { ProblemCode, SceneProblem } from './problems.js';
 export { COLOUR_MODES, SCENE_VERSION, VERTICAL_EXAGGERATIONS, VIEW_MODES } from './types.js';
