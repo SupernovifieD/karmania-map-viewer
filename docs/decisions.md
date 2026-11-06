@@ -4085,4 +4085,8 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
 - Step 15.F4 (one viewer in the app). **Reviewer of the viewer, right, and reproduced**: Lit does a first render even if the element was taken out of the page before it, so `firstUpdated` made a viewer while the app was out; put back, the app's
   `connectedCallback` made another, and the first was never disposed (and, being in the page again, kept its listeners on the window). `mount()` makes the viewer once now. The e2e test makes an app, takes it out at once, lets the
   render happen, puts it back and counts the viewers in it: 2 before the fix, 1 after.
+- Step 15.F5 (a viewer taken out of the page). **Reviewer of the viewer, right, and reproduced**: `disconnectedCallback` disposed the engine and kept the list of datasets, the selection and (since 15.7) the layers, so a viewer moved in the
+  page listed datasets that no engine could give rows of. **They are emptied with the engine now** (`datasets`, `selected`, and `syncDatasets` with nothing, which removes the layers): a viewer put back starts again, and works (the e2e test
+  loads a file, moves the viewer, finds the list, the selection, the engine and the scene empty, and loads the file again). **The same reviewer found that nothing tested that dispose frees the listeners** (a change that kept the
+  `dragover` listener passed every test): the second test drops a file on the page, which the viewer refuses while it is in it (`defaultPrevented`), takes the viewer out, and drops again; with the listener kept it fails (tried).
 

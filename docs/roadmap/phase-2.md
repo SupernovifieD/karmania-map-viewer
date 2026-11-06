@@ -377,6 +377,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.F3 Gate fix, review of M15: `openImport` with an empty list opens the file picker, as it does with no list.
 - [x] 15.F4 Gate fix, review of M15: an app that was taken out of the page before its first render and put back has one
   viewer, not two.
+- [x] 15.F5 Gate fix, review of M15: a viewer taken out of the page forgets the datasets and layers that its engine held,
+  and a test shows that it frees its listeners on the window.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

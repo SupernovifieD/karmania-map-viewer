@@ -141,6 +141,11 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('resize', this.onWindowResize);
     this.engine?.dispose();
     this.engine = undefined;
+    // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer
+    // that is put back in a page starts again, and does not list datasets that no engine can give rows of.
+    this.datasets = [];
+    this.selected = undefined;
+    syncDatasets(this.store, this.datasets);
   }
 
   private readonly onWindowResize = (): void => {
