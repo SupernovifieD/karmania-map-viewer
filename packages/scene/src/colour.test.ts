@@ -30,7 +30,7 @@ describe('colours', () => {
       }
     }
     expect(wrong).toEqual([]);
-  });
+  }, 20_000);
 
   it('mixes each channel on its own, from the first colour at 0 to the second at 1', () => {
     expect(mix([0, 100, 255], [100, 200, 55], 0)).toEqual([0, 100, 255]);

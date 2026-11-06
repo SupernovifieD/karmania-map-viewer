@@ -6,6 +6,7 @@
 import type { BBox } from '@karmania/engine/types';
 import { heldElevation, normalHeading } from './angles.js';
 import type { Camera2d, Camera3d } from './types.js';
+import { validateCamera2d, validateCamera3d } from './validate.js';
 
 /** The size of the map area, in pixels. */
 export interface Viewport {
@@ -55,6 +56,21 @@ function usableViewport(viewport: Viewport): boolean {
   return finite(viewport.width, viewport.height) && viewport.width > 0 && viewport.height > 0;
 }
 
+/**
+ * A camera is given only if `validateScene` would accept it. Every value is checked on the way in, but the arithmetic
+ * can still overflow or underflow with numbers that are finite (a field of view of 1e-310 makes an infinite distance, a middle of
+ * two numbers of 1e308 is infinite, a scale of 1e-300 over a map area of 1e-300 is a distance of 0), and such a camera is
+ * not one: it is `undefined`, as for any other value that cannot be used.
+ */
+function checked2d(camera: Camera2d): Camera2d | undefined {
+  return validateCamera2d(camera).length === 0 ? camera : undefined;
+}
+
+/** See {@link checked2d}. */
+function checked3d(camera: Camera3d): Camera3d | undefined {
+  return validateCamera3d(camera).length === 0 ? camera : undefined;
+}
+
 /** The scale used for an extent that has no size, such as a single point: one map unit to a pixel. */
 const POINT_SCALE = 1;
 
@@ -91,11 +107,15 @@ export function fitCamera2d(input: Fit2dInput): Camera2d | undefined {
     Math.max(1, viewport.height - 2 * padding),
   ] as const;
   const scale = Math.max(across / room[0], down / room[1]);
-  return {
+  // An extent so wide that the arithmetic overflows has no scale (`0 * Infinity` is NaN, which is not above 0 and would be taken for a point).
+  if (!Number.isFinite(scale)) {
+    return undefined;
+  }
+  return checked2d({
     centre: [(extent.min[0] + extent.max[0]) / 2, (extent.min[1] + extent.max[1]) / 2],
     unitsPerPixel: scale > 0 ? scale : POINT_SCALE,
     heading,
-  };
+  });
 }
 
 /**
@@ -125,7 +145,7 @@ export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
   const radius = Math.max(LEAST_RADIUS, Math.hypot(...size) / 2);
   const vertical = (fov * Math.PI) / 180 / 2;
   const horizontal = Math.atan(Math.tan(vertical) * (viewport.width / viewport.height));
-  return {
+  return checked3d({
     target: [
       (extent.min[0] + extent.max[0]) / 2,
       (extent.min[1] + extent.max[1]) / 2,
@@ -135,7 +155,7 @@ export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
     heading: normalHeading(input.heading ?? 0),
     elevation: heldElevation(input.elevation ?? 45),
     fov,
-  };
+  });
 }
 
 /** What the 3D camera of a 2D one is made from. */
@@ -182,13 +202,13 @@ export function cameraTo3d(input: To3dInput): Camera3d | undefined {
   if (!finite(targetZ, input.elevation ?? 0)) {
     return undefined;
   }
-  return {
+  return checked3d({
     target: [camera2d.centre[0], camera2d.centre[1], targetZ],
     distance: (viewport.height * camera2d.unitsPerPixel) / heightAt(1, fov),
     heading: normalHeading(camera2d.heading),
     elevation: heldElevation(input.elevation ?? 45),
     fov,
-  };
+  });
 }
 
 /**
@@ -206,9 +226,9 @@ export function cameraTo2d(input: To2dInput): Camera2d | undefined {
   ) {
     return undefined;
   }
-  return {
+  return checked2d({
     centre: [camera3d.target[0], camera3d.target[1]],
     unitsPerPixel: heightAt(camera3d.distance, camera3d.fov) / viewport.height,
     heading: normalHeading(camera3d.heading),
-  };
+  });
 }

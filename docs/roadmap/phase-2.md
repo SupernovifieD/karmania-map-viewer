@@ -333,6 +333,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 14.F6 Gate fix, review of M14: the words that were stale or wrong in the roadmap, a header and the decisions,
   the data and problem-code notes the review asked for, and the packages that use vitest, vite and Node's types.
 - [x] 14.F7 Gate fix, second review of M14: `addLayers` also refuses a dataset whose columns are not what the engine gives.
+- [x] 14.F8 Gate fix, second review of M14: a camera is given only if it validates, an extent that overflows has no
+  camera, and the small things that review found in tests, comments and docs.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

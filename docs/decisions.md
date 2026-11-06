@@ -3938,8 +3938,8 @@ found that is not true or not worth a change is said in its place.
   the other reviewers and the gate), always "Test timed out in 5000ms" in the scale bar's property test, which took 2.5 s alone; reviewer A saw the scale bar, export layout, cameras and commands test files all fail
   when run together. The cost was not the code but the test: thousands of `expect` calls, each with a message made for it (an `expect` costs the same pass or fail). **The property tests keep every check for every case
   and note a failure in a list that is said once at the end**, and make a message only when there is something to say: the scale bar's went from 2.5 s to 36 ms, the camera fit's from 978 to 20 ms, the export layout's
-  from 1.2 s to a few tens, the round trip's from 320, the command run's message is made only for a document that is wrong; each is also given 20 s (`it(..., 20_000)`) as a margin for a machine that is busy. **No
-  assertion was removed or loosened**: each of three was shown, after the change, to fail when the code is broken (the nice-number rule of the scale bar, the sides of the camera fit, the check of the layout that
+  from 1.2 s to a few tens, the round trip's from 320 ms, the command run's message is made only for a document that is wrong; each is also given 20 s (`it(..., 20_000)`) as a margin for a machine that is busy (the colour sweep and the run of commands were first left without it, and have it since step 14.F8). **No
+  assertion was removed or loosened**: each of four was shown, after the change, to fail when the code is broken (the nice-number rule of the scale bar, the sides of the camera fit, the check of the layout that
   a column is not too tall, and the scale of the camera round trip). The first full gate run's one visual failure was a timeout of the same kind, in the browser and not in these tests.
 - Step 14.F6 (words, and the notes the review asked for). **Reviewer C, right in each of these.** **Corrected in place**: the roadmap's line for 14.10a and the header of `numbers.ts` still gave the brief's rule ("the fewest
   decimals that keep neighbouring bounds apart") and not the one implemented (step 14.10a, a departure that the log and the commit say), and the worked example of 14.10a called the eight bounds `0.0 ... 8.0` "eight
@@ -3966,4 +3966,17 @@ The second review (two fresh reviewers on the cheaper model again, one for the f
   `null` columns** (it made only `a` and `b` before, which is why it could not find this). Two nits of the same report are left: `addLayers(doc, [null])` throws, which is misuse (a dataset that is not even an
   object); and `addLayers` scans every id for each dataset of a call, which took 2.3 s for 500 datasets on a document of 20,000 layers: the same order as before the fix (the reviewer measured 1.4 s with numbers
   and 1.7 s with `BigInt` for 500 calls of `nextId` over 20,000 ids), and a call is of the datasets of one import.
+- Step 14.F8 (what the second review found in the cameras, the tests and the words). **Reviewer B, no must-fix, and these should-fix, all acted on.** (1) **The claim "every camera given is one that `validateScene` accepts" was
+  false for numbers that are finite but extreme** (a field of view of 1e-310 makes an infinite distance, a middle of two numbers of 1e308 is infinite, a scale of 1e-300 over a map area of 1e-300 is a distance of 0),
+  and it was false before step 14.F4 as well. **Each of the four cameras is now checked with `validateCamera2d` or `validateCamera3d` before it is given, and is `undefined` if it does not validate**, so the claim holds by
+  construction and not by a list of the values that were thought of. Three of the four new tests failed with the old code. **Two of the reviewer's inputs did not do what was said, and one of them found a worse bug**:
+  `fitCamera2d` for a square of 1e308 at 45 degrees gives a camera that is valid (1.4e308 does not overflow), and the test says so; and an extent from -1.7e308 to 1.7e308 gave a camera that **validates but is wrong**:
+  its width overflows to `Infinity`, `0 × Infinity` is `NaN` for the other axis, `Math.max(Infinity, NaN)` is `NaN`, and `NaN` is "not above 0", which the code took for the case of a point and gave a scale of 1, which does
+  not fit anything. **A scale that is not finite is no camera now** (a check of its own, which validation cannot supply, since the camera it replaced was valid), with the two turned cases as tests. (2) **The decision of
+  14.F5 said every property test has a timeout of 20 s, and the colour sweep and the run of commands had none**: they have it now. (3) The `@types/node` row of `docs/dependencies.md` said it was referenced only from
+  the test support file, which the scene's `palettes.test.ts` is not. (4) **My random test of the export layout had lost its tall pictures** when step 14.F3 made it use low ones: it samples both now. The nits: the order
+  of the lines is checked by identity and not by `JSON.stringify`; "each of three" was four and "320" had no unit (said in the entry of 14.F5); two comments of `export-layout.ts` say "the space between the margins" and
+  read properly. **A trade-off that the first form of 14.F3 left unsaid**: when a group heading, the name of a layer with classes and its first class cannot all be kept together, the rule for the group heading wins and the layer's
+  name is left at the end of its column (the reviewer's example: lines of 10, 50 (a group), 40 (a layer with classes) and 30 (a class) in a column of 100 give the first three and then the class, where before the fix
+  the last three went to the next column and made it 120 tall). The rule that the owner asked for is kept, and the one that was added is the one that gives way.
 

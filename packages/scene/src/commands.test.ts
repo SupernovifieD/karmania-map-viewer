@@ -282,5 +282,5 @@ describe('a run of commands, right and wrong, in any order', () => {
       // The run is not all refused commands: a good share of them did something.
       expect(changed, `seed ${String(seed)}`).toBeGreaterThan(150);
     }
-  });
+  }, 20_000);
 });

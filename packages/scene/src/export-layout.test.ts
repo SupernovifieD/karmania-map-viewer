@@ -368,8 +368,11 @@ describe('exportLayout: for any legend and picture', () => {
             ? klass(name)
             : layer(name, kind === 'layerc');
       });
-      // Pictures that are low as well as high, so that columns are short and lines are moved often.
-      const size = { width: 800 + next() * 3000, height: 90 + next() * 900 };
+      // Pictures that are low, so that columns are short and lines are moved often, and pictures that are high.
+      const size = {
+        width: 800 + next() * 3000,
+        height: next() < 0.5 ? 90 + next() * 900 : 400 + next() * 2500,
+      };
       const dpi = 72 + next() * 300;
       const l = exportLayout({
         size,
@@ -385,10 +388,8 @@ describe('exportLayout: for any legend and picture', () => {
         r.x + r.width <= outer.x + outer.width &&
         r.y + r.height <= outer.y + outer.height;
       const here = `run ${String(run)}`;
-      if (
-        JSON.stringify(l.columns.flatMap((c) => c.lines).map((p) => p.line)) !==
-        JSON.stringify(lines)
-      ) {
+      const placedLines = l.columns.flatMap((c) => c.lines.map((p) => p.line));
+      if (placedLines.length !== lines.length || placedLines.some((line, i) => line !== lines[i])) {
         wrong.push(`${here}: the lines are not the lines that were given, in order`);
       }
       for (const [index, column] of l.columns.entries()) {
