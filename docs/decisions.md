@@ -3766,3 +3766,11 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   **`setGroupCollapsed(doc, groupId, collapsed)` is added** to this step (the roadmap says so). Whether it should be state of the document at all, and so be saved with it and given back to an embedder, is the brief's
   choice and is kept. A group number goes on from the highest group there is (layer ids are not looked at: `nextId` takes only ids with the prefix, which a test shows by a legend of layers only giving `group-1`; a first
   version listed the groups by hand, and a change that listed every node instead passed every test, which showed that it did nothing). Eight changes to the commands each fail a test (tried).
+- Step 14.8 (commands on style, contours, view, camera, frame and selection, split into 14.8a to 14.8c). **The rule for all of them: a command never makes a document that `validateScene` would refuse.** A value that
+  would is not corrected, it is **refused, the whole change with it, and the same document comes back** (the controls of the viewer offer only values that are right, so a wrong one is a bug to notice, not a
+  value to guess a meaning for); the exceptions are the ones the brief itself makes (the elevation of the 3D camera is clamped, step 14.8b). **`setStyle(doc, layerId, patch)`** changes the parts of the style that the
+  patch has (`colour`, `opacity`, `pointSize`, `lineWidth`), checks the style it would make with the very rules of `validateScene` (`validateStyle`, exported from `validate-layers.ts`, so the limits are written once),
+  writes a single colour in lower case, and is the same document when nothing changes (compared part by part, the colour by every field of its mode). **`setContours(doc, layerId, contours | null)`** sets what the
+  scene remembers about the contour lines of a layer (the lines are the engine's, step 20.4) or takes them away; it is the same document for contours that are wrong, for a change that changes nothing, and for **a layer
+  that is itself made of contours** (`validateScene` refuses that chain). Eight changes to the code each fail a test (tried); the colour test had no case that changed only the order of a ramp until a mutation that
+  ignored `reverse` passed, and now has one for each part.
