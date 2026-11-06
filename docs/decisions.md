@@ -3790,3 +3790,10 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   that the engine moves (step 13.F2's frame that waits for a drawable dataset). **`setSelection(doc, selection | null)`** refuses a layer that is not there and an element that is not a whole number of 0 or more
   (`validateSelection`, exported from `validate-legend.ts`), holds a copy, and **accepts a layer that is hidden** (the table's "Show on map", step 21.5, picks a row of any dataset). Both give the same document when
   nothing would change. Eleven changes to the two commands each fail a test (tried). **This completes the fifteen commands of the brief's list, and the sixteenth, `setGroupCollapsed`, that it lacks.**
+- Step 14.9 (the store, split into 14.9a and 14.9b). **14.9a: a command is a value.** `Command` is a union of sixteen objects with a `type` and the arguments of the function of the same name in fields, and `applyCommand(doc,
+  command)` is the one switch that turns one into the call, so that the action of a person, the call of an embedder (`viewer.dispatch(command)`, section 11.8) and a test are the same thing. `COMMAND_TYPES` lists the kinds and
+  the compiler checks that it is all of them (and that `applyCommand` is exhaustive); **a command of a kind that there is not throws a `TypeError`**, which only an untyped caller can make and is misuse. **The claim of
+  step 14.8, that no command makes a document that `validateScene` refuses, is now a test**: a run of 4,000 commands (four seeds of 1,000, from a seeded generator, so it is the same every time) with values that are
+  often wrong and ids that are often not there, in any order, each document checked by `validateScene` and then deeply frozen so that any command that changed its input would throw; at least 150 of each 1,000 do
+  something, so the run is not all refusals. It was shown to work by putting three bugs in the commands one at a time (a selection left in a layer that was removed, a group deleted with its layers, a style not checked):
+  it found each in under 200 steps.

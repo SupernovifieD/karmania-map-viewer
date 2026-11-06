@@ -293,7 +293,11 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.8a `setStyle` and `setContours`.
   - [x] 14.8b `setViewMode`, `setVerticalExaggeration` and `setCamera`.
   - [x] 14.8c `setFrame` and `setSelection`.
-- [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page.
+- [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page. Split to stay under the commit
+  size guideline:
+  - [x] 14.9a `Command` as data, `applyCommand`, and the test that no run of commands makes a document
+    that `validateScene` refuses.
+  - [ ] 14.9b `createSceneStore`.
 - [ ] 14.10 Legend model with number labels (11.7).
 - [ ] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
   changes, null cases).
