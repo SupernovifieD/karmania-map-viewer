@@ -107,8 +107,9 @@ forbids it, and commit the lockfile.
 Packages depend on each other in one direction: `app` uses `viewer`, which uses `render`, `scene`, `engine` and
 `ui`. `render` names the types of `scene` and `engine` and nothing else of them; `scene` names the types of `engine`
 and nothing else; `engine` and `ui` depend on no other package. `three` is imported only in `render`, and `render`
-and `scene` have no Lit. A package is imported by its name, never by a path into it, and the source of the app uses
-only the entry of the viewer. ESLint enforces it (`eslint.restrictions.mjs`, tested by
+and `scene` have no Lit. A package is imported by its name, never by a path into it, with a static `import` (not `import()`
+or `require()`), and the source of the app uses only the entry of the viewer; where only the types of a package may be named,
+as `import type` (an `import { type X }` is emitted as an import of the module). ESLint enforces it (`eslint.restrictions.mjs`, tested by
 `packages/app/src/import-restrictions.test.ts`), so a wrong import fails `pnpm check`.
 
 ## UI tests

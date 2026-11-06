@@ -381,6 +381,9 @@ or releasing, and whenever the brief says to stop.
   and a test shows that it frees its listeners on the window.
 - [x] 15.F6 Gate fix, review of M15: the theme test tells "left alone" from "set to `undefined`", and a comment says
   the viewer where it said the app.
+- [x] 15.F7 Gate fix, review of M15: the import rules also refuse `import { type X }` where only types may be named,
+  `import()` and `require()` of packages, more forms of a path, and the app's tests reaching past the viewer; the test
+  of the rules cannot pass on a statement it cannot read.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

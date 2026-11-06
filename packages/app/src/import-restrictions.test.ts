@@ -23,11 +23,25 @@ const config: Linter.Config[] = [
   ...importRestrictions,
 ];
 
-/** What the rules say of `statement`, written in `file`: the messages of the import restrictions. */
+/** The rules of the restrictions: the import rule, the one on `import()` and `require()`, and the one on `import { type X }`. */
+const RULES = new Set([
+  '@typescript-eslint/no-restricted-imports',
+  'no-restricted-syntax',
+  '@typescript-eslint/no-import-type-side-effects',
+]);
+
+/**
+ * What the rules say of `statement`, written in `file`: the messages of the import restrictions. A statement that does not
+ * parse is a failure of the test, since the rules say nothing of what they cannot read, and so would "allow" it.
+ */
 function said(file: string, statement: string): string[] {
-  return linter
-    .verify(statement, config, { filename: `${root}${file}` })
-    .filter((message) => message.ruleId === '@typescript-eslint/no-restricted-imports')
+  const messages = linter.verify(statement, config, { filename: `${root}${file}` });
+  expect(
+    messages.filter((message) => message.fatal === true).map((message) => message.message),
+    `${file}: ${statement}`,
+  ).toEqual([]);
+  return messages
+    .filter((message) => message.ruleId !== null && RULES.has(message.ruleId))
     .map((message) => message.message);
 }
 
@@ -60,7 +74,18 @@ describe('the direction of the imports between packages', () => {
 
   it('lets the scene name the types of the engine, and nothing else of it, and nothing else at all', () => {
     allowed('packages/scene/src/a.ts', "import type { X } from '@karmania/engine/types';");
-    allowed('packages/scene/src/a.ts', "import { type X } from '@karmania/engine/display';");
+    // Under `verbatimModuleSyntax` that is emitted as `import {} from '...'`, which loads the module.
+    refused(
+      'packages/scene/src/a.ts',
+      "import { type X } from '@karmania/engine/display';",
+      'side effect import',
+    );
+    refused(
+      'packages/render/src/a.ts',
+      "import { type X } from '@karmania/scene';",
+      'side effect import',
+    );
+    allowed('packages/viewer/src/a.ts', "import { type X } from '@karmania/scene';");
     refused(
       'packages/scene/src/a.ts',
       "import { createEngine } from '@karmania/engine';",
@@ -150,6 +175,48 @@ describe('the direction of the imports between packages', () => {
     allowed('packages/app/e2e/a.e2e.ts', "import { x } from '@karmania/viewer/import-mapping';");
   });
 
+  it('refuses to import a package of the workspace, three or Lit by `import()`, `require()` or `import(...).T`, which the import rule does not see', () => {
+    const dynamic = 'static import';
+    refused('packages/scene/src/a.ts', "const x = await import('@karmania/engine');", dynamic);
+    refused('packages/viewer/src/a.ts', "const x = await import('three');", dynamic);
+    refused('packages/viewer/src/a.ts', "const x = await import('@karmania/app');", dynamic);
+    refused('packages/engine/src/a.ts', "const x = require('@karmania/ui');", dynamic);
+    refused('packages/render/src/a.ts', "const x = await import('lit/decorators.js');", dynamic);
+    refused('packages/app/src/a.ts', "const x = await import('@karmania/viewer/drag');", dynamic);
+    refused('packages/scene/src/a.ts', "let x: import('@karmania/ui').Button;", dynamic);
+    refused('packages/app/e2e/a.e2e.ts', "const x = await import('three');", dynamic);
+    // Files of the package itself, and a specifier that is worked out, are not packages and are not looked at.
+    allowed('packages/viewer/src/a.ts', "const x = await import('./b.js');");
+    allowed('packages/viewer/src/a.ts', 'const x = await import(name);');
+    allowed('packages/viewer/src/a.ts', "const x = await import('node:fs');");
+  });
+
+  it('holds the tests and tools of the app to what its source is held to, except for looking inside the viewer', () => {
+    refused(
+      'packages/app/e2e/a.e2e.ts',
+      "import { Scene } from 'three';",
+      'behind @karmania/render',
+    );
+    refused(
+      'packages/app/e2e/a.e2e.ts',
+      "import { x } from '@karmania/engine';",
+      'through the viewer',
+    );
+    refused(
+      'packages/app/vite.config.ts',
+      "import { x } from '@karmania/scene';",
+      'through the viewer',
+    );
+    allowed('packages/app/e2e/a.e2e.ts', "import { x } from '@karmania/ui';");
+  });
+
+  it('does not take a statement that does not parse for one that is allowed: the rules say nothing of what they cannot read', () => {
+    // `said` fails the test on a parsing error, which is what `toThrow` sees.
+    expect(() => said('packages/render/src/a.ts', "import {{ Scene } from 'three';")).toThrow(
+      'import {{ Scene',
+    );
+  });
+
   it('refuses a path into another package, from any of them, and allows the paths inside one', () => {
     refused('packages/viewer/src/a.ts', "import { x } from '../../app/src/app.js';", 'by its name');
     refused(
@@ -165,6 +232,12 @@ describe('the direction of the imports between packages', () => {
     refused(
       'packages/app/src/a.ts',
       "import { x } from '../../../packages/viewer/src/a.js';",
+      'by its name',
+    );
+    refused('packages/app/src/a.ts', "import { x } from './../../viewer/src/a.js';", 'by its name');
+    refused(
+      'packages/viewer/src/a.ts',
+      "import { x } from '/work/karmania/packages/engine/src/a.js';",
       'by its name',
     );
     allowed('packages/app/e2e/a.e2e.ts', "import { x } from '../src/theme.js';");
