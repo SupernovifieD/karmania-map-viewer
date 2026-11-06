@@ -387,6 +387,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.F8 Gate fix, second review of M15: the rule on `import()` covers `lit-html`, `@lit/*` and `@lit-labs/*` as it said,
   a template without substitution is looked at, and the deprecated `argument` of `TSImportType` is `source`.
 - [x] 15.F9 (added) Gate fix, second review of M15: the root `pnpm lint` passes: the scripts have their Node globals.
+- [x] 15.F10 Gate fix, second review of M15: the dependency table lists every package that declares vite and
+  `@types/node`, and the version of lucide-static that is installed; the log says what was left.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

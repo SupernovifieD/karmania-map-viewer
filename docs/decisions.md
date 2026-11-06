@@ -4119,4 +4119,9 @@ fixed and several that should be; each is acted on below.
 - Step 15.F9 (the root lint). **Reviewer, noted as outside the PR, and true; checked on `main` in a worktree**: `pnpm lint` (`eslint .` at the root) fails with three `no-undef` errors in `scripts/generate-fixtures.mjs` (`process`, `console`), as it does on `main`
   (the script came with M13). It went unnoticed because `pnpm check` runs `pnpm -r lint`, which lints the packages, and not the root; CI runs `pnpm check`. **A block of config gives `scripts/**/*.mjs` the two globals**, and the root
   `pnpm lint` passes (exit 0). `pnpm check` is not changed to run it (it would make the check longer for the sake of one script file, and the owner may want it); said here for the owner.
+- Step 15.F10 (the table, and what was left). **Reviewer, should-fix, right**: the table that 15.F1 corrected still left out `@karmania/ui` and `@karmania/app` in the row of vite and `@karmania/ui` in the row of `@types/node` (its tests read files with
+  Node), and the row of `lucide-static` said `^1.62.0` where the manifest and the lockfile say `^1.61.0` (older than this PR, found by the same look); all three rows are as the manifests are. **Corrections to the commit messages of the fixes**: `2812286`
+  says "app 17 tests" (13: 3 of `theme.ts` and 10 of the import rules, which was ten after 15.F7 and is ten still); it also made changes to `docs/conventions.md` and `docs/dependencies.md` that its message does not mention; and "five bounds" of
+  15.F2 is five checks over seven bounds. **Not changed, said here**: `import-dialog.ts` keeps the engine it was given when a `<karmania-viewer>` is taken out of the page and put back with the wizard open (the viewer's own engine is cleared and made
+  again at the next import, which gives the wizard the new one); the wizard is a modal dialog and nothing in the interface moves the viewer, so it is reached only by a page that moves the element itself.
 
