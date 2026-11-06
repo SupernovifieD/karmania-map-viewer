@@ -267,7 +267,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.3a The list of problems and the checks it is made of (numbers, text, choices, lists, objects).
   - [x] 14.3b `validateScene`: the version, the frame, the view, the cameras and the exaggeration.
   - [x] 14.3c `validateScene`: the layers (colour, opacity, sizes, contours, derivation).
-  - [ ] 14.3d `validateScene`: the legend, the selection and how they refer to layers.
+  - [x] 14.3d `validateScene`: the legend, the selection and how they refer to layers.
   - [ ] 14.3e `migrate`.
 - [ ] 14.4 Colour ramps and palettes with sources and licences; sampling to n
   classes; categorical palette contrast checked against both map backgrounds

@@ -7,6 +7,8 @@ import {
   place,
   readBoolean,
   readChoice,
+  readList,
+  readMap,
   readNumber,
   readNumbers,
   readRecord,
@@ -144,6 +146,22 @@ describe('the checks a scene document is validated with', () => {
     ]);
     expect(run((p) => readRecord(p, '', 7, [])).problems).toEqual([
       'not_an_object : The document must be an object, and it is 7.',
+    ]);
+  });
+
+  it('checks a list and an object of any keys, and says what it found when it is neither', () => {
+    const items = [1, 'a'];
+    expect(run((p) => readList(p, 'legend', items))).toEqual({ value: items, problems: [] });
+    expect(run((p) => readList(p, 'legend', {})).problems).toEqual([
+      'type legend: legend must be a list, and it is an object.',
+    ]);
+    expect(run((p) => readList(p, 'legend', undefined)).problems).toEqual([
+      'missing legend: legend is missing.',
+    ]);
+    const layers = { 'layer-1': 1, anything: 2 };
+    expect(run((p) => readMap(p, 'layers', layers))).toEqual({ value: layers, problems: [] });
+    expect(run((p) => readMap(p, 'layers', [])).problems).toEqual([
+      'not_an_object layers: layers must be an object, and it is a list.',
     ]);
   });
 

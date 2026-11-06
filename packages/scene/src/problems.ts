@@ -293,3 +293,21 @@ export function readMap(
 ): Readonly<Record<string, unknown>> | undefined {
   return readRecord(problems, path, value, isRecord(value) ? Object.keys(value) : []);
 }
+
+/** A list of anything: gives its items, or `undefined` if the value is not a list. */
+export function readList(
+  problems: Problems,
+  path: string,
+  value: unknown,
+): readonly unknown[] | undefined {
+  if (value === undefined) {
+    problems.add(path, 'missing', `${named(path)} is missing.`);
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    problems.add(path, 'type', `${named(path)} must be a list, and it is ${show(value)}.`);
+    return undefined;
+  }
+  const items: readonly unknown[] = value;
+  return items;
+}

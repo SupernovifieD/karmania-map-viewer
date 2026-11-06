@@ -121,12 +121,17 @@ function checkLayer(
 
 /**
  * Checks the layers of the document, and that a derived layer is made from another layer that is not itself
- * derived. Gives the ids that the layers are under, for the legend and the selection to be checked against.
+ * derived. Gives the ids that the layers are under, for the legend and the selection to be checked against, or
+ * `undefined` if the layers are not an object (and nothing can be checked against them).
  */
-export function checkLayers(problems: Problems, path: string, value: unknown): ReadonlySet<string> {
+export function checkLayers(
+  problems: Problems,
+  path: string,
+  value: unknown,
+): ReadonlySet<string> | undefined {
   const layers = readMap(problems, path, value);
   if (layers === undefined) {
-    return new Set();
+    return undefined;
   }
   const sources = new Map<string, string>();
   for (const [key, layer] of Object.entries(layers)) {
