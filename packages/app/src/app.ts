@@ -20,9 +20,9 @@ import {
   PANEL_WIDTH,
   panelWidthLimits,
   savePanelState,
-} from './panel-state.js';
-import type { PanelState } from './panel-state.js';
-import type { ResizeRequest } from './resize-handle.js';
+} from '@karmania/viewer/panel-state';
+import type { PanelState } from '@karmania/viewer/panel-state';
+import type { ResizeRequest } from '@karmania/viewer/resize-handle';
 
 /**
  * The root of the app, `<karmania-app>`: the toolbar across the top (the name, and the Import

@@ -5,9 +5,9 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
 import type { CrsLookup, RowSource } from './datasets.js';
-import { PANEL_TABS } from './panel-tabs.js';
-import type { PanelTab } from './panel-tabs.js';
-import './resize-handle.js';
+import { PANEL_TABS } from '@karmania/viewer/panel-tabs';
+import type { PanelTab } from '@karmania/viewer/panel-tabs';
+import '@karmania/viewer/resize-handle';
 
 /** What a person asked of the panel: to fold it away or open it, or to choose a tab. */
 export interface PanelChange {
