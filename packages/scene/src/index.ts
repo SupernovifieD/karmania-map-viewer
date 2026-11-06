@@ -68,6 +68,24 @@ export type { ClassEntry } from './class-entries.js';
 export { BOUND_DASH, MINUS, formatBounds, formatCount, formatNumber } from './numbers.js';
 export { createSceneStore } from './store.js';
 export type { SceneListener, SceneStore } from './store.js';
+export {
+  COLUMN_GAP,
+  COLUMN_WIDTH,
+  FURNITURE_INSET,
+  LEGEND_GAP,
+  MARGIN,
+  NORTH_ARROW_SIZE,
+  exportLayout,
+} from './export-layout.js';
+export type {
+  ExportLayout,
+  ExportLayoutInput,
+  ExportWarning,
+  LegendColumn,
+  PlacedLine,
+  Rect,
+  Size,
+} from './export-layout.js';
 export { exportLegendLines } from './export-lines.js';
 export type { ExportLine } from './export-lines.js';
 export { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';

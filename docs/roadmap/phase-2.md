@@ -312,12 +312,12 @@ or releasing, and whenever the brief says to stop.
     is a commit of its own).
   - [x] 14.12b The cameras that fit an extent in 2D and in 3D.
   - [x] 14.12c The 2D camera of a 3D one and the 3D camera of a 2D one, keeping centre, heading and scale.
-- [ ] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
+- [x] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
   column, several columns, a group heading at a column end, a narrow map
   warning. Split to stay under the commit size guideline:
   - [x] 14.13a The lines of the exported legend: visible layers that are drawn, their classes, and the groups that
     have any.
-  - [ ] 14.13b The layout: the map, the north arrow, the scale bar and the columns of the legend, in pixels, with the
+  - [x] 14.13b The layout: the map, the north arrow, the scale bar and the columns of the legend, in pixels, with the
     warning that the map is narrow.
 - [ ] 14.G Gate.
 
