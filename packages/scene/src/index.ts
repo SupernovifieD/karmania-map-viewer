@@ -34,6 +34,8 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export { createSceneStore } from './store.js';
+export type { SceneListener, SceneStore } from './store.js';
 export { COMMAND_TYPES, applyCommand } from './commands.js';
 export type { Command } from './commands.js';
 export { setFrame, setSelection } from './commands-frame.js';
