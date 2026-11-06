@@ -5,7 +5,7 @@ import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './da
 import type { CrsLookup } from './datasets.js';
 import './findings.js';
 import { groupFindings } from './import-run.js';
-import { describeSize, formatCount, KIND_NAMES } from './import-files.js';
+import { describeSize, formatCount, KIND_NAMES } from '@karmania/viewer/import-files';
 import { TYPE_NAMES } from './import-mapping.js';
 
 /**

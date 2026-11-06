@@ -5,12 +5,17 @@
   "description": "Karmania viewer: the map area, the panel and the import wizard, composed into one viewer that a page can embed",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@karmania/engine": "workspace:*",
+    "@karmania/ui": "workspace:*"
   },
   "devDependencies": {
     "vite": "^8.3.5",

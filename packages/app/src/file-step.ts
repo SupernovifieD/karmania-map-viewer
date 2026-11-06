@@ -9,8 +9,8 @@ import {
   KIND_HELP,
   KIND_NAMES,
   KINDS_BY_FORMAT,
-} from './import-files.js';
-import type { FileEntry } from './import-files.js';
+} from '@karmania/viewer/import-files';
+import type { FileEntry } from '@karmania/viewer/import-files';
 import type { ImportDraft } from './import-draft.js';
 
 /** The name of the event the step sends when a person changes what is to be imported. */

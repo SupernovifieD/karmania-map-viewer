@@ -5,8 +5,8 @@ import type { PropertyValues } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
 import type { ImportDraft } from './import-draft.js';
-import { formatCount, NO_COLUMNS_NOTE } from './import-files.js';
-import type { FileEntry } from './import-files.js';
+import { formatCount, NO_COLUMNS_NOTE } from '@karmania/viewer/import-files';
+import type { FileEntry } from '@karmania/viewer/import-files';
 import {
   mappingProblems,
   parseSize,
