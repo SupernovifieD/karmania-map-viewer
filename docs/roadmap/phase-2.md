@@ -300,7 +300,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.9b `createSceneStore`.
 - [ ] 14.10 Legend model with number labels (11.7). Split to stay under the commit size guideline:
   - [x] 14.10a Number labels: thousands commas, the fewest decimals that keep neighbouring bounds apart.
-  - [ ] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
+  - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
   - [ ] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
 - [ ] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
   changes, null cases).
