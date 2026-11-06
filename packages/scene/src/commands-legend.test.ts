@@ -6,7 +6,8 @@ import {
   renameGroup,
   setGroupCollapsed,
 } from './commands-legend.js';
-import { frozen, sampleScene } from './test-support/documents.js';
+import { emptyScene } from './empty.js';
+import { frozen, layerById, sampleScene } from './test-support/documents.js';
 import { validateScene } from './validate.js';
 import type { LegendNode, SceneDocument } from './types.js';
 
@@ -203,6 +204,18 @@ describe('createGroup', () => {
         .legend.map((n) => n.id)
         .slice(0, 3),
     ).toEqual(['group-4', 'group-3', 'group-2']);
+  });
+
+  it('does not give a group the id of a layer, also of one that is in a group', () => {
+    // A layer that is called group-1 (an embedder's own name), in a group that is called g-a.
+    const odd: SceneDocument = {
+      ...emptyScene(),
+      layers: { 'group-1': { ...layerById(sampleScene(), 'layer-2'), id: 'group-1' } },
+      legend: [{ type: 'group', id: 'g-a', name: 'A', collapsed: false, children: ['group-1'] }],
+    };
+    const next = createGroup(odd, 'New');
+    expect(next.legend[0]).toMatchObject({ type: 'group', id: 'group-2' });
+    expect(validateScene(next)).toEqual([]);
   });
 
   it('numbers from 1 when there is no group, and counts groups only, not layers', () => {

@@ -125,10 +125,8 @@ export function createGroup(doc: SceneDocument, name: string, index = 0): SceneD
   if (trimmed === '' || Number.isNaN(index)) {
     return doc;
   }
-  const id = nextId(
-    'group',
-    doc.legend.map((node) => node.id),
-  );
+  // Every id there is: a group never has the id of a layer, also of one that is in a group.
+  const id = nextId('group', [...Object.keys(doc.layers), ...doc.legend.map((node) => node.id)]);
   const group: LegendGroupNode = {
     type: 'group',
     id,

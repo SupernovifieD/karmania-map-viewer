@@ -141,6 +141,11 @@ describe('the style of a new layer', () => {
     expect(defaultStyle(brief('blocks'), 5).colour).toEqual({ mode: 'single', value: '#cc79a7' });
   });
 
+  it('is a mistake to ask for the style of a dataset of a kind that there is not', () => {
+    expect(() => defaultStyle(brief('bogus' as Kind), 0)).toThrow(TypeError);
+    expect(() => defaultStyle(brief('constructor' as Kind), 0)).toThrow(/no default style/);
+  });
+
   it('is the same every time for the same dataset and place in the order', () => {
     const grid = brief('grid', [column('grade', 'float')]);
     expect(defaultStyle(grid, 3)).toEqual(defaultStyle(grid, 3));
