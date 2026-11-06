@@ -321,6 +321,8 @@ or releasing, and whenever the brief says to stop.
     warning that the map is narrow.
 - [x] 14.F1 Gate fix, review of M14: ids that cannot collide or lose digits, and datasets that are not what the engine
   gives are refused, so that a command never makes a document that `validateScene` refuses.
+- [x] 14.F2 Gate fix, review of M14: a hole in a list is a thing that is missing, `validateScene` takes a time in
+  proportion to the layers and not to their square, the cap of 100 problems is pinned, and two comments say what is true.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

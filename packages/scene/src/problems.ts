@@ -245,21 +245,18 @@ export function readNumbers(
     );
     return undefined;
   }
-  const items: readonly unknown[] = value;
+  // A copy with no holes: `map` and `forEach` skip the holes of a list such as `new Array(3)`, and a hole is a number that is missing.
+  const items = Array.from<unknown>(value);
   const numbers = items.map((item, index) => readNumber(problems, place(path, index), item, rule));
   const valid = numbers.filter((number): number is number => number !== undefined);
   return valid.length === numbers.length ? valid : undefined;
 }
 
-/**
- * An object whose fields are among `allowed`: a field that is not is a problem of its own (a typo is not
- * silently ignored). Gives the fields, or `undefined` if the value is not an object.
- */
-export function readRecord(
+/** An object: gives its fields, or says that it is missing or not an object and gives `undefined`. */
+function readObject(
   problems: Problems,
   path: string,
   value: unknown,
-  allowed: readonly string[],
 ): Readonly<Record<string, unknown>> | undefined {
   if (value === undefined) {
     problems.add(path, 'missing', `${named(path)} is missing.`);
@@ -273,7 +270,24 @@ export function readRecord(
     );
     return undefined;
   }
-  for (const key of Object.keys(value)) {
+  return value;
+}
+
+/**
+ * An object whose fields are among `allowed`: a field that is not is a problem of its own (a typo is not
+ * silently ignored). Gives the fields, or `undefined` if the value is not an object.
+ */
+export function readRecord(
+  problems: Problems,
+  path: string,
+  value: unknown,
+  allowed: readonly string[],
+): Readonly<Record<string, unknown>> | undefined {
+  const fields = readObject(problems, path, value);
+  if (fields === undefined) {
+    return undefined;
+  }
+  for (const key of Object.keys(fields)) {
     if (!allowed.includes(key)) {
       problems.add(
         field(path, key),
@@ -282,16 +296,19 @@ export function readRecord(
       );
     }
   }
-  return value;
+  return fields;
 }
 
-/** An object whose keys can be anything (layers by their id): gives the fields, or `undefined` if the value is not an object. */
+/**
+ * An object whose keys can be anything (layers by their id): gives the fields, or `undefined` if the value is not an
+ * object. It does not look each key up in a list of the keys, which would take a time in proportion to the square of them.
+ */
 export function readMap(
   problems: Problems,
   path: string,
   value: unknown,
 ): Readonly<Record<string, unknown>> | undefined {
-  return readRecord(problems, path, value, isRecord(value) ? Object.keys(value) : []);
+  return readObject(problems, path, value);
 }
 
 /** A list of anything: gives its items, or `undefined` if the value is not a list. */
@@ -308,6 +325,6 @@ export function readList(
     problems.add(path, 'type', `${named(path)} must be a list, and it is ${show(value)}.`);
     return undefined;
   }
-  const items: readonly unknown[] = value;
-  return items;
+  // A copy with no holes, so that going through the items reaches every place, and a place that is empty is a thing that is missing.
+  return Array.from<unknown>(value);
 }

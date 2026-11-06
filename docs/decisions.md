@@ -3908,4 +3908,14 @@ found that is not true or not worth a change is said in its place.
   or more, a kind of the six, a name that is text, a list of columns), as the rule of step 14.8 says, and **`defaultStyle` throws a `TypeError` for a kind that there is not** (misuse). **The random run of step 14.9a
   now makes bad dataset ids and kinds, and also starts from a document with awkward ids** (a layer called like a group, a group called like a layer, a layer in a group, a number a double cannot hold), because it had
   none of that, which is why it did not find these.
+- Step 14.F2 (`validateScene` and holes, and the square). **Reviewer A, must-fix and should-fix, both right.** (1) **`validateScene` let a sparse list through**: `new Array(3)` as the legend, or `[, 5]` as a camera
+  centre, gave no problem, because `map` and `forEach` skip the holes of a list, and a command then threw on `undefined` (`moveNode` reading `.id`). JSON cannot carry a hole but an embedder passes JavaScript objects.
+  `readList` and `readNumbers` now go through a copy with no holes (`Array.from`), so a hole is a place where nothing is, and **a thing that is missing**, reported at its place (`legend[0]`,
+  `camera2d.centre[0]`). (2) **`validateScene` took a time in proportion to the square of the layers**: the map of layers was read with a list of all its keys as the allowed fields, and each key was looked up in that list
+  (the reviewer measured 1.2 s for 16,000 layers and 82 s for 100,000). The map has its own reader now that does not look up anything. **A first test of this, with 50,000 layers and a time allowed, passed with the
+  old code**: a test that does not wait is not interrupted by a timeout (by the reviewer's figures the old code takes about 12 s for 50,000 layers, which I did not time, and the test was allowed 15), and a clock on a machine that is busy is not a measure. **The test now counts what was
+  searched**: it spies on `Array.prototype.includes` during the check of 5,000 layers and asks that no list longer than 100 was searched (the old code searched one of 5,000; the new code one of a dozen at most).
+  (3) **The cap of 100 problems was not pinned**: the tests used the constant `MAX_PROBLEMS` itself, so raising it to 100,000 changed nothing they could see, though step 14.3a said that changing it fails a test; there is a
+  test of the number now. (4) Two comments said more than was true: `validateScene` "does not throw" is **for plain data** (an object whose getter throws is not plain data, and the error is the getter's), and the store's
+  `subscribe` says that **adding the same function twice is one listener** that one removal takes away (a test says so now).
 

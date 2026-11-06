@@ -1,7 +1,8 @@
 /**
  * `validateScene`: whether a value that came from outside (an embedder's state, a saved file) is a scene
  * document this package can use, and if not, everything that is wrong with it. It does not stop at the first
- * problem and it does not throw. It looks at plain data, as JSON has it.
+ * problem, and for plain data (what JSON has, and objects made of fields) it does not throw. An object whose getter
+ * throws is not plain data, and the error is the getter's own.
  */
 import { CRS_KINDS, FRAME_SOURCES, LOCAL_UNITS } from './choices.js';
 import {
