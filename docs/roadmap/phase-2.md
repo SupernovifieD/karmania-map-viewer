@@ -384,6 +384,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.F7 Gate fix, review of M15: the import rules also refuse `import { type X }` where only types may be named,
   `import()` and `require()` of packages, more forms of a path, and the app's tests reaching past the viewer; the test
   of the rules cannot pass on a statement it cannot read.
+- [x] 15.F8 Gate fix, second review of M15: the rule on `import()` covers `lit-html`, `@lit/*` and `@lit-labs/*` as it said,
+  a template without substitution is looked at, and the deprecated `argument` of `TSImportType` is `source`.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

@@ -4103,3 +4103,17 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
   repeated with the baseline repaired). **The app declares `eslint` and `typescript-eslint`**, which its test imports (they resolved only through the root's `node_modules`). **Not changed**: a package reached through another file
   that re-exports it, which no import rule sees.
 
+### M15 gate, second round
+
+The second review (one reviewer on the cheaper model, only the fixes 15.F1 to 15.F7) ran after the gate was clean again on `2812286` (`pnpm check`; e2e 14 + 638; screenshots 102, no baseline changed; axe 102). It found one thing that must be
+fixed and several that should be; each is acted on below.
+
+- Step 15.F8 (the rule on `import()`, again). **Reviewer, must-fix, right, and it was my own claim that was false**: 15.F7 and its commit said that `import()`, `require()` and `import('x').T` are refused for a workspace package, three
+  **or Lit** in every block, and that `lit-html` and `lit-element` are covered, but the pattern for the dynamic forms (`DYNAMIC`) had `lit` and `lit/...` only, while the static rule had `lit-html`, `lit-element`, `@lit/*` and
+  `@lit-labs/*`; `import('lit-html')`, `import('@lit/reactive-element')` and `import('lit-html').Foo` passed, and the test used `lit/decorators.js` only, so it could not see it. **The pattern has all of them now** (`lit`, `lit-`...,
+  `@lit/`, `@lit-labs/`), and the test has each (dynamic and as a type), with `react` and `literal` as imports that are not refused. **Should-fix, right**: the selector for `import('x').T` used `argument.literal.value`, which the
+  typescript-eslint parser warns is deprecated (the app's test run printed it; a warning is a signal): it is `source.value` now, and the warning is gone. **Should-fix, right**: **a template with no substitution**
+  (`` import(`@karmania/engine`) ``, `` import(`...`).T ``) is a string, not a "specifier that is worked out", and passed; two selectors read its first part. Not looked at, and said so here: a specifier that is joined
+  (`'@karmania' + '/engine'`) and `require` held in a variable (`const r = require; r('...')`), which no selector can follow. Six changes to the rule each fail a test (tried: the old pattern for Lit, no `lit-`, no `@lit/`,
+  no template selector for `import()` or for the type, `TSImportType` not selected).
+

@@ -41,7 +41,7 @@ const NO_LIT = {
  * What `import()`, `require()` and `import('x').T` may not name: a workspace package, three or Lit. The rule above sees
  * only static imports, so a package is imported statically, where the direction of the dependencies can be checked.
  */
-const DYNAMIC = '^(@karmania\\/|three($|\\/)|lit($|\\/))';
+const DYNAMIC = '^(@karmania\\/|three($|\\/)|lit($|\\/|-)|@lit\\/|@lit-labs\\/)';
 const STATIC_ONLY =
   'Import a package with a static import: the direction of the dependencies is checked there.';
 const NO_DYNAMIC = [
@@ -50,7 +50,16 @@ const NO_DYNAMIC = [
     selector: `CallExpression[callee.name='require'][arguments.0.value=/${DYNAMIC}/]`,
     message: STATIC_ONLY,
   },
-  { selector: `TSImportType[argument.literal.value=/${DYNAMIC}/]`, message: STATIC_ONLY },
+  { selector: `TSImportType[source.value=/${DYNAMIC}/]`, message: STATIC_ONLY },
+  // A template with no substitution is a string like any other (a worked-out specifier is not looked at).
+  {
+    selector: `ImportExpression[source.type='TemplateLiteral'][source.quasis.0.value.cooked=/${DYNAMIC}/]`,
+    message: STATIC_ONLY,
+  },
+  {
+    selector: `TSImportType[source.type='TemplateLiteral'][source.quasis.0.value.cooked=/${DYNAMIC}/]`,
+    message: STATIC_ONLY,
+  },
 ];
 
 /**

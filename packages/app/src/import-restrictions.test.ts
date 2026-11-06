@@ -182,6 +182,23 @@ describe('the direction of the imports between packages', () => {
     refused('packages/viewer/src/a.ts', "const x = await import('@karmania/app');", dynamic);
     refused('packages/engine/src/a.ts', "const x = require('@karmania/ui');", dynamic);
     refused('packages/render/src/a.ts', "const x = await import('lit/decorators.js');", dynamic);
+    refused('packages/scene/src/a.ts', "const x = await import('lit-html');", dynamic);
+    refused(
+      'packages/scene/src/a.ts',
+      "const x = await import('lit-element/lit-element.js');",
+      dynamic,
+    );
+    refused('packages/scene/src/a.ts', "const x = await import('@lit/reactive-element');", dynamic);
+    refused('packages/scene/src/a.ts', "const x = await import('@lit-labs/ssr');", dynamic);
+    refused('packages/scene/src/a.ts', "let x: import('lit-html').Foo;", dynamic);
+    refused('packages/scene/src/a.ts', "let x: import('@lit/reactive-element').Foo;", dynamic);
+    // A template with no substitution is a string, and one that starts with a package is refused too.
+    refused('packages/scene/src/a.ts', 'const x = await import(`@karmania/engine`);', dynamic);
+    refused('packages/viewer/src/a.ts', 'const x = await import(`three`);', dynamic);
+    refused('packages/scene/src/a.ts', 'let x: import(`@karmania/ui`).Button;', dynamic);
+    allowed('packages/viewer/src/a.ts', 'const x = await import(`./b.js`);');
+    allowed('packages/viewer/src/a.ts', "const x = await import('react');");
+    allowed('packages/viewer/src/a.ts', "const x = await import('literal');");
     refused('packages/app/src/a.ts', "const x = await import('@karmania/viewer/drag');", dynamic);
     refused('packages/scene/src/a.ts', "let x: import('@karmania/ui').Button;", dynamic);
     refused('packages/app/e2e/a.e2e.ts', "const x = await import('three');", dynamic);
