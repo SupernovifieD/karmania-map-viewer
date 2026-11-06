@@ -3955,3 +3955,15 @@ found that is not true or not worth a change is said in its place.
   viewer, are listed in `PROBLEM_CODES` and `ExportWarning`, and carry a message for a person (and the export dialog of step 22.9 writes the words for a warning). If the owner wants them in the registry, it is a
   step of its own. `docs/dependencies.md` now says that the scene package also uses vitest, vite and Node's type declarations.
 
+### M14 gate, second round
+
+The second review (two fresh reviewers on the cheaper model again, one for the fixes 14.F1 and 14.F2, one for 14.F3 to 14.F6, told to keep the machine quiet) found one thing that must be fixed and some that should.
+
+- Step 14.F7 (`addLayers` and the columns of a dataset). **Reviewer A, must-fix, right.** The refusal of step 14.F1 looked at a dataset's id, kind, name and whether `columns` is a list, **not at the columns in it**: a grid whose
+  first numeric column had an empty name made a layer coloured by the column `""`, which `validateScene` refuses (`style.colour.column must not be empty`), and a `null` column made `addLayers` throw (`firstNumericColumn`
+  read `.type` of it). **A dataset is well formed now only if every column is a plain object with a name that is text and not empty, and a type that is text**, and `addLayers` refuses all the datasets of the call otherwise.
+  The refusal test has five cases of it (an empty name, a name that is a number, `null`, `undefined`, a type that is a number), which failed with the old code, and **the random run now makes columns with no name and
+  `null` columns** (it made only `a` and `b` before, which is why it could not find this). Two nits of the same report are left: `addLayers(doc, [null])` throws, which is misuse (a dataset that is not even an
+  object); and `addLayers` scans every id for each dataset of a call, which took 2.3 s for 500 datasets on a document of 20,000 layers: the same order as before the fix (the reviewer measured 1.4 s with numbers
+  and 1.7 s with `BigInt` for 500 calls of `nextId` over 20,000 ids), and a call is of the datasets of one import.
+

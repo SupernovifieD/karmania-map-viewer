@@ -153,6 +153,18 @@ describe('addLayers', () => {
       { ...dataset(1, 'x'), kind: 'bogus' as Kind },
       { ...dataset(1, 'x'), name: 7 as unknown as string },
       { ...dataset(1, 'x'), columns: 'a' as unknown as readonly ColumnSummary[] },
+      // A column that is not what the engine gives, in a grid (which reads its columns to find the one to colour by).
+      { ...dataset(1, 'x', 'grid'), columns: [{ name: '', type: 'float', nullCount: 0 }] },
+      {
+        ...dataset(1, 'x', 'grid'),
+        columns: [{ name: 5 as unknown as string, type: 'float', nullCount: 0 }],
+      },
+      { ...dataset(1, 'x', 'grid'), columns: [null as unknown as ColumnSummary] },
+      { ...dataset(1, 'x', 'grid'), columns: [undefined as unknown as ColumnSummary] },
+      {
+        ...dataset(1, 'x', 'points'),
+        columns: [{ name: 'a', type: 7 as unknown as ColumnSummary['type'], nullCount: 0 }],
+      },
     ];
     for (const one of wrong) {
       expect(addLayers(doc, [dataset(3, 'fine'), one])).toBe(doc);

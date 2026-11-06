@@ -113,7 +113,17 @@ function randomCommand(doc: SceneDocument, next: () => number): Command {
           name: text(),
           kind: pick([...kinds, ...kinds, 'bogus' as Kind]),
           elementCount: 10,
-          columns: [column(), column()],
+          // Now and then a column that is not what the engine gives (no name, or nothing at all).
+          columns: [
+            column(),
+            pick([
+              column(),
+              column(),
+              column(),
+              { ...column(), name: '' },
+              null as unknown as ColumnSummary,
+            ]),
+          ],
         })),
       };
     case 1:

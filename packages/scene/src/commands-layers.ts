@@ -6,6 +6,7 @@
 import { LAYER_COLOURS, defaultStyle, type DatasetBrief } from './defaults.js';
 import { DATASET_KINDS } from './choices.js';
 import { nextId, ordinalOf } from './ids.js';
+import { isRecord } from './problems.js';
 import type { Layer, LegendNode, SceneDocument } from './types.js';
 
 /** A dataset a layer is made for: what the engine says of it when it is loaded (its `Summary` has all of this). */
@@ -14,14 +15,28 @@ export interface NewDataset extends DatasetBrief {
   readonly name: string;
 }
 
-/** Whether a dataset is what the engine gives: a whole id of 0 or more, a kind there is, a name and a list of columns. */
+/** Whether a column is what the engine gives: an object with a name that is text and not empty, and a type that is text. */
+function wellFormedColumn(column: unknown): boolean {
+  return (
+    isRecord(column) &&
+    typeof column['name'] === 'string' &&
+    column['name'] !== '' &&
+    typeof column['type'] === 'string'
+  );
+}
+
+/**
+ * Whether a dataset is what the engine gives: a whole id of 0 or more, a kind there is, a name that is text, and a
+ * list of columns that are each what the engine gives (a layer is coloured by the name of one, which a layer must have).
+ */
 function wellFormed(dataset: NewDataset): boolean {
   return (
     Number.isInteger(dataset.id) &&
     dataset.id >= 0 &&
     DATASET_KINDS.includes(dataset.kind) &&
     typeof dataset.name === 'string' &&
-    Array.isArray(dataset.columns)
+    Array.isArray(dataset.columns) &&
+    dataset.columns.every(wellFormedColumn)
   );
 }
 
@@ -30,7 +45,7 @@ function wellFormed(dataset: NewDataset): boolean {
  * the datasets lowest, as if they were added one at a time). The layer is named for the dataset, and is
  * `layer-N` with N one more than the highest there is among all the ids of layers and groups; the colour it gets
  * is the one of that number. **A dataset that is not what the engine gives** (an id that is not a whole number of 0 or
- * more, a kind that there is not) refuses all of them, and nothing to add is the same document.
+ * more, a kind that there is not, a column with no name) refuses all of them, and nothing to add is the same document.
  */
 export function addLayers(doc: SceneDocument, datasets: readonly NewDataset[]): SceneDocument {
   if (datasets.length === 0 || !datasets.every(wellFormed)) {

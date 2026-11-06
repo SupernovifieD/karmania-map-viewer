@@ -332,6 +332,7 @@ or releasing, and whenever the brief says to stop.
   machine does not run them out of their five seconds.
 - [x] 14.F6 Gate fix, review of M14: the words that were stale or wrong in the roadmap, a header and the decisions,
   the data and problem-code notes the review asked for, and the packages that use vitest, vite and Node's types.
+- [x] 14.F7 Gate fix, second review of M14: `addLayers` also refuses a dataset whose columns are not what the engine gives.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)
