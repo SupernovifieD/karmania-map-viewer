@@ -25,6 +25,23 @@ test.describe('what the viewer offers a page', () => {
     await page.goto('/');
   });
 
+  test('has one viewer in an app that was taken out of the page before it first showed, and put back', async ({
+    page,
+  }) => {
+    const count = await page.evaluate(async () => {
+      const later = (): Promise<void> => new Promise((resolve) => setTimeout(resolve));
+      const app = document.createElement('karmania-app');
+      document.body.append(app);
+      // Out again at once: its first render still happens, with the app out of the page.
+      app.remove();
+      await later();
+      document.body.append(app);
+      await later();
+      return app.shadowRoot?.querySelectorAll('karmania-viewer').length;
+    });
+    expect(count).toBe(1);
+  });
+
   test('opens the wizard on the files it is given', async ({ page }) => {
     await openImport(page, ['a.csv']);
     await expect(dialog(page).locator('karmania-file-step')).toBeVisible();

@@ -71,9 +71,13 @@ export class KarmaniaApp extends LitElement {
     this.viewer = undefined;
   }
 
+  /**
+   * Puts the viewer in its container, once: the first render happens even if the app was taken out of the page
+   * before it, and then the app is put back with its viewer already in it.
+   */
   private mount(): void {
     const container = this.renderRoot.querySelector<HTMLElement>('.viewer');
-    if (container !== null) {
+    if (container !== null && this.viewer === undefined) {
       this.viewer = createViewer(container);
     }
   }

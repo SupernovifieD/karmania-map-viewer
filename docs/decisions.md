@@ -4082,4 +4082,7 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
 - Step 15.F3 (`openImport` with no files). **Reviewer of the viewer, right**: the doc said "or the file picker when there are none to give", the code looked only for `undefined`, and `importFiles` returns at once for an empty list, so
   `openImport([])` opened neither the wizard nor the picker. An empty list is no files now: the picker. New e2e file `viewer.e2e.ts` (what the viewer offers a page): the wizard on files, the picker and then the wizard for none and for an
   empty list; the empty list failed before the fix (the picker never opened, 10 s) and passes after.
+- Step 15.F4 (one viewer in the app). **Reviewer of the viewer, right, and reproduced**: Lit does a first render even if the element was taken out of the page before it, so `firstUpdated` made a viewer while the app was out; put back, the app's
+  `connectedCallback` made another, and the first was never disposed (and, being in the page again, kept its listeners on the window). `mount()` makes the viewer once now. The e2e test makes an app, takes it out at once, lets the
+  render happen, puts it back and counts the viewers in it: 2 before the fix, 1 after.
 
