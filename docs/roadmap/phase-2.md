@@ -374,6 +374,7 @@ or releasing, and whenever the brief says to stop.
   true, and what the review found but this milestone leaves is recorded.
 - [x] 15.F2 Gate fix, review of M15: the largest number is not written as `Infinity`, and the comments and the
   tests say what 15 significant digits do (a longer bound is rounded to 15).
+- [x] 15.F3 Gate fix, review of M15: `openImport` with an empty list opens the file picker, as it does with no list.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

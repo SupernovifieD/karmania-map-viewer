@@ -4079,4 +4079,7 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
   digits or fewer"), and the code comments and the commit body of `b7347aa` overclaimed. **The comments say what 15 digits do now, and a test pins it** (five bounds). **A bug that the same look found**: `Number.MAX_VALUE` was written
   `Infinity`, because `Number('1.79769313486232e+308')` is past the largest number; a bound that 15 digits would carry out of range is written with all its digits now (`1.7976931348623157e+308`), with `1.5e308` and the smallest
   number as neighbours in the test. The exponent of a number that has one is as the platform writes it (`−1e-7`: the true minus is the sign in front only), which the comment says. Three changes to the code each fail a test (tried).
+- Step 15.F3 (`openImport` with no files). **Reviewer of the viewer, right**: the doc said "or the file picker when there are none to give", the code looked only for `undefined`, and `importFiles` returns at once for an empty list, so
+  `openImport([])` opened neither the wizard nor the picker. An empty list is no files now: the picker. New e2e file `viewer.e2e.ts` (what the viewer offers a page): the wizard on files, the picker and then the wizard for none and for an
+  empty list; the empty list failed before the fix (the picker never opened, 10 s) and passes after.
 
