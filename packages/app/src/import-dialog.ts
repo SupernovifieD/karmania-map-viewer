@@ -5,19 +5,25 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './file-step.js';
 import type { DraftChange } from './file-step.js';
-import { applyDraftChange, draftFor } from './import-draft.js';
-import type { ImportDraft } from './import-draft.js';
+import { applyDraftChange, draftFor } from '@karmania/viewer/import-draft';
+import type { ImportDraft } from '@karmania/viewer/import-draft';
 import { crsBlocker } from '@karmania/viewer/import-crs';
 import { entriesOf, isImportable } from '@karmania/viewer/import-files';
-import { mappingProblems } from './import-mapping.js';
+import { mappingProblems } from '@karmania/viewer/import-mapping';
 import type { FileEntry } from '@karmania/viewer/import-files';
 import './crs-step.js';
 import './findings.js';
 import type { GoToStep } from './findings.js';
 import './mapping-step.js';
 import './nodata-step.js';
-import { buildMapping, groupFindings, IDLE, loadBlocker, loadLabel } from './import-run.js';
-import type { RunState } from './import-run.js';
+import {
+  buildMapping,
+  groupFindings,
+  IDLE,
+  loadBlocker,
+  loadLabel,
+} from '@karmania/viewer/import-run';
+import type { RunState } from '@karmania/viewer/import-run';
 import './review-step.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';

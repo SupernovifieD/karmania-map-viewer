@@ -18,7 +18,7 @@ import {
   UNIT_NAMES,
 } from '@karmania/viewer/import-crs';
 import type { CrsMode } from '@karmania/viewer/import-crs';
-import type { ImportDraft } from './import-draft.js';
+import type { ImportDraft } from '@karmania/viewer/import-draft';
 import type { FileEntry } from '@karmania/viewer/import-files';
 
 /** Whether some text, from a select say, is a way of choosing the coordinate system. */

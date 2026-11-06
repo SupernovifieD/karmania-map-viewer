@@ -3,8 +3,8 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import './findings.js';
 import { describeSize, KIND_ICONS } from '@karmania/viewer/import-files';
-import { groupFindings, PHASE_LABELS } from './import-run.js';
-import type { RunState } from './import-run.js';
+import { groupFindings, PHASE_LABELS } from '@karmania/viewer/import-run';
+import type { RunState } from '@karmania/viewer/import-run';
 
 /** The name of the event the step sends when a person asks to stop the import. */
 export const RUN_CANCEL = 'karmania-run-cancel';

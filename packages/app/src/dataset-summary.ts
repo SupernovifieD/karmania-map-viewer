@@ -9,9 +9,9 @@ import {
 } from '@karmania/viewer/datasets';
 import type { CrsLookup } from '@karmania/viewer/datasets';
 import './findings.js';
-import { groupFindings } from './import-run.js';
+import { groupFindings } from '@karmania/viewer/import-run';
 import { describeSize, formatCount, KIND_NAMES } from '@karmania/viewer/import-files';
-import { TYPE_NAMES } from './import-mapping.js';
+import { TYPE_NAMES } from '@karmania/viewer/import-mapping';
 
 /**
  * What a person wants to know about the dataset that is selected, in the Data tab: what kind it is
