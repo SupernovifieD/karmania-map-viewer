@@ -3697,3 +3697,7 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   one fault is one problem and not a page. What is wrong in a node places nothing, so its layer is also reported as not in the legend (the tests say so); that is noise that goes when the node is mended. Tested by the
   sample and a table of spoiled copies; seven changes to the rules each fail a test (tried one by one, each pattern checked to have applied; three expectations of mine were wrong at first, about the layer that a spoiled
   node no longer places and about which place of a duplicate is reported, and were corrected after printing what the code gave and reasoning that it was right).
+- Step 14.3e (`migrate`). `migrate(doc)` gives `{ status: 'ok', doc, from }` or `{ status: 'failed', problems }`. Version 1 is the only version, so a document of version 1 that `validateScene` finds nothing wrong in is
+  given back as the very object, with `from: 1`, and anything else is the problems, a version that is not known being the one problem `version`. **There is no table of steps yet**: an empty one is code that nothing can run
+  or test, and when a version 2 exists its step from 1 is added in `migrate.ts` and the test of "a version it does not know" changes its number, so that cannot be forgotten. `isSceneDocument` is `validateScene` as a type
+  guard, so that no cast is needed to say that a value is a `SceneDocument`. Never throws, never changes what it is given (tested with a deeply frozen document); four changes to it fail a test (tried).
