@@ -15,7 +15,6 @@
     "test:perf": "KARMANIA_PERF=1 playwright test --project performance --workers=1"
   },
   "dependencies": {
-    "@karmania/engine": "workspace:*",
     "@karmania/ui": "workspace:*",
     "@karmania/viewer": "workspace:*",
     "lit": "^3.3.3"

@@ -33,6 +33,7 @@ async function seen(page: Page): Promise<Seen> {
   await page.waitForFunction(() => {
     const element = document
       .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer')
       ?.shadowRoot?.querySelector('karmania-import-dialog') as unknown as Internals | null;
     return element !== null && (element.entries !== undefined || element.failure !== undefined);
   });

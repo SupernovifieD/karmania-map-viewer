@@ -41,7 +41,7 @@ interface Crafted {
 
 /** Gives the app datasets that were not imported, to look at the list with: only what it shows is in them. */
 async function setDatasets(page: Page, crafted: readonly Crafted[]): Promise<void> {
-  await page.locator('karmania-app').evaluate(async (element, list) => {
+  await page.locator('karmania-viewer').evaluate(async (element, list) => {
     const app = element as unknown as {
       datasets: unknown[];
       selected: number | undefined;
@@ -222,7 +222,7 @@ test.describe('the list of datasets', () => {
     await expect(p.choose('Collars')).not.toHaveAttribute('aria-current');
     expect(
       await page
-        .locator('karmania-app')
+        .locator('karmania-viewer')
         .evaluate((app) => (app as unknown as { selected: number }).selected),
     ).toBe(2);
     // A bar at the edge, a tint, and bold type.
@@ -269,7 +269,7 @@ test.describe('the list of datasets', () => {
       element.scrollTop = 0;
     });
     // A dataset far down is selected from elsewhere (as a new one is, when it is loaded): it comes into view.
-    await page.locator('karmania-app').evaluate(async (element) => {
+    await page.locator('karmania-viewer').evaluate(async (element) => {
       const app = element as unknown as { selected: number; updateComplete: Promise<boolean> };
       app.selected = 9;
       await app.updateComplete;
@@ -348,7 +348,7 @@ test.describe('loading and removing datasets', () => {
     await importAndLoad(page, 'mixed.geojson');
     await expect(q.map).toContainText('3 datasets loaded');
     const before = await page
-      .locator('karmania-app')
+      .locator('karmania-viewer')
       .evaluate((app) =>
         (app as unknown as { datasets: { id: number; name: string }[] }).datasets.map((d) => d.id),
       );
@@ -357,7 +357,7 @@ test.describe('loading and removing datasets', () => {
     await q.confirm.click();
     await expect(q.rows).toHaveCount(2);
     await expect(q.map).toContainText('2 datasets loaded');
-    const state = await page.locator('karmania-app').evaluate((app) => {
+    const state = await page.locator('karmania-viewer').evaluate((app) => {
       const held = app as unknown as {
         datasets: { id: number }[];
         selected: number;
@@ -380,7 +380,7 @@ test.describe('loading and removing datasets', () => {
     const q = parts(page);
     await importAndLoad(page, 'mixed.geojson');
     const ids = await page
-      .locator('karmania-app')
+      .locator('karmania-viewer')
       .evaluate((app) =>
         (app as unknown as { datasets: { id: number }[] }).datasets.map((d) => d.id),
       );
@@ -390,7 +390,7 @@ test.describe('loading and removing datasets', () => {
     await q.confirm.click();
     await expect(q.rows).toHaveCount(2);
     const selected = await page
-      .locator('karmania-app')
+      .locator('karmania-viewer')
       .evaluate((app) => (app as unknown as { selected: number }).selected);
     expect(selected).toBe(ids[1]);
     await expect(q.rows.first().locator('.choose')).toBeFocused();

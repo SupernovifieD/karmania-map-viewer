@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PACKAGE_NAME } from './index.js';
+import * as viewer from './index.js';
 
 describe('@karmania/viewer', () => {
-  it('exposes its package name', () => {
-    expect(PACKAGE_NAME).toBe('@karmania/viewer');
+  it('exposes the viewer element', () => {
+    expect(Object.keys(viewer)).toEqual(['KarmaniaViewer']);
   });
 });

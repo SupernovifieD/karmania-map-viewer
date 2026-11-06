@@ -65,7 +65,10 @@ pnpm perf         # how long the large files take, in a browser (writes them fir
 ## How it is built
 
 ```
-files ──► @karmania/app        the page: import wizard, Data tab (Lit web components)
+files ──► @karmania/app        the page: a toolbar and the viewer
+              │
+              ▼
+          @karmania/viewer     the map area, the panel, the import wizard and the Data tab (Lit web components)
               │  uses            @karmania/ui has the components: tabs, dialog, table, ...
               ▼
           @karmania/engine     a TypeScript API that runs the Rust code in a Web Worker
@@ -86,7 +89,8 @@ files ──► @karmania/app        the page: import wizard, Data tab (Lit web 
 - **`karmania-wasm`** is the thin layer that lets the browser call the two.
 - **`@karmania/engine`** starts a worker, sends it files and asks, and hands back datasets, summaries and pages of rows. A file never blocks the page, and a table asks only for the rows in view.
 - **`@karmania/ui`** is the set of components and the design tokens (colours, sizes, light and dark themes). The app is built from them.
-- **`@karmania/app`** is the page itself.
+- **`@karmania/viewer`** is the viewer a page embeds: the map area, the side panel with the Data tab, and the import wizard, as the element `<karmania-viewer>`.
+- **`@karmania/app`** is the page itself: a toolbar over the viewer, and the gallery of the components.
 
 A few principles run through all of it: data problems are findings and never crashes; output is the same every time for the same input; and the interface is checked by tests that look at the page, at three window sizes from 1024 x 640 up, in both the light and the dark theme.
 
