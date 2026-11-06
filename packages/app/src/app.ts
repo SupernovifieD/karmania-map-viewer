@@ -4,7 +4,7 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from '@karmania/viewer/drag';
 import { IMPORT_FILE_ACCEPT } from '@karmania/viewer/import-files';
-import type { DatasetChoice } from './dataset-list.js';
+import type { DatasetChoice } from '@karmania/viewer/dataset-list';
 import { selectionAfterRemoving } from '@karmania/viewer/datasets';
 import type { CrsLookup, RowSource } from '@karmania/viewer/datasets';
 import './import-dialog.js';
