@@ -3934,4 +3934,11 @@ found that is not true or not worth a change is said in its place.
   500 and the like is one that `validateScene` accepts). The viewer's state is validated, so this was not reachable through the document; it was the contract that was not kept. **Not changed**, from the same report: `formatBounds`
   of a list with `NaN` or an infinite bound writes it as the platform does (`NaN`, `-Infinity` with a hyphen), and a scale bar of more than 1e21 metres is written with an exponent; the engine gives finite bounds
   (the comment of `ClassBreaks` does not say so, the checks of `display-check.ts` do), and a bar of that size is not a map.
+- Step 14.F5 (tests that ran out of time on a loaded machine). **Reviewers A and C, right.** `pnpm --filter @karmania/scene test` failed in three of four runs on the reviewer's machine (a load average of 44 to 244 from
+  the other reviewers and the gate), always "Test timed out in 5000ms" in the scale bar's property test, which took 2.5 s alone; reviewer A saw the scale bar, export layout, cameras and commands test files all fail
+  when run together. The cost was not the code but the test: thousands of `expect` calls, each with a message made for it (an `expect` costs the same pass or fail). **The property tests keep every check for every case
+  and note a failure in a list that is said once at the end**, and make a message only when there is something to say: the scale bar's went from 2.5 s to 36 ms, the camera fit's from 978 to 20 ms, the export layout's
+  from 1.2 s to a few tens, the round trip's from 320, the command run's message is made only for a document that is wrong; each is also given 20 s (`it(..., 20_000)`) as a margin for a machine that is busy. **No
+  assertion was removed or loosened**: each of three was shown, after the change, to fail when the code is broken (the nice-number rule of the scale bar, the sides of the camera fit, the check of the layout that
+  a column is not too tall, and the scale of the camera round trip). The first full gate run's one visual failure was a timeout of the same kind, in the browser and not in these tests.
 

@@ -83,22 +83,27 @@ describe('the scale bar, for any map', () => {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
     };
+    // Every check is made for every scale, but a failure is noted and said once at the end: thousands of `expect` calls,
+    // each with a message made for it, took 2.5 s and a loaded machine took more than the 5 s a test is given.
+    const wrong: string[] = [];
     for (let i = 0; i < 3000; i += 1) {
       const unitsPerPixel = 10 ** (next() * 10 - 4);
       for (const units of ['m', 'ft', 'us_ft'] as const) {
         const b = bar(unitsPerPixel, units);
-        expect(b.widthPx, `${String(unitsPerPixel)} ${units}`).toBeLessThanOrEqual(
-          SCALE_BAR_MAX_PIXELS,
-        );
-        expect(b.widthPx, `${String(unitsPerPixel)} ${units}`).toBeGreaterThanOrEqual(
-          SCALE_BAR_MAX_PIXELS * 0.4 - 1e-9,
-        );
         const lead = Number((b.value / 10 ** Math.floor(Math.log10(b.value))).toPrecision(9));
-        expect([1, 2, 5]).toContain(lead);
-        expect(Math.abs(b.widthPx - b.mapUnits / unitsPerPixel)).toBeLessThan(1e-6);
+        const checks = [
+          b.widthPx <= SCALE_BAR_MAX_PIXELS,
+          b.widthPx >= SCALE_BAR_MAX_PIXELS * 0.4 - 1e-9,
+          lead === 1 || lead === 2 || lead === 5,
+          Math.abs(b.widthPx - b.mapUnits / unitsPerPixel) < 1e-6,
+        ];
+        if (checks.includes(false)) {
+          wrong.push(`${String(unitsPerPixel)} ${units}: ${JSON.stringify(checks)}`);
+        }
       }
     }
-  });
+    expect(wrong).toEqual([]);
+  }, 20_000);
 
   it('is never wider than the room even where the arithmetic overshoots it by a rounding error', () => {
     // 5e-7 units to a pixel and 100 pixels is room for 5.000000000000001e-5, and 5e-5 over 5e-7 is 100.00000000000001.

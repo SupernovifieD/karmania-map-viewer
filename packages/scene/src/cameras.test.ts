@@ -90,6 +90,8 @@ describe('fitCamera2d', () => {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
     };
+    // Every check for every case, said once at the end (see the scale bar's test: thousands of `expect` calls are slow).
+    const wrong: string[] = [];
     for (let i = 0; i < 2000; i += 1) {
       const x0 = (next() - 0.5) * 1e6;
       const y0 = (next() - 0.5) * 1e6;
@@ -98,29 +100,32 @@ describe('fitCamera2d', () => {
       const heading = next() * 720 - 360;
       const padding = next() * 40;
       const fit = fitCamera2d({ extent, viewport, heading, padding });
-      expect(fit).toBeDefined();
       if (fit === undefined) {
+        wrong.push(`case ${String(i)}: no camera`);
         continue;
       }
       const radians = (fit.heading * Math.PI) / 180;
+      const roomX = (viewport.width - 2 * padding) / 2;
+      const roomY = (viewport.height - 2 * padding) / 2;
       let widest = 0;
+      let inside = true;
       for (const x of [extent.min[0], extent.max[0]]) {
         for (const y of [extent.min[1], extent.max[1]]) {
           const dx = (x - fit.centre[0]) / fit.unitsPerPixel;
           const dy = (y - fit.centre[1]) / fit.unitsPerPixel;
           const right = dx * Math.cos(radians) - dy * Math.sin(radians);
           const up = dx * Math.sin(radians) + dy * Math.cos(radians);
-          const roomX = (viewport.width - 2 * padding) / 2;
-          const roomY = (viewport.height - 2 * padding) / 2;
-          expect(Math.abs(right)).toBeLessThanOrEqual(roomX + 1e-6);
-          expect(Math.abs(up)).toBeLessThanOrEqual(roomY + 1e-6);
+          inside = inside && Math.abs(right) <= roomX + 1e-6 && Math.abs(up) <= roomY + 1e-6;
           widest = Math.max(widest, Math.abs(right) / roomX, Math.abs(up) / roomY);
         }
       }
-      expect(widest).toBeCloseTo(1, 6);
-      expect(validateCamera2d(fit)).toEqual([]);
+      // Touching: the corner that goes furthest is at the edge of the room, to 5e-7 of it.
+      if (!inside || Math.abs(widest - 1) >= 5e-7 || validateCamera2d(fit).length > 0) {
+        wrong.push(`case ${String(i)}: inside ${String(inside)}, widest ${String(widest)}`);
+      }
     }
-  });
+    expect(wrong).toEqual([]);
+  }, 20_000);
 
   it('is undefined for an extent or a map area that cannot be used, so the camera is left as it is', () => {
     const bad: [string, Parameters<typeof fitCamera2d>[0]][] = [
@@ -288,6 +293,8 @@ describe('cameraTo3d and cameraTo2d: switching views', () => {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
     };
+    // Every check for every case, said once at the end (thousands of `expect` calls are slow, and a loaded machine ran out of time).
+    const wrong: string[] = [];
     for (let i = 0; i < 1000; i += 1) {
       const camera2d: Camera2d = {
         centre: [next() * 1e6, next() * 1e7],
@@ -303,18 +310,14 @@ describe('cameraTo3d and cameraTo2d: switching views', () => {
         elevation: 10 + next() * 70,
         targetZ: next() * 500,
       });
-      expect(three).toBeDefined();
       if (three === undefined) {
+        wrong.push(`case ${String(i)}: no 3D camera`);
         continue;
       }
-      expect(validateCamera3d(three)).toEqual([]);
       const back = cameraTo2d({ camera3d: three, viewport: port });
-      expect(back?.centre).toEqual(camera2d.centre);
-      expect(back?.heading).toBeCloseTo(camera2d.heading, 9);
-      expect(back?.unitsPerPixel ?? 0).toBeCloseTo(
-        camera2d.unitsPerPixel,
-        9 - Math.max(0, Math.ceil(Math.log10(camera2d.unitsPerPixel))),
-      );
+      const places = 9 - Math.max(0, Math.ceil(Math.log10(camera2d.unitsPerPixel)));
+      const near = (a: number, b: number, digits: number): boolean =>
+        Math.abs(a - b) < 10 ** -digits / 2;
       const again = cameraTo3d({
         camera2d: back ?? camera2d,
         viewport: port,
@@ -322,9 +325,19 @@ describe('cameraTo3d and cameraTo2d: switching views', () => {
         elevation: three.elevation,
         targetZ: three.target[2],
       });
-      expect(again?.distance).toBeCloseTo(three.distance, 6);
+      const checks = [
+        validateCamera3d(three).length === 0,
+        back?.centre[0] === camera2d.centre[0] && back.centre[1] === camera2d.centre[1],
+        near(back?.heading ?? NaN, camera2d.heading, 9),
+        near(back?.unitsPerPixel ?? NaN, camera2d.unitsPerPixel, places),
+        near(again?.distance ?? NaN, three.distance, 6),
+      ];
+      if (checks.includes(false)) {
+        wrong.push(`case ${String(i)}: ${JSON.stringify(checks)}`);
+      }
     }
-  });
+    expect(wrong).toEqual([]);
+  }, 20_000);
 
   it('gives a camera that validateScene accepts', () => {
     expect(validateCamera3d(cameraTo3d({ camera2d: view, viewport, fov: 45 }))).toEqual([]);

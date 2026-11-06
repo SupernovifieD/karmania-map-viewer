@@ -327,6 +327,8 @@ or releasing, and whenever the brief says to stop.
   there, and a line wider than its column is said to be drawn within its rectangle.
 - [x] 14.F4 Gate fix, review of M14: the cameras are undefined for a heading or an elevation that is not a number,
   so every camera given is one that `validateScene` accepts.
+- [x] 14.F5 Gate fix, review of M14: the property tests take tens of milliseconds and not seconds, so that a loaded
+  machine does not run them out of their five seconds.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

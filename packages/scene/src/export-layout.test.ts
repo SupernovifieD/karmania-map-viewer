@@ -356,6 +356,8 @@ describe('exportLayout: for any legend and picture', () => {
       return state / 4294967296;
     };
     const kinds = ['group', 'layer', 'layerc', 'class'] as const;
+    // Every check for every case, said once at the end (thousands of `expect` calls are slow, and a loaded machine ran out of time).
+    const wrong: string[] = [];
     for (let run = 0; run < 400; run += 1) {
       const lines: ExportLine[] = Array.from({ length: Math.floor(next() * 60) }, (_, i) => {
         const kind = kinds[Math.floor(next() * kinds.length)];
@@ -382,37 +384,37 @@ describe('exportLayout: for any legend and picture', () => {
         r.y >= outer.y &&
         r.x + r.width <= outer.x + outer.width &&
         r.y + r.height <= outer.y + outer.height;
-      expect(l.columns.flatMap((c) => c.lines).map((p) => p.line)).toEqual(lines);
-      for (const [index, column] of l.columns.entries()) {
-        expect(column.rect.x + column.rect.width, `run ${String(run)}`).toBeLessThanOrEqual(
-          size.width - margin + (l.map.width === 0 ? Infinity : 0),
-        );
-        const previous = l.columns[index - 1];
-        if (previous !== undefined) {
-          expect(column.rect.x).toBeGreaterThan(previous.rect.x + previous.rect.width - 1);
-        }
-        for (const placed of column.lines) {
-          expect(
-            inside(placed.rect, {
-              x: column.rect.x,
-              y: column.rect.y,
-              width: column.rect.width,
-              height: column.rect.height,
-            }),
-          ).toBe(true);
-        }
-        // Lines are one under the other with nothing between them.
-        column.lines.reduce((y, placed) => {
-          expect(placed.rect.y).toBe(y);
-          return y + placed.rect.height;
-        }, column.rect.y);
+      const here = `run ${String(run)}`;
+      if (
+        JSON.stringify(l.columns.flatMap((c) => c.lines).map((p) => p.line)) !==
+        JSON.stringify(lines)
+      ) {
+        wrong.push(`${here}: the lines are not the lines that were given, in order`);
       }
-      // No column but one with a single line that is too tall goes beyond the bottom margin.
-      for (const column of l.columns) {
-        if (column.lines.length > 1) {
-          expect(column.rect.y + column.rect.height).toBeLessThanOrEqual(size.height - margin);
+      for (const [index, column] of l.columns.entries()) {
+        if (l.map.width !== 0 && column.rect.x + column.rect.width > size.width - margin) {
+          wrong.push(`${here}: column ${String(index)} goes past the right margin`);
+        }
+        const previous = l.columns[index - 1];
+        if (previous !== undefined && column.rect.x <= previous.rect.x + previous.rect.width - 1) {
+          wrong.push(`${here}: column ${String(index)} is not apart from the one before`);
+        }
+        let y = column.rect.y;
+        for (const placed of column.lines) {
+          // Every line is inside its column, and one under the other with nothing between them.
+          if (!inside(placed.rect, column.rect) || placed.rect.y !== y) {
+            wrong.push(`${here}: a line of column ${String(index)} is not in its place`);
+          }
+          y += placed.rect.height;
+        }
+        // No column but one with a single line that is too tall goes beyond the bottom margin.
+        if (column.lines.length > 1 && column.rect.y + column.rect.height > size.height - margin) {
+          wrong.push(
+            `${here}: column ${String(index)} of ${String(column.lines.length)} lines is too tall`,
+          );
         }
       }
     }
-  });
+    expect(wrong).toEqual([]);
+  }, 20_000);
 });
