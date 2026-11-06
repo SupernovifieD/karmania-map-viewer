@@ -91,7 +91,8 @@ function keepsWithNext(line: ExportLine): boolean {
 /**
  * The lines in columns of at most `height` pixels: top to bottom, then the next column. **A line that is a heading
  * (a group, or a layer that has lines of classes under it) is never the last of a column**, unless it is alone in it,
- * where nothing can be done: the brief asks for this of group headings, and the same is done for layers with
+ * where nothing can be done, or unless it, what goes with it and the next line are together taller than a column, where moving them
+ * would only make the next column too tall: the brief asks for this of group headings, and the same is done for layers with
  * classes, whose name would otherwise be left at the bottom with its classes at the top of the next column. A line
  * that is taller than a column has a column of its own.
  */
@@ -116,6 +117,14 @@ function inColumns(
         if (taken !== undefined) {
           moved.unshift(taken);
         }
+      }
+      // They go only if they fit in the next column together with the line that is waiting: a heading that would make
+      // that column taller than the picture stays where it is, which is the one thing the rule gives way to.
+      const together =
+        moved.reduce((sum, placed) => sum + placed.size.height, 0) + item.size.height;
+      if (together > height) {
+        column.push(...moved);
+        moved.length = 0;
       }
       columns.push(column);
       column = moved;
