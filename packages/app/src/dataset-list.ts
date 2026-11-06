@@ -2,7 +2,7 @@ import type { Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
-import { describeWarnings, warningCount } from './datasets.js';
+import { describeWarnings, warningCount } from '@karmania/viewer/datasets';
 import { describeSize, formatCount, KIND_ICONS } from '@karmania/viewer/import-files';
 
 /** The name of the event the list sends when a person chooses a dataset. */

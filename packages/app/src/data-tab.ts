@@ -5,7 +5,7 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './dataset-list.js';
 import './dataset-summary.js';
-import type { CrsLookup, RowSource } from './datasets.js';
+import type { CrsLookup, RowSource } from '@karmania/viewer/datasets';
 import { IMPORT_REQUEST } from '@karmania/viewer/map-area';
 
 /**
