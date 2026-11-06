@@ -152,9 +152,9 @@ export class KarmaniaViewer extends LitElement {
     this.renderRoot.querySelector('input')?.click();
   };
 
-  /** Opens the import wizard on `files`, or the file picker when there are none to give. */
+  /** Opens the import wizard on `files`, or the file picker when there are none to give (no list, or an empty one). */
   openImport(files?: readonly File[]): void {
-    if (files === undefined) {
+    if (files === undefined || files.length === 0) {
       this.chooseFiles();
     } else {
       this.importFiles(files);

@@ -9,7 +9,7 @@ import './viewer.js';
 export interface Viewer {
   /** The scene as it is now: a layer for each loaded dataset, the camera, the legend. */
   scene(): SceneDocument;
-  /** Opens the import wizard on `files`, or the browser's file picker when there are none to give. */
+  /** Opens the import wizard on `files`, or the browser's file picker when there are none to give (no list, or an empty one). */
   openImport(files?: readonly File[]): void;
   /**
    * Takes the viewer out of the page and frees what it holds: the engine and its worker, and the listeners on the
