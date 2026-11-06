@@ -34,6 +34,17 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export { legendModel } from './legend-model.js';
+export type {
+  GroupVisibility,
+  LayerNotice,
+  LayerSwatch,
+  LegendEntry,
+  LegendGroupEntry,
+  LegendInputs,
+  LegendLayerEntry,
+  LegendModel,
+} from './legend-model.js';
 export {
   NO_VALUE_LABEL,
   OTHER_COLOUR,
