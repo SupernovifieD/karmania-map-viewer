@@ -299,7 +299,8 @@ or releasing, and whenever the brief says to stop.
     that `validateScene` refuses.
   - [x] 14.9b `createSceneStore`.
 - [x] 14.10 Legend model with number labels (11.7). Split to stay under the commit size guideline:
-  - [x] 14.10a Number labels: thousands commas, the fewest decimals that keep neighbouring bounds apart.
+  - [x] 14.10a Number labels: thousands commas, and the fewest decimals at which each bound reads as itself to less
+    than a tenth of the narrowest class (a departure from the brief's "keep neighbouring bounds distinct", see decisions).
   - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
   - [x] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
 - [x] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
@@ -329,6 +330,8 @@ or releasing, and whenever the brief says to stop.
   so every camera given is one that `validateScene` accepts.
 - [x] 14.F5 Gate fix, review of M14: the property tests take tens of milliseconds and not seconds, so that a loaded
   machine does not run them out of their five seconds.
+- [x] 14.F6 Gate fix, review of M14: the words that were stale or wrong in the roadmap, a header and the decisions,
+  the data and problem-code notes the review asked for, and the packages that use vitest, vite and Node's types.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)
