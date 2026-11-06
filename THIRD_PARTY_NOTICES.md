@@ -68,3 +68,17 @@ code, which is under the ISC License. Its notice, which the license asks to be k
 
 The text is that of the file `LICENSE-ISC` of the crate. It is not yet in the builds (the
 earcut crate is not called until step 13.8): steps 23.5, 23.6 and 24.5 put this file in them.
+
+## Colour ramps
+
+The colour ramps of `@karmania/scene` (`packages/scene/src/ramp-data.ts`) are data copied from two sources:
+
+- **viridis and magma**, from matplotlib 3.10.0, which has the numbers of the original `colormaps.py` of
+  github.com/BIDS/colormap by Nathaniel J. Smith, Stefan van der Walt and Eric Firing. They are released under the
+  CC0 license / public domain dedication, and ask for credit, which is given here.
+- **ColorBrewer** colour schemes: this product includes color specifications and designs developed by Cynthia
+  Brewer (<http://colorbrewer.org/>), under the Apache License, Version 2.0
+  (<http://www.apache.org/licenses/LICENSE-2.0>), as packaged at github.com/axismaps/colorbrewer.
+
+The Okabe-Ito categorical palette (step 14.4c) is credited in the same place when it is added. This file is not yet
+copied into the builds of the engine and of the app: that is steps 23.5 and 23.6.

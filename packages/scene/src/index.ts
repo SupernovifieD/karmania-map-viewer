@@ -3,6 +3,8 @@ export const PACKAGE_NAME = '@karmania/scene';
 
 export { contrastRatio, mix, parseHex, relativeLuminance, toHex } from './colour.js';
 export type { Rgb } from './colour.js';
+export { RAMPS, RAMP_IDS, RAMP_KINDS, rampById, sampleRamp } from './ramps.js';
+export type { Ramp, RampKind } from './ramps.js';
 export { migrate } from './migrate.js';
 export type { MigrateResult } from './migrate.js';
 export { isSceneDocument, validateScene } from './validate.js';

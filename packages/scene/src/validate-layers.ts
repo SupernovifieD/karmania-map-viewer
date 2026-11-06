@@ -12,6 +12,7 @@ import {
   show,
   type Problems,
 } from './problems.js';
+import { RAMP_IDS } from './ramps.js';
 
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
@@ -40,7 +41,7 @@ function checkColour(problems: Problems, path: string, value: unknown): void {
       min: 2,
       max: 20,
     });
-    readString(problems, field(path, 'ramp'), colour['ramp'], true);
+    readChoice(problems, field(path, 'ramp'), colour['ramp'], RAMP_IDS);
     readBoolean(problems, field(path, 'reverse'), colour['reverse']);
   }
 }
