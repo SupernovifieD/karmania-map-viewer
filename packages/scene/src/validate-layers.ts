@@ -10,7 +10,8 @@ import {
   readRecord,
   readString,
   show,
-  type Problems,
+  Problems,
+  type SceneProblem,
 } from './problems.js';
 import { RAMP_IDS } from './ramps.js';
 
@@ -160,4 +161,18 @@ export function checkLayers(
     }
   }
   return new Set(Object.keys(layers));
+}
+
+/** What is wrong with a style, as the document would have it (the commands refuse a style that is not right). */
+export function validateStyle(style: unknown): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkStyle(problems, 'style', style);
+  return problems.finish();
+}
+
+/** What is wrong with the contours of a layer, as the document would have them. */
+export function validateContours(contours: unknown): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkContours(problems, 'contours', contours);
+  return problems.finish();
 }
