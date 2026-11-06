@@ -3998,3 +3998,18 @@ The third review (one reviewer on the cheaper model, only the fixes 14.F7 and 14
   kept**: an extent wider than the largest number (from -1.7e308 to 1.7e308) has no camera in 2D, though its true scale is finite, because the width itself overflows; that is a design limit and not a wrong
   camera.
 
+## After M14: the owner's decisions
+
+The owner answered the open items of the M14 report before M15 was started. Cividis is still left out and the owner asked for the reasons, which are given in the report and in the entry of step 14.4b; the layout rules, the
+default line colours and the rest were accepted as they are (the owner will change them at the end of the implementation if anything is needed, and the colours when a visibility problem shows).
+
+- Step 14.10a, changed by the owner (number labels). **Bounds are written as they are, not rounded.** The owner's words: "show them as is, don't round them. Later, we can add a choice by the user can decide to see a
+  rounded version, or the numbers as is." So `formatBounds` writes each bound by itself, whatever the bounds next to it are: `0, 2.5, 5, 7.5, 10` read `0`, `2.5`, `5`, `7.5`, `10` (no `0.0`), and `0.1234567` and
+  `0.1234568` read as that. Kept from the brief: thousands commas and the true minus sign (U+2212); the en dash between two bounds is unchanged. **One judgement, which the owner did not decide, and is open to change**: the
+  digits are those of the shortest text that gives the number back, **trimmed at 15 significant digits**, which takes off only the noise of arithmetic (the bounds of equal classes are sums and products: `0.1 + 0.2` would
+  read `0.30000000000000004`, and `8 / 7` is `1.14285714285714`) and can change no number that a file writes with 15 digits or fewer. It is the rule of the table of the Data tab, so the legend and the table write a
+  value alike. A number that the platform writes with an exponent (below 1e-6, from 1e21) keeps it (`1e-7`, `1e+21`), as the old code did for the large ones; a bound that is not finite is written as it is. **The rounded rule
+  (a tenth of the narrowest class, never more than 6 significant digits, the same decimals for every bound) is gone from the code and is in the history, in the commit `5676067`, for the choice that the owner
+  will add later.** The class of a single value still reads that value alone. The tests of the old rule were replaced by tests of the new one, and nine changes to the code each fail one (tried: the 15 digits changed to 14, 16
+  and 17, the minus sign dropped or made a hyphen, the absolute value dropped, the commas dropped, the sign test made `<=`, the non-finite case removed); a tenth change, a guard for numbers with an exponent, did
+  nothing (the commas of a whole part that has no three digits in a row are none), so the guard was removed.

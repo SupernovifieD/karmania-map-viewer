@@ -299,8 +299,8 @@ or releasing, and whenever the brief says to stop.
     that `validateScene` refuses.
   - [x] 14.9b `createSceneStore`.
 - [x] 14.10 Legend model with number labels (11.7). Split to stay under the commit size guideline:
-  - [x] 14.10a Number labels: thousands commas, and the fewest decimals at which each bound reads as itself to less
-    than a tenth of the narrowest class (a departure from the brief's "keep neighbouring bounds distinct", see decisions).
+  - [x] 14.10a Number labels: thousands commas and a true minus sign, and each bound as it is, not rounded (the owner's
+    choice after M14, see decisions; the brief's rule was "the fewest decimals that keep neighbouring bounds distinct").
   - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
   - [x] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
 - [x] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
