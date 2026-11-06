@@ -31,9 +31,9 @@ Anything else needs the owner's approval first. That includes strong copyleft
 | @eslint/js (dev) | ^10.0.1 | MIT | ESLint's recommended rule set. | step 0.6 |
 | typescript-eslint (dev) | ^8.72.0 | MIT | Parser and the `strictTypeChecked` rule set (bans `any`, unsafe `unknown` use, floating promises, non-null assertions). | step 0.6 |
 | prettier (dev) | ^3.9.10 | MIT | Code formatting for TypeScript, JavaScript, JSON, YAML, CSS and HTML. | step 0.6 |
-| vitest (dev, `@karmania/engine`, `@karmania/ui`, `@karmania/app`) | ^5.0.5 | MIT | TypeScript unit tests. The UI package has used it since step 6.1, and the app since step 7.7, for the panel's state. | step 0.7 |
-| @types/node (dev, `@karmania/engine`) | ^24.19.2 | MIT | Node type declarations for the tests that load the built WebAssembly module in Node (pulls in `undici-types`, MIT). Referenced only from the test support file. | step 4.3b |
-| vite (dev, `@karmania/engine`) | ^8.3.5 | MIT | Required peer of vitest, and the app dev server and library builds later. Was 7.x from step 0.7 until step 0.13 (Vite 8 pulls in lightningcss, MPL-2.0, now accepted for dev-only tools). | step 0.7 |
+| vitest (dev, `@karmania/engine`, `@karmania/ui`, `@karmania/app`, `@karmania/scene`) | ^5.0.5 | MIT | TypeScript unit tests. The UI package has used it since step 6.1, and the app since step 7.7, for the panel's state. | step 0.7 |
+| @types/node (dev, `@karmania/engine`, `@karmania/scene`) | ^24.19.2 | MIT | Node type declarations for the tests that load the built WebAssembly module in Node (pulls in `undici-types`, MIT). Referenced only from test files and the test support file (the engine's, and the scene's `palettes.test.ts`, which reads a stylesheet), never from code that is shipped. | step 4.3b |
+| vite (dev, `@karmania/engine`, `@karmania/scene`) | ^8.3.5 | MIT | Required peer of vitest, and the app dev server and library builds later. Was 7.x from step 0.7 until step 0.13 (Vite 8 pulls in lightningcss, MPL-2.0, now accepted for dev-only tools). | step 0.7 |
 | lit (`@karmania/ui`, `@karmania/app`) | ^3.3.3 | BSD-3-Clause | The web component library the UI is built with: small, and its components work inside any host page. Brings `@lit/reactive-element`, `lit-element` and `lit-html` (all BSD-3-Clause), `@lit-labs/ssr-dom-shim` (BSD-3-Clause) and `@types/trusted-types` (MIT, types only). | step 6.1 |
 | lucide-static (`@karmania/ui`) | ^1.62.0 | ISC | The icons: static SVG drawings, imported one by one as text (`?raw`), so only the icons in `components/icons.ts` are in the build. No icon fonts. | step 6.4 |
 | @axe-core/playwright (dev, `@karmania/app`) | ^4.14.0 | MPL-2.0 | Runs axe on pages in the browser tests and fails on serious or critical accessibility violations. Brings `axe-core` (MPL-2.0). Both are dev-only test tools, covered by the MPL-2.0 rule in the policy above. | step 6.4 |
@@ -126,3 +126,20 @@ developer's machine and in CI):
 | Tool | Version | License | Purpose | Added |
 | --- | --- | --- | --- | --- |
 | wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue into `packages/engine/wasm` (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. In CI it is installed by `taiki-e/install-action` (MIT OR Apache-2.0, pinned to a commit), which downloads a prebuilt binary. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |
+
+## Data
+
+Data that is copied into the repository, not installed: the values are in the file named, and the comment at the
+top of that file says where each table was taken from and how it was converted.
+
+| Data | Source | License | Where | Added |
+| --- | --- | --- | --- | --- |
+| viridis and magma colour ramps (256 colours each) | matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`: the same numbers as the original `colormaps.py` of github.com/BIDS/colormap, by Nathaniel J. Smith, Stefan van der Walt and Eric Firing (checked equal when they were taken) | CC0-1.0. The original says: "This file and the colormaps in it are released under the CC0 license / public domain dedication. We would appreciate credit if you use or redistribute these colormaps, but do not impose any legal restrictions." | `packages/scene/src/ramp-data.ts` | step 14.4b |
+| ColorBrewer colour schemes: Blues, Greens, Oranges, Reds, Purples, YlGnBu, YlOrRd (sequential, 9), RdBu, PuOr, BrBG (diverging, 11), Paired (qualitative, 12) | github.com/axismaps/colorbrewer, `export/colorbrewer.js`, by Cynthia Brewer (colorbrewer.org). Its header: "This product includes color specifications and designs developed by Cynthia Brewer (http://colorbrewer.org/)." | Apache-2.0 (the licence file of that repository is the Apache License 2.0) | `packages/scene/src/ramp-data.ts` | step 14.4b |
+| Okabe-Ito categorical palette (8 colours, black last) | Masataka Okabe and Kei Ito, Color Universal Design (jfly.uni-koeln.de/color); also Bang Wong, Nature Methods 8, 441 (2011). A published list of colour values | none stated (a list of eight colour values; credited in `THIRD_PARTY_NOTICES.md`) | `packages/scene/src/ramps.ts` | step 14.4c |
+
+Not taken: cividis. The brief names it with viridis and magma as CC0, but the repository it comes from
+(github.com/pnnl/cmaputil, Battelle Memorial Institute) has a licence of its own, a permissive text of the BSD kind that
+forbids the use of Battelle's name without consent, and no statement was found that the colormap is CC0. The policy
+above says anything not named needs the owner's approval, so it is left out until the owner decides (step 14.4b in
+`docs/decisions.md`).

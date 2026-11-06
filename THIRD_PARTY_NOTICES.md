@@ -26,6 +26,12 @@ though it may be part of a commercial package where the commerciality rests on v
 provider; ownership by IOGP must be acknowledged in any publication or transmission of it; the
 terms must be passed on; the data may be changed only as the terms allow, and data changed
 otherwise must not be attributed to EPSG; and it is provided as is, without warranty of any kind.
+Subsets may be taken, but the terms advise that the description of a system is incomplete unless it
+has the essential elements of IOGP Guidance Note 7-1 (the copies name the annex A in one and F in
+the other). What is in this build is such a subset, a name, a kind, a unit and a PROJ definition
+for each code, so it is not a complete EPSG description of any system. The reading was repeated on
+2026-11-06 with the same result at the source (403) and the same terms in two copies (the
+licensing manual of MySQL 8.0 and the licence file of a GeoServer site).
 
 What Karmania does with it: it reads the name, the kind and the unit of a system out of its
 definition, and it converts positions with the PROJ definition. It changes no value of the
@@ -62,3 +68,20 @@ code, which is under the ISC License. Its notice, which the license asks to be k
 
 The text is that of the file `LICENSE-ISC` of the crate. It is not yet in the builds (the
 earcut crate is not called until step 13.8): steps 23.5, 23.6 and 24.5 put this file in them.
+
+## Colour ramps
+
+The colour ramps of `@karmania/scene` (`packages/scene/src/ramp-data.ts`) are data copied from two sources:
+
+- **viridis and magma**, from matplotlib 3.10.0, which has the numbers of the original `colormaps.py` of
+  github.com/BIDS/colormap by Nathaniel J. Smith, Stefan van der Walt and Eric Firing. They are released under the
+  CC0 license / public domain dedication, and ask for credit, which is given here.
+- **ColorBrewer** colour schemes: this product includes color specifications and designs developed by Cynthia
+  Brewer (<http://colorbrewer.org/>), under the Apache License, Version 2.0
+  (<http://www.apache.org/licenses/LICENSE-2.0>), as packaged at github.com/axismaps/colorbrewer.
+
+- The **Okabe-Ito** palette of eight colours that people with the common kinds of colour blindness can tell apart,
+  published by Masataka Okabe and Kei Ito (Color Universal Design, jfly.uni-koeln.de/color) and by Bang Wong
+  (Nature Methods 8, 441, 2011): a published list of colour values, with no licence stated, credited here.
+
+This file is not yet copied into the builds of the engine and of the app: that is steps 23.5 and 23.6.
