@@ -3,7 +3,7 @@
  * its colours come from and under what licence (the data is in `ramp-data.ts`, with the sources written out).
  */
 import { mix, parseHex, toHex, type Rgb } from './colour.js';
-import { BREWER_DIVERGING, BREWER_SEQUENTIAL, MAGMA, VIRIDIS } from './ramp-data.js';
+import { BREWER_DIVERGING, BREWER_PAIRED, BREWER_SEQUENTIAL, MAGMA, VIRIDIS } from './ramp-data.js';
 import type { RampId } from './types.js';
 
 /**
@@ -28,6 +28,15 @@ export interface Ramp {
   /** The SPDX identifier of the licence it is under. */
   readonly licence: string;
 }
+
+/**
+ * The Okabe-Ito palette: eight colours that people with the common kinds of colour blindness can tell apart,
+ * published by Masataka Okabe and Kei Ito (Color Universal Design, 2002; jfly.uni-koeln.de/color) and by Bang Wong
+ * (Nature Methods 8, 441, 2011). It is a published list of colour values, with no licence stated. Orange, sky blue,
+ * bluish green, vermillion, blue, reddish purple, yellow and black: the order of the colours of a new layer, with
+ * black last because it cannot be seen on the dark map (and yellow because it cannot be seen on the light one).
+ */
+const OKABE_ITO = '#e69f00#56b4e9#009e73#d55e00#0072b2#cc79a7#f0e442#000000';
 
 const MATPLOTLIB = 'matplotlib 3.10.0 (original: github.com/BIDS/colormap)';
 const COLORBREWER = 'ColorBrewer, Cynthia Brewer (colorbrewer.org)';
@@ -75,6 +84,15 @@ export const RAMPS: readonly Ramp[] = [
   brewer('rdbu', 'Red-blue', 'diverging', BREWER_DIVERGING.rdbu),
   brewer('puor', 'Purple-orange', 'diverging', BREWER_DIVERGING.puor),
   brewer('brbg', 'Brown-blue-green', 'diverging', BREWER_DIVERGING.brbg),
+  defineRamp(
+    'okabe-ito',
+    'Okabe-Ito',
+    'categorical',
+    OKABE_ITO,
+    'Masataka Okabe and Kei Ito, Color Universal Design (jfly.uni-koeln.de/color)',
+    'none stated (a published list of eight colours)',
+  ),
+  brewer('paired', 'Paired', 'categorical', BREWER_PAIRED),
 ];
 
 /** The id of every ramp, in the same order. */
