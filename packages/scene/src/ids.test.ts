@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextId, numberOf } from './ids.js';
+import { nextId, ordinalOf } from './ids.js';
 
 describe('the ids of layers and groups', () => {
   it('start at 1, and go on from the highest there is, not from how many there are', () => {
@@ -20,10 +20,27 @@ describe('the ids of layers and groups', () => {
     expect(nextId('layer', ['layer-1', 'layer-2'])).toBe('layer-3');
   });
 
-  it('say which number an id has, and 0 for one that has none', () => {
-    expect(numberOf('layer-12')).toBe(12);
-    expect(numberOf('group-1')).toBe(1);
-    expect(numberOf('mine')).toBe(0);
-    expect(numberOf('')).toBe(0);
+  it('do not lose a digit when the number is beyond what a double holds, so a new id is never one that exists', () => {
+    expect(nextId('layer', ['layer-9007199254740992'])).toBe('layer-9007199254740993');
+    expect(nextId('layer', ['layer-9007199254740992', 'layer-9007199254740993'])).toBe(
+      'layer-9007199254740994',
+    );
+    expect(nextId('layer', [`layer-${'9'.repeat(400)}`])).toBe(`layer-1${'0'.repeat(400)}`);
+  });
+
+  it('say which place in a palette of a given size an id has: the number less one, round again after the last', () => {
+    expect([1, 2, 8, 9, 16, 17].map((n) => ordinalOf(`layer-${String(n)}`, 8))).toEqual([
+      0, 1, 7, 0, 7, 0,
+    ]);
+    expect(ordinalOf('layer-9007199254740993', 8)).toBe(Number((9007199254740993n - 1n) % 8n));
+    expect(ordinalOf(`layer-${'9'.repeat(400)}`, 8)).toBe(
+      Number((BigInt('9'.repeat(400)) - 1n) % 8n),
+    );
+  });
+
+  it('say place 0 for an id that has no number or is 0, never a place before the first', () => {
+    for (const id of ['mine', '', 'layer-0', 'layer-']) {
+      expect(ordinalOf(id, 8), id).toBe(0);
+    }
   });
 });

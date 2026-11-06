@@ -79,5 +79,11 @@ export function defaultStyle(dataset: DatasetBrief, ordinal: number): LayerStyle
     case 'grid':
     case 'blocks':
       return { colour, opacity: DEFAULT_OPACITY };
+    default: {
+      const kind: unknown = dataset.kind;
+      throw new TypeError(
+        `There is no default style for a dataset of the kind ${JSON.stringify(kind)}.`,
+      );
+    }
   }
 }

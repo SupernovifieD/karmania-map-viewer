@@ -319,6 +319,8 @@ or releasing, and whenever the brief says to stop.
     have any.
   - [x] 14.13b The layout: the map, the north arrow, the scale bar and the columns of the legend, in pixels, with the
     warning that the map is narrow.
+- [x] 14.F1 Gate fix, review of M14: ids that cannot collide or lose digits, and datasets that are not what the engine
+  gives are refused, so that a command never makes a document that `validateScene` refuses.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

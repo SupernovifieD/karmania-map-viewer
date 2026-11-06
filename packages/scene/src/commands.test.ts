@@ -2,7 +2,7 @@ import type { ColumnSummary, Kind } from '@karmania/engine/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { COMMAND_TYPES, applyCommand, type Command } from './commands.js';
 import { emptyScene } from './empty.js';
-import { SAMPLE_FRAME, frozen, sampleScene } from './test-support/documents.js';
+import { SAMPLE_FRAME, frozen, layerById, sampleScene } from './test-support/documents.js';
 import type { SceneDocument, VerticalExaggeration, ViewMode } from './types.js';
 import type { StylePatch } from './commands-style.js';
 import { validateScene } from './validate.js';
@@ -108,9 +108,10 @@ function randomCommand(doc: SceneDocument, next: () => number): Command {
       return {
         type: 'addLayers',
         datasets: Array.from({ length: Math.floor(next() * 3) }, () => ({
-          id: Math.floor(next() * 6),
+          // Mostly datasets as the engine gives them, and now and then one that is not (it refuses them all).
+          id: pick([0, 1, 2, 3, 4, 5, 1, 2, 3, -1, 1.5, NaN]),
           name: text(),
-          kind: pick(kinds),
+          kind: pick([...kinds, ...kinds, 'bogus' as Kind]),
           elementCount: 10,
           columns: [column(), column()],
         })),
@@ -223,9 +224,34 @@ function randomCommand(doc: SceneDocument, next: () => number): Command {
 
 describe('a run of commands, right and wrong, in any order', () => {
   it('never makes a document that validateScene refuses, and never changes one that it was given', () => {
-    for (const seed of [1, 2, 3, 4]) {
+    // The scene a viewer starts with, and one whose ids are awkward: a layer called like a group, a group called like a
+    // layer, a layer in a group, and a number that a double cannot hold.
+    const awkward: SceneDocument = {
+      ...emptyScene(),
+      layers: {
+        'group-1': { ...layerById(sampleScene(), 'layer-2'), id: 'group-1' },
+        'layer-9007199254740993': {
+          ...layerById(sampleScene(), 'layer-2'),
+          id: 'layer-9007199254740993',
+        },
+      },
+      legend: [
+        { type: 'group', id: 'layer-3', name: 'Odd', collapsed: false, children: ['group-1'] },
+        { type: 'layer', id: 'layer-9007199254740993' },
+      ],
+    };
+    expect(validateScene(awkward)).toEqual([]);
+    for (const [seed, start] of [
+      [1, emptyScene()],
+      [2, emptyScene()],
+      [3, emptyScene()],
+      [4, emptyScene()],
+      [5, awkward],
+      [6, awkward],
+      [7, awkward],
+    ] as const) {
       const next = generator(seed);
-      let doc: SceneDocument = frozen(emptyScene());
+      let doc: SceneDocument = frozen(start);
       let changed = 0;
       for (let step = 0; step < 1000; step += 1) {
         const command = randomCommand(doc, next);

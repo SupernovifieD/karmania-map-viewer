@@ -3888,3 +3888,24 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   map has the whole width. Nineteen changes to the code were tried and each now fails a test; two passed at first and got cases of their own (the empty column made by a first line taller than a column, and a map of exactly no
   width), and one was first written with a pattern that did not match the formatted code and was redone. I also corrected two expected values of my own in the first tests (a class line that fitted, so nothing moved, and
   the picture that is exactly half, which is not less than half).
+
+## M14 gate
+
+The gate was first run on `25b5413`: `pnpm check` after every step, then `pnpm test:e2e` (exit 0), `pnpm test:visual`, `pnpm test:axe` (102 passed), and the review of the milestone by **three fresh reviewers on a
+cheaper model (Haiku), as the owner asked**, each with a part: (A) the document, the validation, the commands and the store; (B) the models, colours, numbers, furniture, cameras and the export; (C) the history, the
+roadmap, the decisions and the data licences. They were told not to touch the machine's heavy tests, and not to edit the repository; each wrote its own scripts. **The visual run had one failure,
+`data-tab-many`, "Test timeout of 60000ms exceeded", while the three reviewers were running** (one measured a load average of 44 to 244). Run alone on a quiet machine it passes in 20.6 s, so the failure was the load and not
+a defect; the final gate is run on its own, with nothing else on the machine. The reviewers' findings are sub-steps 14.F1 and following, each reproduced here by a test that failed before the fix; what the reviewers
+found that is not true or not worth a change is said in its place.
+
+- Step 14.F1 (a command made a document that `validateScene` refuses). **Must-fix of reviewer A, which was right**: the claim of step 14.8, "no command makes a document that `validateScene` refuses", was false for
+  five inputs, found by the reviewer's own scripts and each now a test that failed with the old code (8 tests, and the random run of step 14.9a, which finds the first at step 255 with the old code). (1) **`createGroup`
+  counted only the ids at the top of the legend**, so a layer called `group-1` inside a group made a group `group-1`; it counts every layer and every group now. (2) **`addLayers` counted only the layers**, so a group
+  called `layer-1` made a layer `layer-1`; it counts the groups too. (3) **The numbers of ids were read as doubles**, which lose digits above 9,007,199,254,740,991, so `layer-9007199254740992` gave the same id again,
+  overwrote the layer and doubled its place in the legend; they are read as `BigInt` now (`nextId`, and `ordinalOf` for the colour). (4) **An id with 400 digits** made the number infinite and the colour of the layer
+  `-1`, so `addLayers` threw on a document that is valid; fixed by the same. (5) **A dataset that is not what the engine gives** (an id of -1 or 1.5, a kind that there is not) made a layer that the validation refuses, or
+  none at all (`defaultStyle` had no case for a kind it did not know and gave `undefined`): **`addLayers` now refuses all the datasets of the call, with the same document, when one is not well formed** (a whole id of 0
+  or more, a kind of the six, a name that is text, a list of columns), as the rule of step 14.8 says, and **`defaultStyle` throws a `TypeError` for a kind that there is not** (misuse). **The random run of step 14.9a
+  now makes bad dataset ids and kinds, and also starts from a document with awkward ids** (a layer called like a group, a group called like a layer, a layer in a group, a number a double cannot hold), because it had
+  none of that, which is why it did not find these.
+

@@ -4,7 +4,7 @@
  * that each is a list of members of the engine's type, and `choices.test.ts` that it is all of them.
  */
 import type { ClassMethod, FrameSource } from '@karmania/engine/display';
-import type { Units } from '@karmania/engine/types';
+import type { Kind, Units } from '@karmania/engine/types';
 
 /** How the map's coordinate system was chosen. */
 export const FRAME_SOURCES = ['auto', 'user'] as const satisfies readonly FrameSource[];
@@ -22,3 +22,13 @@ export const CLASS_METHODS = [
 
 /** The two kinds of coordinate reference system a frame can have. */
 export const CRS_KINDS = ['epsg', 'local'] as const;
+
+/** The shapes a dataset can have. */
+export const DATASET_KINDS = [
+  'points',
+  'lines',
+  'polygons',
+  'mesh',
+  'grid',
+  'blocks',
+] as const satisfies readonly Kind[];

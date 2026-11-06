@@ -8,7 +8,8 @@ import {
   type NewDataset,
 } from './commands-layers.js';
 import { emptyScene } from './empty.js';
-import { frozen, sampleScene } from './test-support/documents.js';
+import { frozen, layerById, sampleScene } from './test-support/documents.js';
+import type { SceneDocument } from './types.js';
 import { validateScene } from './validate.js';
 
 const grade: ColumnSummary = { name: 'grade', type: 'float', nullCount: 0 };
@@ -110,6 +111,52 @@ describe('addLayers', () => {
       mode: 'single',
       value: '#d55e00',
     });
+  });
+
+  it('does not give a layer the id of a group, whatever number the group has', () => {
+    const doc: SceneDocument = {
+      ...sampleScene(),
+      legend: [
+        { type: 'group', id: 'layer-7', name: 'Odd', collapsed: false, children: [] },
+        ...sampleScene().legend,
+      ],
+    };
+    const next = addLayers(doc, [dataset(1, 'x')]);
+    expect(Object.keys(next.layers)).toContain('layer-8');
+    expect(validateScene(next)).toEqual([]);
+  });
+
+  it('does not repeat an id, nor give up, when the numbers are beyond what a double holds or have 400 digits', () => {
+    const big = (id: string): SceneDocument => {
+      const base = emptyScene();
+      return {
+        ...base,
+        layers: { [id]: { ...layerById(sampleScene(), 'layer-2'), id } },
+        legend: [{ type: 'layer', id }],
+      };
+    };
+    const first = addLayers(big('layer-9007199254740993'), [dataset(1, 'x')]);
+    expect(Object.keys(first.layers)).toEqual(['layer-9007199254740993', 'layer-9007199254740994']);
+    expect(validateScene(first)).toEqual([]);
+    const long = `layer-${'9'.repeat(400)}`;
+    const second = addLayers(big(long), [dataset(1, 'x'), dataset(2, 'y')]);
+    expect(Object.keys(second.layers)).toHaveLength(3);
+    expect(validateScene(second)).toEqual([]);
+  });
+
+  it('refuses datasets that are not what the engine gives, all of them, with the same document', () => {
+    const doc = sampleScene();
+    const wrong: NewDataset[] = [
+      { ...dataset(1, 'x'), id: -1 },
+      { ...dataset(1, 'x'), id: 1.5 },
+      { ...dataset(1, 'x'), id: NaN },
+      { ...dataset(1, 'x'), kind: 'bogus' as Kind },
+      { ...dataset(1, 'x'), name: 7 as unknown as string },
+      { ...dataset(1, 'x'), columns: 'a' as unknown as readonly ColumnSummary[] },
+    ];
+    for (const one of wrong) {
+      expect(addLayers(doc, [dataset(3, 'fine'), one])).toBe(doc);
+    }
   });
 
   it('shows a dataset twice if it is asked to, each layer with its own id', () => {

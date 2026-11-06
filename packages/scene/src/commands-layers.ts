@@ -3,8 +3,9 @@
  * is given. A command that names a layer that is not there (an event that came after the layer was removed) changes
  * nothing, and gives back the very document it was given, which is how a store knows that nothing happened.
  */
-import { defaultStyle, type DatasetBrief } from './defaults.js';
-import { nextId, numberOf } from './ids.js';
+import { LAYER_COLOURS, defaultStyle, type DatasetBrief } from './defaults.js';
+import { DATASET_KINDS } from './choices.js';
+import { nextId, ordinalOf } from './ids.js';
 import type { Layer, LegendNode, SceneDocument } from './types.js';
 
 /** A dataset a layer is made for: what the engine says of it when it is loaded (its `Summary` has all of this). */
@@ -13,25 +14,43 @@ export interface NewDataset extends DatasetBrief {
   readonly name: string;
 }
 
+/** Whether a dataset is what the engine gives: a whole id of 0 or more, a kind there is, a name and a list of columns. */
+function wellFormed(dataset: NewDataset): boolean {
+  return (
+    Number.isInteger(dataset.id) &&
+    dataset.id >= 0 &&
+    DATASET_KINDS.includes(dataset.kind) &&
+    typeof dataset.name === 'string' &&
+    Array.isArray(dataset.columns)
+  );
+}
+
 /**
  * Adds a layer for each dataset, on top of the legend and not in a group, visible, in its default style (the first of
  * the datasets lowest, as if they were added one at a time). The layer is named for the dataset, and is
- * `layer-N` with N one more than the highest there is; the colour it gets is the one of that number.
+ * `layer-N` with N one more than the highest there is among all the ids of layers and groups; the colour it gets
+ * is the one of that number. **A dataset that is not what the engine gives** (an id that is not a whole number of 0 or
+ * more, a kind that there is not) refuses all of them, and nothing to add is the same document.
  */
 export function addLayers(doc: SceneDocument, datasets: readonly NewDataset[]): SceneDocument {
-  if (datasets.length === 0) {
+  if (datasets.length === 0 || !datasets.every(wellFormed)) {
     return doc;
   }
   const layers: Record<string, Layer> = { ...doc.layers };
   const legend: LegendNode[] = [...doc.legend];
+  const taken = new Set([
+    ...Object.keys(layers),
+    ...doc.legend.flatMap((node) => (node.type === 'group' ? [node.id] : [])),
+  ]);
   for (const dataset of datasets) {
-    const id = nextId('layer', Object.keys(layers));
+    const id = nextId('layer', taken);
+    taken.add(id);
     layers[id] = {
       id,
       datasetId: dataset.id,
       name: dataset.name,
       visible: true,
-      style: defaultStyle(dataset, numberOf(id) - 1),
+      style: defaultStyle(dataset, ordinalOf(id, LAYER_COLOURS.length)),
     };
     legend.unshift({ type: 'layer', id });
   }
