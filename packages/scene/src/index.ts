@@ -34,6 +34,8 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export { northArrow } from './north-arrow.js';
+export type { NorthArrow } from './north-arrow.js';
 export { legendModel } from './legend-model.js';
 export type {
   GroupVisibility,

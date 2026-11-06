@@ -3833,3 +3833,8 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   gives no finding for a dataset that is not drawn, the notice says so in a sentence of its own** ("This dataset cannot be drawn in the coordinate system of the map."), so that a layer that is not drawn never has no
   reason. The model does not include the contours section (step 20.6). Ten changes to the code each fail a test (tried); one passed at first because `toEqual` does not tell a missing `hint` from an `undefined` one, and
   the notices are now compared with `toStrictEqual`.
+- Step 14.11 (the furniture, split into 14.11a and 14.11b). **14.11a: `northArrow(heading)`** gives `angle` (how far the needle is turned, degrees clockwise from straight up: **minus the heading**, as section 11.7
+  says, kept between -180 and 180, so a map facing east, heading 90, has north on the left at -90, and south is 180), `degrees` (the heading to the whole degree, 0 up to 360), `northUp` and a `label` (`North is up`,
+  or `Map turned 30° from north`, which the button's accessible name of step 17.1 and the map's label of step 17.7 use, so that the screen reader hears what the eye sees). **North is up to the whole degree**: a heading of
+  359.6 reads as `North is up` (and 0.6 as 1°). A heading that is not a number gives an arrow pointing up, since nothing is known to turn it. It points to **grid north of the map's coordinate system, not true north**
+  (section 9.5 asks to record this; it is here, and the label says `north`, not `true north`). Seven changes to the code each fail a test (tried).
