@@ -1,6 +1,8 @@
 /**
- * Numbers as the legend writes them (section 11.7 of the brief): thousands separated by commas, the fewest decimals
- * that keep neighbouring bounds apart, never more than 6 significant digits, and a true minus sign. Plain arithmetic
+ * Numbers as the legend writes them (section 11.7 of the brief): thousands separated by commas, the fewest decimals at
+ * which each bound reads as itself (to less than a tenth of the narrowest class: `formatBounds` says why that departs
+ * from the brief's "keep neighbouring bounds distinct"), never more than 6 significant digits, and a true minus sign. The
+ * bounds are finite, as the engine's own checks make them. Plain arithmetic
  * on text: the same text on every machine, in every locale (nothing here asks the platform how to write a number).
  */
 
