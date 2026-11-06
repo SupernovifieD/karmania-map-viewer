@@ -265,7 +265,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 14.2 Types of section 11.6 of the brief.
 - [ ] 14.3 validateScene() and migrate() with tests. Split to stay under the commit size guideline:
   - [x] 14.3a The list of problems and the checks it is made of (numbers, text, choices, lists, objects).
-  - [ ] 14.3b `validateScene`: the version, the frame, the view, the cameras and the exaggeration.
+  - [x] 14.3b `validateScene`: the version, the frame, the view, the cameras and the exaggeration.
   - [ ] 14.3c `validateScene`: the layers (colour, opacity, sizes, contours, derivation).
   - [ ] 14.3d `validateScene`: the legend, the selection and how they refer to layers.
   - [ ] 14.3e `migrate`.

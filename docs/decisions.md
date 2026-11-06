@@ -3672,3 +3672,11 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   **At most 100 problems are listed**, and a last one counts the rest, so a document of a million bad layers cannot make a list of a million. **A field that is not in the contract is a problem** (`unknown_field`): a
   document is state to be restored, a typo in `opactiy` would otherwise be dropped without a word, and a new field is what a new version is for. A number must be finite (JSON cannot carry NaN or infinity,
   and a camera cannot use them). 14.3a is the checks only (`problems.ts`), tested for every limit on both sides of it; changing any of the five comparisons of a limit (`>=` for `>` and so on) or the cap of 100 fails a test (tried).
+- Step 14.3b (`validateScene`, the document level). A value that is not an object is one problem (`not_an_object`, or `missing` for `undefined`). **A version that is not 1 ends the check** with that one problem and nothing
+  else, because the rules of version 1 do not say what a document of another version is: a version above 1 is "newer than this viewer reads", anything else that is not 1 is "must be 1", and a missing one is `missing`
+  (`migrate`, step 14.3e, is for older documents). Then the fields that are not in the contract, the frame (`null` is a frame that is not made yet; an EPSG system has a whole `code` of 1 or more and no unit, a local grid has a
+  `units` and no code, and each is an unknown field in the other), the view, the two cameras and the exaggeration, all by the limits of step 14.2; problems come in the order of the document, never stopping at the first. The lists
+  of choices (`choices.ts`) are written in the scene so that it loads no engine code; the compiler checks each member against the engine's type and `choices.test.ts` that each list is all of the type. The layers, the legend
+  and the selection are 14.3c and 14.3d: until then `validateScene` does not look at them. **Tested** by the sample document and a table of spoiled copies of it; seven changes to the rules (the elevation or the field of
+  view one step wider, the units of a local grid, the origin not checked, unknown fields let through, a whole code not required, the early return on version) each fail a test (tried one by one; one first tried as a change
+  that changed nothing and was redone).
