@@ -350,7 +350,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.3 Move the panel (tabs, resize handle, panel state): `panel-tabs.ts`, `panel-state.ts` with its test and
   `resize-handle.ts`. The panel element itself, `panel.ts`, imports the Data tab (it registers `<karmania-data-tab>`),
   so it moves after the Data tab, as step 15.4d.
-- [ ] 15.4 Move the Data tab, dataset list and summary, and the panel that holds them. Each piece moves after what it
+- [x] 15.4 Move the Data tab, dataset list and summary, and the panel that holds them. Each piece moves after what it
   imports, since the viewer may not import from the app:
   - [x] 15.4a `datasets.ts` and `import-crs.ts`, with their tests.
   - [x] 15.4b The import logic that the summary uses: `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and
@@ -359,7 +359,7 @@ or releasing, and whenever the brief says to stop.
     tests leave the app, and a package with no test file fails `vitest run`. (Added; not in the brief.)
   - [x] 15.4c The findings list: `findings-text.ts`, `import-steps.ts` and `findings.ts`, with their tests.
   - [x] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.
-  - [ ] 15.4e `panel.ts`.
+  - [x] 15.4e `panel.ts`.
 - [ ] 15.5 Move the import dialog and its steps.
 - [ ] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes
   toolbar plus viewer; a minimal createViewer(container) and dispose(). Still

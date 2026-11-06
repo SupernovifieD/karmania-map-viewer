@@ -11,8 +11,8 @@ import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import '@karmania/viewer/map-area';
 import type { DroppedFiles } from '@karmania/viewer/map-area';
-import './panel.js';
-import type { PanelChange } from './panel.js';
+import '@karmania/viewer/panel';
+import type { PanelChange } from '@karmania/viewer/panel';
 import {
   browserStorage,
   clampPanelWidth,
