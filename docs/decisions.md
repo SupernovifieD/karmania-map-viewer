@@ -3760,3 +3760,9 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   `NaN` is the same document (a mistake of the caller that cannot mean a place). A move to where the node already is is the same document, found by comparing the legend, not by the arguments. Seven changes to the
   command each fail a test (tried; two survived at first, the `NaN` guard because the move in the test was one that changes nothing anyway, and the lower clamp because `-5` on a list of three acts as the start without
   it, and each got a case that tells it apart).
+- Step 14.7b (groups). **`createGroup(doc, name, index = 0)`** makes an empty, open group `group-N` at the top of the legend (or at a place, counted as `moveNode` counts it); **`renameGroup`**; **`deleteGroup`**
+  puts the group's layers where the group was, in their order, so none is lost or moved (section 10.3); **names are trimmed, and a name that is nothing but space is no name** (the command gives the same document, for the
+  viewer to keep the field open). **A gap in the brief, filled**: the document has `collapsed` on every group and step 19.5 collapses and expands them, but the brief's list of commands has none that changes it, so
+  **`setGroupCollapsed(doc, groupId, collapsed)` is added** to this step (the roadmap says so). Whether it should be state of the document at all, and so be saved with it and given back to an embedder, is the brief's
+  choice and is kept. A group number goes on from the highest group there is (layer ids are not looked at: `nextId` takes only ids with the prefix, which a test shows by a legend of layers only giving `group-1`; a first
+  version listed the groups by hand, and a change that listed every node instead passed every test, which showed that it did nothing). Eight changes to the commands each fail a test (tried).

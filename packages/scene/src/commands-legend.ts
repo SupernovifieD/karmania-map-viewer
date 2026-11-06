@@ -3,7 +3,8 @@
  * holds layers: one level, so a group is never in a group. Like every command, each is a pure function, and a
  * command that would change nothing, or that names what is not there, gives back the document it was given.
  */
-import type { GroupId, LegendNode, SceneDocument } from './types.js';
+import { nextId } from './ids.js';
+import type { GroupId, LegendGroupNode, LegendNode, SceneDocument } from './types.js';
 
 /** Where a node goes: the top of the legend (`parent` is `null`) or a group, at a place in that list. */
 export interface LegendPlace {
@@ -91,4 +92,76 @@ export function moveNode(doc: SceneDocument, id: string, to: LegendPlace): Scene
     legend = rest.map((n) => (n === parent ? moved : n));
   }
   return sameLegend(legend, doc.legend) ? doc : { ...doc, legend };
+}
+
+function groupsOf(legend: readonly LegendNode[]): LegendGroupNode[] {
+  return legend.filter((node): node is LegendGroupNode => node.type === 'group');
+}
+
+/** The document with the group `id` made into what `change` says: the same document if there is no such group, or if its name and whether it is folded are as they were. */
+function changeGroup(
+  doc: SceneDocument,
+  id: string,
+  change: (group: LegendGroupNode) => LegendGroupNode,
+): SceneDocument {
+  const group = groupsOf(doc.legend).find((candidate) => candidate.id === id);
+  if (group === undefined) {
+    return doc;
+  }
+  const changed = change(group);
+  if (changed.name === group.name && changed.collapsed === group.collapsed) {
+    return doc;
+  }
+  return { ...doc, legend: doc.legend.map((node) => (node === group ? changed : node)) };
+}
+
+/**
+ * Makes an empty group, called `name` without the space around it, as `group-N` with N one more than the highest,
+ * at a place at the top of the legend (the top by default; the place is as for {@link moveNode}). A name that is
+ * nothing but space is no name, and gives the same document.
+ */
+export function createGroup(doc: SceneDocument, name: string, index = 0): SceneDocument {
+  const trimmed = name.trim();
+  if (trimmed === '' || Number.isNaN(index)) {
+    return doc;
+  }
+  const id = nextId(
+    'group',
+    doc.legend.map((node) => node.id),
+  );
+  const group: LegendGroupNode = {
+    type: 'group',
+    id,
+    name: trimmed,
+    collapsed: false,
+    children: [],
+  };
+  return { ...doc, legend: insertAt(doc.legend, index, group) };
+}
+
+/** Names a group `name` without the space around it. A name that is nothing but space, or the one it has, is the same document. */
+export function renameGroup(doc: SceneDocument, groupId: string, name: string): SceneDocument {
+  const trimmed = name.trim();
+  return trimmed === '' ? doc : changeGroup(doc, groupId, (group) => ({ ...group, name: trimmed }));
+}
+
+/** Folds a group up so that its layers are not listed, or opens it. */
+export function setGroupCollapsed(
+  doc: SceneDocument,
+  groupId: string,
+  collapsed: boolean,
+): SceneDocument {
+  return changeGroup(doc, groupId, (group) => ({ ...group, collapsed }));
+}
+
+/** Takes a group away and puts its layers where it was, in the order they had: no layer is lost or moved. */
+export function deleteGroup(doc: SceneDocument, groupId: string): SceneDocument {
+  const group = groupsOf(doc.legend).find((candidate) => candidate.id === groupId);
+  if (group === undefined) {
+    return doc;
+  }
+  const legend = doc.legend.flatMap((node): LegendNode[] =>
+    node === group ? group.children.map((id): LegendNode => ({ type: 'layer', id })) : [node],
+  );
+  return { ...doc, legend };
 }
