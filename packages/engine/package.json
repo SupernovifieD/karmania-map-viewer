@@ -5,7 +5,9 @@
   "description": "Karmania engine: worker, client, API, builders and public types",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./display": "./src/display.ts",
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "lint": "eslint .",
