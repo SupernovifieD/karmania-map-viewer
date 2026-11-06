@@ -26,6 +26,12 @@ though it may be part of a commercial package where the commerciality rests on v
 provider; ownership by IOGP must be acknowledged in any publication or transmission of it; the
 terms must be passed on; the data may be changed only as the terms allow, and data changed
 otherwise must not be attributed to EPSG; and it is provided as is, without warranty of any kind.
+Subsets may be taken, but the terms advise that the description of a system is incomplete unless it
+has the essential elements of IOGP Guidance Note 7-1 (the copies name the annex A in one and F in
+the other). What is in this build is such a subset, a name, a kind, a unit and a PROJ definition
+for each code, so it is not a complete EPSG description of any system. The reading was repeated on
+2026-11-06 with the same result at the source (403) and the same terms in two copies (the
+licensing manual of MySQL 8.0 and the licence file of a GeoServer site).
 
 What Karmania does with it: it reads the name, the kind and the unit of a system out of its
 definition, and it converts positions with the PROJ definition. It changes no value of the

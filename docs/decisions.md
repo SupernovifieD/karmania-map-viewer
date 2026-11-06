@@ -3638,3 +3638,20 @@ numbers of the polygon table in `docs/perf.md` have the same shape and order of 
   **Nits of the review left as they are**, none of which can be reached: a second `let vertices` that repeats the first in `polygons.rs` (`PolygonsFill::advance`); `polygons_buffers` ignores whether the budget `usize::MAX`
   finished the job, which only matters on a target where `usize` has 32 bits and the total cost passes 4.29 billion, and the stepped path used by the wasm exports loops until the job says it is done; and the message of
   `d1aa9f2` says a polygon of ordinary rings "costs what it did", when it costs about a thousandth more for each ring.
+
+## M14: scene document
+
+Before step 14.1, at the owner's request ("check EPSG to see if you can read the terms"), on 2026-11-06:
+
+- **The source still cannot be read.** `https://epsg.org/terms-of-use.html` answered the fetch tool of this session with HTTP 403 again (a plain request; nothing was changed to get past it, no
+  User-Agent, no proxy, as in step 12.F10). So the terms are still not read at the source, and the caveat in `THIRD_PARTY_NOTICES.md` stays.
+- **Two public copies were read instead, and are second-hand**: the licensing manual of MySQL 8.0.46 (Oracle, section 2.7, a notice for the dataset that points to `http://www.epsg.org/TermsOfUse`) and a licence file
+  published with a GeoServer site (`geoserver.silvis.forest.wisc.edu/.../licenses/EPSG.html`, whose footer is 2025). Neither carries a date for the terms, and the Oracle copy reproduces only four conditions without
+  the "table below" of permitted changes. They agree with what step 12.2 and `THIRD_PARTY_NOTICES.md` already record: free of charge, may be used, copied and distributed; may be in a commercial package if the
+  commerciality rests on value added by the provider and not on the dataset; ownership by IOGP must be acknowledged; recipients must be told of the terms; changes only as the terms allow, with numeric
+  equivalence, and data changed otherwise must not be attributed to EPSG; provided as is; distribution for profit of the dataset itself forbidden (the GeoServer copy). They also carry what step 12.F10 said was
+  missing: **subsets may be extracted, but a description of a system is incomplete unless it has the essential elements of IOGP Guidance Note 7-1** (Annex F in the Oracle copy, A in the other: two editions).
+- **What changed**: that advisory is now in `THIRD_PARTY_NOTICES.md`, with the fact that Karmania's definitions are such a subset (name, kind, unit, PROJ definition). Nothing in the code changed.
+- **What is still the owner's**: to read the live page once in a browser against `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md` (the copies may be older or newer than the page), and to decide whether the
+  advisory about the essential elements needs more than the sentence now in the notices. Karmania is Apache-2.0 and free of charge, so the clause on distribution for profit does not apply to it as the copies word
+  it; this is a reading of two copies and not legal advice.
