@@ -3655,3 +3655,15 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
 - **What is still the owner's**: to read the live page once in a browser against `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md` (the copies may be older or newer than the page), and to decide whether the
   advisory about the essential elements needs more than the sentence now in the notices. Karmania is Apache-2.0 and free of charge, so the clause on distribution for profit does not apply to it as the copies word
   it; this is a reading of two copies and not legal advice.
+
+- Step 14.1 (the package). `packages/scene` is `@karmania/scene`: pure TypeScript with `lib: ["ES2022"]` (no DOM, as the brief says), the repository's strict lint and tsconfig, Vitest. It depends on `@karmania/engine`
+  by `workspace:*` for types only, and on nothing else. The lockfile gained the importer and no third-party package.
+- Step 14.2 (the types of section 11.6). `types.ts` has the contract as it is in the brief, every field `readonly` (a document is replaced, never changed), with these choices where the brief is silent.
+  (1) **The engine's types by a narrow path.** The scene's tsconfig has no DOM library, and the engine's index exports its client and worker, which need DOM types, so a `type` import of `@karmania/engine` would
+  fail to typecheck. The engine's `package.json` gained two subpaths, `./display` and `./types`, which are the two files that import nothing but each other; the scene imports `Frame` and `ClassMethod` from
+  `@karmania/engine/display`. (2) **`ContourParams` is defined in the scene** with the four fields of section 11.5, because the engine gets its own in step 20.4; it is to be replaced by an import then (a type that
+  is structurally the same, so nothing else changes). (3) **`RampId` is a string** here, and the ramps arrive in step 14.4, which makes `validateScene` refuse an id that is not one. (4) **Limits the brief gives
+  or that follow from it**: opacity 0 to 1, point size 2 to 24, line width 1 to 8, elevation -89 to 89, a field of view above 0 and below 180, a distance and a `unitsPerPixel` above 0; **classes** 2 to 20 (the style editor of
+  step 19.7 offers 3 to 12; 20 is the most categories the engine shows, and 1 class is not a classification). The heading is any finite number, and the commands of step 14.8 will turn it into 0 up to 360.
+  (5) **A dataset's id is a number**, as the engine has it (`DrawableEntry.id`), and layer ids and group ids are strings. **Test**: a document that uses every field, checked by the compiler, and `expectTypeOf`
+  and `@ts-expect-error` checks of the shapes (the unions, the tuples, the `readonly`, the absent-not-undefined optional fields); with `viewMode` made writable in `types.ts` the typecheck fails (tried).
