@@ -19,8 +19,8 @@ Rust:
 
 TypeScript:
 
-- Packages are `@karmania/engine`, `@karmania/ui` and `@karmania/app`. Files use
-  `kebab-case.ts`; tests sit next to the code as `name.test.ts`.
+- Packages are `@karmania/engine`, `@karmania/ui`, `@karmania/scene`, `@karmania/viewer` and
+  `@karmania/app`. Files use `kebab-case.ts`; tests sit next to the code as `name.test.ts`.
 - Variables and functions use `camelCase`; types, interfaces and classes use
   `PascalCase`. Named exports only; no default exports except tool config files
   that require them (enforced by ESLint).

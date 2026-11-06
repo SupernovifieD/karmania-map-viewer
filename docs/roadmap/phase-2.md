@@ -349,7 +349,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 15.2b Move `map-area.ts`.
 - [x] 15.3 Move the panel (tabs, resize handle, panel state): `panel-tabs.ts`, `panel-state.ts` with its test and
   `resize-handle.ts`. The panel element itself, `panel.ts`, imports the Data tab (it registers `<karmania-data-tab>`),
-  so it moves after the Data tab, as step 15.4d.
+  so it moves after the Data tab, as step 15.4e.
 - [x] 15.4 Move the Data tab, dataset list and summary, and the panel that holds them. Each piece moves after what it
   imports, since the viewer may not import from the app:
   - [x] 15.4a `datasets.ts` and `import-crs.ts`, with their tests.
@@ -370,6 +370,8 @@ or releasing, and whenever the brief says to stop.
   remove layers (nothing drawn yet); tests.
 - [x] 15.8 ESLint import restrictions for the dependency direction (5.2).
 - [x] 15.8a (added) Record the decisions of M15 in the log.
+- [x] 15.F1 Gate fix, review of M15: the dependency table, the list of packages, a step number and the README say what is
+  true, and what the review found but this milestone leaves is recorded.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

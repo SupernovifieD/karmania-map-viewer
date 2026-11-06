@@ -4056,3 +4056,22 @@ direction of the dependencies (15.8). Nothing changes on screen. The moves are `
   changes to the blocks each fail it (tried; two of the first attempt had not applied, because prettier had reformatted the text they looked for, and were done again). A real violation is refused by `eslint` itself (tried, removed). The
   `render` block has no package to lint until 16.1.
 
+### M15 gate, first round
+
+The gate ran on `790f4df` (`pnpm check`, the e2e suite (14 + 632 tests), the screenshots (102, **no baseline changed**) and axe (102), each alone on a quiet machine) and then three reviewers on the cheaper model, one for the moves,
+one for the viewer, `createViewer` and the app, one for the scene sync, the ESLint rules and the first commit. What follows is each finding acted on, by its step, and what was **not** changed and why.
+
+- Step 15.F1 (what the documents say). **Reviewer of the moves, right**: `docs/dependencies.md` was not updated for the dependencies M15 added (viewer for lit, vitest and vite; app for `@types/node`; the rule is that a
+  dependency is recorded in the commit that adds it), `docs/conventions.md` listed three packages of five, the roadmap said `panel.ts` moves as "15.4d" (it is 15.4e), and the README did not mention the scene. All corrected. **Corrections to
+  commit messages, which are pushed and not rewritten**: `f53ceea` says "2 more for createViewer" (it added one test, `scene()`; the 6 for `syncDatasets` are right); `d4de12b` says "40 sample imports" (44, at 41 call sites; said in 15.8a); `53df934`
+  is **599 changed lines**, over the guideline of about 150 and with no word about it: `app.ts` was split into the viewer's `viewer.ts` and a thin `app.ts`, which git does not see as a move (the file that stays is not the one that
+  moved), so the rule that moves do not count could not apply; it was not split into smaller commits because the half-way states would not build. `d4de12b` (about 300 lines, of which 174 are the test), `f53ceea` (237) and `5371035` (172)
+  are over the guideline too, and `b7347aa` (173). The earlier commits of this PR are renames with a few changed import lines.
+  **Left for M23 (embedding), found by the reviewer and true**: two viewers on one page share the panel's saved state (`PANEL_STORAGE_KEY` is one constant, and each viewer writes its whole in-memory state, so one can undo the other's
+  change after a reload); the events of the map area and the panel are `composed` and so leave the viewer's shadow root (nothing listens to them outside, and each viewer listens only to its own children, so two viewers do not hear
+  each other, but a page can hear them); the panel's width follows the window, and the stray drops are refused on the window (already said at 15.6). They are the phase 1 behaviour moved as it was, and M23.3 is the step that puts two
+  viewers on one page and makes them independent. **Not changed, pre-existing and not reachable from the interface**: `onDatasetRemove` computes the next selection before its `await` and writes it after (an import that finishes during the
+  await would be overwritten; both the import and the removal are modal dialogs), and it reads `engine.datasets()` after the await (a viewer disposed in between would throw `EngineDisposedError` as an unhandled rejection from an event
+  handler); both are the code of `app.ts` on `main`, to be looked at in M24 (hardening). **For M20**: derived datasets (contours) have their own summary and `syncDatasets` would give each a plain layer beside the derived layer the
+  scene makes; step 20.4 has to skip a summary with `derivedFrom` there.
+
