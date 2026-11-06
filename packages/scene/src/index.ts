@@ -71,13 +71,8 @@ export type { SceneListener, SceneStore } from './store.js';
 export { COMMAND_TYPES, applyCommand } from './commands.js';
 export type { Command } from './commands.js';
 export { setFrame, setSelection } from './commands-frame.js';
-export {
-  heldElevation,
-  normalHeading,
-  setCamera,
-  setVerticalExaggeration,
-  setViewMode,
-} from './commands-view.js';
+export { heldElevation, normalHeading } from './angles.js';
+export { setCamera, setVerticalExaggeration, setViewMode } from './commands-view.js';
 export type { CameraPatch } from './commands-view.js';
 export { setContours, setStyle } from './commands-style.js';
 export type { StylePatch } from './commands-style.js';
