@@ -50,7 +50,7 @@ async function setDatasets(
   page: Page,
   datasets: readonly Record<string, unknown>[],
 ): Promise<void> {
-  await page.locator('karmania-app').evaluate(async (element, list) => {
+  await page.locator('karmania-viewer').evaluate(async (element, list) => {
     const app = element as unknown as {
       datasets: readonly unknown[];
       selected: number | undefined;
@@ -69,7 +69,7 @@ async function setDatasets(
  * summary: the app hands its own lookup down again each time it draws.
  */
 function answerCodesWith(page: Page, answer: string): Promise<void> {
-  return page.locator('karmania-app').evaluate((element, source) => {
+  return page.locator('karmania-viewer').evaluate((element, source) => {
     (element as unknown as { engine: unknown }).engine = {
       crsInfo: (0, eval)(source) as (code: number) => Promise<unknown>,
       dispose: () => undefined,

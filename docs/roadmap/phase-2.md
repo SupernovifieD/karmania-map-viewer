@@ -361,9 +361,11 @@ or releasing, and whenever the brief says to stop.
   - [x] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.
   - [x] 15.4e `panel.ts`.
 - [x] 15.5 Move the import dialog and its steps.
-- [ ] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes
-  toolbar plus viewer; a minimal createViewer(container) and dispose(). Still
-  pixel-identical.
+- [ ] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes toolbar plus viewer; a minimal
+  createViewer(container) and dispose(). Still pixel-identical. Split:
+  - [x] 15.6a `<karmania-viewer>`: the composition of `app.ts` (the map area, the panel, the wizard, the engine and
+    the state) moves into the viewer; the app is the toolbar and `<karmania-viewer>`.
+  - [ ] 15.6b `createViewer(container)` and `dispose()`; the app uses them.
 - [ ] 15.7 The viewer holds a scene store; datasets loaded or removed add or
   remove layers (nothing drawn yet); tests.
 - [ ] 15.8 ESLint import restrictions for the dependency direction (5.2).

@@ -144,7 +144,7 @@ async function measure(page: Page, data: string, sidecar: string): Promise<Measu
   const started = await inPage<number>(
     page,
     `const now = performance.now();
-     document.querySelector('karmania-app').shadowRoot.querySelector('karmania-map-area').dispatchEvent(
+     document.querySelector('karmania-app').shadowRoot.querySelector('karmania-viewer').shadowRoot.querySelector('karmania-map-area').dispatchEvent(
        new CustomEvent('karmania-files-dropped', { detail: { files: window.files }, bubbles: true, composed: true }));
      return now;`,
   );

@@ -51,7 +51,9 @@ const TWO: Pick[] = [
 /** What the app holds: the datasets, the one that is selected. */
 const appState = (page: Page) =>
   page.evaluate(() => {
-    const app = document.querySelector('karmania-app') as unknown as {
+    const app = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
       datasets: { id: number; name: string; elementCount: number }[];
       selected: number | undefined;
       engine: { datasets: () => { id: number }[] } | undefined;

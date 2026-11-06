@@ -184,9 +184,6 @@ importers:
 
   packages/app:
     dependencies:
-      '@karmania/engine':
-        specifier: workspace:*
-        version: link:../engine
       '@karmania/ui':
         specifier: workspace:*
         version: link:../ui

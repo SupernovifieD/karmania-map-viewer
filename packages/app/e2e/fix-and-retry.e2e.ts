@@ -38,7 +38,9 @@ const GAP: Pick[] = [
 
 const loadedInEngine = (page: Page): Promise<number> =>
   page.evaluate(() => {
-    const app = document.querySelector('karmania-app') as unknown as {
+    const app = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
       engine: { datasets: () => { elementCount: number }[] } | undefined;
     };
     return app.engine?.datasets().reduce((total, each) => total + each.elementCount, 0) ?? 0;
