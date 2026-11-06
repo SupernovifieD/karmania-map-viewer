@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@karmania/engine": "workspace:*",
+    "@karmania/scene": "workspace:*",
     "@karmania/ui": "workspace:*",
     "lit": "^3.3.3"
   },

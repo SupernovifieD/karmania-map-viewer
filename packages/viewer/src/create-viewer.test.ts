@@ -3,11 +3,16 @@ import { createViewer } from './create-viewer.js';
 
 /** A page whose `createElement` hands out fake viewer elements, and the containers that take them. */
 function page() {
-  const made: { openImport: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> }[] = [];
+  const scene = { version: 1 };
+  const made: {
+    openImport: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+    scene: ReturnType<typeof vi.fn>;
+  }[] = [];
   const tags: string[] = [];
   const createElement = vi.fn((tag: string) => {
     tags.push(tag);
-    const element = { openImport: vi.fn(), remove: vi.fn() };
+    const element = { openImport: vi.fn(), remove: vi.fn(), scene: vi.fn(() => scene) };
     made.push(element);
     return element;
   });
@@ -19,7 +24,7 @@ function page() {
       element: { append: (child: unknown) => children.push(child) } as unknown as HTMLElement,
     };
   };
-  return { made, tags, container };
+  return { made, tags, scene, container };
 }
 
 afterEach(() => {
@@ -42,6 +47,15 @@ describe('createViewer', () => {
     viewer.openImport(files);
     viewer.openImport();
     expect(made[0]?.openImport.mock.calls).toEqual([[files], [undefined]]);
+  });
+
+  it('gives the scene the viewer holds, and refuses to once it was disposed', () => {
+    const { made, scene, container } = page();
+    const viewer = createViewer(container().element);
+    expect(viewer.scene()).toBe(scene);
+    viewer.dispose();
+    expect(() => viewer.scene()).toThrow('The viewer has been disposed.');
+    expect(made[0]?.scene).toHaveBeenCalledTimes(1);
   });
 
   it('takes the element out of the page when it is disposed, once, however often it is asked', () => {

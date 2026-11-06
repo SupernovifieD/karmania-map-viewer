@@ -1,5 +1,7 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
+import { createSceneStore } from '@karmania/scene';
+import type { SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
@@ -23,6 +25,7 @@ import {
 } from './panel-state.js';
 import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
+import { syncDatasets } from './scene-datasets.js';
 
 /**
  * The viewer, `<karmania-viewer>`: the map area and the side panel, side by side, and the import wizard that opens
@@ -93,6 +96,17 @@ export class KarmaniaViewer extends LitElement {
 
   /** The engine, which is started when the first files arrive, not before. */
   private engine: Engine | undefined;
+
+  /**
+   * The scene: what there is to draw and how, the one place that says so. It has a layer for each dataset that is
+   * loaded, which `syncDatasets` keeps; nothing is drawn from it yet.
+   */
+  private readonly store = createSceneStore();
+
+  /** The scene as it is now. */
+  scene(): SceneDocument {
+    return this.store.getState();
+  }
 
   /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the viewer is. */
   private readonly rows: RowSource = (id, start, count) => {
@@ -188,6 +202,7 @@ export class KarmaniaViewer extends LitElement {
     const next = selectionAfterRemoving(this.datasets, id, this.selected);
     await engine.remove(id);
     this.datasets = engine.datasets();
+    syncDatasets(this.store, this.datasets);
     this.selected = next;
   };
 
@@ -202,6 +217,7 @@ export class KarmaniaViewer extends LitElement {
    */
   private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
     this.datasets = this.engine?.datasets() ?? [];
+    syncDatasets(this.store, this.datasets);
     this.selected = event.detail.summaries[0]?.id;
     this.changePanel({ tab: 'data', collapsed: false });
   };
