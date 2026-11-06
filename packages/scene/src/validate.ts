@@ -137,3 +137,17 @@ export function validateScene(doc: unknown): readonly SceneProblem[] {
 export function isSceneDocument(doc: unknown): doc is SceneDocument {
   return validateScene(doc).length === 0;
 }
+
+/** What is wrong with a 2D camera, as the document would have it (the commands refuse one that is not right). */
+export function validateCamera2d(camera: unknown): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkCamera2d(problems, 'camera2d', camera);
+  return problems.finish();
+}
+
+/** What is wrong with a 3D camera, as the document would have it. */
+export function validateCamera3d(camera: unknown): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkCamera3d(problems, 'camera3d', camera);
+  return problems.finish();
+}

@@ -3774,3 +3774,12 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   scene remembers about the contour lines of a layer (the lines are the engine's, step 20.4) or takes them away; it is the same document for contours that are wrong, for a change that changes nothing, and for **a layer
   that is itself made of contours** (`validateScene` refuses that chain). Eight changes to the code each fail a test (tried); the colour test had no case that changed only the order of a ramp until a mutation that
   ignored `reverse` passed, and now has one for each part.
+- Step 14.8b (the view and the cameras). **`setViewMode`** and **`setVerticalExaggeration`** take only the values of the contract and are the same document otherwise. **`setCamera(doc, { camera2d?, camera3d? })`** moves
+  each camera by the fields it is given (a camera patch is partial; the 2D centre and the 3D target are given whole). **Two values are made right and not refused**, the two the brief says something about: **the 3D
+  elevation is held between -89 and 89** (section 9.5: "Elevation is clamped"), and **a heading that is given is turned into the degrees from 0 up to 360** that point the same way (the decision of step 14.2: any finite
+  heading is a valid document, so a command is where it becomes one angle, and a test of a heading of 725 gives 5). Fields that are not given are not touched (a document with a heading of 400, which is valid, keeps it
+  through a move of the distance). **Everything else that is wrong refuses the whole change in both cameras** (a scale, a distance or a field of view not above 0, a position that is not a number, a tuple of the wrong
+  length), as the rule of step 14.8 says; it is the checks of `validateScene` (`validateCamera2d` and `validateCamera3d` are exported from `validate.ts`) that decide. The heading is not shared between the two cameras here
+  though the brief says "heading is shared": switching views keeps centre and heading by the camera models of step 14.12, which give the patch for `setCamera`. Ten changes to the commands each fail a test (tried;
+  two survived and were equivalent for any valid document: the length check of two position tuples, which the check had already made equal, and holding an elevation that is not given, which is held already; the code
+  was simplified for both).

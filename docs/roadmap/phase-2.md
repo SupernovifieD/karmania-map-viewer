@@ -291,7 +291,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 14.8 Commands: style, contours, view, camera, frame, selection. Split to stay under the commit
   size guideline:
   - [x] 14.8a `setStyle` and `setContours`.
-  - [ ] 14.8b `setViewMode`, `setVerticalExaggeration` and `setCamera`.
+  - [x] 14.8b `setViewMode`, `setVerticalExaggeration` and `setCamera`.
   - [ ] 14.8c `setFrame` and `setSelection`.
 - [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page.
 - [ ] 14.10 Legend model with number labels (11.7).

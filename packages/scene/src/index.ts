@@ -34,6 +34,14 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export {
+  heldElevation,
+  normalHeading,
+  setCamera,
+  setVerticalExaggeration,
+  setViewMode,
+} from './commands-view.js';
+export type { CameraPatch } from './commands-view.js';
 export { setContours, setStyle } from './commands-style.js';
 export type { StylePatch } from './commands-style.js';
 export { emptyScene } from './empty.js';
