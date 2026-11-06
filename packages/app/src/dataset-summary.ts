@@ -1,8 +1,13 @@
 import type { CrsInfo, Summary } from '@karmania/engine';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './datasets.js';
-import type { CrsLookup } from './datasets.js';
+import {
+  crsLabelNamed,
+  crsTitleNamed,
+  describeWarnings,
+  extentRows,
+} from '@karmania/viewer/datasets';
+import type { CrsLookup } from '@karmania/viewer/datasets';
 import './findings.js';
 import { groupFindings } from './import-run.js';
 import { describeSize, formatCount, KIND_NAMES } from '@karmania/viewer/import-files';

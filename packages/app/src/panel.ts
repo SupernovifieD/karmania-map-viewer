@@ -4,7 +4,7 @@ import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
-import type { CrsLookup, RowSource } from './datasets.js';
+import type { CrsLookup, RowSource } from '@karmania/viewer/datasets';
 import { PANEL_TABS } from '@karmania/viewer/panel-tabs';
 import type { PanelTab } from '@karmania/viewer/panel-tabs';
 import '@karmania/viewer/resize-handle';

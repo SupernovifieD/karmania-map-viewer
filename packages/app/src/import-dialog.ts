@@ -7,7 +7,7 @@ import './file-step.js';
 import type { DraftChange } from './file-step.js';
 import { applyDraftChange, draftFor } from './import-draft.js';
 import type { ImportDraft } from './import-draft.js';
-import { crsBlocker } from './import-crs.js';
+import { crsBlocker } from '@karmania/viewer/import-crs';
 import { entriesOf, isImportable } from '@karmania/viewer/import-files';
 import { mappingProblems } from './import-mapping.js';
 import type { FileEntry } from '@karmania/viewer/import-files';

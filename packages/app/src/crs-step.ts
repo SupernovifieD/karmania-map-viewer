@@ -16,8 +16,8 @@ import {
   parseEpsg,
   summarizeCrs,
   UNIT_NAMES,
-} from './import-crs.js';
-import type { CrsMode } from './import-crs.js';
+} from '@karmania/viewer/import-crs';
+import type { CrsMode } from '@karmania/viewer/import-crs';
 import type { ImportDraft } from './import-draft.js';
 import type { FileEntry } from '@karmania/viewer/import-files';
 
