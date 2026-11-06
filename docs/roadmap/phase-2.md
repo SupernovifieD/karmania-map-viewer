@@ -302,10 +302,10 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.10a Number labels: thousands commas, the fewest decimals that keep neighbouring bounds apart.
   - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
   - [x] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
-- [ ] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
+- [x] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
   changes, null cases). Split to stay under the commit size guideline:
   - [x] 14.11a The north arrow: the angle of the needle and what it says.
-  - [ ] 14.11b The scale bar: a nice length, its unit, its width in pixels, or nothing and why.
+  - [x] 14.11b The scale bar: a nice length, its unit, its width in pixels, or nothing and why.
 - [ ] 14.12 Camera models: fit 2D and 3D; 2D to 3D keeping centre and heading.
 - [ ] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
   column, several columns, a group heading at a column end, a narrow map

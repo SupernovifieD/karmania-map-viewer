@@ -3838,3 +3838,15 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   or `Map turned 30° from north`, which the button's accessible name of step 17.1 and the map's label of step 17.7 use, so that the screen reader hears what the eye sees). **North is up to the whole degree**: a heading of
   359.6 reads as `North is up` (and 0.6 as 1°). A heading that is not a number gives an arrow pointing up, since nothing is known to turn it. It points to **grid north of the map's coordinate system, not true north**
   (section 9.5 asks to record this; it is here, and the label says `north`, not `true north`). Seven changes to the code each fail a test (tried).
+- Step 14.11b (the scale bar). **`scaleBar({ viewMode, units, unitsPerPixel, maxPixels? })`** gives a bar or nothing. **A bar** is the largest of 1, 2 and 5 times a power of ten that fits in at most 160 pixels (the
+  brief's width; `maxPixels` can change it), with its `value`, `unit`, `label` (`200 m`, `1 km`, `0.1 m`, `2,000 ft`, `1 mi`), `widthPx` and `mapUnits`. **Units**: a map in metres writes metres and, from 1,000 metres of room,
+  kilometres; a map in feet writes feet and, from 5,280 feet of room, miles, **for international feet and for US survey feet alike**: the brief says "US survey feet use survey miles", and a survey mile is 5,280 survey
+  feet as a mile is 5,280 feet, so the sum is the same and the label is `mi` in both (the units of the map are the engine's `CrsInfo.units`, which the viewer gives, since the scene cannot know what an EPSG code is
+  in). **A bar never reads `1,000 m` or `5,280 ft`**, and its width is between 0.4 and 1 of the room (a nice number is within 2.5 times of what it fits in), by a test over 3,000 random scales in each unit. **Nothing,
+  with a reason and a sentence** (`three_d`, `geographic`, `unknown_units`, `no_map`, `no_scale`), in this order of priority: the 3D view (the bar is 2D only), a map in degrees (no scale bar, section 9.2), units that are
+  not known, no map, and a scale that is not above 0, not a number, or so small that the bar would be under a millionth of a unit. **Two things came out of the mutation tests.** The power of ten and the digits are read
+  from the number's own decimal form (`toExponential`), because the first version used `Math.log10` and corrected it by hand for the engines where `Math.log10(1000)` is not exactly 3, and those corrections could not be
+  tested on this engine (a change that removed them passed), whereas the decimal form is exact everywhere and needs none. And **the width is held to the room** (`Math.min`), since there are scales where the nice length
+  over the scale is a rounding error over the room (5e-7 units to a pixel and 100 pixels give 100.00000000000001), which the test now has; a search found them, none was found at random. A wrong `maxPixels` is a `RangeError`.
+  Fourteen changes to the code each fail a test (tried); two boundary cases (room exactly 200 and exactly 500) were added after mutants that moved them passed. I also mis-calculated two expected values in my first tests
+  (0.0001 m and 2,000 ft), and the code was right.
