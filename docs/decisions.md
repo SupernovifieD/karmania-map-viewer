@@ -3746,3 +3746,9 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   if added one at a time (the last on top). A dataset can have two layers if it is added twice. A dataset is described by the engine's `Summary` (it has `id`, `name`, `kind`, `elementCount`, `columns`, so a summary is
   passed as it is). **`emptyScene()`** is the document with nothing in it: 2D, no frame, and cameras that are placeholders (a unit scale looking at 0, 0; 3D from 1,000 away at 45 degrees), which the first fit to data
   (step 14.12) replaces and nothing draws before. Six changes to `addLayers` and the ids each fail a test (tried).
+- Step 14.6b (remove, show and hide). **`removeLayersOfDataset(doc, datasetId)`** takes out every layer of the dataset and, until none is left to take, every layer made from one that went (the contours of a layer, which
+  `validateScene` would refuse without their source), from the layers and from the legend; **a group stays where it is when it is left empty** (the person made it, and removing a dataset is not removing a folder),
+  and the selection is cleared if it was in a layer that went. It does not touch the frame or the cameras: a scene whose last layer is removed is `emptyScene()` but for them, and dropping the frame when the last
+  dataset is removed is the viewer's, from the engine's `chooseFrame` (step 15.7). **`setVisible`** and **`setGroupVisible`**: a group's checkbox sets every layer in it; whether a group looks checked, unchecked or in
+  between is for the legend model (step 14.10) to say from its layers, so the scene has no state for it. All three give back the same document when nothing would change. Seven changes to them each fail a test (tried); the
+  layers a derived layer is made from are found with `Object.hasOwn`, so a layer id like `constructor` is no layer.

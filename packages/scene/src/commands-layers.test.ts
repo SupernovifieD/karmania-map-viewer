@@ -1,6 +1,12 @@
 import type { ColumnSummary, Kind } from '@karmania/engine/types';
 import { describe, expect, it } from 'vitest';
-import { addLayers, type NewDataset } from './commands-layers.js';
+import {
+  addLayers,
+  removeLayersOfDataset,
+  setGroupVisible,
+  setVisible,
+  type NewDataset,
+} from './commands-layers.js';
 import { emptyScene } from './empty.js';
 import { frozen, sampleScene } from './test-support/documents.js';
 import { validateScene } from './validate.js';
@@ -119,5 +125,142 @@ describe('addLayers', () => {
     expect(addLayers(doc, [])).toBe(doc);
     const solid = frozen(sampleScene());
     expect(addLayers(solid, [dataset(1, 'x'), dataset(2, 'y')]).legend).toHaveLength(4);
+  });
+});
+
+describe('removeLayersOfDataset', () => {
+  it('takes the layer out of the layers and of the legend, wherever it is, and keeps the rest as it was', () => {
+    const doc = sampleScene();
+    const next = removeLayersOfDataset(doc, 2);
+    expect(Object.keys(next.layers)).toEqual(['layer-1', 'layer-3']);
+    // layer-2 was in the group, which stays, with the layer that is left.
+    expect(next.legend).toEqual([
+      { type: 'layer', id: 'layer-1' },
+      { type: 'group', id: 'group-1', name: 'Survey', collapsed: false, children: ['layer-3'] },
+    ]);
+    expect(next.layers['layer-1']).toBe(doc.layers['layer-1']);
+    expect(validateScene(next)).toEqual([]);
+  });
+
+  it('takes out a layer that is at the top of the legend, and every layer of a dataset that has more than one', () => {
+    const twice = addLayers(addLayers(emptyScene(), [dataset(1, 'a')]), [
+      dataset(2, 'b'),
+      dataset(1, 'a'),
+    ]);
+    const next = removeLayersOfDataset(twice, 1);
+    expect(Object.values(next.layers).map((l) => l.datasetId)).toEqual([2]);
+    expect(next.legend).toEqual([{ type: 'layer', id: 'layer-2' }]);
+    expect(validateScene(next)).toEqual([]);
+  });
+
+  it('takes out what is made from the layers that go: the contours of a layer, with the layer', () => {
+    const next = removeLayersOfDataset(sampleScene(), 1);
+    expect(Object.keys(next.layers)).toEqual(['layer-2']);
+    expect(next.legend).toEqual([
+      { type: 'group', id: 'group-1', name: 'Survey', collapsed: false, children: ['layer-2'] },
+    ]);
+    expect(validateScene(next)).toEqual([]);
+  });
+
+  it('takes out the contours of a layer by their own dataset, and leaves the layer they were made from', () => {
+    const next = removeLayersOfDataset(sampleScene(), 3);
+    expect(Object.keys(next.layers)).toEqual(['layer-1', 'layer-2']);
+    expect(validateScene(next)).toEqual([]);
+  });
+
+  it('clears the selection when its layer goes, and keeps it when another goes', () => {
+    expect(removeLayersOfDataset(sampleScene(), 2).selection).toBeNull();
+    expect(removeLayersOfDataset(sampleScene(), 3).selection).toEqual({
+      layerId: 'layer-2',
+      element: 0,
+    });
+  });
+
+  it('keeps the frame and the cameras, and leaves a scene with nothing in it when the last layer goes', () => {
+    const one = addLayers(emptyScene(), [dataset(1, 'a')]);
+    expect(removeLayersOfDataset(one, 1)).toEqual(emptyScene());
+    const doc = sampleScene();
+    const next = removeLayersOfDataset(doc, 2);
+    expect([next.frame, next.camera2d, next.camera3d, next.viewMode]).toEqual([
+      doc.frame,
+      doc.camera2d,
+      doc.camera3d,
+      doc.viewMode,
+    ]);
+  });
+
+  it('is the same document when no layer is of that dataset, and never changes the one it is given', () => {
+    const doc = sampleScene();
+    expect(removeLayersOfDataset(doc, 99)).toBe(doc);
+    expect(removeLayersOfDataset(emptyScene(), 1).legend).toEqual([]);
+    expect(Object.keys(removeLayersOfDataset(frozen(sampleScene()), 2).layers)).toHaveLength(2);
+  });
+});
+
+describe('setVisible', () => {
+  it('shows and hides a layer, and nothing else', () => {
+    const doc = sampleScene();
+    const shown = setVisible(doc, 'layer-2', true);
+    expect(shown.layers['layer-2']?.visible).toBe(true);
+    expect({ ...shown, layers: doc.layers }).toEqual(doc);
+    expect(shown.layers['layer-1']).toBe(doc.layers['layer-1']);
+    expect(setVisible(shown, 'layer-2', false)).toEqual(doc);
+    expect(validateScene(shown)).toEqual([]);
+  });
+
+  it('is the same document when the layer is not there, or already is so', () => {
+    const doc = sampleScene();
+    expect(setVisible(doc, 'layer-9', true)).toBe(doc);
+    expect(setVisible(doc, 'constructor', true)).toBe(doc);
+    expect(setVisible(doc, 'layer-1', true)).toBe(doc);
+    expect(setVisible(doc, 'layer-2', false)).toBe(doc);
+  });
+
+  it('never changes the document it is given', () => {
+    expect(setVisible(frozen(sampleScene()), 'layer-2', true).layers['layer-2']?.visible).toBe(
+      true,
+    );
+  });
+});
+
+describe('setGroupVisible', () => {
+  it('shows or hides every layer in the group, and no layer outside it', () => {
+    const doc = sampleScene();
+    const hidden = setGroupVisible(doc, 'group-1', false);
+    expect(['layer-1', 'layer-2', 'layer-3'].map((id) => hidden.layers[id]?.visible)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    const shown = setGroupVisible(doc, 'group-1', true);
+    expect(['layer-1', 'layer-2', 'layer-3'].map((id) => shown.layers[id]?.visible)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(validateScene(hidden)).toEqual([]);
+  });
+
+  it('is the same document when the group is not there, is a layer, is empty, or its layers are all so already', () => {
+    const doc = sampleScene();
+    expect(setGroupVisible(doc, 'group-9', true)).toBe(doc);
+    expect(setGroupVisible(doc, 'layer-1', false)).toBe(doc);
+    expect(setGroupVisible(doc, 'group-1', true).layers['layer-2']?.visible).toBe(true);
+    const hidden = setGroupVisible(doc, 'group-1', false);
+    expect(setGroupVisible(hidden, 'group-1', false)).toBe(hidden);
+    const empty = {
+      ...doc,
+      legend: [
+        ...doc.legend,
+        { type: 'group' as const, id: 'group-2', name: '', collapsed: false, children: [] },
+      ],
+    };
+    expect(setGroupVisible(empty, 'group-2', true)).toBe(empty);
+  });
+
+  it('never changes the document it is given', () => {
+    expect(
+      setGroupVisible(frozen(sampleScene()), 'group-1', false).layers['layer-3']?.visible,
+    ).toBe(false);
   });
 });

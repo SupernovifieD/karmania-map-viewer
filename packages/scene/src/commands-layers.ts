@@ -37,3 +37,77 @@ export function addLayers(doc: SceneDocument, datasets: readonly NewDataset[]): 
   }
   return { ...doc, layers, legend };
 }
+
+/**
+ * Takes out every layer of the dataset, and the layers that are made from them (contours of a layer that is gone have
+ * nothing to be made from), from the layers and from the legend, a group staying where it is even if it is left
+ * empty. The selection is cleared if it was in a layer that went. Nothing to take out is the same document.
+ */
+export function removeLayersOfDataset(doc: SceneDocument, datasetId: number): SceneDocument {
+  const gone = new Set(
+    Object.values(doc.layers)
+      .filter((layer) => layer.datasetId === datasetId)
+      .map((layer) => layer.id),
+  );
+  if (gone.size === 0) {
+    return doc;
+  }
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const layer of Object.values(doc.layers)) {
+      if (
+        layer.derived !== undefined &&
+        gone.has(layer.derived.sourceLayer) &&
+        !gone.has(layer.id)
+      ) {
+        gone.add(layer.id);
+        grew = true;
+      }
+    }
+  }
+  const layers = Object.fromEntries(Object.entries(doc.layers).filter(([id]) => !gone.has(id)));
+  const legend = doc.legend.flatMap((node): LegendNode[] => {
+    if (node.type === 'layer') {
+      return gone.has(node.id) ? [] : [node];
+    }
+    return [{ ...node, children: node.children.filter((id) => !gone.has(id)) }];
+  });
+  const selected = doc.selection !== null && gone.has(doc.selection.layerId);
+  return { ...doc, layers, legend, selection: selected ? null : doc.selection };
+}
+
+/** Shows or hides a layer. A layer that is not there, or that already is so, is the same document. */
+export function setVisible(doc: SceneDocument, layerId: string, visible: boolean): SceneDocument {
+  const layer = Object.hasOwn(doc.layers, layerId) ? doc.layers[layerId] : undefined;
+  if (layer === undefined || layer.visible === visible) {
+    return doc;
+  }
+  return { ...doc, layers: { ...doc.layers, [layerId]: { ...layer, visible } } };
+}
+
+/**
+ * Shows or hides every layer in a group, which is how the checkbox of a group works (whether a group looks
+ * checked, unchecked or in between is for the legend model to say, from its layers). A group that is not there, or
+ * whose layers are all so already, is the same document.
+ */
+export function setGroupVisible(
+  doc: SceneDocument,
+  groupId: string,
+  visible: boolean,
+): SceneDocument {
+  const group = doc.legend.find((node) => node.type === 'group' && node.id === groupId);
+  if (group?.type !== 'group') {
+    return doc;
+  }
+  let changed = false;
+  const layers: Record<string, Layer> = { ...doc.layers };
+  for (const id of group.children) {
+    const layer = layers[id];
+    if (layer !== undefined && layer.visible !== visible) {
+      layers[id] = { ...layer, visible };
+      changed = true;
+    }
+  }
+  return changed ? { ...doc, layers } : doc;
+}

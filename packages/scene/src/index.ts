@@ -19,7 +19,12 @@ export {
   layerColour,
 } from './defaults.js';
 export type { DatasetBrief } from './defaults.js';
-export { addLayers } from './commands-layers.js';
+export {
+  addLayers,
+  removeLayersOfDataset,
+  setGroupVisible,
+  setVisible,
+} from './commands-layers.js';
 export type { NewDataset } from './commands-layers.js';
 export { emptyScene } from './empty.js';
 export { MAP_BACKGROUNDS, MIN_GRAPHIC_CONTRAST, contrastOnMaps } from './palettes.js';
