@@ -323,6 +323,8 @@ or releasing, and whenever the brief says to stop.
   gives are refused, so that a command never makes a document that `validateScene` refuses.
 - [x] 14.F2 Gate fix, review of M14: a hole in a list is a thing that is missing, `validateScene` takes a time in
   proportion to the layers and not to their square, the cap of 100 problems is pinned, and two comments say what is true.
+- [x] 14.F3 Gate fix, review of M14: lines that go to the next column to stay with their heading do so only if they fit
+  there, and a line wider than its column is said to be drawn within its rectangle.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

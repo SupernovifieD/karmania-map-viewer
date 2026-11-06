@@ -122,6 +122,25 @@ describe('exportLayout: the width of a column', () => {
     expect(new Set(l.columns.map((c) => c.rect.width))).toEqual(new Set([240]));
   });
 
+  it('gives a line that is wider than the column the width of the column, and no more: it is drawn within its rectangle', () => {
+    // The brief clamps the column to 320 and says nothing of a line that is wider: the layout never puts a rectangle
+    // across the next column, and the export draws the text of such a line cut short within its rectangle.
+    const l = layout([layer('A'), layer('B'), layer('C')], 3000, 100, 96, null, () => ({
+      width: 500,
+      height: 40,
+    }));
+    expect(l.columns.length).toBeGreaterThan(1);
+    expect(new Set(l.columns.flatMap((c) => c.lines.map((p) => p.rect.width)))).toEqual(
+      new Set([320]),
+    );
+    for (const [index, column] of l.columns.entries()) {
+      const next = l.columns[index + 1];
+      if (next !== undefined) {
+        expect(column.rect.x + column.rect.width).toBeLessThan(next.rect.x);
+      }
+    }
+  });
+
   it('rounds the size of a line up to a whole pixel', () => {
     const l = layout([layer('A')], 1200, 800, 96, { width: 10.2, height: 5.1 }, () => ({
       width: 249.2,
@@ -217,6 +236,23 @@ describe('exportLayout: a heading is never the last line of a column', () => {
       ['L:A'],
       ['G:Survey', 'L:Grade', 'C:0 – 10'],
     ]);
+  });
+
+  it('does not move a heading that would be too tall, with what follows it, for a column of its own: it stays', () => {
+    // Found by the review of the milestone: A (10) and the name of Grade (54) fill a column, and the first class (40) does not
+    // fit. Moving the name takes it to the next column, where it and the class (94) are taller than the 73 there is.
+    const heights: Record<string, number> = { A: 10, Grade: 54, '0 \u2013 10': 40 };
+    const lines = [layer('A'), layer('Grade', true), klass('0 \u2013 10')];
+    const l = layout(lines, 1012, 149, 150, null, (line) => ({
+      width: 50,
+      height:
+        heights[
+          line.kind === 'class' ? line.entry.label : line.kind === 'layer' ? line.name : ''
+        ] ?? 0,
+    }));
+    expect(l.map.height).toBe(73);
+    expect(l.columns.map((c) => names(c.lines))).toEqual([['L:A', 'L:Grade'], ['C:0 \u2013 10']]);
+    expect(l.columns.map((c) => c.rect.height)).toEqual([64, 40]);
   });
 
   it('cannot move a heading that is alone in its column, and does not loop for ever', () => {
@@ -330,7 +366,8 @@ describe('exportLayout: for any legend and picture', () => {
             ? klass(name)
             : layer(name, kind === 'layerc');
       });
-      const size = { width: 800 + next() * 3000, height: 400 + next() * 2500 };
+      // Pictures that are low as well as high, so that columns are short and lines are moved often.
+      const size = { width: 800 + next() * 3000, height: 90 + next() * 900 };
       const dpi = 72 + next() * 300;
       const l = exportLayout({
         size,

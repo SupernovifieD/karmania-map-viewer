@@ -3918,4 +3918,13 @@ found that is not true or not worth a change is said in its place.
   (3) **The cap of 100 problems was not pinned**: the tests used the constant `MAX_PROBLEMS` itself, so raising it to 100,000 changed nothing they could see, though step 14.3a said that changing it fails a test; there is a
   test of the number now. (4) Two comments said more than was true: `validateScene` "does not throw" is **for plain data** (an object whose getter throws is not plain data, and the error is the getter's), and the store's
   `subscribe` says that **adding the same function twice is one listener** that one removal takes away (a test says so now).
+- Step 14.F3 (the export layout: a column that was too tall, and a line that is too wide). **Reviewer B, must-fix, right.** The rule that a heading, or a layer with classes, is not left at the end of a column moved the
+  lines to the next column **without asking whether they fit there**: with a column of 73 pixels (a picture 149 high at 150 dpi), a line of 10, the name of a layer with classes of 54 and its first class of 40, the name
+  went to the next column and made it 94 tall, past the bottom margin, which step 14.13b says only a line that is taller than a column does. The reviewer found 199 to 1,937 such columns in 30,000 pictures that were
+  50 pixels or more high, and two at 200 or more; my own random test used pictures of 400 pixels and more and heights of 10 to 70, so it never reached a column short enough, and now uses pictures of 90 to 990. **Now
+  the lines that would move go only if they fit in the next column together with the line that is waiting; if not, they stay at the end of their column, which is the one thing the rule gives way to** (the other is a
+  heading that is alone in its column). The reviewer's input is a test (with the old code the column is 94 tall), and so is the random run, which fails with the old code on its own. **The other finding, right in what it
+  says and a gap in the brief and not in the code**: a line wider than the column (the column is clamped to 320 and the brief says nothing of a line that is wider) is given the width of the column and no more, so no
+  rectangle crosses the next column; **the export must draw the text of such a line within its rectangle, cut short with an ellipsis** (step 22.3), and `measure` may return the width of the cut text. A test says that the
+  rectangles are never wider than the column and never touch the next one.
 
