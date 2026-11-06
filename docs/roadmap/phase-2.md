@@ -325,6 +325,8 @@ or releasing, and whenever the brief says to stop.
   proportion to the layers and not to their square, the cap of 100 problems is pinned, and two comments say what is true.
 - [x] 14.F3 Gate fix, review of M14: lines that go to the next column to stay with their heading do so only if they fit
   there, and a line wider than its column is said to be drawn within its rectangle.
+- [x] 14.F4 Gate fix, review of M14: the cameras are undefined for a heading or an elevation that is not a number,
+  so every camera given is one that `validateScene` accepts.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

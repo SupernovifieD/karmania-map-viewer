@@ -368,3 +368,56 @@ describe('cameraTo3d and cameraTo2d: switching views', () => {
     expect(cameraTo2d({ camera3d: three, viewport: { width: 100, height: NaN } })).toBeUndefined();
   });
 });
+
+describe('the cameras are undefined for an angle that is not a number', () => {
+  // Found by the review of the milestone: a camera with a heading or an elevation that is NaN or infinite came back, and
+  // validateScene refuses it, though the cameras are said to be ones that it accepts.
+  const cube = box([0, 0, 0], [100, 100, 100]);
+  const viewport = { width: 800, height: 600 };
+  const view: Camera2d = { centre: [1, 2], unitsPerPixel: 2, heading: 30 };
+
+  it('in fitCamera2d: a heading', () => {
+    for (const heading of [NaN, Infinity, -Infinity]) {
+      expect(
+        fitCamera2d({ extent: flat(0, 0, 10, 10), viewport, heading }),
+        String(heading),
+      ).toBeUndefined();
+    }
+  });
+
+  it('in fitCamera3d: a heading or an elevation', () => {
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      expect(
+        fitCamera3d({ extent: cube, viewport, fov: 45, heading: bad }),
+        `heading ${String(bad)}`,
+      ).toBeUndefined();
+      expect(
+        fitCamera3d({ extent: cube, viewport, fov: 45, elevation: bad }),
+        `elevation ${String(bad)}`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('in cameraTo3d: an elevation', () => {
+    for (const elevation of [NaN, Infinity, -Infinity]) {
+      expect(
+        cameraTo3d({ camera2d: view, viewport, fov: 45, elevation }),
+        String(elevation),
+      ).toBeUndefined();
+    }
+  });
+
+  it('and every camera that is given is one that validateScene accepts', () => {
+    expect(
+      validateCamera2d(fitCamera2d({ extent: flat(0, 0, 10, 10), viewport, heading: 725 })),
+    ).toEqual([]);
+    expect(
+      validateCamera3d(
+        fitCamera3d({ extent: cube, viewport, fov: 45, heading: -725, elevation: 500 }),
+      ),
+    ).toEqual([]);
+    expect(
+      validateCamera3d(cameraTo3d({ camera2d: view, viewport, fov: 45, elevation: -500 })),
+    ).toEqual([]);
+  });
+});

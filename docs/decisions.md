@@ -3927,4 +3927,11 @@ found that is not true or not worth a change is said in its place.
   says and a gap in the brief and not in the code**: a line wider than the column (the column is clamped to 320 and the brief says nothing of a line that is wider) is given the width of the column and no more, so no
   rectangle crosses the next column; **the export must draw the text of such a line within its rectangle, cut short with an ellipsis** (step 22.3), and `measure` may return the width of the cut text. A test says that the
   rectangles are never wider than the column and never touch the next one.
+- Step 14.F4 (the cameras and angles that are not numbers). **Reviewer B, should-fix, right.** The decision of step 14.12b says that what the cameras give is a camera that `validateScene` accepts, and it was not for a heading
+  or an elevation that is `NaN` or infinite: `normalHeading` and `heldElevation` leave a value that is not a number alone (so that the check can refuse it), and the cameras passed it on, `fitCamera2d` as a heading,
+  `fitCamera3d` as a heading or an elevation, `cameraTo3d` as an elevation (its heading was already checked). **They are `undefined` now for an angle that is not a number**, as for every other value that cannot be
+  used, and the tests say so for `NaN`, `Infinity` and `-Infinity` in each place (three of them failed with the old code, the fourth is the claim itself: every camera given for a heading of 725, an elevation of
+  500 and the like is one that `validateScene` accepts). The viewer's state is validated, so this was not reachable through the document; it was the contract that was not kept. **Not changed**, from the same report: `formatBounds`
+  of a list with `NaN` or an infinite bound writes it as the platform does (`NaN`, `-Infinity` with a hyphen), and a scale bar of more than 1e21 metres is written with an exponent; the engine gives finite bounds
+  (the comment of `ClassBreaks` does not say so, the checks of `display-check.ts` do), and a bar of that size is not a map.
 

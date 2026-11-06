@@ -74,7 +74,8 @@ export function fitCamera2d(input: Fit2dInput): Camera2d | undefined {
     !usableExtent(extent) ||
     !usableViewport(viewport) ||
     !Number.isFinite(padding) ||
-    padding < 0
+    padding < 0 ||
+    !Number.isFinite(input.heading ?? 0)
   ) {
     return undefined;
   }
@@ -101,8 +102,8 @@ export function fitCamera2d(input: Fit2dInput): Camera2d | undefined {
  * The 3D camera that shows the whole extent: looking at the middle of it from far enough that the sphere around it fits the
  * narrower of the two fields of view (the heights are those of the extent times the exaggeration), from the heading
  * and the elevation given (held between -89 and 89). `undefined` if the extent is not made of numbers or has a side that
- * is negative, the viewport has no size, the field of view is not above 0 and below 180, or the exaggeration is not
- * above 0.
+ * is negative, the viewport has no size, the field of view is not above 0 and below 180, the exaggeration is not
+ * above 0, or the heading or the elevation is not a number.
  */
 export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
   const { extent, viewport, fov } = input;
@@ -111,7 +112,8 @@ export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
     !usableExtent(extent) ||
     !usableViewport(viewport) ||
     !(fov > 0 && fov < 180) ||
-    !(exaggeration > 0 && Number.isFinite(exaggeration))
+    !(exaggeration > 0 && Number.isFinite(exaggeration)) ||
+    !finite(input.heading ?? 0, input.elevation ?? 0)
   ) {
     return undefined;
   }
@@ -177,7 +179,7 @@ export function cameraTo3d(input: To3dInput): Camera3d | undefined {
     return undefined;
   }
   const targetZ = input.targetZ ?? 0;
-  if (!Number.isFinite(targetZ)) {
+  if (!finite(targetZ, input.elevation ?? 0)) {
     return undefined;
   }
   return {
