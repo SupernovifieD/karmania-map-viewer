@@ -26,7 +26,13 @@ export {
   setVisible,
 } from './commands-layers.js';
 export type { NewDataset } from './commands-layers.js';
-export { moveNode } from './commands-legend.js';
+export {
+  createGroup,
+  deleteGroup,
+  moveNode,
+  renameGroup,
+  setGroupCollapsed,
+} from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
 export { emptyScene } from './empty.js';
 export { MAP_BACKGROUNDS, MIN_GRAPHIC_CONTRAST, contrastOnMaps } from './palettes.js';
