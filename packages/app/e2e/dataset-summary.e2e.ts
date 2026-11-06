@@ -65,8 +65,8 @@ async function setDatasets(
 
 /**
  * Crafted datasets have no engine behind them, so the app is given one that only says what a code
- * means, with `answer` (the source of a function of the code). It is the app that is given it, not the
- * summary: the app hands its own lookup down again each time it draws.
+ * means, with `answer` (the source of a function of the code). It is the viewer that is given it, not the
+ * summary: the viewer hands its own lookup down again each time it draws.
  */
 function answerCodesWith(page: Page, answer: string): Promise<void> {
   return page.locator('karmania-viewer').evaluate((element, source) => {

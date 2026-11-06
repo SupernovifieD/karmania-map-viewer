@@ -4089,4 +4089,6 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
   page listed datasets that no engine could give rows of. **They are emptied with the engine now** (`datasets`, `selected`, and `syncDatasets` with nothing, which removes the layers): a viewer put back starts again, and works (the e2e test
   loads a file, moves the viewer, finds the list, the selection, the engine and the scene empty, and loads the file again). **The same reviewer found that nothing tested that dispose frees the listeners** (a change that kept the
   `dragover` listener passed every test): the second test drops a file on the page, which the viewer refuses while it is in it (`defaultPrevented`), takes the viewer out, and drops again; with the listener kept it fails (tried).
+- Step 15.F6 (two small things in tests). **Reviewer of the viewer, right**: the theme test compared with `toEqual({})`, which ignores a property whose value is `undefined`, so a `forceThemeFromAddress` that wrote `undefined` for a
+  wrong theme (which a browser turns into `data-theme="undefined"`) passed; it is `toStrictEqual({})` now, and that change to the code fails it (tried). A comment of `dataset-summary.e2e.ts` said "the app" for what is the viewer's.
 

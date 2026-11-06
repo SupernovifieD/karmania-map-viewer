@@ -379,6 +379,8 @@ or releasing, and whenever the brief says to stop.
   viewer, not two.
 - [x] 15.F5 Gate fix, review of M15: a viewer taken out of the page forgets the datasets and layers that its engine held,
   and a test shows that it frees its listeners on the window.
+- [x] 15.F6 Gate fix, review of M15: the theme test tells "left alone" from "set to `undefined`", and a comment says
+  the viewer where it said the app.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)
