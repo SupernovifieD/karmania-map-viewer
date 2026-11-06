@@ -33,7 +33,8 @@ describe('forceThemeFromAddress', () => {
     for (const search of ['', '?theme=', '?theme=blue', '?theme=Light', '?theme', '?themes=dark']) {
       const dataset = pageAt(search);
       forceThemeFromAddress();
-      expect(dataset, search).toEqual({});
+      // Strictly: a property that was set to `undefined` is not "left alone" (it would read `data-theme="undefined"`).
+      expect(dataset, search).toStrictEqual({});
     }
   });
 });
