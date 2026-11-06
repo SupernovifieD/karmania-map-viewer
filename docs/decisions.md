@@ -3797,3 +3797,11 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   often wrong and ids that are often not there, in any order, each document checked by `validateScene` and then deeply frozen so that any command that changed its input would throw; at least 150 of each 1,000 do
   something, so the run is not all refusals. It was shown to work by putting three bugs in the commands one at a time (a selection left in a layer that was removed, a group deleted with its layers, a style not checked):
   it found each in under 200 steps.
+- Step 14.9b (`createSceneStore`). **A store is three functions over a closure**: `getState`, `dispatch(command)` and `subscribe(listener)`, with no module state, so any number of them can be on one page (tested with two
+  that know nothing of each other). The document it starts with is the one given (itself, not a copy) or `emptyScene()`; **one from outside goes through `migrate` first**, the store does not check what a typed caller
+  gives it. `dispatch` gives back the new document, or the one there was when the command changed nothing, in which case **no one is told** (the commands give back the same object for that, which is how this works).
+  **Order**: listeners are called in the order they were added; one taken away by an earlier listener in the same round is not called, and one added in a round is first called for the next change (the list is
+  copied at the start of a round). **A command given from inside a listener is applied at once and told after the round that is going on**, in a queue, so that every listener hears the changes in the order they were made
+  and with the right `previous` (a first version of the test had one nested change; the case of two in a row, which `push` and `unshift` tell apart, was added after a change of one to the other passed). **A listener that
+  throws does not stop the others**: all are called, the change is made, and the first error is thrown from `dispatch` (a thing thrown that is not an `Error` is made one, tested by what is caught, since `toThrow` accepts
+  a bare string and let a change of that line pass at first). A command of a kind that there is not is a `TypeError` that changes nothing. Nine changes to the store each fail a test (tried).
