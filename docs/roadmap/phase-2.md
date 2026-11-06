@@ -355,6 +355,8 @@ or releasing, and whenever the brief says to stop.
   - [x] 15.4a `datasets.ts` and `import-crs.ts`, with their tests.
   - [x] 15.4b The import logic that the summary uses: `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and
     `import-run.ts`, with their tests.
+  - [x] 15.4c0 A unit test for the app's own `theme.ts`: with `findings-text` and `import-steps` the last unit
+    tests leave the app, and a package with no test file fails `vitest run`. (Added; not in the brief.)
   - [ ] 15.4c The findings list: `findings-text.ts`, `import-steps.ts` and `findings.ts`, with their tests.
   - [ ] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.
   - [ ] 15.4e `panel.ts`.
