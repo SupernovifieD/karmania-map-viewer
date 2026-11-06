@@ -451,9 +451,11 @@ describe('the cameras are undefined when the arithmetic overflows, whatever the 
     expect(
       fitCamera3d({ extent: box([-1.7e308, 0, 0], [1.7e308, 1, 1]), viewport, fov: 45 }),
     ).toBeUndefined();
-    expect(
-      fitCamera3d({ extent: box([1e308, 0, 0], [1e308, 0, 0]), viewport, fov: 45 }),
-    ).toBeUndefined();
+    // A point at 1e308 is a place that a camera can look at: its middle is 1e308 (the sum of the two overflows, the sum
+    // of their halves does not), and a camera is given.
+    const far = fitCamera3d({ extent: box([1e308, 0, 0], [1e308, 0, 0]), viewport, fov: 45 });
+    expect(far?.target).toEqual([1e308, 0, 0]);
+    expect(validateCamera3d(far)).toEqual([]);
   });
 
   it('in fitCamera2d', () => {
@@ -461,6 +463,12 @@ describe('the cameras are undefined when the arithmetic overflows, whatever the 
     const huge = fitCamera2d({ extent: flat(0, 0, 1e308, 1e308), viewport, heading: 45 });
     expect(huge).toBeDefined();
     expect(validateCamera2d(huge)).toEqual([]);
+    const far = fitCamera2d({ extent: flat(1e308, 1e308, 1e308, 1e308), viewport });
+    expect(far).toEqual({ centre: [1e308, 1e308], unitsPerPixel: 1, heading: 0 });
+    // An extent that is not a point but whose scale is lost to underflow is not a point: it has no camera, and does not
+    // get the scale of a point, which would not fit it.
+    expect(fitCamera2d({ extent: flat(0, 0, 5e-324, 5e-324), viewport })).toBeUndefined();
+    expect(fitCamera2d({ extent: flat(0, 0, 5e-324, 0), viewport, heading: 30 })).toBeUndefined();
     expect(fitCamera2d({ extent: flat(-1.7e308, 0, 1.7e308, 1), viewport })).toBeUndefined();
     expect(
       fitCamera2d({ extent: flat(-1.7e308, 0, 1.7e308, 1), viewport, heading: 90 }),

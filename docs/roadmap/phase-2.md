@@ -335,6 +335,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 14.F7 Gate fix, second review of M14: `addLayers` also refuses a dataset whose columns are not what the engine gives.
 - [x] 14.F8 Gate fix, second review of M14: a camera is given only if it validates, an extent that overflows has no
   camera, and the small things that review found in tests, comments and docs.
+- [x] 14.F9 Gate fix, third review of M14: `addLayers` works on one copy of each dataset (holes and getters), and the
+  cameras take the middle as the sum of the halves and do not take a scale that underflows for a point.
 - [ ] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)

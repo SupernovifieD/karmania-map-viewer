@@ -3975,8 +3975,26 @@ The second review (two fresh reviewers on the cheaper model again, one for the f
   not fit anything. **A scale that is not finite is no camera now** (a check of its own, which validation cannot supply, since the camera it replaced was valid), with the two turned cases as tests. (2) **The decision of
   14.F5 said every property test has a timeout of 20 s, and the colour sweep and the run of commands had none**: they have it now. (3) The `@types/node` row of `docs/dependencies.md` said it was referenced only from
   the test support file, which the scene's `palettes.test.ts` is not. (4) **My random test of the export layout had lost its tall pictures** when step 14.F3 made it use low ones: it samples both now. The nits: the order
-  of the lines is checked by identity and not by `JSON.stringify`; "each of three" was four and "320" had no unit (said in the entry of 14.F5); two comments of `export-layout.ts` say "the space between the margins" and
-  read properly. **A trade-off that the first form of 14.F3 left unsaid**: when a group heading, the name of a layer with classes and its first class cannot all be kept together, the rule for the group heading wins and the layer's
+  of the lines is checked by identity and not by `JSON.stringify`; "each of three" was four and "320" had no unit (said in the entry of 14.F5); a comment of `export-layout.ts` says "the space between the margins" and the
+  other reads properly (the entry said two comments; the correction is in step 14.F9). **A trade-off that the first form of 14.F3 left unsaid**: when a group heading, the name of a layer with classes and its first class cannot all be kept together, the rule for the group heading wins and the layer's
   name is left at the end of its column (the reviewer's example: lines of 10, 50 (a group), 40 (a layer with classes) and 30 (a class) in a column of 100 give the first three and then the class, where before the fix
   the last three went to the next column and made it 120 tall). The rule that the owner asked for is kept, and the one that was added is the one that gives way.
+
+### M14 gate, third round
+
+The third review (one reviewer on the cheaper model, only the fixes 14.F7 and 14.F8) found one thing that must be fixed and three that should be, and what follows is each acted on.
+
+- Step 14.F9 (`addLayers` and holes and getters; the middle of a camera; a scale that underflows). **Reviewer, must-fix, right.** The refusal of 14.F7 used `every`, which **skips the holes of a list**: a hole in `columns`
+  (`new Array(1)`) or in the list of datasets passed the check, and a later read of it threw (`firstNumericColumn` reading `.type` of `undefined`), the same class of fault as the holes of step 14.F2. **`addLayers` now
+  takes a copy of each dataset first** (`snapshotOf`: a plain object, a whole id of 0 or more, a kind of the six, a name that is text, columns that are each a plain object with a name that is text and not empty and a
+  type of the five; a hole is a dataset or a column that is not there) **and makes the layers from the copies**, so a hole, or a `null`, is refused with the same document (the `[null]` that was said to throw as misuse
+  is refused too, which is simpler and kinder). **The second finding, should-fix, right, and the same change fixes it: each field was read more than once** (the check, `defaultStyle`, the name of the layer), so a
+  getter that answers differently the second time made a layer that was refused or an exception; **each field is read once now**, and the three cases of the reviewer (a name, a kind and a column name that change) are a test
+  (it fails if the layers are made from the datasets and not the copies). **Should-fix, right: a centre at 1e308 was refused**: `(min + max) / 2` overflows where the sum of the halves does not (halving is exact), and a
+  place at 1e308 is a place a camera can look at; the cameras take the middle as the sum of the halves, and the test that had the refusal in it says a camera is given. **Should-fix, right in a form that moved
+  after step 14.F8: a scale of an extent that has a size but underflows to 0** (5e-324 over 800 pixels) **was taken for a point** by the old `scale > 0 ? scale : POINT_SCALE`, which is what gave a scale of 1 that
+  fits nothing. A point is `width === 0 && height === 0` now and has a scale of its own, and any other extent is given its scale, which the check of the camera refuses if it is 0, `NaN` or infinite; a first form added a
+  check of its own for this and a change that removed it passed every test, because the camera's check already refuses it, so that code is gone, with a comment. The old rule, put back, fails a test. **A limit that is
+  kept**: an extent wider than the largest number (from -1.7e308 to 1.7e308) has no camera in 2D, though its true scale is finite, because the width itself overflows; that is a design limit and not a wrong
+  camera.
 

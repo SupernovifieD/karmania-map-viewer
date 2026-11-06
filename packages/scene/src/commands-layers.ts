@@ -3,8 +3,9 @@
  * is given. A command that names a layer that is not there (an event that came after the layer was removed) changes
  * nothing, and gives back the very document it was given, which is how a store knows that nothing happened.
  */
+import type { ColumnSummary } from '@karmania/engine/types';
 import { LAYER_COLOURS, defaultStyle, type DatasetBrief } from './defaults.js';
-import { DATASET_KINDS } from './choices.js';
+import { COLUMN_TYPES, DATASET_KINDS } from './choices.js';
 import { nextId, ordinalOf } from './ids.js';
 import { isRecord } from './problems.js';
 import type { Layer, LegendNode, SceneDocument } from './types.js';
@@ -15,29 +16,57 @@ export interface NewDataset extends DatasetBrief {
   readonly name: string;
 }
 
-/** Whether a column is what the engine gives: an object with a name that is text and not empty, and a type that is text. */
-function wellFormedColumn(column: unknown): boolean {
-  return (
-    isRecord(column) &&
-    typeof column['name'] === 'string' &&
-    column['name'] !== '' &&
-    typeof column['type'] === 'string'
-  );
+/**
+ * A copy of a column, if it is what the engine gives: a plain object with a name that is text and not empty, a type of
+ * the five, and a count of the rows with no value (0 if it is not a number). Each field is read once.
+ */
+function columnOf(value: unknown): ColumnSummary | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const { name, type, nullCount } = value;
+  const known = COLUMN_TYPES.find((candidate) => candidate === type);
+  if (typeof name !== 'string' || name === '' || known === undefined) {
+    return undefined;
+  }
+  return { name, type: known, nullCount: typeof nullCount === 'number' ? nullCount : 0 };
 }
 
 /**
- * Whether a dataset is what the engine gives: a whole id of 0 or more, a kind there is, a name that is text, and a
- * list of columns that are each what the engine gives (a layer is coloured by the name of one, which a layer must have).
+ * A copy of a dataset, if it is what the engine gives: a plain object with a whole id of 0 or more, a kind there is, a name
+ * that is text, and a list of columns that are each what the engine gives (a layer is coloured by the name of one, which a
+ * layer must have). **Each field is read once and the layer is made of the copy**, so that what was checked is what is used:
+ * a getter can answer otherwise the next time. A hole in a list of columns is a column that is not there, as `every` and
+ * `forEach` would not say.
  */
-function wellFormed(dataset: NewDataset): boolean {
-  return (
-    Number.isInteger(dataset.id) &&
-    dataset.id >= 0 &&
-    DATASET_KINDS.includes(dataset.kind) &&
-    typeof dataset.name === 'string' &&
-    Array.isArray(dataset.columns) &&
-    dataset.columns.every(wellFormedColumn)
-  );
+function snapshotOf(value: unknown): NewDataset | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const { id, name, kind, elementCount, columns } = value;
+  const known = DATASET_KINDS.find((candidate) => candidate === kind);
+  if (
+    typeof id !== 'number' ||
+    !Number.isInteger(id) ||
+    id < 0 ||
+    typeof name !== 'string' ||
+    known === undefined ||
+    !Array.isArray(columns)
+  ) {
+    return undefined;
+  }
+  const copies = Array.from<unknown>(columns).map(columnOf);
+  const good = copies.filter((copy): copy is ColumnSummary => copy !== undefined);
+  if (good.length !== copies.length) {
+    return undefined;
+  }
+  return {
+    id,
+    name,
+    kind: known,
+    elementCount: typeof elementCount === 'number' ? elementCount : 0,
+    columns: good,
+  };
 }
 
 /**
@@ -48,7 +77,10 @@ function wellFormed(dataset: NewDataset): boolean {
  * more, a kind that there is not, a column with no name) refuses all of them, and nothing to add is the same document.
  */
 export function addLayers(doc: SceneDocument, datasets: readonly NewDataset[]): SceneDocument {
-  if (datasets.length === 0 || !datasets.every(wellFormed)) {
+  // A copy with no holes, made once: `every` and `forEach` would skip a hole, which is a dataset that is not there.
+  const copies = Array.from<unknown>(datasets).map(snapshotOf);
+  const snapshots = copies.filter((copy): copy is NewDataset => copy !== undefined);
+  if (copies.length === 0 || snapshots.length !== copies.length) {
     return doc;
   }
   const layers: Record<string, Layer> = { ...doc.layers };
@@ -57,7 +89,7 @@ export function addLayers(doc: SceneDocument, datasets: readonly NewDataset[]): 
     ...Object.keys(layers),
     ...doc.legend.flatMap((node) => (node.type === 'group' ? [node.id] : [])),
   ]);
-  for (const dataset of datasets) {
+  for (const dataset of snapshots) {
     const id = nextId('layer', taken);
     taken.add(id);
     layers[id] = {
