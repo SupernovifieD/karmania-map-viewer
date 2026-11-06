@@ -1,10 +1,10 @@
 import type { DecimalSeparator, Kind } from '@karmania/engine';
-import { KINDS_BY_FORMAT } from '@karmania/viewer/import-files';
-import type { FileEntry } from '@karmania/viewer/import-files';
+import { KINDS_BY_FORMAT } from './import-files.js';
+import type { FileEntry } from './import-files.js';
 import { columnsFromPreview, EMPTY_BLOCK_SIZE, withKind } from './import-mapping.js';
 import type { BlockSizeDraft, ColumnDraft } from './import-mapping.js';
-import { crsDraftFor } from '@karmania/viewer/import-crs';
-import type { CrsDraft } from '@karmania/viewer/import-crs';
+import { crsDraftFor } from './import-crs.js';
+import type { CrsDraft } from './import-crs.js';
 import { NO_NODATA, nodataFromSuggestions } from './import-nodata.js';
 import type { EmptyCoordinates, NodataDraft } from './import-nodata.js';
 

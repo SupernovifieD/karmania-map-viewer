@@ -353,7 +353,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 15.4 Move the Data tab, dataset list and summary, and the panel that holds them. Each piece moves after what it
   imports, since the viewer may not import from the app:
   - [x] 15.4a `datasets.ts` and `import-crs.ts`, with their tests.
-  - [ ] 15.4b The import logic that the summary uses: `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and
+  - [x] 15.4b The import logic that the summary uses: `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and
     `import-run.ts`, with their tests.
   - [ ] 15.4c The findings list: `findings-text.ts`, `import-steps.ts` and `findings.ts`, with their tests.
   - [ ] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.

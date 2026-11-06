@@ -6,9 +6,9 @@ import type {
   Kind,
   Summary,
 } from '@karmania/engine';
-import { crsOf } from '@karmania/viewer/import-crs';
+import { crsOf } from './import-crs.js';
 import type { ImportDraft } from './import-draft.js';
-import type { FileEntry } from '@karmania/viewer/import-files';
+import type { FileEntry } from './import-files.js';
 import { blockSizeOf, effectiveName } from './import-mapping.js';
 import { nodataOf } from './import-nodata.js';
 

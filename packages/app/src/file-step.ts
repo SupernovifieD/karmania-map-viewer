@@ -11,7 +11,7 @@ import {
   KINDS_BY_FORMAT,
 } from '@karmania/viewer/import-files';
 import type { FileEntry } from '@karmania/viewer/import-files';
-import type { ImportDraft } from './import-draft.js';
+import type { ImportDraft } from '@karmania/viewer/import-draft';
 
 /** The name of the event the step sends when a person changes what is to be imported. */
 export const DRAFT_CHANGE = 'karmania-draft-change';
