@@ -18,14 +18,18 @@ describe('colours', () => {
   });
 
   it('writes what it reads, for every colour of a sweep of the cube', () => {
+    const wrong: string[] = [];
     for (let r = 0; r < 256; r += 51) {
       for (let g = 0; g < 256; g += 17) {
         for (let b = 0; b < 256; b += 15) {
-          const rgb = [r, g, b] as const;
-          expect(parseHex(toHex(rgb))).toEqual(rgb);
+          const back = parseHex(toHex([r, g, b]));
+          if (back?.[0] !== r || back[1] !== g || back[2] !== b) {
+            wrong.push(`${String(r)},${String(g)},${String(b)}`);
+          }
         }
       }
     }
+    expect(wrong).toEqual([]);
   });
 
   it('mixes each channel on its own, from the first colour at 0 to the second at 1', () => {

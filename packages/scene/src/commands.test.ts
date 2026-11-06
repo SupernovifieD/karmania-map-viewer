@@ -260,10 +260,13 @@ describe('a run of commands, right and wrong, in any order', () => {
           changed += 1;
         }
         const problems = validateScene(after);
-        expect(
-          problems,
-          `seed ${String(seed)} step ${String(step)} ${JSON.stringify(command)}`,
-        ).toEqual([]);
+        // The message names the command, and is made only if there is something to say.
+        if (problems.length > 0) {
+          expect(
+            problems,
+            `seed ${String(seed)} step ${String(step)} ${JSON.stringify(command)}`,
+          ).toEqual([]);
+        }
         doc = frozen(after);
       }
       // The run is not all refused commands: a good share of them did something.
