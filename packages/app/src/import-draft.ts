@@ -1,6 +1,6 @@
 import type { DecimalSeparator, Kind } from '@karmania/engine';
-import { KINDS_BY_FORMAT } from './import-files.js';
-import type { FileEntry } from './import-files.js';
+import { KINDS_BY_FORMAT } from '@karmania/viewer/import-files';
+import type { FileEntry } from '@karmania/viewer/import-files';
 import { columnsFromPreview, EMPTY_BLOCK_SIZE, withKind } from './import-mapping.js';
 import type { BlockSizeDraft, ColumnDraft } from './import-mapping.js';
 import { crsDraftFor } from './import-crs.js';

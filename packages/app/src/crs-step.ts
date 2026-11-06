@@ -19,7 +19,7 @@ import {
 } from './import-crs.js';
 import type { CrsMode } from './import-crs.js';
 import type { ImportDraft } from './import-draft.js';
-import type { FileEntry } from './import-files.js';
+import type { FileEntry } from '@karmania/viewer/import-files';
 
 /** Whether some text, from a select say, is a way of choosing the coordinate system. */
 function isMode(value: string): value is CrsMode {

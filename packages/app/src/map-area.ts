@@ -1,7 +1,7 @@
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
-import { carriesFiles } from './drag.js';
-import { formatCount } from './import-files.js';
+import { carriesFiles } from '@karmania/viewer/drag';
+import { formatCount } from '@karmania/viewer/import-files';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';

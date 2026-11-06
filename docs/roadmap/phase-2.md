@@ -343,7 +343,10 @@ or releasing, and whenever the brief says to stop.
 
 - [x] 15.1 Package @karmania/viewer, empty, with tests running.
 - [ ] 15.2 Move the map area component and its tests. Every screenshot and e2e
-  test unchanged.
+  test unchanged. Split, because the map area needs two helpers that the rest of the app uses too, and
+  the viewer may not import from the app:
+  - [x] 15.2a Move the helpers: `drag.ts` and `import-files.ts` with its test.
+  - [ ] 15.2b Move `map-area.ts`.
 - [ ] 15.3 Move the panel (tabs, resize handle, panel state).
 - [ ] 15.4 Move the Data tab, dataset list and summary.
 - [ ] 15.5 Move the import dialog and its steps.

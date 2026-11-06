@@ -8,7 +8,7 @@ import type {
 } from '@karmania/engine';
 import { crsOf } from './import-crs.js';
 import type { ImportDraft } from './import-draft.js';
-import type { FileEntry } from './import-files.js';
+import type { FileEntry } from '@karmania/viewer/import-files';
 import { blockSizeOf, effectiveName } from './import-mapping.js';
 import { nodataOf } from './import-nodata.js';
 

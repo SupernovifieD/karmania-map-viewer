@@ -2,7 +2,7 @@ import type { Finding, Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import './findings.js';
-import { describeSize, KIND_ICONS } from './import-files.js';
+import { describeSize, KIND_ICONS } from '@karmania/viewer/import-files';
 import { groupFindings, PHASE_LABELS } from './import-run.js';
 import type { RunState } from './import-run.js';
 
