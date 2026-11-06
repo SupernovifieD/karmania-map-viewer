@@ -171,6 +171,67 @@ describe('addLayers', () => {
     }
   });
 
+  it('refuses a hole in the list of datasets or in the list of columns, which a loop over the list skips', () => {
+    // Found by the third review of the milestone: `every` and `forEach` skip holes, so a hole passed the check and a
+    // later read of it threw. JSON has no holes, but an embedder passes JavaScript objects.
+    const doc = sampleScene();
+    const grid = (columns: unknown[]): NewDataset => ({
+      ...dataset(1, 'x', 'grid'),
+      columns: columns as ColumnSummary[],
+    });
+    const holes = new Array<unknown>(1);
+    const middle = new Array<unknown>(3);
+    middle[0] = grade;
+    middle[2] = grade;
+    expect(addLayers(doc, [grid(holes)])).toBe(doc);
+    expect(addLayers(doc, [grid(middle)])).toBe(doc);
+    const sparse = new Array<NewDataset>(2);
+    sparse[0] = dataset(1, 'fine');
+    expect(addLayers(doc, sparse)).toBe(doc);
+    const first = new Array<NewDataset>(2);
+    first[1] = dataset(1, 'fine');
+    expect(addLayers(doc, first)).toBe(doc);
+    expect(addLayers(doc, [null as unknown as NewDataset])).toBe(doc);
+  });
+
+  it('reads each field of a dataset once, so that a getter that changes its answer cannot make a layer that is refused', () => {
+    // A getter that gives a good value to the check and a bad one to the layer: the layer is made of what the check saw.
+    let reads = 0;
+    const flipping = (good: unknown, bad: unknown): PropertyDescriptor => ({
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? good : bad;
+      },
+    });
+    const doc = sampleScene();
+    const named = Object.defineProperty(
+      { ...dataset(1, 'x', 'grid') },
+      'name',
+      flipping('seen', 5),
+    );
+    const named1 = addLayers(doc, [named]);
+    expect(validateScene(named1)).toEqual([]);
+    expect(Object.values(named1.layers).at(-1)?.name).toBe('seen');
+    reads = 0;
+    const kind = Object.defineProperty(
+      { ...dataset(1, 'x') },
+      'kind',
+      flipping('points', 'constructor'),
+    );
+    expect(validateScene(addLayers(doc, [kind]))).toEqual([]);
+    reads = 0;
+    const column = Object.defineProperty(
+      { name: 'a', type: 'float', nullCount: 0 },
+      'name',
+      flipping('a', ''),
+    );
+    const withColumn = addLayers(doc, [
+      { ...dataset(1, 'x', 'grid'), columns: [column as unknown as ColumnSummary] },
+    ]);
+    expect(validateScene(withColumn)).toEqual([]);
+  });
+
   it('shows a dataset twice if it is asked to, each layer with its own id', () => {
     const next = addLayers(addLayers(emptyScene(), [dataset(1, 'a')]), [dataset(1, 'a')]);
     expect(Object.values(next.layers).map((l) => [l.id, l.datasetId])).toEqual([

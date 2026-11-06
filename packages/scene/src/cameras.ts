@@ -71,6 +71,14 @@ function checked3d(camera: Camera3d): Camera3d | undefined {
   return validateCamera3d(camera).length === 0 ? camera : undefined;
 }
 
+/**
+ * The middle of two numbers. Each is halved first: halving is exact, and the sum of two numbers of 1e308 is infinite where
+ * the sum of their halves is not (so a place at 1e308 has a middle).
+ */
+function middle(low: number, high: number): number {
+  return low / 2 + high / 2;
+}
+
 /** The scale used for an extent that has no size, such as a single point: one map unit to a pixel. */
 const POINT_SCALE = 1;
 
@@ -107,13 +115,13 @@ export function fitCamera2d(input: Fit2dInput): Camera2d | undefined {
     Math.max(1, viewport.height - 2 * padding),
   ] as const;
   const scale = Math.max(across / room[0], down / room[1]);
-  // An extent so wide that the arithmetic overflows has no scale (`0 * Infinity` is NaN, which is not above 0 and would be taken for a point).
-  if (!Number.isFinite(scale)) {
-    return undefined;
-  }
+  // A point has no size and is shown at a scale of its own. An extent that has a size but whose scale is lost, to overflow
+  // (`0 * Infinity` is NaN) or to underflow (a size of 5e-324 over 800 pixels is 0), is not a point and has no scale: the
+  // scale of a point would not fit it. It is the check of the camera, below, that refuses a scale of 0, NaN or infinity.
+  const point = width === 0 && height === 0;
   return checked2d({
-    centre: [(extent.min[0] + extent.max[0]) / 2, (extent.min[1] + extent.max[1]) / 2],
-    unitsPerPixel: scale > 0 ? scale : POINT_SCALE,
+    centre: [middle(extent.min[0], extent.max[0]), middle(extent.min[1], extent.max[1])],
+    unitsPerPixel: point ? POINT_SCALE : scale,
     heading,
   });
 }
@@ -147,9 +155,9 @@ export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
   const horizontal = Math.atan(Math.tan(vertical) * (viewport.width / viewport.height));
   return checked3d({
     target: [
-      (extent.min[0] + extent.max[0]) / 2,
-      (extent.min[1] + extent.max[1]) / 2,
-      (extent.min[2] + extent.max[2]) / 2,
+      middle(extent.min[0], extent.max[0]),
+      middle(extent.min[1], extent.max[1]),
+      middle(extent.min[2], extent.max[2]),
     ],
     distance: radius / Math.sin(Math.min(vertical, horizontal)),
     heading: normalHeading(input.heading ?? 0),

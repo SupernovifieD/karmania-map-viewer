@@ -4,7 +4,7 @@
  * that each is a list of members of the engine's type, and `choices.test.ts` that it is all of them.
  */
 import type { ClassMethod, FrameSource } from '@karmania/engine/display';
-import type { Kind, Units } from '@karmania/engine/types';
+import type { ColumnType, Kind, Units } from '@karmania/engine/types';
 
 /** How the map's coordinate system was chosen. */
 export const FRAME_SOURCES = ['auto', 'user'] as const satisfies readonly FrameSource[];
@@ -32,3 +32,12 @@ export const DATASET_KINDS = [
   'grid',
   'blocks',
 ] as const satisfies readonly Kind[];
+
+/** The types a column can have. */
+export const COLUMN_TYPES = [
+  'float',
+  'int',
+  'bool',
+  'text',
+  'category',
+] as const satisfies readonly ColumnType[];
