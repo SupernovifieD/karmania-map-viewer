@@ -386,6 +386,7 @@ or releasing, and whenever the brief says to stop.
   of the rules cannot pass on a statement it cannot read.
 - [x] 15.F8 Gate fix, second review of M15: the rule on `import()` covers `lit-html`, `@lit/*` and `@lit-labs/*` as it said,
   a template without substitution is looked at, and the deprecated `argument` of `TSImportType` is `source`.
+- [x] 15.F9 (added) Gate fix, second review of M15: the root `pnpm lint` passes: the scripts have their Node globals.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)

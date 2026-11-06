@@ -4116,4 +4116,7 @@ fixed and several that should be; each is acted on below.
   (`` import(`@karmania/engine`) ``, `` import(`...`).T ``) is a string, not a "specifier that is worked out", and passed; two selectors read its first part. Not looked at, and said so here: a specifier that is joined
   (`'@karmania' + '/engine'`) and `require` held in a variable (`const r = require; r('...')`), which no selector can follow. Six changes to the rule each fail a test (tried: the old pattern for Lit, no `lit-`, no `@lit/`,
   no template selector for `import()` or for the type, `TSImportType` not selected).
+- Step 15.F9 (the root lint). **Reviewer, noted as outside the PR, and true; checked on `main` in a worktree**: `pnpm lint` (`eslint .` at the root) fails with three `no-undef` errors in `scripts/generate-fixtures.mjs` (`process`, `console`), as it does on `main`
+  (the script came with M13). It went unnoticed because `pnpm check` runs `pnpm -r lint`, which lints the packages, and not the root; CI runs `pnpm check`. **A block of config gives `scripts/**/*.mjs` the two globals**, and the root
+  `pnpm lint` passes (exit 0). `pnpm check` is not changed to run it (it would make the check longer for the sake of one script file, and the owner may want it); said here for the owner.
 
