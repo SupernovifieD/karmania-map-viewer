@@ -3850,3 +3850,14 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   over the scale is a rounding error over the room (5e-7 units to a pixel and 100 pixels give 100.00000000000001), which the test now has; a search found them, none was found at random. A wrong `maxPixels` is a `RangeError`.
   Fourteen changes to the code each fail a test (tried); two boundary cases (room exactly 200 and exactly 500) were added after mutants that moved them passed. I also mis-calculated two expected values in my first tests
   (0.0001 m and 2,000 ft), and the code was right.
+- Step 14.12 (the camera models, split into 14.12a to 14.12c). **14.12a is a move**: `normalHeading` and `heldElevation` go from `commands-view.ts` into `angles.ts`, unchanged, with their tests, in a commit of
+  their own (section 6.6: a move is never mixed with a change). **14.12b: the cameras that fit an extent.** **`fitCamera2d({ extent, viewport, heading?, padding? })`** centres on the extent and takes the scale at which
+  it just fills the map area less the padding on each side. **A turned map measures the extent across its own screen**: facing east, the width on the screen is the north to south of the extent, and a square turned by 45
+  degrees is √2 wider (the first version measured by projecting the four corners and a change of the sign of one axis passed every test, because the span of a rectangle does not depend on it, so the code now says that
+  directly: `|cos| × width + |sin| × height`). **An extent that is a point is centred at one map unit to a pixel**, and **the room never goes below one pixel** however large the padding. **`fitCamera3d({ extent,
+  viewport, fov, heading?, elevation?, verticalExaggeration? })`** looks at the middle of the box from where the sphere round it fits the narrower of the two fields of view (a map area that is taller than it is wide
+  needs more distance), the heights times the exaggeration, from a sphere of at least one map unit; the target keeps the heights as they are (the renderer applies the exaggeration), as `Camera3d` says. **A camera that
+  cannot be made is `undefined`, not an exception**: an extent that is not numbers or has a negative side, **a map area with no size (common: a container that is hidden or not laid out yet)**, a field of view not above
+  0 and below 180, an exaggeration not above 0; the viewer then leaves the camera as it is. What is returned is a camera that `validateScene` accepts (a test over 2,000 and 500 random cases says so), and in 2D that
+  every corner of the extent is inside the map area less the padding with one side touching it (2,000 random extents, headings and sizes). Sixteen different changes to the code each fail a test (tried); the width of the room with a
+  padding larger than the width had no case until one for it was added after a mutant passed.
