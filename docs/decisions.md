@@ -3730,3 +3730,10 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   outline in section 9.3, and the first three colours of a new layer (orange 1.90, sky blue 1.95, bluish green 2.89) are under 3 to 1 on the light map as 2 px lines. Giving lines a 1 px casing in the same outline colour
   would make them readable, and is a change to 9.3 that is not made here; the alternative is to leave line colours to the person. Paired is offered knowing that it is weak on the light map, which the list above
   says; the legend has labels as well as swatches.
+- Step 14.5 (default styles). `defaultStyle(dataset, ordinal)` is what section 11.6 says: points 6 px, lines 2 px, polygons at opacity 0.6 and everything else at 1, a **single colour that is the next of the palette** for
+  everything but grids and block models, which are coloured by **their first numeric column, in 7 equal classes of viridis**; a mesh has one colour even when it has a column of numbers. The dataset is described by the
+  engine's own `Summary` (`kind`, `elementCount`, `columns`), as types only. **Two readings where the brief is silent**: (1) a numeric column is a `float` or an `int` column, and **one with no value at all is passed over**
+  (`nullCount` equal to the element count: it has nothing to divide into classes, and the engine would answer `classes.column.no_values`), so the first numeric column "that can be coloured" is taken; a grid or blocks with none
+  have a single colour like any other layer. (2) **The place in the order is a number the caller gives** (`ordinal`, from 0): the palette has eight colours and starts again after the eighth. How the commands of 14.6 get
+  that number from the document, which has no counter, is that entry. Tested kind by kind, with the first-column rules and the wrap of the palette, and by `validateScene` accepting every style made for every kind with and
+  without a numeric column; six changes to the code each fail a test (tried).

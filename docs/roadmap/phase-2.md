@@ -280,7 +280,7 @@ or releasing, and whenever the brief says to stop.
     Cividis is left out until the owner decides (its licence is not CC0 as far as is shown).
   - [x] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
     the light and the dark map, and the colours of new layers.
-- [ ] 14.5 Default styles (11.6).
+- [x] 14.5 Default styles (11.6).
 - [ ] 14.6 Commands: layers and visibility.
 - [ ] 14.7 Commands: ordering and groups.
 - [ ] 14.8 Commands: style, contours, view, camera, frame, selection.

@@ -5,6 +5,20 @@ export { contrastRatio, mix, parseHex, relativeLuminance, toHex } from './colour
 export type { Rgb } from './colour.js';
 export { RAMPS, RAMP_IDS, RAMP_KINDS, rampById, sampleRamp } from './ramps.js';
 export type { Ramp, RampKind } from './ramps.js';
+export {
+  DEFAULT_CLASSES,
+  DEFAULT_LINE_WIDTH,
+  DEFAULT_METHOD,
+  DEFAULT_OPACITY,
+  DEFAULT_POINT_SIZE,
+  DEFAULT_POLYGON_OPACITY,
+  DEFAULT_RAMP,
+  LAYER_COLOURS,
+  defaultStyle,
+  firstNumericColumn,
+  layerColour,
+} from './defaults.js';
+export type { DatasetBrief } from './defaults.js';
 export { MAP_BACKGROUNDS, MIN_GRAPHIC_CONTRAST, contrastOnMaps } from './palettes.js';
 export { migrate } from './migrate.js';
 export type { MigrateResult } from './migrate.js';
