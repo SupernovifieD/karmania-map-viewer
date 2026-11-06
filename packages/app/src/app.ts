@@ -9,8 +9,8 @@ import { selectionAfterRemoving } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
-import './map-area.js';
-import type { DroppedFiles } from './map-area.js';
+import '@karmania/viewer/map-area';
+import type { DroppedFiles } from '@karmania/viewer/map-area';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {

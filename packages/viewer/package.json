@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@karmania/engine": "workspace:*",
-    "@karmania/ui": "workspace:*"
+    "@karmania/ui": "workspace:*",
+    "lit": "^3.3.3"
   },
   "devDependencies": {
     "vite": "^8.3.5",
