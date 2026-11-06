@@ -4074,4 +4074,9 @@ one for the viewer, `createViewer` and the app, one for the scene sync, the ESLi
   await would be overwritten; both the import and the removal are modal dialogs), and it reads `engine.datasets()` after the await (a viewer disposed in between would throw `EngineDisposedError` as an unhandled rejection from an event
   handler); both are the code of `app.ts` on `main`, to be looked at in M24 (hardening). **For M20**: derived datasets (contours) have their own summary and `syncDatasets` would give each a plain layer beside the derived layer the
   scene makes; step 20.4 has to skip a summary with `derivedFrom` there.
+- Step 15.F2 (number labels). **Reviewer of the scene and the lint rules, right in each**: the comments of `numbers.ts` said that 15 digits "keep every number that a file can write" and that "two bounds that differ read differently", which
+  is false for a number of more than 15 digits (`9007199254740992` reads `9,007,199,254,740,990`, and `1` and `1.0000000000000002` read alike); the owner's decision in this log said it correctly ("no number that a file writes with 15
+  digits or fewer"), and the code comments and the commit body of `b7347aa` overclaimed. **The comments say what 15 digits do now, and a test pins it** (five bounds). **A bug that the same look found**: `Number.MAX_VALUE` was written
+  `Infinity`, because `Number('1.79769313486232e+308')` is past the largest number; a bound that 15 digits would carry out of range is written with all its digits now (`1.7976931348623157e+308`), with `1.5e308` and the smallest
+  number as neighbours in the test. The exponent of a number that has one is as the platform writes it (`−1e-7`: the true minus is the sign in front only), which the comment says. Three changes to the code each fail a test (tried).
 

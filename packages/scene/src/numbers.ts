@@ -49,16 +49,20 @@ const AS_IS_DIGITS = 15;
 
 /**
  * A bound written as it is, and not rounded: its own digits, thousands separated by commas, a true minus sign. The
- * digits are those of the shortest text that gives the number back, **trimmed at 15 significant digits**, which
- * keeps every number that a file can write and takes off only the noise of arithmetic (the bounds of equal classes
- * are sums and products, and `0.1 + 0.2` would otherwise read `0.30000000000000004`), as the table of the Data tab
- * does. A number that the platform writes with an exponent (below 1e-6, from 1e21) keeps it. One that is not finite is written as it is.
+ * digits are those of the shortest text that gives the number back, **trimmed at 15 significant digits**: a number
+ * of 15 digits or fewer, which is what a file writes, is as it was, and one of more is rounded to 15 (`9007199254740992`
+ * reads `9,007,199,254,740,990`), which takes off the noise of arithmetic (the bounds of equal classes are sums
+ * and products, and `0.1 + 0.2` would otherwise read `0.30000000000000004`), as the table of the Data tab does. A
+ * number that the platform writes with an exponent (below 1e-6, from 1e21) keeps it, written as the platform does
+ * (`1e-7`, with `−` in front if it is negative), and one that 15 digits would carry past the largest number (the
+ * largest itself) is written with all its digits. One that is not finite is written as it is.
  */
 function formatAsIs(bound: number): string {
   if (!Number.isFinite(bound)) {
     return String(bound);
   }
-  const text = String(Number(Math.abs(bound).toPrecision(AS_IS_DIGITS)));
+  const trimmed = Number(Math.abs(bound).toPrecision(AS_IS_DIGITS));
+  const text = String(Number.isFinite(trimmed) ? trimmed : Math.abs(bound));
   const [whole = '0', fraction] = text.split('.');
   const body = grouped(whole) + (fraction === undefined ? '' : `.${fraction}`);
   return bound < 0 ? `${MINUS}${body}` : body;
@@ -69,7 +73,8 @@ function formatAsIs(bound: number): string {
  * after the milestone: the brief's "the fewest decimals that keep neighbouring bounds distinct" rounds a bound, and
  * a rounded or a plain reading is to be a choice of the person later; the rounding rule, with its tenth of the
  * narrowest class, is in the history of this file, in the commit `5676067`). So the bounds 0, 2.5 and 5 read `0`,
- * `2.5` and `5`, and two bounds that differ read differently.
+ * `2.5` and `5`. Two bounds that differ within their first 15 digits read differently; two that differ only beyond them
+ * (`1` and `1.0000000000000002`) read alike.
  */
 export function formatBounds(bounds: readonly number[]): string[] {
   return bounds.map(formatAsIs);

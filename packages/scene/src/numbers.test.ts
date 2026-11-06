@@ -87,6 +87,22 @@ describe('formatBounds', () => {
     expect(formatBounds([123456789.012345])).toEqual(['123,456,789.012345']);
   });
 
+  it('rounds a bound of more than 15 significant digits to 15, which is all that it takes off, and says so by the labels it gives', () => {
+    expect(formatBounds([9007199254740992])).toEqual(['9,007,199,254,740,990']);
+    expect(formatBounds([0.12345678901234566])).toEqual(['0.123456789012346']);
+    expect(formatBounds([123456789012345680000])).toEqual(['123,456,789,012,346,000,000']);
+    // Two bounds that differ only beyond the 15th digit read alike.
+    expect(formatBounds([1, 1.0000000000000002])).toEqual(['1', '1']);
+    expect(formatBounds([999999.9999999999, 1000000])).toEqual(['1,000,000', '1,000,000']);
+  });
+
+  it('writes the largest numbers whole, where 15 digits would carry them past the largest number', () => {
+    expect(formatBounds([Number.MAX_VALUE])).toEqual(['1.7976931348623157e+308']);
+    expect(formatBounds([-Number.MAX_VALUE])).toEqual([`${MINUS}1.7976931348623157e+308`]);
+    expect(formatBounds([1.5e308])).toEqual(['1.5e+308']);
+    expect(formatBounds([Number.MIN_VALUE])).toEqual(['5e-324']);
+  });
+
   it('puts commas between the thousands of the whole part only', () => {
     expect(formatBounds([1000000, 2000000.5, 3000000])).toEqual([
       '1,000,000',

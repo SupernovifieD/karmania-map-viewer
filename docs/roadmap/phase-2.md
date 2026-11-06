@@ -372,6 +372,8 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.8a (added) Record the decisions of M15 in the log.
 - [x] 15.F1 Gate fix, review of M15: the dependency table, the list of packages, a step number and the README say what is
   true, and what the review found but this milestone leaves is recorded.
+- [x] 15.F2 Gate fix, review of M15: the largest number is not written as `Infinity`, and the comments and the
+  tests say what 15 significant digits do (a longer bound is rounded to 15).
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)
