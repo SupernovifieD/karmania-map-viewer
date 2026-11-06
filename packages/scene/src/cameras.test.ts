@@ -434,3 +434,71 @@ describe('the cameras are undefined for an angle that is not a number', () => {
     ).toEqual([]);
   });
 });
+
+describe('the cameras are undefined when the arithmetic overflows, whatever the numbers are', () => {
+  // Found by the second review of the milestone: finite but extreme numbers made cameras that validateScene refuses (an
+  // infinite distance, a distance or a scale of 0, a middle that overflows), against the claim that every camera given is
+  // one it accepts. A camera is checked before it is given.
+  const viewport = { width: 800, height: 600 };
+  const three: Camera3d = { target: [0, 0, 0], distance: 100, heading: 0, elevation: 45, fov: 45 };
+
+  it('in fitCamera3d', () => {
+    const cube = box([0, 0, 0], [100, 100, 100]);
+    expect(fitCamera3d({ extent: cube, viewport, fov: 1e-310 })).toBeUndefined();
+    expect(
+      fitCamera3d({ extent: cube, viewport: { width: 1e-320, height: 600 }, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      fitCamera3d({ extent: box([-1.7e308, 0, 0], [1.7e308, 1, 1]), viewport, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      fitCamera3d({ extent: box([1e308, 0, 0], [1e308, 0, 0]), viewport, fov: 45 }),
+    ).toBeUndefined();
+  });
+
+  it('in fitCamera2d', () => {
+    // 1e308 turned by 45 degrees is 1.4e308, which does not overflow: a camera is given, and it is a valid one.
+    const huge = fitCamera2d({ extent: flat(0, 0, 1e308, 1e308), viewport, heading: 45 });
+    expect(huge).toBeDefined();
+    expect(validateCamera2d(huge)).toEqual([]);
+    expect(fitCamera2d({ extent: flat(-1.7e308, 0, 1.7e308, 1), viewport })).toBeUndefined();
+    expect(
+      fitCamera2d({ extent: flat(-1.7e308, 0, 1.7e308, 1), viewport, heading: 90 }),
+    ).toBeUndefined();
+    expect(
+      fitCamera2d({ extent: flat(0, -1.7e308, 1, 1.7e308), viewport, heading: 30 }),
+    ).toBeUndefined();
+  });
+
+  it('in cameraTo3d and cameraTo2d', () => {
+    const view: Camera2d = { centre: [1, 2], unitsPerPixel: 1e-300, heading: 0 };
+    expect(
+      cameraTo3d({ camera2d: view, viewport: { width: 800, height: 1e-300 }, fov: 45 }),
+    ).toBeUndefined();
+    expect(
+      cameraTo2d({
+        camera3d: { ...three, distance: 1e-300 },
+        viewport: { width: 800, height: 1e300 },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('and a camera for numbers that are large or small but do not overflow is still given', () => {
+    expect(
+      validateCamera3d(
+        fitCamera3d({ extent: box([0, 0, 0], [1e30, 1e30, 1e30]), viewport, fov: 45 }),
+      ),
+    ).toEqual([]);
+    expect(
+      fitCamera3d({ extent: box([0, 0, 0], [1e30, 1e30, 1e30]), viewport, fov: 45 }),
+    ).toBeDefined();
+    expect(fitCamera2d({ extent: flat(0, 0, 1e-30, 1e-30), viewport })).toBeDefined();
+    expect(
+      cameraTo3d({
+        camera2d: { centre: [0, 0], unitsPerPixel: 1e-20, heading: 0 },
+        viewport,
+        fov: 45,
+      }),
+    ).toBeDefined();
+  });
+});
