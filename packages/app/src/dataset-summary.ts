@@ -8,7 +8,7 @@ import {
   extentRows,
 } from '@karmania/viewer/datasets';
 import type { CrsLookup } from '@karmania/viewer/datasets';
-import './findings.js';
+import '@karmania/viewer/findings';
 import { groupFindings } from '@karmania/viewer/import-run';
 import { describeSize, formatCount, KIND_NAMES } from '@karmania/viewer/import-files';
 import { TYPE_NAMES } from '@karmania/viewer/import-mapping';

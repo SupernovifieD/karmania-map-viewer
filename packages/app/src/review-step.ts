@@ -1,7 +1,7 @@
 import type { Finding, Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import './findings.js';
+import '@karmania/viewer/findings';
 import { describeSize, KIND_ICONS } from '@karmania/viewer/import-files';
 import { groupFindings, PHASE_LABELS } from '@karmania/viewer/import-run';
 import type { RunState } from '@karmania/viewer/import-run';

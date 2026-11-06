@@ -4,7 +4,7 @@ import { css, html, LitElement, nothing } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
 import type { CrsInfo, Engine, Units } from '@karmania/engine';
-import './findings.js';
+import '@karmania/viewer/findings';
 import {
   crsOf,
   describeCrs,

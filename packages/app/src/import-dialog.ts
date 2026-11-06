@@ -12,8 +12,8 @@ import { entriesOf, isImportable } from '@karmania/viewer/import-files';
 import { mappingProblems } from '@karmania/viewer/import-mapping';
 import type { FileEntry } from '@karmania/viewer/import-files';
 import './crs-step.js';
-import './findings.js';
-import type { GoToStep } from './findings.js';
+import '@karmania/viewer/findings';
+import type { GoToStep } from '@karmania/viewer/findings';
 import './mapping-step.js';
 import './nodata-step.js';
 import {
@@ -25,8 +25,14 @@ import {
 } from '@karmania/viewer/import-run';
 import type { RunState } from '@karmania/viewer/import-run';
 import './review-step.js';
-import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
-import type { ImportStep } from './import-steps.js';
+import {
+  describeStep,
+  FIRST_STEP,
+  IMPORT_STEPS,
+  stepAfter,
+  stepBefore,
+} from '@karmania/viewer/import-steps';
+import type { ImportStep } from '@karmania/viewer/import-steps';
 
 /** The name of the event the dialog sends when it has been closed, by Cancel, Esc or the close button. */
 export const IMPORT_CLOSE = 'karmania-import-close';

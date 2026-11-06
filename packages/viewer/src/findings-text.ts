@@ -1,5 +1,5 @@
 import type { Finding, Location, Severity } from '@karmania/engine';
-import { formatCount } from '@karmania/viewer/import-files';
+import { formatCount } from './import-files.js';
 
 /** What each severity is called, for people: an error, a warning, a note. */
 export const SEVERITY_NAMES: Readonly<Record<Severity, string>> = {
