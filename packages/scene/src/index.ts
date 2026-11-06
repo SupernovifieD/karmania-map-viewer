@@ -26,6 +26,8 @@ export {
   setVisible,
 } from './commands-layers.js';
 export type { NewDataset } from './commands-layers.js';
+export { moveNode } from './commands-legend.js';
+export type { LegendPlace } from './commands-legend.js';
 export { emptyScene } from './empty.js';
 export { MAP_BACKGROUNDS, MIN_GRAPHIC_CONTRAST, contrastOnMaps } from './palettes.js';
 export { migrate } from './migrate.js';

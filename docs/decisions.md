@@ -3752,3 +3752,11 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   dataset is removed is the viewer's, from the engine's `chooseFrame` (step 15.7). **`setVisible`** and **`setGroupVisible`**: a group's checkbox sets every layer in it; whether a group looks checked, unchecked or in
   between is for the legend model (step 14.10) to say from its layers, so the scene has no state for it. All three give back the same document when nothing would change. Seven changes to them each fail a test (tried); the
   layers a derived layer is made from are found with `Object.hasOwn`, so a layer id like `constructor` is no layer.
+- Step 14.7a (`moveNode`). **One command moves a layer or a group**, `moveNode(doc, id, { parent, index })`, where `parent` is `null` for the top of the legend or a group's id. This is every move of section 10.3: a drop
+  line (any place), Alt+Up and Alt+Down (the place one up or down), Alt+Right (into the group above) and Alt+Left (out of its group): the viewer works out the place and the command only puts the node there. **`index` is counted
+  with the node taken out of the list it goes into**, so that "one place down" is `index + 1` in the same list, whichever list it is; a place before the start is the start, one past the end the end, and the fraction of
+  one is dropped (all of that is what `slice` does, and the code relies on it; the first version clamped by hand and two of the clamps could be removed without a test noticing, which showed they did nothing, so they
+  were). **A group can only go to the top** (a group sent into a group, or anything into a group that is not there or is a layer, is the same document); a group that is left empty by a move stays; a place that is
+  `NaN` is the same document (a mistake of the caller that cannot mean a place). A move to where the node already is is the same document, found by comparing the legend, not by the arguments. Seven changes to the
+  command each fail a test (tried; two survived at first, the `NaN` guard because the move in the test was one that changes nothing anyway, and the lower clamp because `-5` on a list of three acts as the start without
+  it, and each got a case that tells it apart).
