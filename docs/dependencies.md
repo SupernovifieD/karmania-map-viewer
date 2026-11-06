@@ -27,9 +27,9 @@ Anything else needs the owner's approval first. That includes strong copyleft
 | Dependency | Version | License | Purpose | Added |
 | --- | --- | --- | --- | --- |
 | typescript (dev) | ~6.0.3 | Apache-2.0 | Strict type checking for all TypeScript packages. Held below 7 because typescript-eslint 8.72 supports only `>=4.8.4 <6.1.0`. | step 0.5 |
-| eslint (dev) | ^10.13.0 | MIT | Linting for TypeScript and JavaScript. | step 0.6 |
+| eslint (dev, root and `@karmania/app`) | ^10.13.0 | MIT | Linting for TypeScript and JavaScript. The app's test of the import rules runs ESLint's `Linter` (declared there, as it imports it). | step 0.6 |
 | @eslint/js (dev) | ^10.0.1 | MIT | ESLint's recommended rule set. | step 0.6 |
-| typescript-eslint (dev) | ^8.72.0 | MIT | Parser and the `strictTypeChecked` rule set (bans `any`, unsafe `unknown` use, floating promises, non-null assertions). | step 0.6 |
+| typescript-eslint (dev, root and `@karmania/app`) | ^8.72.0 | MIT | Parser and the `strictTypeChecked` rule set (bans `any`, unsafe `unknown` use, floating promises, non-null assertions). | step 0.6 |
 | prettier (dev) | ^3.9.10 | MIT | Code formatting for TypeScript, JavaScript, JSON, YAML, CSS and HTML. | step 0.6 |
 | vitest (dev, `@karmania/engine`, `@karmania/ui`, `@karmania/app`, `@karmania/scene`, `@karmania/viewer`) | ^5.0.5 | MIT | TypeScript unit tests. The UI package has used it since step 6.1, and the app since step 7.7, for the panel's state. | step 0.7 |
 | @types/node (dev, `@karmania/engine`, `@karmania/scene`, `@karmania/app`) | ^24.19.2 | MIT | Node type declarations for the tests that load the built WebAssembly module in Node (pulls in `undici-types`, MIT). Referenced only from test files and the test support file (the engine's, the scene's `palettes.test.ts`, which reads a stylesheet, and the app's `import-restrictions.test.ts`, which finds the repository's root), never from code that is shipped. | step 4.3b |
