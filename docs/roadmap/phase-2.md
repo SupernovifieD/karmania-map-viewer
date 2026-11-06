@@ -306,7 +306,12 @@ or releasing, and whenever the brief says to stop.
   changes, null cases). Split to stay under the commit size guideline:
   - [x] 14.11a The north arrow: the angle of the needle and what it says.
   - [x] 14.11b The scale bar: a nice length, its unit, its width in pixels, or nothing and why.
-- [ ] 14.12 Camera models: fit 2D and 3D; 2D to 3D keeping centre and heading.
+- [ ] 14.12 Camera models: fit 2D and 3D; 2D to 3D keeping centre and heading. Split to stay under the
+  commit size guideline:
+  - [x] 14.12a The heading and elevation helpers move out of the commands into `angles.ts`, unchanged (a move
+    is a commit of its own).
+  - [ ] 14.12b The cameras that fit an extent in 2D and in 3D.
+  - [ ] 14.12c The 2D camera of a 3D one and the 3D camera of a 2D one, keeping centre, heading and scale.
 - [ ] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
   column, several columns, a group heading at a column end, a narrow map
   warning.

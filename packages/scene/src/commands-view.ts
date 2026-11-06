@@ -5,6 +5,7 @@
  * elevation of the 3D camera is held between -89 and 89 degrees (section 9.5), and a heading is turned into the
  * degrees from 0 up to 360 that it is the same direction as.
  */
+import { heldElevation, normalHeading } from './angles.js';
 import { VERTICAL_EXAGGERATIONS, VIEW_MODES } from './types.js';
 import { validateCamera2d, validateCamera3d } from './validate.js';
 import type { Camera2d, Camera3d, SceneDocument, VerticalExaggeration, ViewMode } from './types.js';
@@ -26,16 +27,6 @@ export function setVerticalExaggeration(
     return doc;
   }
   return { ...doc, verticalExaggeration: factor };
-}
-
-/** The degrees from 0 up to, not including, 360 that point the same way as `degrees`; anything not a number is left for the check to refuse. */
-export function normalHeading(degrees: number): number {
-  return Number.isFinite(degrees) ? ((degrees % 360) + 360) % 360 : degrees;
-}
-
-/** The elevation held between -89 and 89 degrees; anything not a number is left for the check to refuse. */
-export function heldElevation(degrees: number): number {
-  return Number.isFinite(degrees) ? Math.min(89, Math.max(-89, degrees)) : degrees;
 }
 
 /** The parts of the cameras to change; a part that is given may itself have only some of its fields. */
