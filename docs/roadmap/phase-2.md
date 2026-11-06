@@ -337,7 +337,7 @@ or releasing, and whenever the brief says to stop.
   camera, and the small things that review found in tests, comments and docs.
 - [x] 14.F9 Gate fix, third review of M14: `addLayers` works on one copy of each dataset (holes and getters), and the
   cameras take the middle as the sum of the halves and do not take a scale that underflows for a point.
-- [ ] 14.G Gate.
+- [x] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)
 
