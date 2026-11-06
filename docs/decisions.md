@@ -3680,3 +3680,12 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   and the selection are 14.3c and 14.3d: until then `validateScene` does not look at them. **Tested** by the sample document and a table of spoiled copies of it; seven changes to the rules (the elevation or the field of
   view one step wider, the units of a local grid, the origin not checked, unknown fields let through, a whole code not required, the early return on version) each fail a test (tried one by one; one first tried as a change
   that changed nothing and was redone).
+- Step 14.3c (`validateScene`, the layers). `layers` is an object whose keys are the layer ids, and the `id` inside a layer must be its key (`consistency`). A layer has an `id`, a whole `datasetId` of 0 or more, a `name`
+  (any text, even empty: a dataset's name is what it is), `visible` and a `style`. **A colour** is `single` (`value` as `#` and six hexadecimal digits, **in either case**: an embedder's `#E69F00` is a colour, and
+  the commands of step 14.8 write it in lower case) or `classes` (`column` not empty, a `method` of the four, **`classes` a whole number from 2 to 20**, a `ramp` that is not empty, `reverse` true or false); a field of the
+  other mode is an unknown field. **A ramp is only "not empty" for now**: step 14.4 has the ramps and makes `validateScene` refuse an id that is not one. Opacity is 0 to 1, point size 2 to 24 and line width 1 to 8, both of
+  which may be absent, **and a field whose value is `undefined` counts as absent** (a JavaScript object often has one; JSON cannot). Contours have an `interval` above 0, a `base`, an `indexEvery` that is a whole number of 1 or
+  more, `visible`, and a `column` that may be absent. **A derived layer** (`derived: { kind: 'contours', sourceLayer }`) must name a layer that exists (`reference`, found with `Object.hasOwn`, because a name like
+  `constructor` is "in" every object), that is not itself, and that is not itself derived (`consistency`): the scene has no command that makes contours of contours, and a chain could loop where the removal of a source removes
+  what is made from it. Tested by the sample and a table of spoiled copies; ten changes to the rules fail a test (tried one by one; two first tried with a pattern that no longer matched after formatting, and so showed the
+  result of the run before, and were redone; one change, the case of a layer made from itself, passed because the next rule also catches it with the same code and path, so the test now compares the messages).

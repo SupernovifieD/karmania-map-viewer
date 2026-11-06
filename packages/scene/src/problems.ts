@@ -284,3 +284,12 @@ export function readRecord(
   }
   return value;
 }
+
+/** An object whose keys can be anything (layers by their id): gives the fields, or `undefined` if the value is not an object. */
+export function readMap(
+  problems: Problems,
+  path: string,
+  value: unknown,
+): Readonly<Record<string, unknown>> | undefined {
+  return readRecord(problems, path, value, isRecord(value) ? Object.keys(value) : []);
+}

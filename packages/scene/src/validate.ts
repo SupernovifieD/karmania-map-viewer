@@ -15,6 +15,7 @@ import {
   show,
   type SceneProblem,
 } from './problems.js';
+import { checkLayers } from './validate-layers.js';
 import { SCENE_VERSION, VERTICAL_EXAGGERATIONS, VIEW_MODES } from './types.js';
 
 const DOCUMENT_FIELDS = [
@@ -125,6 +126,7 @@ export function validateScene(doc: unknown): readonly SceneProblem[] {
   checkCamera2d(problems, 'camera2d', doc['camera2d']);
   checkCamera3d(problems, 'camera3d', doc['camera3d']);
   readChoice(problems, 'verticalExaggeration', doc['verticalExaggeration'], VERTICAL_EXAGGERATIONS);
-  // The layers, the legend and the selection are checked by the steps that follow (14.3c and 14.3d).
+  checkLayers(problems, 'layers', doc['layers']);
+  // The legend and the selection are checked by the step that follows (14.3d).
   return problems.finish();
 }

@@ -1,6 +1,7 @@
 /** Documents and ways to spoil them, for the tests of the scene. Not part of the package. */
 import type { Frame } from '@karmania/engine/display';
 import type { SceneDocument } from '../types.js';
+import { validateScene } from '../validate.js';
 
 /** The frame of the sample: UTM zone 40 north. */
 export const SAMPLE_FRAME: Frame = {
@@ -107,4 +108,9 @@ export function spoil(node: unknown, path: readonly (string | number)[], value: 
     return { ...node, [head]: spoil(inside, rest, value) };
   }
   throw new Error(`The test spoils a place that is not there: ${String(head)}`);
+}
+
+/** The `code path` of every problem `validateScene` finds in the sample after `path` is set to `value`. */
+export function problemsAfter(path: readonly (string | number)[], value: unknown): string[] {
+  return validateScene(spoil(sampleScene(), path, value)).map((p) => `${p.code} ${p.path}`);
 }

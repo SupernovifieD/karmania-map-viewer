@@ -67,7 +67,7 @@ export interface Camera3d {
 /** The two ways a layer gets its colour. */
 export const COLOUR_MODES = ['single', 'classes'] as const;
 
-/** One colour for everything in the layer. `value` is `#rrggbb`, lower case. */
+/** One colour for everything in the layer. `value` is `#rrggbb`; the commands write it in lower case. */
 export interface SingleColour {
   readonly mode: 'single';
   readonly value: string;
