@@ -1,6 +1,7 @@
 import eslint from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import tseslint from 'typescript-eslint';
+import { importRestrictions } from './eslint.restrictions.mjs';
 
 export default defineConfig(
   globalIgnores([
@@ -40,6 +41,8 @@ export default defineConfig(
       ],
     },
   },
+  // Which package may import which: after the TypeScript rules, whose `no-restricted-imports` they replace.
+  ...importRestrictions,
   {
     // Plain JavaScript (tool configs, scripts) is not part of any tsconfig.
     files: ['**/*.{js,mjs,cjs}'],

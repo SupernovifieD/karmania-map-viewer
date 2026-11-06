@@ -104,6 +104,13 @@ dependency in the step that first needs it, record it in `docs/dependencies.md`
 in the same commit, use the latest stable version unless a documented constraint
 forbids it, and commit the lockfile.
 
+Packages depend on each other in one direction: `app` uses `viewer`, which uses `render`, `scene`, `engine` and
+`ui`. `render` names the types of `scene` and `engine` and nothing else of them; `scene` names the types of `engine`
+and nothing else; `engine` and `ui` depend on no other package. `three` is imported only in `render`, and `render`
+and `scene` have no Lit. A package is imported by its name, never by a path into it, and the source of the app uses
+only the entry of the viewer. ESLint enforces it (`eslint.restrictions.mjs`, tested by
+`packages/app/src/import-restrictions.test.ts`), so a wrong import fails `pnpm check`.
+
 ## UI tests
 
 Every UI state is tested in a browser (`pnpm test:e2e`), on the gallery page now and the
