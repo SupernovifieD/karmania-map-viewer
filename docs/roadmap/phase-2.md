@@ -288,11 +288,11 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.7a `moveNode`: a layer or a group to a place in the legend or in a group.
   - [x] 14.7b `createGroup`, `renameGroup`, `deleteGroup`, and `setGroupCollapsed` (the brief's list has no
     command that changes `collapsed`, and step 19.5 needs one).
-- [ ] 14.8 Commands: style, contours, view, camera, frame, selection. Split to stay under the commit
+- [x] 14.8 Commands: style, contours, view, camera, frame, selection. Split to stay under the commit
   size guideline:
   - [x] 14.8a `setStyle` and `setContours`.
   - [x] 14.8b `setViewMode`, `setVerticalExaggeration` and `setCamera`.
-  - [ ] 14.8c `setFrame` and `setSelection`.
+  - [x] 14.8c `setFrame` and `setSelection`.
 - [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page.
 - [ ] 14.10 Legend model with number labels (11.7).
 - [ ] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit

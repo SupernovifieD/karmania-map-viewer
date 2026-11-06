@@ -151,3 +151,10 @@ export function validateCamera3d(camera: unknown): readonly SceneProblem[] {
   checkCamera3d(problems, 'camera3d', camera);
   return problems.finish();
 }
+
+/** What is wrong with a frame (or `null`, which is none), as the document would have it. */
+export function validateFrame(frame: unknown): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkFrame(problems, 'frame', frame);
+  return problems.finish();
+}

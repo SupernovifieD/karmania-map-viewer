@@ -34,6 +34,7 @@ export {
   setGroupCollapsed,
 } from './commands-legend.js';
 export type { LegendPlace } from './commands-legend.js';
+export { setFrame, setSelection } from './commands-frame.js';
 export {
   heldElevation,
   normalHeading,

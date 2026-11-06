@@ -3783,3 +3783,10 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   though the brief says "heading is shared": switching views keeps centre and heading by the camera models of step 14.12, which give the patch for `setCamera`. Ten changes to the commands each fail a test (tried;
   two survived and were equivalent for any valid document: the length check of two position tuples, which the check had already made equal, and holding an elevation that is not given, which is held already; the code
   was simplified for both).
+- Step 14.8c (the frame and the selection). **`setFrame(doc, frame | null)`** holds **a copy** of the frame (so that nothing that keeps the object it passed can change the document; tested by changing the array after).
+  **When the map's coordinate system changes the cameras go back to their placeholders** (`emptyScene()`'s): a camera is in the units of the system, so a centre of 512,345 metres is nowhere in degrees and a scale of 0.5 metres
+  to a pixel is not 0.5 degrees; the same when the frame is cleared or comes back after none. The viewer fits to the data after (step 14.12). **A system is the same** if both are the same EPSG code, or both a local grid in the
+  same unit; **a new origin or source in the same system leaves the cameras where they are**, which is the case of the first frame of a scene after the first dataset (the cameras are placeholders anyway) and of an origin
+  that the engine moves (step 13.F2's frame that waits for a drawable dataset). **`setSelection(doc, selection | null)`** refuses a layer that is not there and an element that is not a whole number of 0 or more
+  (`validateSelection`, exported from `validate-legend.ts`), holds a copy, and **accepts a layer that is hidden** (the table's "Show on map", step 21.5, picks a row of any dataset). Both give the same document when
+  nothing would change. Eleven changes to the two commands each fail a test (tried). **This completes the fifteen commands of the brief's list, and the sixteenth, `setGroupCollapsed`, that it lacks.**

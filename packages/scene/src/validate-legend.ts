@@ -10,7 +10,8 @@ import {
   readRecord,
   readString,
   show,
-  type Problems,
+  Problems,
+  type SceneProblem,
 } from './problems.js';
 
 /**
@@ -112,4 +113,14 @@ export function checkSelection(
     problems.add(where, 'reference', `${where} is ${show(id)}, and there is no such layer.`);
   }
   readNumber(problems, field(path, 'element'), selection['element'], { integer: true, min: 0 });
+}
+
+/** What is wrong with a selection, given the layers there are, as the document would have it. */
+export function validateSelection(
+  selection: unknown,
+  layerIds: ReadonlySet<string>,
+): readonly SceneProblem[] {
+  const problems = new Problems();
+  checkSelection(problems, 'selection', selection, layerIds);
+  return problems.finish();
 }
