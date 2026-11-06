@@ -3,11 +3,11 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
-import '@karmania/viewer/data-tab';
-import type { CrsLookup, RowSource } from '@karmania/viewer/datasets';
-import { PANEL_TABS } from '@karmania/viewer/panel-tabs';
-import type { PanelTab } from '@karmania/viewer/panel-tabs';
-import '@karmania/viewer/resize-handle';
+import './data-tab.js';
+import type { CrsLookup, RowSource } from './datasets.js';
+import { PANEL_TABS } from './panel-tabs.js';
+import type { PanelTab } from './panel-tabs.js';
+import './resize-handle.js';
 
 /** What a person asked of the panel: to fold it away or open it, or to choose a tab. */
 export interface PanelChange {
