@@ -20,7 +20,7 @@ import {
   withType,
 } from '@karmania/viewer/import-mapping';
 import type { BlockSizeDraft } from '@karmania/viewer/import-mapping';
-import './findings.js';
+import '@karmania/viewer/findings';
 import { COLUMN_TYPES, ROLES } from '@karmania/engine';
 import type { ColumnType, Role } from '@karmania/engine';
 

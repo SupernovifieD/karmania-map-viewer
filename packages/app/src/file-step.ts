@@ -1,7 +1,7 @@
 import { sharedStyles } from '@karmania/ui';
 import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import './findings.js';
+import '@karmania/viewer/findings';
 import {
   describeFile,
   isImportable,
