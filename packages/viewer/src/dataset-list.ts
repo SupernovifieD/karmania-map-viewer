@@ -2,8 +2,8 @@ import type { Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
-import { describeWarnings, warningCount } from '@karmania/viewer/datasets';
-import { describeSize, formatCount, KIND_ICONS } from '@karmania/viewer/import-files';
+import { describeWarnings, warningCount } from './datasets.js';
+import { describeSize, formatCount, KIND_ICONS } from './import-files.js';
 
 /** The name of the event the list sends when a person chooses a dataset. */
 export const DATASET_SELECT = 'karmania-dataset-select';
