@@ -1,6 +1,8 @@
 /** Public name of this package. */
 export const PACKAGE_NAME = '@karmania/scene';
 
+export { contrastRatio, mix, parseHex, relativeLuminance, toHex } from './colour.js';
+export type { Rgb } from './colour.js';
 export { migrate } from './migrate.js';
 export type { MigrateResult } from './migrate.js';
 export { isSceneDocument, validateScene } from './validate.js';
