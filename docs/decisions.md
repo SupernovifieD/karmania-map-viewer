@@ -3717,3 +3717,16 @@ Before step 14.1, at the owner's request ("check EPSG to see if you can read the
   `n` that is not 9 or 11 is made (the published schemes for each smaller `n` are tuned by hand and are not used); `reverse` reverses the result; `n` that is not a whole number from 1 is a `RangeError`, a mistake of the
   caller, since the classes of a column are not. `validateScene` now refuses a ramp id that is not one of them (`choice`), using a list and not `in`, so `constructor` is refused too. The Apache-2.0 notice of
   ColorBrewer is in `THIRD_PARTY_NOTICES.md` with the CC0 credit that the viridis authors ask for. Six changes to the sampling each fail a test (tried).
+- Step 14.4c (the categorical palettes and their contrast). **Two categorical ramps**: Okabe-Ito (8 colours, a published list, credited, no licence stated) and ColorBrewer's Paired (12). **The order of Okabe-Ito is
+  changed from the published one** to orange, sky blue, bluish green, vermillion, blue, reddish purple, yellow, black: the first colour of a new layer would otherwise be black, which cannot be seen on the dark map (1.10 to 1),
+  and the layers that come first should be the ones that can be seen. **The two backgrounds** are `--k-surface-map`, `#e9ecf0` (light) and `#0e1013` (dark); a test reads `tokens.css` (as the ui package's own tokens
+  test does, with `/// <reference types="node" />`) and fails if they differ. A first form of that test imported the file with `?raw`, which in Vitest gives an empty string for a stylesheet, and failed on that, not on
+  the data. **The contrast** (WCAG 2.2, 1.4.11, 3 to 1 for a graphic; the numbers are those of an independent Python implementation, which the test pins to two decimals), light map / dark map:
+  Okabe-Ito orange 1.90 / 8.46, sky blue 1.95 / 8.26, bluish green 2.89 / 5.57, vermillion 3.26 / 4.93, blue 4.38 / 3.67, reddish purple 2.58 / 6.22, yellow 1.12 / 14.41, black 17.72 / 1.10; **under 3 to 1: on the
+  light map five of the eight (orange, sky blue, bluish green, reddish purple, yellow), on the dark map one (black)**, and none on both. Paired: on the light map eight of twelve are under 3 to 1 (`#a6cee3` 1.41,
+  `#b2df8a` 1.28, `#33a02c` 2.86, `#fb9a99` 1.74, `#fdbf6f` 1.38, `#ff7f00` 2.14, `#cab2d6` 1.63, `#ffff99` 1.13), on the dark map one (`#6a3d9a` 2.49). Both lists are pinned by a test, so a change of palette or of
+  background makes this record stale loudly. **How they are made readable**: points and polygons are drawn with the 1 px outline of section 9.3 of the brief (steps 16.7 and 16.9), in black on the light map and white on the
+  dark map, which stand 17.72 and 19.05 to 1 from their maps, so a marker with a weak fill still has a boundary that is not weak. **What that does not cover, and is open for the owner and step 16.8**: lines have no
+  outline in section 9.3, and the first three colours of a new layer (orange 1.90, sky blue 1.95, bluish green 2.89) are under 3 to 1 on the light map as 2 px lines. Giving lines a 1 px casing in the same outline colour
+  would make them readable, and is a change to 9.3 that is not made here; the alternative is to leave line colours to the person. Paired is offered knowing that it is weak on the light map, which the list above
+  says; the legend has labels as well as swatches.

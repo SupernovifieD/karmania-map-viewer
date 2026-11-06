@@ -22,7 +22,11 @@ describe('the ramps', () => {
       expect(['sequential', 'diverging', 'categorical']).toContain(entry.kind);
       expect(entry.colours.length).toBeGreaterThanOrEqual(entry.kind === 'categorical' ? 1 : 2);
       expect(entry.source.length).toBeGreaterThan(0);
-      expect(['CC0-1.0', 'Apache-2.0']).toContain(entry.licence);
+      expect([
+        'CC0-1.0',
+        'Apache-2.0',
+        'none stated (a published list of eight colours)',
+      ]).toContain(entry.licence);
       expect(entry.colours.every((c) => /^#[0-9a-f]{6}$/.test(c))).toBe(true);
     }
   });

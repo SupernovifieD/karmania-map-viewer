@@ -269,7 +269,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 14.3c `validateScene`: the layers (colour, opacity, sizes, contours, derivation).
   - [x] 14.3d `validateScene`: the legend, the selection and how they refer to layers.
   - [x] 14.3e `migrate`.
-- [ ] 14.4 Colour ramps and palettes with sources and licences; sampling to n
+- [x] 14.4 Colour ramps and palettes with sources and licences; sampling to n
   classes; categorical palette contrast checked against both map backgrounds
   (record any colour under 3:1 and how it is made readable, for example by the
   outline). Split to stay under the commit size guideline:
@@ -278,7 +278,7 @@ or releasing, and whenever the brief says to stop.
     diverging) with their sources and licences, sampling to n classes, the "Data" table
     of `docs/dependencies.md`, and `validateScene` refusing a ramp that is not one.
     Cividis is left out until the owner decides (its licence is not CC0 as far as is shown).
-  - [ ] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
+  - [x] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
     the light and the dark map, and the colours of new layers.
 - [ ] 14.5 Default styles (11.6).
 - [ ] 14.6 Commands: layers and visibility.

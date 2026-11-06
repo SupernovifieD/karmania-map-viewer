@@ -80,5 +80,8 @@ The colour ramps of `@karmania/scene` (`packages/scene/src/ramp-data.ts`) are da
   Brewer (<http://colorbrewer.org/>), under the Apache License, Version 2.0
   (<http://www.apache.org/licenses/LICENSE-2.0>), as packaged at github.com/axismaps/colorbrewer.
 
-The Okabe-Ito categorical palette (step 14.4c) is credited in the same place when it is added. This file is not yet
-copied into the builds of the engine and of the app: that is steps 23.5 and 23.6.
+- The **Okabe-Ito** palette of eight colours that people with the common kinds of colour blindness can tell apart,
+  published by Masataka Okabe and Kei Ito (Color Universal Design, jfly.uni-koeln.de/color) and by Bang Wong
+  (Nature Methods 8, 441, 2011): a published list of colour values, with no licence stated, credited here.
+
+This file is not yet copied into the builds of the engine and of the app: that is steps 23.5 and 23.6.
