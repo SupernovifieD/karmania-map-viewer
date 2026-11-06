@@ -135,3 +135,78 @@ export function fitCamera3d(input: Fit3dInput): Camera3d | undefined {
     fov,
   };
 }
+
+/** What the 3D camera of a 2D one is made from. */
+export interface To3dInput {
+  readonly camera2d: Camera2d;
+  readonly viewport: Viewport;
+  /** The vertical field of view of the 3D camera, in degrees, above 0 and below 180. */
+  readonly fov: number;
+  /** Degrees above the horizon; 45 by default. */
+  readonly elevation?: number;
+  /** The height of the point looked at, in map units; 0 by default. */
+  readonly targetZ?: number;
+}
+
+/** What the 2D camera of a 3D one is made from. */
+export interface To2dInput {
+  readonly camera3d: Camera3d;
+  readonly viewport: Viewport;
+}
+
+/** How many map units the map area is high at a distance `d` from the camera: `2 d tan(fov / 2)`. */
+function heightAt(distance: number, fov: number): number {
+  return 2 * distance * Math.tan((fov * Math.PI) / 360);
+}
+
+/**
+ * The 3D camera that shows the same place as a 2D one: the same centre (looked at, at the height given), the same
+ * heading, and the distance at which the map area is as high, in map units, as it was, so that what is at the centre has
+ * the same scale on the screen. Switching views keeps the centre, the heading and the scale there, and the 3D camera
+ * adds what 2D has not got: the elevation and the field of view. `undefined` if the 2D camera, the viewport or the
+ * field of view cannot be used.
+ */
+export function cameraTo3d(input: To3dInput): Camera3d | undefined {
+  const { camera2d, viewport, fov } = input;
+  if (
+    !usableViewport(viewport) ||
+    !(fov > 0 && fov < 180) ||
+    !finite(...camera2d.centre, camera2d.unitsPerPixel, camera2d.heading) ||
+    !(camera2d.unitsPerPixel > 0)
+  ) {
+    return undefined;
+  }
+  const targetZ = input.targetZ ?? 0;
+  if (!Number.isFinite(targetZ)) {
+    return undefined;
+  }
+  return {
+    target: [camera2d.centre[0], camera2d.centre[1], targetZ],
+    distance: (viewport.height * camera2d.unitsPerPixel) / heightAt(1, fov),
+    heading: normalHeading(camera2d.heading),
+    elevation: heldElevation(input.elevation ?? 45),
+    fov,
+  };
+}
+
+/**
+ * The 2D camera that shows the same place as a 3D one: the same centre (where it looks, without the height), the same
+ * heading, and the scale that the 3D camera has at what it looks at. `undefined` if the 3D camera or the viewport
+ * cannot be used.
+ */
+export function cameraTo2d(input: To2dInput): Camera2d | undefined {
+  const { camera3d, viewport } = input;
+  if (
+    !usableViewport(viewport) ||
+    !(camera3d.fov > 0 && camera3d.fov < 180) ||
+    !finite(...camera3d.target, camera3d.distance, camera3d.heading) ||
+    !(camera3d.distance > 0)
+  ) {
+    return undefined;
+  }
+  return {
+    centre: [camera3d.target[0], camera3d.target[1]],
+    unitsPerPixel: heightAt(camera3d.distance, camera3d.fov) / viewport.height,
+    heading: normalHeading(camera3d.heading),
+  };
+}
