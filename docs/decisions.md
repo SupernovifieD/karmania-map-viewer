@@ -4125,3 +4125,12 @@ fixed and several that should be; each is acted on below.
   15.F2 is five checks over seven bounds. **Not changed, said here**: `import-dialog.ts` keeps the engine it was given when a `<karmania-viewer>` is taken out of the page and put back with the wizard open (the viewer's own engine is cleared and made
   again at the next import, which gives the wizard the new one); the wizard is a modal dialog and nothing in the interface moves the viewer, so it is reached only by a page that moves the element itself.
 
+### M15 gate, third round
+
+The third review (one reviewer, only 15.F8 to 15.F10) found one thing that must be fixed and one wording; reviewing stopped after it, as in M14, because what it finds now is about forms of a call that nothing in the repository uses.
+
+- Step 15.F11 (`require` of a template). **Reviewer, must-fix, right**: `` require(`three`) `` was not refused (the selector for `require` read `arguments.0.value`, which a template does not have), though the comment said a template is a string like any other and the log said
+  `require` is refused in every block. A selector reads its first text, and the tests have `` require(`three`) `` and `` require(`@karmania/ui`) `` refused and `` require(`literal`) `` allowed; the selector off fails a test (tried). **Nit, right**: the comment said that "a worked-out
+  specifier is not looked at", but a template is read by its first text even with a substitution after it (`` `lit${x}` `` is refused; `` `${x}` `` and `` `./locales/${x}.js` `` are not); the comment says so, and three tests pin it. **Left, said**: what the rules cannot follow (a
+  joined specifier, `require` held in a variable, an import through a file that re-exports a package). The reviewer also confirmed: the Lit pattern, the `scripts` block, every row of the dependency table against the manifests, and the count of the app's tests (13).
+

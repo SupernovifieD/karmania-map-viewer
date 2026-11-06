@@ -196,6 +196,13 @@ describe('the direction of the imports between packages', () => {
     refused('packages/scene/src/a.ts', 'const x = await import(`@karmania/engine`);', dynamic);
     refused('packages/viewer/src/a.ts', 'const x = await import(`three`);', dynamic);
     refused('packages/scene/src/a.ts', 'let x: import(`@karmania/ui`).Button;', dynamic);
+    refused('packages/scene/src/a.ts', 'const x = require(`three`);', dynamic);
+    refused('packages/engine/src/a.ts', 'const x = require(`@karmania/ui`);', dynamic);
+    // With a substitution after the first text, it is that text that is read; a template that starts with one is not.
+    refused('packages/scene/src/a.ts', 'const x = await import(`lit${name}`);', dynamic);
+    allowed('packages/viewer/src/a.ts', 'const x = await import(`./locales/${name}.js`);');
+    allowed('packages/viewer/src/a.ts', 'const x = await import(`${name}`);');
+    allowed('packages/viewer/src/a.ts', 'const x = require(`literal`);');
     allowed('packages/viewer/src/a.ts', 'const x = await import(`./b.js`);');
     allowed('packages/viewer/src/a.ts', "const x = await import('react');");
     allowed('packages/viewer/src/a.ts', "const x = await import('literal');");

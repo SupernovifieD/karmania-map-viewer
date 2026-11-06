@@ -51,13 +51,18 @@ const NO_DYNAMIC = [
     message: STATIC_ONLY,
   },
   { selector: `TSImportType[source.value=/${DYNAMIC}/]`, message: STATIC_ONLY },
-  // A template with no substitution is a string like any other (a worked-out specifier is not looked at).
+  // A template is read by its first text, with or without a substitution after it (`@karmania/${x}` is refused,
+  // `${x}` and `./locales/${x}.js` are not): a specifier that is joined or held in a variable is not looked at.
   {
     selector: `ImportExpression[source.type='TemplateLiteral'][source.quasis.0.value.cooked=/${DYNAMIC}/]`,
     message: STATIC_ONLY,
   },
   {
     selector: `TSImportType[source.type='TemplateLiteral'][source.quasis.0.value.cooked=/${DYNAMIC}/]`,
+    message: STATIC_ONLY,
+  },
+  {
+    selector: `CallExpression[callee.name='require'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.cooked=/${DYNAMIC}/]`,
     message: STATIC_ONLY,
   },
 ];

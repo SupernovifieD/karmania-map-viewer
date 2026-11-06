@@ -389,7 +389,9 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.F9 (added) Gate fix, second review of M15: the root `pnpm lint` passes: the scripts have their Node globals.
 - [x] 15.F10 Gate fix, second review of M15: the dependency table lists every package that declares vite and
   `@types/node`, and the version of lucide-static that is installed; the log says what was left.
-- [ ] 15.G Gate.
+- [x] 15.F11 Gate fix, third review of M15: `require()` of a template string is refused like `import()`, and the comment
+  says what a template is read by.
+- [x] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)
 
