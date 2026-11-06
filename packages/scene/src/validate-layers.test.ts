@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABSENT, problemsAfter, sampleScene, spoil } from './test-support/documents.js';
+import { RAMP_IDS } from './ramps.js';
 import { validateScene } from './validate.js';
 
 const LAYER = ['layers', 'layer-2'] as const;
@@ -73,9 +74,15 @@ describe('validateScene: the layers', () => {
     expect(problemsAfter([...COLOUR, 'method'], 'median')).toEqual([
       'choice layers.layer-1.style.colour.method',
     ]);
-    expect(problemsAfter([...COLOUR, 'ramp'], '')).toEqual([
-      'range layers.layer-1.style.colour.ramp',
-    ]);
+    // A ramp is one of the ramps there are (step 14.4b), and nothing else, whatever is a name in every object.
+    for (const id of RAMP_IDS) {
+      expect(problemsAfter([...COLOUR, 'ramp'], id)).toEqual([]);
+    }
+    for (const bad of ['', 'rainbow', 'Viridis', 'constructor']) {
+      expect(problemsAfter([...COLOUR, 'ramp'], bad)).toEqual([
+        'choice layers.layer-1.style.colour.ramp',
+      ]);
+    }
     expect(problemsAfter([...COLOUR, 'reverse'], 0)).toEqual([
       'type layers.layer-1.style.colour.reverse',
     ]);

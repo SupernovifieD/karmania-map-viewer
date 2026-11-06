@@ -126,3 +126,19 @@ developer's machine and in CI):
 | Tool | Version | License | Purpose | Added |
 | --- | --- | --- | --- | --- |
 | wasm-pack | 0.15.0 | MIT OR Apache-2.0 | Builds the WebAssembly module and its JavaScript glue into `packages/engine/wasm` (`scripts/build-wasm`, `pnpm build:wasm`). Install with `cargo install wasm-pack`. In CI it is installed by `taiki-e/install-action` (MIT OR Apache-2.0, pinned to a commit), which downloads a prebuilt binary. On first use it downloads and caches the matching `wasm-bindgen` command-line tool (MIT OR Apache-2.0) and `wasm-opt` from Binaryen (Apache-2.0), so the first build needs network access. | step 4.1 |
+
+## Data
+
+Data that is copied into the repository, not installed: the values are in the file named, and the comment at the
+top of that file says where each table was taken from and how it was converted.
+
+| Data | Source | License | Where | Added |
+| --- | --- | --- | --- | --- |
+| viridis and magma colour ramps (256 colours each) | matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`: the same numbers as the original `colormaps.py` of github.com/BIDS/colormap, by Nathaniel J. Smith, Stefan van der Walt and Eric Firing (checked equal when they were taken) | CC0-1.0. The original says: "This file and the colormaps in it are released under the CC0 license / public domain dedication. We would appreciate credit if you use or redistribute these colormaps, but do not impose any legal restrictions." | `packages/scene/src/ramp-data.ts` | step 14.4b |
+| ColorBrewer colour schemes: Blues, Greens, Oranges, Reds, Purples, YlGnBu, YlOrRd (sequential, 9), RdBu, PuOr, BrBG (diverging, 11), Paired (qualitative, 12) | github.com/axismaps/colorbrewer, `export/colorbrewer.js`, by Cynthia Brewer (colorbrewer.org). Its header: "This product includes color specifications and designs developed by Cynthia Brewer (http://colorbrewer.org/)." | Apache-2.0 (the licence file of that repository is the Apache License 2.0) | `packages/scene/src/ramp-data.ts` | step 14.4b |
+
+Not taken: cividis. The brief names it with viridis and magma as CC0, but the repository it comes from
+(github.com/pnnl/cmaputil, Battelle Memorial Institute) has a licence of its own, a permissive text of the BSD kind that
+forbids the use of Battelle's name without consent, and no statement was found that the colormap is CC0. The policy
+above says anything not named needs the owner's approval, so it is left out until the owner decides (step 14.4b in
+`docs/decisions.md`).
