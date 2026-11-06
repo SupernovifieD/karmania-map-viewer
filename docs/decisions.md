@@ -3638,3 +3638,363 @@ numbers of the polygon table in `docs/perf.md` have the same shape and order of 
   **Nits of the review left as they are**, none of which can be reached: a second `let vertices` that repeats the first in `polygons.rs` (`PolygonsFill::advance`); `polygons_buffers` ignores whether the budget `usize::MAX`
   finished the job, which only matters on a target where `usize` has 32 bits and the total cost passes 4.29 billion, and the stepped path used by the wasm exports loops until the job says it is done; and the message of
   `d1aa9f2` says a polygon of ordinary rings "costs what it did", when it costs about a thousandth more for each ring.
+
+## M14: scene document
+
+Before step 14.1, at the owner's request ("check EPSG to see if you can read the terms"), on 2026-11-06:
+
+- **The source still cannot be read.** `https://epsg.org/terms-of-use.html` answered the fetch tool of this session with HTTP 403 again (a plain request; nothing was changed to get past it, no
+  User-Agent, no proxy, as in step 12.F10). So the terms are still not read at the source, and the caveat in `THIRD_PARTY_NOTICES.md` stays.
+- **Two public copies were read instead, and are second-hand**: the licensing manual of MySQL 8.0.46 (Oracle, section 2.7, a notice for the dataset that points to `http://www.epsg.org/TermsOfUse`) and a licence file
+  published with a GeoServer site (`geoserver.silvis.forest.wisc.edu/.../licenses/EPSG.html`, whose footer is 2025). Neither carries a date for the terms, and the Oracle copy reproduces only four conditions without
+  the "table below" of permitted changes. They agree with what step 12.2 and `THIRD_PARTY_NOTICES.md` already record: free of charge, may be used, copied and distributed; may be in a commercial package if the
+  commerciality rests on value added by the provider and not on the dataset; ownership by IOGP must be acknowledged; recipients must be told of the terms; changes only as the terms allow, with numeric
+  equivalence, and data changed otherwise must not be attributed to EPSG; provided as is; distribution for profit of the dataset itself forbidden (the GeoServer copy). They also carry what step 12.F10 said was
+  missing: **subsets may be extracted, but a description of a system is incomplete unless it has the essential elements of IOGP Guidance Note 7-1** (Annex F in the Oracle copy, A in the other: two editions).
+- **What changed**: that advisory is now in `THIRD_PARTY_NOTICES.md`, with the fact that Karmania's definitions are such a subset (name, kind, unit, PROJ definition). Nothing in the code changed.
+- **What is still the owner's**: to read the live page once in a browser against `THIRD_PARTY_NOTICES.md` and `docs/dependencies.md` (the copies may be older or newer than the page), and to decide whether the
+  advisory about the essential elements needs more than the sentence now in the notices. Karmania is Apache-2.0 and free of charge, so the clause on distribution for profit does not apply to it as the copies word
+  it; this is a reading of two copies and not legal advice.
+
+- Step 14.1 (the package). `packages/scene` is `@karmania/scene`: pure TypeScript with `lib: ["ES2022"]` (no DOM, as the brief says), the repository's strict lint and tsconfig, Vitest. It depends on `@karmania/engine`
+  by `workspace:*` for types only, and on nothing else. The lockfile gained the importer and no third-party package.
+- Step 14.2 (the types of section 11.6). `types.ts` has the contract as it is in the brief, every field `readonly` (a document is replaced, never changed), with these choices where the brief is silent.
+  (1) **The engine's types by a narrow path.** The scene's tsconfig has no DOM library, and the engine's index exports its client and worker, which need DOM types, so a `type` import of `@karmania/engine` would
+  fail to typecheck. The engine's `package.json` gained two subpaths, `./display` and `./types`, which are the two files that import nothing but each other; the scene imports `Frame` and `ClassMethod` from
+  `@karmania/engine/display`. (2) **`ContourParams` is defined in the scene** with the four fields of section 11.5, because the engine gets its own in step 20.4; it is to be replaced by an import then (a type that
+  is structurally the same, so nothing else changes). (3) **`RampId` is a string** here, and the ramps arrive in step 14.4, which makes `validateScene` refuse an id that is not one. (4) **Limits the brief gives
+  or that follow from it**: opacity 0 to 1, point size 2 to 24, line width 1 to 8, elevation -89 to 89, a field of view above 0 and below 180, a distance and a `unitsPerPixel` above 0; **classes** 2 to 20 (the style editor of
+  step 19.7 offers 3 to 12; 20 is the most categories the engine shows, and 1 class is not a classification). The heading is any finite number, and the commands of step 14.8 will turn it into 0 up to 360.
+  (5) **A dataset's id is a number**, as the engine has it (`DrawableEntry.id`), and layer ids and group ids are strings. **Test**: a document that uses every field, checked by the compiler, and `expectTypeOf`
+  and `@ts-expect-error` checks of the shapes (the unions, the tuples, the `readonly`, the absent-not-undefined optional fields); with `viewMode` made writable in `types.ts` the typecheck fails (tried).
+- Step 14.3 (`validateScene` and `migrate`, split into 14.3a to 14.3e). **A problem is a value** (`{ path, code, message }`), never a thrown error, as the brief's rule for data says; the code is for a program
+  (`not_an_object`, `missing`, `unknown_field`, `type`, `range`, `choice`, `version`, `reference`, `duplicate`, `consistency`, `too_many`) and the message, which names the path and what was found, for a person.
+  **At most 100 problems are listed**, and a last one counts the rest, so a document of a million bad layers cannot make a list of a million. **A field that is not in the contract is a problem** (`unknown_field`): a
+  document is state to be restored, a typo in `opactiy` would otherwise be dropped without a word, and a new field is what a new version is for. A number must be finite (JSON cannot carry NaN or infinity,
+  and a camera cannot use them). 14.3a is the checks only (`problems.ts`), tested for every limit on both sides of it; changing any of the five comparisons of a limit (`>=` for `>` and so on) or the cap of 100 fails a test (tried).
+- Step 14.3b (`validateScene`, the document level). A value that is not an object is one problem (`not_an_object`, or `missing` for `undefined`). **A version that is not 1 ends the check** with that one problem and nothing
+  else, because the rules of version 1 do not say what a document of another version is: a version above 1 is "newer than this viewer reads", anything else that is not 1 is "must be 1", and a missing one is `missing`
+  (`migrate`, step 14.3e, is for older documents). Then the fields that are not in the contract, the frame (`null` is a frame that is not made yet; an EPSG system has a whole `code` of 1 or more and no unit, a local grid has a
+  `units` and no code, and each is an unknown field in the other), the view, the two cameras and the exaggeration, all by the limits of step 14.2; problems come in the order of the document, never stopping at the first. The lists
+  of choices (`choices.ts`) are written in the scene so that it loads no engine code; the compiler checks each member against the engine's type and `choices.test.ts` that each list is all of the type. The layers, the legend
+  and the selection are 14.3c and 14.3d: until then `validateScene` does not look at them. **Tested** by the sample document and a table of spoiled copies of it; seven changes to the rules (the elevation or the field of
+  view one step wider, the units of a local grid, the origin not checked, unknown fields let through, a whole code not required, the early return on version) each fail a test (tried one by one; one first tried as a change
+  that changed nothing and was redone).
+- Step 14.3c (`validateScene`, the layers). `layers` is an object whose keys are the layer ids, and the `id` inside a layer must be its key (`consistency`). A layer has an `id`, a whole `datasetId` of 0 or more, a `name`
+  (any text, even empty: a dataset's name is what it is), `visible` and a `style`. **A colour** is `single` (`value` as `#` and six hexadecimal digits, **in either case**: an embedder's `#E69F00` is a colour, and
+  the commands of step 14.8 write it in lower case) or `classes` (`column` not empty, a `method` of the four, **`classes` a whole number from 2 to 20**, a `ramp` that is not empty, `reverse` true or false); a field of the
+  other mode is an unknown field. **A ramp is only "not empty" for now**: step 14.4 has the ramps and makes `validateScene` refuse an id that is not one. Opacity is 0 to 1, point size 2 to 24 and line width 1 to 8, both of
+  which may be absent, **and a field whose value is `undefined` counts as absent** (a JavaScript object often has one; JSON cannot). Contours have an `interval` above 0, a `base`, an `indexEvery` that is a whole number of 1 or
+  more, `visible`, and a `column` that may be absent. **A derived layer** (`derived: { kind: 'contours', sourceLayer }`) must name a layer that exists (`reference`, found with `Object.hasOwn`, because a name like
+  `constructor` is "in" every object), that is not itself, and that is not itself derived (`consistency`): the scene has no command that makes contours of contours, and a chain could loop where the removal of a source removes
+  what is made from it. Tested by the sample and a table of spoiled copies; ten changes to the rules fail a test (tried one by one; two first tried with a pattern that no longer matched after formatting, and so showed the
+  result of the run before, and were redone; one change, the case of a layer made from itself, passed because the next rule also catches it with the same code and path, so the test now compares the messages).
+- Step 14.3d (`validateScene`, the legend and the selection). The legend is a list of nodes, each a `layer` (`type`, `id`) or a `group` (`type`, `id`, `name`, `collapsed`, `children`: layer ids, which may be empty), and a
+  field of the other kind is an unknown field. **Every layer is in the legend exactly once**, directly or in a group (a layer that is not is `consistency` at `layers.<id>`, a second place is `duplicate` at the later
+  place, a layer that is not there is `reference`), and **a group's id is neither another group's nor a layer's**. This is the invariant the commands of 14.6 and 14.7 keep (adding a layer puts it in the legend, removing
+  one takes it out), and **derived layers (contours) are in the legend too**: if M20 decides that they are shown only under their source, this rule is the one to relax, and this record the place to say so. The selection is
+  `null`, or a `layerId` that is a layer and an `element` that is a whole number of 0 or more. **When the layers cannot be read at all** (not an object) what the legend and the selection refer to is not checked, so that
+  one fault is one problem and not a page. What is wrong in a node places nothing, so its layer is also reported as not in the legend (the tests say so); that is noise that goes when the node is mended. Tested by the
+  sample and a table of spoiled copies; seven changes to the rules each fail a test (tried one by one, each pattern checked to have applied; three expectations of mine were wrong at first, about the layer that a spoiled
+  node no longer places and about which place of a duplicate is reported, and were corrected after printing what the code gave and reasoning that it was right).
+- Step 14.3e (`migrate`). `migrate(doc)` gives `{ status: 'ok', doc, from }` or `{ status: 'failed', problems }`. Version 1 is the only version, so a document of version 1 that `validateScene` finds nothing wrong in is
+  given back as the very object, with `from: 1`, and anything else is the problems, a version that is not known being the one problem `version`. **There is no table of steps yet**: an empty one is code that nothing can run
+  or test, and when a version 2 exists its step from 1 is added in `migrate.ts` and the test of "a version it does not know" changes its number, so that cannot be forgotten. `isSceneDocument` is `validateScene` as a type
+  guard, so that no cast is needed to say that a value is a `SceneDocument`. Never throws, never changes what it is given (tested with a deeply frozen document); four changes to it fail a test (tried).
+- Step 14.4 (colour ramps and palettes, split into 14.4a to 14.4c). 14.4a is the arithmetic: `#rrggbb` read in either case and written in lower case, mixing in sRGB (each channel on its own, which is what the ramps are
+  sampled with), and **contrast as WCAG 2.2 (1.4.11) measures it**, from 1 to 21, with 3 as the ask for a graphic. The contrast test pins the published values (21 for black on white, 4.54 and 4.48 for `#767676` and
+  `#777777` on white); of six changes to the code five fail a test (tried), and the sixth, `<` for `<=` at the knee of the curve (0.04045), changes nothing that a number can show, since the two formulas meet there.
+- Step 14.4b (the ramps). **The ramps are**: viridis and magma (256 colours each, from matplotlib 3.10.0, checked to be the same numbers as the CC0 original `colormaps.py` of github.com/BIDS/colormap), the ColorBrewer
+  sequential Blues, Greens, Oranges, Reds, Purples, YlGnBu and YlOrRd (9 colours) and the diverging RdBu, PuOr and BrBG (11), each with its source and licence in the data (`ramps.ts`) and in `docs/dependencies.md` (a new
+  "Data" table) and `THIRD_PARTY_NOTICES.md`. They were read from the downloaded files by regular expressions and written by a script into `ramp-data.ts` as `#rrggbb` strings (the script was run from the scratchpad and is
+  not in the repository; the comment at the top of the data says the sources and the rounding, each component times 255, half up); the test pins each table's number of colours and a checksum (FNV-1a), the known end
+  points, and, by property, that a sequential ramp does not turn back in lightness (viridis dips by 0.0002 and 0.0003 twice, which is the rounding to 8 bits and is allowed up to 0.001; the first form of that test had no
+  tolerance and failed, and the dips were measured before it was loosened) and that a diverging one has a light middle. **Cividis is not included, and the owner is asked**: the brief calls viridis, cividis and magma
+  CC0, and for viridis and magma the original file says so, but cividis is not in that file: it comes from github.com/pnnl/cmaputil (Battelle Memorial Institute), whose licence is a permissive text of its own (use, copy,
+  modify and sell, with the notice kept, and without using Battelle's name without consent; GitHub shows it as "Other"), and nothing found says that the colormap is CC0. That would be allowed by the policy only as a
+  BSD-like licence that the owner approves; until then it stays out (viridis is also made for colour-blind readers, so nothing is lost for them; adding it later is one table and one line). **Sampling**: a sequential or
+  diverging ramp is sampled evenly along its stops with a mix in sRGB (the stops themselves when `n` is their number, the middle one for `n = 1`), which for ColorBrewer's schemes of 9 and 11 colours is also how any
+  `n` that is not 9 or 11 is made (the published schemes for each smaller `n` are tuned by hand and are not used); `reverse` reverses the result; `n` that is not a whole number from 1 is a `RangeError`, a mistake of the
+  caller, since the classes of a column are not. `validateScene` now refuses a ramp id that is not one of them (`choice`), using a list and not `in`, so `constructor` is refused too. The Apache-2.0 notice of
+  ColorBrewer is in `THIRD_PARTY_NOTICES.md` with the CC0 credit that the viridis authors ask for. Six changes to the sampling each fail a test (tried).
+- Step 14.4c (the categorical palettes and their contrast). **Two categorical ramps**: Okabe-Ito (8 colours, a published list, credited, no licence stated) and ColorBrewer's Paired (12). **The order of Okabe-Ito is
+  changed from the published one** to orange, sky blue, bluish green, vermillion, blue, reddish purple, yellow, black: the first colour of a new layer would otherwise be black, which cannot be seen on the dark map (1.10 to 1),
+  and the layers that come first should be the ones that can be seen. **The two backgrounds** are `--k-surface-map`, `#e9ecf0` (light) and `#0e1013` (dark); a test reads `tokens.css` (as the ui package's own tokens
+  test does, with `/// <reference types="node" />`) and fails if they differ. A first form of that test imported the file with `?raw`, which in Vitest gives an empty string for a stylesheet, and failed on that, not on
+  the data. **The contrast** (WCAG 2.2, 1.4.11, 3 to 1 for a graphic; the numbers are those of an independent Python implementation, which the test pins to two decimals), light map / dark map:
+  Okabe-Ito orange 1.90 / 8.46, sky blue 1.95 / 8.26, bluish green 2.89 / 5.57, vermillion 3.26 / 4.93, blue 4.38 / 3.67, reddish purple 2.58 / 6.22, yellow 1.12 / 14.41, black 17.72 / 1.10; **under 3 to 1: on the
+  light map five of the eight (orange, sky blue, bluish green, reddish purple, yellow), on the dark map one (black)**, and none on both. Paired: on the light map eight of twelve are under 3 to 1 (`#a6cee3` 1.41,
+  `#b2df8a` 1.28, `#33a02c` 2.86, `#fb9a99` 1.74, `#fdbf6f` 1.38, `#ff7f00` 2.14, `#cab2d6` 1.63, `#ffff99` 1.13), on the dark map one (`#6a3d9a` 2.49). Both lists are pinned by a test, so a change of palette or of
+  background makes this record stale loudly. **How they are made readable**: points and polygons are drawn with the 1 px outline of section 9.3 of the brief (steps 16.7 and 16.9), in black on the light map and white on the
+  dark map, which stand 17.72 and 19.05 to 1 from their maps, so a marker with a weak fill still has a boundary that is not weak. **What that does not cover, and is open for the owner and step 16.8**: lines have no
+  outline in section 9.3, and the first three colours of a new layer (orange 1.90, sky blue 1.95, bluish green 2.89) are under 3 to 1 on the light map as 2 px lines. Giving lines a 1 px casing in the same outline colour
+  would make them readable, and is a change to 9.3 that is not made here; the alternative is to leave line colours to the person. Paired is offered knowing that it is weak on the light map, which the list above
+  says; the legend has labels as well as swatches.
+- Step 14.5 (default styles). `defaultStyle(dataset, ordinal)` is what section 11.6 says: points 6 px, lines 2 px, polygons at opacity 0.6 and everything else at 1, a **single colour that is the next of the palette** for
+  everything but grids and block models, which are coloured by **their first numeric column, in 7 equal classes of viridis**; a mesh has one colour even when it has a column of numbers. The dataset is described by the
+  engine's own `Summary` (`kind`, `elementCount`, `columns`), as types only. **Two readings where the brief is silent**: (1) a numeric column is a `float` or an `int` column, and **one with no value at all is passed over**
+  (`nullCount` equal to the element count: it has nothing to divide into classes, and the engine would answer `classes.column.no_values`), so the first numeric column "that can be coloured" is taken; a grid or blocks with none
+  have a single colour like any other layer. (2) **The place in the order is a number the caller gives** (`ordinal`, from 0): the palette has eight colours and starts again after the eighth. How the commands of 14.6 get
+  that number from the document, which has no counter, is that entry. Tested kind by kind, with the first-column rules and the wrap of the palette, and by `validateScene` accepting every style made for every kind with and
+  without a numeric column; six changes to the code each fail a test (tried).
+- Step 14.6 (commands on layers and visibility, split into 14.6a and 14.6b). **A command is a pure function from a document to the next one**, in files by kind (`commands-layers.ts` here), and never changes what it is
+  given (tested on a deeply frozen document). **A command that names a layer or a group that is not there changes nothing and gives back the very document it was given**, not an error: the person can click on a
+  row an instant after the layer was removed, and a store (step 14.9) can tell that nothing happened because the reference is the same. **Ids**: a layer is `layer-N` and a group `group-N` with N one more than the highest
+  number among the ids that are the same prefix and a number (`ids.ts`), because the document has no counter and the brief fixes its fields; so the number of a layer given up by removing the highest one is given out
+  again, which no one can refer to (the selection is cleared with the layer, step 14.6b). **The colour of a new layer** is that of its number (`layer-1` the first of the palette, `layer-9` the first again), so that it
+  does not depend on how many layers there are now. **`addLayers`** puts a layer at the top of the legend and not in a group, visible, named for the dataset, in the default style; the datasets of one call are as
+  if added one at a time (the last on top). A dataset can have two layers if it is added twice. A dataset is described by the engine's `Summary` (it has `id`, `name`, `kind`, `elementCount`, `columns`, so a summary is
+  passed as it is). **`emptyScene()`** is the document with nothing in it: 2D, no frame, and cameras that are placeholders (a unit scale looking at 0, 0; 3D from 1,000 away at 45 degrees), which the first fit to data
+  (step 14.12) replaces and nothing draws before. Six changes to `addLayers` and the ids each fail a test (tried).
+- Step 14.6b (remove, show and hide). **`removeLayersOfDataset(doc, datasetId)`** takes out every layer of the dataset and, until none is left to take, every layer made from one that went (the contours of a layer, which
+  `validateScene` would refuse without their source), from the layers and from the legend; **a group stays where it is when it is left empty** (the person made it, and removing a dataset is not removing a folder),
+  and the selection is cleared if it was in a layer that went. It does not touch the frame or the cameras: a scene whose last layer is removed is `emptyScene()` but for them, and dropping the frame when the last
+  dataset is removed is the viewer's, from the engine's `chooseFrame` (step 15.7). **`setVisible`** and **`setGroupVisible`**: a group's checkbox sets every layer in it; whether a group looks checked, unchecked or in
+  between is for the legend model (step 14.10) to say from its layers, so the scene has no state for it. All three give back the same document when nothing would change. Seven changes to them each fail a test (tried); the
+  layers a derived layer is made from are found with `Object.hasOwn`, so a layer id like `constructor` is no layer.
+- Step 14.7a (`moveNode`). **One command moves a layer or a group**, `moveNode(doc, id, { parent, index })`, where `parent` is `null` for the top of the legend or a group's id. This is every move of section 10.3: a drop
+  line (any place), Alt+Up and Alt+Down (the place one up or down), Alt+Right (into the group above) and Alt+Left (out of its group): the viewer works out the place and the command only puts the node there. **`index` is counted
+  with the node taken out of the list it goes into**, so that "one place down" is `index + 1` in the same list, whichever list it is; a place before the start is the start, one past the end the end, and the fraction of
+  one is dropped (all of that is what `slice` does, and the code relies on it; the first version clamped by hand and two of the clamps could be removed without a test noticing, which showed they did nothing, so they
+  were). **A group can only go to the top** (a group sent into a group, or anything into a group that is not there or is a layer, is the same document); a group that is left empty by a move stays; a place that is
+  `NaN` is the same document (a mistake of the caller that cannot mean a place). A move to where the node already is is the same document, found by comparing the legend, not by the arguments. Seven changes to the
+  command each fail a test (tried; two survived at first, the `NaN` guard because the move in the test was one that changes nothing anyway, and the lower clamp because `-5` on a list of three acts as the start without
+  it, and each got a case that tells it apart).
+- Step 14.7b (groups). **`createGroup(doc, name, index = 0)`** makes an empty, open group `group-N` at the top of the legend (or at a place, counted as `moveNode` counts it); **`renameGroup`**; **`deleteGroup`**
+  puts the group's layers where the group was, in their order, so none is lost or moved (section 10.3); **names are trimmed, and a name that is nothing but space is no name** (the command gives the same document, for the
+  viewer to keep the field open). **A gap in the brief, filled**: the document has `collapsed` on every group and step 19.5 collapses and expands them, but the brief's list of commands has none that changes it, so
+  **`setGroupCollapsed(doc, groupId, collapsed)` is added** to this step (the roadmap says so). Whether it should be state of the document at all, and so be saved with it and given back to an embedder, is the brief's
+  choice and is kept. A group number goes on from the highest group there is (layer ids are not looked at: `nextId` takes only ids with the prefix, which a test shows by a legend of layers only giving `group-1`; a first
+  version listed the groups by hand, and a change that listed every node instead passed every test, which showed that it did nothing). Eight changes to the commands each fail a test (tried).
+- Step 14.8 (commands on style, contours, view, camera, frame and selection, split into 14.8a to 14.8c). **The rule for all of them: a command never makes a document that `validateScene` would refuse.** A value that
+  would is not corrected, it is **refused, the whole change with it, and the same document comes back** (the controls of the viewer offer only values that are right, so a wrong one is a bug to notice, not a
+  value to guess a meaning for); the exceptions are the ones the brief itself makes (the elevation of the 3D camera is clamped, step 14.8b). **`setStyle(doc, layerId, patch)`** changes the parts of the style that the
+  patch has (`colour`, `opacity`, `pointSize`, `lineWidth`), checks the style it would make with the very rules of `validateScene` (`validateStyle`, exported from `validate-layers.ts`, so the limits are written once),
+  writes a single colour in lower case, and is the same document when nothing changes (compared part by part, the colour by every field of its mode). **`setContours(doc, layerId, contours | null)`** sets what the
+  scene remembers about the contour lines of a layer (the lines are the engine's, step 20.4) or takes them away; it is the same document for contours that are wrong, for a change that changes nothing, and for **a layer
+  that is itself made of contours** (`validateScene` refuses that chain). Eight changes to the code each fail a test (tried); the colour test had no case that changed only the order of a ramp until a mutation that
+  ignored `reverse` passed, and now has one for each part.
+- Step 14.8b (the view and the cameras). **`setViewMode`** and **`setVerticalExaggeration`** take only the values of the contract and are the same document otherwise. **`setCamera(doc, { camera2d?, camera3d? })`** moves
+  each camera by the fields it is given (a camera patch is partial; the 2D centre and the 3D target are given whole). **Two values are made right and not refused**, the two the brief says something about: **the 3D
+  elevation is held between -89 and 89** (section 9.5: "Elevation is clamped"), and **a heading that is given is turned into the degrees from 0 up to 360** that point the same way (the decision of step 14.2: any finite
+  heading is a valid document, so a command is where it becomes one angle, and a test of a heading of 725 gives 5). Fields that are not given are not touched (a document with a heading of 400, which is valid, keeps it
+  through a move of the distance). **Everything else that is wrong refuses the whole change in both cameras** (a scale, a distance or a field of view not above 0, a position that is not a number, a tuple of the wrong
+  length), as the rule of step 14.8 says; it is the checks of `validateScene` (`validateCamera2d` and `validateCamera3d` are exported from `validate.ts`) that decide. The heading is not shared between the two cameras here
+  though the brief says "heading is shared": switching views keeps centre and heading by the camera models of step 14.12, which give the patch for `setCamera`. Ten changes to the commands each fail a test (tried;
+  two survived and were equivalent for any valid document: the length check of two position tuples, which the check had already made equal, and holding an elevation that is not given, which is held already; the code
+  was simplified for both).
+- Step 14.8c (the frame and the selection). **`setFrame(doc, frame | null)`** holds **a copy** of the frame (so that nothing that keeps the object it passed can change the document; tested by changing the array after).
+  **When the map's coordinate system changes the cameras go back to their placeholders** (`emptyScene()`'s): a camera is in the units of the system, so a centre of 512,345 metres is nowhere in degrees and a scale of 0.5 metres
+  to a pixel is not 0.5 degrees; the same when the frame is cleared or comes back after none. The viewer fits to the data after (step 14.12). **A system is the same** if both are the same EPSG code, or both a local grid in the
+  same unit; **a new origin or source in the same system leaves the cameras where they are**, which is the case of the first frame of a scene after the first dataset (the cameras are placeholders anyway) and of an origin
+  that the engine moves (step 13.F2's frame that waits for a drawable dataset). **`setSelection(doc, selection | null)`** refuses a layer that is not there and an element that is not a whole number of 0 or more
+  (`validateSelection`, exported from `validate-legend.ts`), holds a copy, and **accepts a layer that is hidden** (the table's "Show on map", step 21.5, picks a row of any dataset). Both give the same document when
+  nothing would change. Eleven changes to the two commands each fail a test (tried). **This completes the fifteen commands of the brief's list, and the sixteenth, `setGroupCollapsed`, that it lacks.**
+- Step 14.9 (the store, split into 14.9a and 14.9b). **14.9a: a command is a value.** `Command` is a union of sixteen objects with a `type` and the arguments of the function of the same name in fields, and `applyCommand(doc,
+  command)` is the one switch that turns one into the call, so that the action of a person, the call of an embedder (`viewer.dispatch(command)`, section 11.8) and a test are the same thing. `COMMAND_TYPES` lists the kinds and
+  the compiler checks that it is all of them (and that `applyCommand` is exhaustive); **a command of a kind that there is not throws a `TypeError`**, which only an untyped caller can make and is misuse. **The claim of
+  step 14.8, that no command makes a document that `validateScene` refuses, is now a test**: a run of 4,000 commands (four seeds of 1,000, from a seeded generator, so it is the same every time) with values that are
+  often wrong and ids that are often not there, in any order, each document checked by `validateScene` and then deeply frozen so that any command that changed its input would throw; at least 150 of each 1,000 do
+  something, so the run is not all refusals. It was shown to work by putting three bugs in the commands one at a time (a selection left in a layer that was removed, a group deleted with its layers, a style not checked):
+  it found each in under 200 steps.
+- Step 14.9b (`createSceneStore`). **A store is three functions over a closure**: `getState`, `dispatch(command)` and `subscribe(listener)`, with no module state, so any number of them can be on one page (tested with two
+  that know nothing of each other). The document it starts with is the one given (itself, not a copy) or `emptyScene()`; **one from outside goes through `migrate` first**, the store does not check what a typed caller
+  gives it. `dispatch` gives back the new document, or the one there was when the command changed nothing, in which case **no one is told** (the commands give back the same object for that, which is how this works).
+  **Order**: listeners are called in the order they were added; one taken away by an earlier listener in the same round is not called, and one added in a round is first called for the next change (the list is
+  copied at the start of a round). **A command given from inside a listener is applied at once and told after the round that is going on**, in a queue, so that every listener hears the changes in the order they were made
+  and with the right `previous` (a first version of the test had one nested change; the case of two in a row, which `push` and `unshift` tell apart, was added after a change of one to the other passed). **A listener that
+  throws does not stop the others**: all are called, the change is made, and the first error is thrown from `dispatch` (a thing thrown that is not an `Error` is made one, tested by what is caught, since `toThrow` accepts
+  a bare string and let a change of that line pass at first). A command of a kind that there is not is a `TypeError` that changes nothing. Nine changes to the store each fail a test (tried).
+- Step 14.10 (the legend model, split into 14.10a to 14.10c). **14.10a: number labels** (`numbers.ts`). Thousands are separated by commas, **a negative number has a true minus sign (U+2212)** so that it is never taken for
+  the **en dash (U+2013, with a space on each side) between the two bounds** of a class, a number that rounds to nothing has no sign (`0.0`, not `-0.0`), and nothing asks the platform how to write a number, so the text is
+  the same in every locale (the viewer is embedded in pages of any). A number of 1e21 or more, which the platform writes with an exponent, is written with 6 significant digits and an exponent. **A deviation from the
+  brief's rule, and why.** Section 11.7 says: "the fewest decimals (up to 6 significant digits) that keep neighbouring bounds distinct". Taken literally that gives `0, 3, 5, 8, 10` for the bounds 0, 2.5, 5, 7.5, 10 (they are
+  distinct without decimals), which are not the bounds: a value of 2.7 is in the class that reads "3 – 5". It was found because the first version did exactly that and its own tests said so. **The rule here is the fewest
+  decimals at which every bound reads as itself to less than a tenth of the narrowest class**, which also keeps neighbours distinct (each is within a tenth of its true value, so two bounds a class apart cannot meet),
+  and never more than the 6 significant digits of the bound that can have most (so `0.1234567` and `0.1234568` both read `0.123457`, as the brief allows). The same decimals for every bound of a list, so the numbers line
+  up (`0.0 – 2.5`, `2.5 – 5.0`); the bounds of seven equal classes from 0 to 8 are `0.0, 1.1, 2.3, 3.4, 4.6, 5.7, 6.9, 8.0` (the step 14.F6 corrected "eight classes", which were eight bounds). With no class to measure by (one bound, all equal) a bound reads as itself to a millionth. If the owner wants the
+  literal rule, it is one line (the `tolerance`), and the tests that say "2.5 is not 3" are the ones to change. Twelve changes to the code each fail a test (tried; counted again at the end, the first count said eleven); the first version's check that neighbours are distinct
+  turned out to be implied by the tolerance and was removed, and the comparison is strict, found by a mutant that a bound exactly at the tolerance (10.5 reading 11) let through.
+- Step 14.10b (the classes of a layer). **`classColours(colour, breaks)` is the one place that decides the colour of a class**: the ramp sampled to as many colours as the breaks have classes (which can be fewer than the
+  style asked for, because the engine drops empty classes), from its last colour if reversed. The legend takes its swatches from it, and the renderer (step 16.13) and the export must take theirs from it too, which is how
+  "the legend's counts and colours are the picture's" (section 9.3) is kept. **`classEntries(colour, breaks)`** gives the lines under a layer, each with `label`, `count`, `countLabel` (the count written with commas, so
+  that the screen and the export write the same text) and `colour`: a range reads `lower – upper` by `formatBounds`, **the largest value as a class of its own reads as that value alone** (`5`, not `5 – 5`), a category
+  reads as its value (a year `2024` is not `2,024`), then **"Other"** in a grey, then **"No value"**, which has **no colour (`null`)** and is drawn as an empty swatch (a grid's no-value cells are transparent, section 9.3, so
+  a filled swatch would show what is not on the map). **The grey of "Other", `#8c8c8c`**, is neither a colour of the palette nor on a ramp; against the maps it has 2.84 to 1 (light) and 5.67 to 1 (dark) by an independent
+  calculation, so it is under 3 to 1 on the light map like most of the palette, and is made readable by the outline in the same way (step 14.4c). An unknown ramp is a `RangeError` (a document that `validateScene`
+  accepts has none). Ten changes to the code each fail a test (tried); two numbers I had written for the grey's contrast before computing them were wrong, and the independent calculation, not the code's own, corrected them.
+- Step 14.10c (the legend model). **`legendModel(doc, { breaks?, drawable? })`** is the legend as data, for the Legend tab (step 19) and for the export (step 22.3) to draw: `entries` in the order of the document
+  (a layer, or a group with its layers), `layerCount`, and `layerCountLabel` (`3 layers`, `1 layer`, `0 layers`: the caption above the list). **A group has `visibility` `all`, `some` or `none`**, worked out from its
+  layers (the tri-state checkbox of section 10.3; the document keeps no such state, and a group with no layer is `none`). **A layer has a `swatch`**: one colour, or the colours of its ramp, which are those of its
+  classes once it is classified and the ramp sampled to the classes asked for until then. **The lines under it (`classes`) are only for a layer coloured by classes that is drawn and has its breaks** (`breaks` is by
+  layer id, from `engine.classify`). **Whether it is drawn** comes from the engine's `FrameChoice.drawable`: a dataset that has an entry that says `not_drawn` is not, and its layer then has a **`notice` in the engine's own
+  words** (an error finding before a warning before anything else, with the hint if it has one) and no lines; a dataset the engine has not mentioned is taken to be drawn (it may still be preparing, which is the chip's
+  business and not a reason to write a notice); a layer that is not drawn keeps its swatch and its on or off state, so that turning it on is still possible and shows nothing until the system is changed. **If the engine
+  gives no finding for a dataset that is not drawn, the notice says so in a sentence of its own** ("This dataset cannot be drawn in the coordinate system of the map."), so that a layer that is not drawn never has no
+  reason. The model does not include the contours section (step 20.6). Ten changes to the code each fail a test (tried); one passed at first because `toEqual` does not tell a missing `hint` from an `undefined` one, and
+  the notices are now compared with `toStrictEqual`.
+- Step 14.11 (the furniture, split into 14.11a and 14.11b). **14.11a: `northArrow(heading)`** gives `angle` (how far the needle is turned, degrees clockwise from straight up: **minus the heading**, as section 11.7
+  says, kept between -180 and 180, so a map facing east, heading 90, has north on the left at -90, and south is 180), `degrees` (the heading to the whole degree, 0 up to 360), `northUp` and a `label` (`North is up`,
+  or `Map turned 30° from north`, which the button's accessible name of step 17.1 and the map's label of step 17.7 use, so that the screen reader hears what the eye sees). **North is up to the whole degree**: a heading of
+  359.6 reads as `North is up` (and 0.6 as 1°). A heading that is not a number gives an arrow pointing up, since nothing is known to turn it. It points to **grid north of the map's coordinate system, not true north**
+  (section 9.5 asks to record this; it is here, and the label says `north`, not `true north`). Seven changes to the code each fail a test (tried).
+- Step 14.11b (the scale bar). **`scaleBar({ viewMode, units, unitsPerPixel, maxPixels? })`** gives a bar or nothing. **A bar** is the largest of 1, 2 and 5 times a power of ten that fits in at most 160 pixels (the
+  brief's width; `maxPixels` can change it), with its `value`, `unit`, `label` (`200 m`, `1 km`, `0.1 m`, `2,000 ft`, `1 mi`), `widthPx` and `mapUnits`. **Units**: a map in metres writes metres and, from 1,000 metres of room,
+  kilometres; a map in feet writes feet and, from 5,280 feet of room, miles, **for international feet and for US survey feet alike**: the brief says "US survey feet use survey miles", and a survey mile is 5,280 survey
+  feet as a mile is 5,280 feet, so the sum is the same and the label is `mi` in both (the units of the map are the engine's `CrsInfo.units`, which the viewer gives, since the scene cannot know what an EPSG code is
+  in). **A bar never reads `1,000 m` or `5,280 ft`**, and its width is between 0.4 and 1 of the room (a nice number is within 2.5 times of what it fits in), by a test over 3,000 random scales in each unit. **Nothing,
+  with a reason and a sentence** (`three_d`, `geographic`, `unknown_units`, `no_map`, `no_scale`), in this order of priority: the 3D view (the bar is 2D only), a map in degrees (no scale bar, section 9.2), units that are
+  not known, no map, and a scale that is not above 0, not a number, or so small that the bar would be under a millionth of a unit. **Two things came out of the mutation tests.** The power of ten and the digits are read
+  from the number's own decimal form (`toExponential`), because the first version used `Math.log10` and corrected it by hand for the engines where `Math.log10(1000)` is not exactly 3, and those corrections could not be
+  tested on this engine (a change that removed them passed), whereas the decimal form is exact everywhere and needs none. And **the width is held to the room** (`Math.min`), since there are scales where the nice length
+  over the scale is a rounding error over the room (5e-7 units to a pixel and 100 pixels give 100.00000000000001), which the test now has; a search found them, none was found at random. A wrong `maxPixels` is a `RangeError`.
+  Fourteen changes to the code each fail a test (tried); two boundary cases (room exactly 200 and exactly 500) were added after mutants that moved them passed. I also mis-calculated two expected values in my first tests
+  (0.0001 m and 2,000 ft), and the code was right.
+- Step 14.12 (the camera models, split into 14.12a to 14.12c). **14.12a is a move**: `normalHeading` and `heldElevation` go from `commands-view.ts` into `angles.ts`, unchanged, with their tests, in a commit of
+  their own (section 6.6: a move is never mixed with a change). **14.12b: the cameras that fit an extent.** **`fitCamera2d({ extent, viewport, heading?, padding? })`** centres on the extent and takes the scale at which
+  it just fills the map area less the padding on each side. **A turned map measures the extent across its own screen**: facing east, the width on the screen is the north to south of the extent, and a square turned by 45
+  degrees is √2 wider (the first version measured by projecting the four corners and a change of the sign of one axis passed every test, because the span of a rectangle does not depend on it, so the code now says that
+  directly: `|cos| × width + |sin| × height`). **An extent that is a point is centred at one map unit to a pixel**, and **the room never goes below one pixel** however large the padding. **`fitCamera3d({ extent,
+  viewport, fov, heading?, elevation?, verticalExaggeration? })`** looks at the middle of the box from where the sphere round it fits the narrower of the two fields of view (a map area that is taller than it is wide
+  needs more distance), the heights times the exaggeration, from a sphere of at least one map unit; the target keeps the heights as they are (the renderer applies the exaggeration), as `Camera3d` says. **A camera that
+  cannot be made is `undefined`, not an exception**: an extent that is not numbers or has a negative side, **a map area with no size (common: a container that is hidden or not laid out yet)**, a field of view not above
+  0 and below 180, an exaggeration not above 0; the viewer then leaves the camera as it is. What is returned is a camera that `validateScene` accepts (a test over 2,000 and 500 random cases says so), and in 2D that
+  every corner of the extent is inside the map area less the padding with one side touching it (2,000 random extents, headings and sizes). Sixteen different changes to the code each fail a test (tried); the width of the room with a
+  padding larger than the width had no case until one for it was added after a mutant passed.
+- Step 14.12c (switching views). **`cameraTo3d({ camera2d, viewport, fov, elevation?, targetZ? })`** and **`cameraTo2d({ camera3d, viewport })`** keep **the centre, the heading and the scale at the centre**: a
+  map area of `H` pixels at `u` map units to a pixel is `H × u` units high, and a camera with a vertical field of view `fov` sees `2 d tan(fov / 2)` units high at a distance `d` from what it looks at, so `d = H u / (2
+  tan(fov / 2))` and the other way round. The 3D camera adds what 2D has not got: **the elevation (45 degrees if none is given, held between -89 and 89) and the field of view**, and the height of the point it looks at
+  (`targetZ`, 0 if none; the viewer gives the middle of the data's heights). 2D to 3D to 2D comes back to the same centre, heading and scale (1,000 random cameras, to 9 digits). The scale matches at the point looked
+  at, across the screen; the ground in front of and behind it is foreshortened by the elevation, as in any perspective view, and no conversion can change that. **The headings are turned into one turn in both
+  directions** (a first version of the test had only headings that were already between 0 and 360, and a change that left them as they were passed, so there is a case with 400 and -30 now). Both are `undefined` for a
+  camera, a map area or a field of view that cannot be used, as the fit cameras are. This completes 14.12. Eleven changes to the code each fail a test (tried).
+- Step 14.13 (the export layout, split into 14.13a and 14.13b). **14.13a: `exportLegendLines(legendModel)`** is the legend as the picture has it, one flat list of lines: a group heading, a layer (with its swatch, whether it is in a
+  group, and whether lines of classes follow), and a class line (the same `ClassEntry` as the Legend tab, so the picture says the same words, numbers and colours). **Only what is in the picture is listed**: a layer that is
+  on **and drawn** (section 10.6 says "only visible layers appear"; **a layer that is on but that the engine says cannot be drawn is not in the picture, so it is left out of its legend too**, which is a reading of
+  "visible" and the owner's to correct), a group only if it has such a layer, and **whether a group is folded in the Legend tab does not matter** (a picture cannot be unfolded). The order is that of the Legend tab. Seven
+  changes to the code each fail a test (tried); one passed at first because every layer at the top of the legend in the tests was on and drawn, and there is a case for one that is off and for one that is not drawn.
+- Step 14.13b (`exportLayout`). **The layout is arithmetic in pixels of the picture, and the text is measured by a callback** (`measure(line) -> { width, height }`: the export measures with the real font, the tests
+  with a fake one, so nothing here depends on the platform). **Every length of section 10.6 is multiplied by `dpi / 96` and rounded to a whole pixel** (a margin of 24 is 75 pixels at 300 dpi, 3.125 times), and **the sizes
+  that `measure` gives are rounded up**, so every rectangle is whole pixels and the 1 px border of the map is one crisp line. A picture or a dpi that is not above 0 is a `RangeError` (the dialog limits both). **The
+  geometry**: a margin of 24 all round; the map from the left margin, as high as the picture between the margins, and as wide as is left; the north arrow (40) at the top right of the map and the scale bar (if any)
+  at its bottom left, both 16 in; the legend 24 to the right of the map from the same top, in columns of **one width for all of them, the widest line of the whole legend, not under 200 nor over 320**, 16 apart. Because
+  the columns take the height between the margins, the number of columns depends on the heights of the lines and not on the width of the map, so there is no circle to resolve. **A heading is never the last line of
+  a column** (section 10.6 says so of group headings): such a line goes to the next column with what follows it, and **so does a layer that has lines of classes under it, which the brief does not ask for and is an
+  addition** (otherwise a layer's name is left at the bottom of one column and its classes are at the top of the next); lines that go together move together (a group heading and the name of the layer under it), but
+  never the whole of a column, so a heading alone in a column stays, and nothing loops. **A line taller than a column has a column of its own**, and runs past the bottom margin (the export dialog's warning about the
+  size of a picture is where that is dealt with); the first version, with a line taller than the column as the very first line, made an empty column before it, which a mutant showed and a test now pins. **Warnings**:
+  `map_narrow` when the map is **less than** half of the picture wide (the brief: "when it would get less than half the picture's width"; exactly half is fine, and the test is on both sides of it), and **`no_room_for_map`
+  when the legend leaves no width for a map at all** (an addition: the dialog must be able to refuse that, and "narrow" would understate it); the map is then 0 wide. With nothing to list there is no legend and the
+  map has the whole width. Nineteen changes to the code were tried and each now fails a test; two passed at first and got cases of their own (the empty column made by a first line taller than a column, and a map of exactly no
+  width), and one was first written with a pattern that did not match the formatted code and was redone. I also corrected two expected values of my own in the first tests (a class line that fitted, so nothing moved, and
+  the picture that is exactly half, which is not less than half).
+
+## M14 gate
+
+The gate was first run on `25b5413`: `pnpm check` after every step, then `pnpm test:e2e` (exit 0), `pnpm test:visual`, `pnpm test:axe` (102 passed), and the review of the milestone by **three fresh reviewers on a
+cheaper model (Haiku), as the owner asked**, each with a part: (A) the document, the validation, the commands and the store; (B) the models, colours, numbers, furniture, cameras and the export; (C) the history, the
+roadmap, the decisions and the data licences. They were told not to touch the machine's heavy tests, and not to edit the repository; each wrote its own scripts. **The visual run had one failure,
+`data-tab-many`, "Test timeout of 60000ms exceeded", while the three reviewers were running** (one measured a load average of 44 to 244). Run alone on a quiet machine it passes in 20.6 s, so the failure was the load and not
+a defect; the final gate is run on its own, with nothing else on the machine. The reviewers' findings are sub-steps 14.F1 and following, each reproduced here by a test that failed before the fix; what the reviewers
+found that is not true or not worth a change is said in its place.
+
+- Step 14.F1 (a command made a document that `validateScene` refuses). **Must-fix of reviewer A, which was right**: the claim of step 14.8, "no command makes a document that `validateScene` refuses", was false for
+  five inputs, found by the reviewer's own scripts and each now a test that failed with the old code (8 tests, and the random run of step 14.9a, which finds the first at step 255 with the old code). (1) **`createGroup`
+  counted only the ids at the top of the legend**, so a layer called `group-1` inside a group made a group `group-1`; it counts every layer and every group now. (2) **`addLayers` counted only the layers**, so a group
+  called `layer-1` made a layer `layer-1`; it counts the groups too. (3) **The numbers of ids were read as doubles**, which lose digits above 9,007,199,254,740,991, so `layer-9007199254740992` gave the same id again,
+  overwrote the layer and doubled its place in the legend; they are read as `BigInt` now (`nextId`, and `ordinalOf` for the colour). (4) **An id with 400 digits** made the number infinite and the colour of the layer
+  `-1`, so `addLayers` threw on a document that is valid; fixed by the same. (5) **A dataset that is not what the engine gives** (an id of -1 or 1.5, a kind that there is not) made a layer that the validation refuses, or
+  none at all (`defaultStyle` had no case for a kind it did not know and gave `undefined`): **`addLayers` now refuses all the datasets of the call, with the same document, when one is not well formed** (a whole id of 0
+  or more, a kind of the six, a name that is text, a list of columns), as the rule of step 14.8 says, and **`defaultStyle` throws a `TypeError` for a kind that there is not** (misuse). **The random run of step 14.9a
+  now makes bad dataset ids and kinds, and also starts from a document with awkward ids** (a layer called like a group, a group called like a layer, a layer in a group, a number a double cannot hold), because it had
+  none of that, which is why it did not find these.
+- Step 14.F2 (`validateScene` and holes, and the square). **Reviewer A, must-fix and should-fix, both right.** (1) **`validateScene` let a sparse list through**: `new Array(3)` as the legend, or `[, 5]` as a camera
+  centre, gave no problem, because `map` and `forEach` skip the holes of a list, and a command then threw on `undefined` (`moveNode` reading `.id`). JSON cannot carry a hole but an embedder passes JavaScript objects.
+  `readList` and `readNumbers` now go through a copy with no holes (`Array.from`), so a hole is a place where nothing is, and **a thing that is missing**, reported at its place (`legend[0]`,
+  `camera2d.centre[0]`). (2) **`validateScene` took a time in proportion to the square of the layers**: the map of layers was read with a list of all its keys as the allowed fields, and each key was looked up in that list
+  (the reviewer measured 1.2 s for 16,000 layers and 82 s for 100,000). The map has its own reader now that does not look up anything. **A first test of this, with 50,000 layers and a time allowed, passed with the
+  old code**: a test that does not wait is not interrupted by a timeout (by the reviewer's figures the old code takes about 12 s for 50,000 layers, which I did not time, and the test was allowed 15), and a clock on a machine that is busy is not a measure. **The test now counts what was
+  searched**: it spies on `Array.prototype.includes` during the check of 5,000 layers and asks that no list longer than 100 was searched (the old code searched one of 5,000; the new code one of a dozen at most).
+  (3) **The cap of 100 problems was not pinned**: the tests used the constant `MAX_PROBLEMS` itself, so raising it to 100,000 changed nothing they could see, though step 14.3a said that changing it fails a test; there is a
+  test of the number now. (4) Two comments said more than was true: `validateScene` "does not throw" is **for plain data** (an object whose getter throws is not plain data, and the error is the getter's), and the store's
+  `subscribe` says that **adding the same function twice is one listener** that one removal takes away (a test says so now).
+- Step 14.F3 (the export layout: a column that was too tall, and a line that is too wide). **Reviewer B, must-fix, right.** The rule that a heading, or a layer with classes, is not left at the end of a column moved the
+  lines to the next column **without asking whether they fit there**: with a column of 73 pixels (a picture 149 high at 150 dpi), a line of 10, the name of a layer with classes of 54 and its first class of 40, the name
+  went to the next column and made it 94 tall, past the bottom margin, which step 14.13b says only a line that is taller than a column does. The reviewer found 199 to 1,937 such columns in 30,000 pictures that were
+  50 pixels or more high, and two at 200 or more; my own random test used pictures of 400 pixels and more and heights of 10 to 70, so it never reached a column short enough, and now uses pictures of 90 to 990. **Now
+  the lines that would move go only if they fit in the next column together with the line that is waiting; if not, they stay at the end of their column, which is the one thing the rule gives way to** (the other is a
+  heading that is alone in its column). The reviewer's input is a test (with the old code the column is 94 tall), and so is the random run, which fails with the old code on its own. **The other finding, right in what it
+  says and a gap in the brief and not in the code**: a line wider than the column (the column is clamped to 320 and the brief says nothing of a line that is wider) is given the width of the column and no more, so no
+  rectangle crosses the next column; **the export must draw the text of such a line within its rectangle, cut short with an ellipsis** (step 22.3), and `measure` may return the width of the cut text. A test says that the
+  rectangles are never wider than the column and never touch the next one.
+- Step 14.F4 (the cameras and angles that are not numbers). **Reviewer B, should-fix, right.** The decision of step 14.12b says that what the cameras give is a camera that `validateScene` accepts, and it was not for a heading
+  or an elevation that is `NaN` or infinite: `normalHeading` and `heldElevation` leave a value that is not a number alone (so that the check can refuse it), and the cameras passed it on, `fitCamera2d` as a heading,
+  `fitCamera3d` as a heading or an elevation, `cameraTo3d` as an elevation (its heading was already checked). **They are `undefined` now for an angle that is not a number**, as for every other value that cannot be
+  used, and the tests say so for `NaN`, `Infinity` and `-Infinity` in each place (three of them failed with the old code, the fourth is the claim itself: every camera given for a heading of 725, an elevation of
+  500 and the like is one that `validateScene` accepts). The viewer's state is validated, so this was not reachable through the document; it was the contract that was not kept. **Not changed**, from the same report: `formatBounds`
+  of a list with `NaN` or an infinite bound writes it as the platform does (`NaN`, `-Infinity` with a hyphen), and a scale bar of more than 1e21 metres is written with an exponent; the engine gives finite bounds
+  (the comment of `ClassBreaks` does not say so, the checks of `display-check.ts` do), and a bar of that size is not a map.
+- Step 14.F5 (tests that ran out of time on a loaded machine). **Reviewers A and C, right.** `pnpm --filter @karmania/scene test` failed in three of four runs on the reviewer's machine (a load average of 44 to 244 from
+  the other reviewers and the gate), always "Test timed out in 5000ms" in the scale bar's property test, which took 2.5 s alone; reviewer A saw the scale bar, export layout, cameras and commands test files all fail
+  when run together. The cost was not the code but the test: thousands of `expect` calls, each with a message made for it (an `expect` costs the same pass or fail). **The property tests keep every check for every case
+  and note a failure in a list that is said once at the end**, and make a message only when there is something to say: the scale bar's went from 2.5 s to 36 ms, the camera fit's from 978 to 20 ms, the export layout's
+  from 1.2 s to a few tens, the round trip's from 320 ms, the command run's message is made only for a document that is wrong; each is also given 20 s (`it(..., 20_000)`) as a margin for a machine that is busy (the colour sweep and the run of commands were first left without it, and have it since step 14.F8). **No
+  assertion was removed or loosened**: each of four was shown, after the change, to fail when the code is broken (the nice-number rule of the scale bar, the sides of the camera fit, the check of the layout that
+  a column is not too tall, and the scale of the camera round trip). The first full gate run's one visual failure was a timeout of the same kind, in the browser and not in these tests.
+- Step 14.F6 (words, and the notes the review asked for). **Reviewer C, right in each of these.** **Corrected in place**: the roadmap's line for 14.10a and the header of `numbers.ts` still gave the brief's rule ("the fewest
+  decimals that keep neighbouring bounds apart") and not the one implemented (step 14.10a, a departure that the log and the commit say), and the worked example of 14.10a called the eight bounds `0.0 ... 8.0` "eight
+  equal classes", which are seven. **A correction to the counts of changes in earlier entries.** Entries of steps 14.3 to 14.13 say "N changes to the code each fail a test (tried)" and, in the same breath, that one or two
+  of them were equivalent, which cannot both be so. What they mean, and what was done: changes were made to the code one at a time (a mutant), the tests were run, and a change that **passed every test was either
+  shown to need a test, and got one, or was an equivalent change (a change of a line that does nothing for any valid input), and the code was then simplified so that the line is gone**; so each change that is
+  counted was seen to fail a test when it was tried (they were not all run again against the final code). The numbers were counted by hand as the work went, were not recounted afterwards, and are therefore approximate; they say that the work was done, and the tests
+  are what shows it. **Okabe-Ito is data that no licence in the policy covers**: the brief names it ("Okabe-Ito (published palette)", section 4) as data to be stored with its source in `@karmania/scene`, which the
+  owner approved by naming it, but the log did not say that. It is a published list of eight colour values with no licence stated, credited in `THIRD_PARTY_NOTICES.md`, and **cividis was left out for a different
+  reason**: the brief said it was CC0 and the source shows a licence of its own that is not. If the owner wants a licence in the policy for a published list of colours, that is the owner's to say. **The codes of what
+  the scene finds wrong with a document** (`missing`, `type`, `range`, `choice`, `unknown_field`, `reference`, `duplicate`, `consistency`, ...) and **the warnings of the export** (`map_narrow`, `no_room_for_map`) **are not
+  finding codes** in the sense of section 7.1 and `docs/validation-codes.md`, which are the kernel's, one code with a severity, a message and a hint for the data of a dataset. They are for the program that embeds the
+  viewer, are listed in `PROBLEM_CODES` and `ExportWarning`, and carry a message for a person (and the export dialog of step 22.9 writes the words for a warning). If the owner wants them in the registry, it is a
+  step of its own. `docs/dependencies.md` now says that the scene package also uses vitest, vite and Node's type declarations.
+
+### M14 gate, second round
+
+The second review (two fresh reviewers on the cheaper model again, one for the fixes 14.F1 and 14.F2, one for 14.F3 to 14.F6, told to keep the machine quiet) found one thing that must be fixed and some that should.
+
+- Step 14.F7 (`addLayers` and the columns of a dataset). **Reviewer A, must-fix, right.** The refusal of step 14.F1 looked at a dataset's id, kind, name and whether `columns` is a list, **not at the columns in it**: a grid whose
+  first numeric column had an empty name made a layer coloured by the column `""`, which `validateScene` refuses (`style.colour.column must not be empty`), and a `null` column made `addLayers` throw (`firstNumericColumn`
+  read `.type` of it). **A dataset is well formed now only if every column is a plain object with a name that is text and not empty, and a type that is text**, and `addLayers` refuses all the datasets of the call otherwise.
+  The refusal test has five cases of it (an empty name, a name that is a number, `null`, `undefined`, a type that is a number), which failed with the old code, and **the random run now makes columns with no name and
+  `null` columns** (it made only `a` and `b` before, which is why it could not find this). Two nits of the same report are left: `addLayers(doc, [null])` throws, which is misuse (a dataset that is not even an
+  object); and `addLayers` scans every id for each dataset of a call, which took 2.3 s for 500 datasets on a document of 20,000 layers: the same order as before the fix (the reviewer measured 1.4 s with numbers
+  and 1.7 s with `BigInt` for 500 calls of `nextId` over 20,000 ids), and a call is of the datasets of one import.
+- Step 14.F8 (what the second review found in the cameras, the tests and the words). **Reviewer B, no must-fix, and these should-fix, all acted on.** (1) **The claim "every camera given is one that `validateScene` accepts" was
+  false for numbers that are finite but extreme** (a field of view of 1e-310 makes an infinite distance, a middle of two numbers of 1e308 is infinite, a scale of 1e-300 over a map area of 1e-300 is a distance of 0),
+  and it was false before step 14.F4 as well. **Each of the four cameras is now checked with `validateCamera2d` or `validateCamera3d` before it is given, and is `undefined` if it does not validate**, so the claim holds by
+  construction and not by a list of the values that were thought of. Three of the four new tests failed with the old code. **Two of the reviewer's inputs did not do what was said, and one of them found a worse bug**:
+  `fitCamera2d` for a square of 1e308 at 45 degrees gives a camera that is valid (1.4e308 does not overflow), and the test says so; and an extent from -1.7e308 to 1.7e308 gave a camera that **validates but is wrong**:
+  its width overflows to `Infinity`, `0 × Infinity` is `NaN` for the other axis, `Math.max(Infinity, NaN)` is `NaN`, and `NaN` is "not above 0", which the code took for the case of a point and gave a scale of 1, which does
+  not fit anything. **A scale that is not finite is no camera now** (a check of its own, which validation cannot supply, since the camera it replaced was valid), with the two turned cases as tests. (2) **The decision of
+  14.F5 said every property test has a timeout of 20 s, and the colour sweep and the run of commands had none**: they have it now. (3) The `@types/node` row of `docs/dependencies.md` said it was referenced only from
+  the test support file, which the scene's `palettes.test.ts` is not. (4) **My random test of the export layout had lost its tall pictures** when step 14.F3 made it use low ones: it samples both now. The nits: the order
+  of the lines is checked by identity and not by `JSON.stringify`; "each of three" was four and "320" had no unit (said in the entry of 14.F5); a comment of `export-layout.ts` says "the space between the margins" and the
+  other reads properly (the entry said two comments; the correction is in step 14.F9). **A trade-off that the first form of 14.F3 left unsaid**: when a group heading, the name of a layer with classes and its first class cannot all be kept together, the rule for the group heading wins and the layer's
+  name is left at the end of its column (the reviewer's example: lines of 10, 50 (a group), 40 (a layer with classes) and 30 (a class) in a column of 100 give the first three and then the class, where before the fix
+  the last three went to the next column and made it 120 tall). The rule that the owner asked for is kept, and the one that was added is the one that gives way.
+
+### M14 gate, third round
+
+The third review (one reviewer on the cheaper model, only the fixes 14.F7 and 14.F8) found one thing that must be fixed and three that should be, and what follows is each acted on.
+
+- Step 14.F9 (`addLayers` and holes and getters; the middle of a camera; a scale that underflows). **Reviewer, must-fix, right.** The refusal of 14.F7 used `every`, which **skips the holes of a list**: a hole in `columns`
+  (`new Array(1)`) or in the list of datasets passed the check, and a later read of it threw (`firstNumericColumn` reading `.type` of `undefined`), the same class of fault as the holes of step 14.F2. **`addLayers` now
+  takes a copy of each dataset first** (`snapshotOf`: a plain object, a whole id of 0 or more, a kind of the six, a name that is text, columns that are each a plain object with a name that is text and not empty and a
+  type of the five; a hole is a dataset or a column that is not there) **and makes the layers from the copies**, so a hole, or a `null`, is refused with the same document (the `[null]` that was said to throw as misuse
+  is refused too, which is simpler and kinder). **The second finding, should-fix, right, and the same change fixes it: each field was read more than once** (the check, `defaultStyle`, the name of the layer), so a
+  getter that answers differently the second time made a layer that was refused or an exception; **each field is read once now**, and the three cases of the reviewer (a name, a kind and a column name that change) are a test
+  (it fails if the layers are made from the datasets and not the copies). **Should-fix, right: a centre at 1e308 was refused**: `(min + max) / 2` overflows where the sum of the halves does not (halving is exact), and a
+  place at 1e308 is a place a camera can look at; the cameras take the middle as the sum of the halves, and the test that had the refusal in it says a camera is given. **Should-fix, right in a form that moved
+  after step 14.F8: a scale of an extent that has a size but underflows to 0** (5e-324 over 800 pixels) **was taken for a point** by the old `scale > 0 ? scale : POINT_SCALE`, which is what gave a scale of 1 that
+  fits nothing. A point is `width === 0 && height === 0` now and has a scale of its own, and any other extent is given its scale, which the check of the camera refuses if it is 0, `NaN` or infinite; a first form added a
+  check of its own for this and a change that removed it passed every test, because the camera's check already refuses it, so that code is gone, with a comment. The old rule, put back, fails a test. **A limit that is
+  kept**: an extent wider than the largest number (from -1.7e308 to 1.7e308) has no camera in 2D, though its true scale is finite, because the width itself overflows; that is a design limit and not a wrong
+  camera.
+

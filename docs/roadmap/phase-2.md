@@ -261,26 +261,83 @@ or releasing, and whenever the brief says to stop.
 
 ## M14: Scene document (@karmania/scene)
 
-- [ ] 14.1 Package (pure TypeScript, no DOM lib), Vitest, one test.
-- [ ] 14.2 Types of section 11.6 of the brief.
-- [ ] 14.3 validateScene() and migrate() with tests.
-- [ ] 14.4 Colour ramps and palettes with sources and licences; sampling to n
+- [x] 14.1 Package (pure TypeScript, no DOM lib), Vitest, one test.
+- [x] 14.2 Types of section 11.6 of the brief.
+- [x] 14.3 validateScene() and migrate() with tests. Split to stay under the commit size guideline:
+  - [x] 14.3a The list of problems and the checks it is made of (numbers, text, choices, lists, objects).
+  - [x] 14.3b `validateScene`: the version, the frame, the view, the cameras and the exaggeration.
+  - [x] 14.3c `validateScene`: the layers (colour, opacity, sizes, contours, derivation).
+  - [x] 14.3d `validateScene`: the legend, the selection and how they refer to layers.
+  - [x] 14.3e `migrate`.
+- [x] 14.4 Colour ramps and palettes with sources and licences; sampling to n
   classes; categorical palette contrast checked against both map backgrounds
   (record any colour under 3:1 and how it is made readable, for example by the
-  outline).
-- [ ] 14.5 Default styles (11.6).
-- [ ] 14.6 Commands: layers and visibility.
-- [ ] 14.7 Commands: ordering and groups.
-- [ ] 14.8 Commands: style, contours, view, camera, frame, selection.
-- [ ] 14.9 Store: getState, dispatch, subscribe; several stores per page.
-- [ ] 14.10 Legend model with number labels (11.7).
-- [ ] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
-  changes, null cases).
-- [ ] 14.12 Camera models: fit 2D and 3D; 2D to 3D keeping centre and heading.
-- [ ] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
+  outline). Split to stay under the commit size guideline:
+  - [x] 14.4a Colours: `#rrggbb`, mixing, and WCAG contrast.
+  - [x] 14.4b The ramps (viridis and magma from matplotlib, ColorBrewer sequential and
+    diverging) with their sources and licences, sampling to n classes, the "Data" table
+    of `docs/dependencies.md`, and `validateScene` refusing a ramp that is not one.
+    Cividis is left out until the owner decides (its licence is not CC0 as far as is shown).
+  - [x] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
+    the light and the dark map, and the colours of new layers.
+- [x] 14.5 Default styles (11.6).
+- [x] 14.6 Commands: layers and visibility. Split to stay under the commit size guideline:
+  - [x] 14.6a The empty scene, the ids of new layers, and `addLayers`.
+  - [x] 14.6b `removeLayersOfDataset`, `setVisible` and `setGroupVisible`.
+- [x] 14.7 Commands: ordering and groups. Split to stay under the commit size guideline:
+  - [x] 14.7a `moveNode`: a layer or a group to a place in the legend or in a group.
+  - [x] 14.7b `createGroup`, `renameGroup`, `deleteGroup`, and `setGroupCollapsed` (the brief's list has no
+    command that changes `collapsed`, and step 19.5 needs one).
+- [x] 14.8 Commands: style, contours, view, camera, frame, selection. Split to stay under the commit
+  size guideline:
+  - [x] 14.8a `setStyle` and `setContours`.
+  - [x] 14.8b `setViewMode`, `setVerticalExaggeration` and `setCamera`.
+  - [x] 14.8c `setFrame` and `setSelection`.
+- [x] 14.9 Store: getState, dispatch, subscribe; several stores per page. Split to stay under the commit
+  size guideline:
+  - [x] 14.9a `Command` as data, `applyCommand`, and the test that no run of commands makes a document
+    that `validateScene` refuses.
+  - [x] 14.9b `createSceneStore`.
+- [x] 14.10 Legend model with number labels (11.7). Split to stay under the commit size guideline:
+  - [x] 14.10a Number labels: thousands commas, and the fewest decimals at which each bound reads as itself to less
+    than a tenth of the narrowest class (a departure from the brief's "keep neighbouring bounds distinct", see decisions).
+  - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
+  - [x] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
+- [x] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
+  changes, null cases). Split to stay under the commit size guideline:
+  - [x] 14.11a The north arrow: the angle of the needle and what it says.
+  - [x] 14.11b The scale bar: a nice length, its unit, its width in pixels, or nothing and why.
+- [x] 14.12 Camera models: fit 2D and 3D; 2D to 3D keeping centre and heading. Split to stay under the
+  commit size guideline:
+  - [x] 14.12a The heading and elevation helpers move out of the commands into `angles.ts`, unchanged (a move
+    is a commit of its own).
+  - [x] 14.12b The cameras that fit an extent in 2D and in 3D.
+  - [x] 14.12c The 2D camera of a 3D one and the 3D camera of a 2D one, keeping centre, heading and scale.
+- [x] 14.13 Export layout model (10.6) with a fake measure callback; tests for one
   column, several columns, a group heading at a column end, a narrow map
-  warning.
-- [ ] 14.G Gate.
+  warning. Split to stay under the commit size guideline:
+  - [x] 14.13a The lines of the exported legend: visible layers that are drawn, their classes, and the groups that
+    have any.
+  - [x] 14.13b The layout: the map, the north arrow, the scale bar and the columns of the legend, in pixels, with the
+    warning that the map is narrow.
+- [x] 14.F1 Gate fix, review of M14: ids that cannot collide or lose digits, and datasets that are not what the engine
+  gives are refused, so that a command never makes a document that `validateScene` refuses.
+- [x] 14.F2 Gate fix, review of M14: a hole in a list is a thing that is missing, `validateScene` takes a time in
+  proportion to the layers and not to their square, the cap of 100 problems is pinned, and two comments say what is true.
+- [x] 14.F3 Gate fix, review of M14: lines that go to the next column to stay with their heading do so only if they fit
+  there, and a line wider than its column is said to be drawn within its rectangle.
+- [x] 14.F4 Gate fix, review of M14: the cameras are undefined for a heading or an elevation that is not a number,
+  so every camera given is one that `validateScene` accepts.
+- [x] 14.F5 Gate fix, review of M14: the property tests take tens of milliseconds and not seconds, so that a loaded
+  machine does not run them out of their five seconds.
+- [x] 14.F6 Gate fix, review of M14: the words that were stale or wrong in the roadmap, a header and the decisions,
+  the data and problem-code notes the review asked for, and the packages that use vitest, vite and Node's types.
+- [x] 14.F7 Gate fix, second review of M14: `addLayers` also refuses a dataset whose columns are not what the engine gives.
+- [x] 14.F8 Gate fix, second review of M14: a camera is given only if it validates, an extent that overflows has no
+  camera, and the small things that review found in tests, comments and docs.
+- [x] 14.F9 Gate fix, third review of M14: `addLayers` works on one copy of each dataset (holes and getters), and the
+  cameras take the middle as the sum of the halves and do not take a scale that underflows for a point.
+- [x] 14.G Gate.
 
 ## M15: The viewer package (a move, no visible change)
 
