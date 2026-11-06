@@ -4013,3 +4013,46 @@ default line colours and the rest were accepted as they are (the owner will chan
   will add later.** The class of a single value still reads that value alone. The tests of the old rule were replaced by tests of the new one, and nine changes to the code each fail one (tried: the 15 digits changed to 14, 16
   and 17, the minus sign dropped or made a hyphen, the absolute value dropped, the commas dropped, the sign test made `<=`, the non-finite case removed); a tenth change, a guard for numbers with an exponent, did
   nothing (the commas of a whole part that has no three digits in a row are none), so the guard was removed.
+
+## M15: the viewer package
+
+The components of the app move into `@karmania/viewer` (steps 15.1 to 15.5), are composed into `<karmania-viewer>` with a `createViewer(container)` (15.6), the viewer holds a scene store (15.7), and ESLint enforces the
+direction of the dependencies (15.8). Nothing changes on screen. The moves are `git mv` renames: a file moved with no change but its imports of other files that moved, and the commit says which lines.
+
+- Step 15.1 (the package). `@karmania/viewer` has a manifest, a tsconfig with the DOM (as the app's), an entry and a test, and `vitest`, `lint` and `typecheck` cover it with the others. Dependencies were added by the step that first needed
+  each (the engine and the ui at 15.2a, lit at 15.2b, the scene at 15.7). **The style test of the ui package scans `packages/viewer/src` as well** (`styles.test.ts` had a list of roots), so that the CSS of a component that moves is
+  still held to "no raw colours, lengths or durations"; without that, moving a component would have taken it out of the test.
+- Step 15.2 (the map area, split in 15.2a and 15.2b). **The viewer may not import from the app**, so what a component imports moves before it, or with it: the map area needs `carriesFiles` (`drag.ts`) and `formatCount`
+  (`import-files.ts`, with its test), which moved first (15.2a). **The viewer exports every module of its source under `./*`** while the pieces move, so that the app can import `@karmania/viewer/map-area`; at 15.6 the app
+  stopped needing them, and **the pattern is kept for one reason**: `e2e/mapping-wording.e2e.ts` (a test that opens no page and compares the wizard's wording with `docs/validation-codes.md`) imports `import-mapping`. The ESLint
+  rule of 15.8 forbids the app's source from using them, and its tests may. The map area has no unit test of its own: `map-area.e2e.ts` and the screenshots cover it.
+- Step 15.3 and 15.4 (the panel, the Data tab; split in 15.4a to 15.4e). **The brief's order is kept in name but not in every file**: `panel.ts` imports `data-tab.js`, which registers `<karmania-data-tab>`, which registers the dataset list and
+  the summary, which import `datasets.ts`, `import-run.ts`, `findings.ts` and what those import, so the panel could not move before the Data tab without importing from the app. **15.3 moved the panel's tabs, state (with its test) and
+  resize handle** (`panel-tabs.ts`, `panel-state.ts`, `resize-handle.ts`); **15.4 was split**: 15.4a `datasets.ts` and `import-crs.ts`; 15.4b `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and `import-run.ts`; 15.4c
+  `findings-text.ts`, `import-steps.ts` and `findings.ts`; 15.4d the Data tab, the dataset list and the summary; **15.4e `panel.ts`**. Each piece moved after what it imports. **A step the brief does not have, 15.4c0**: the last two unit tests
+  of the app (`findings-text`, `import-steps`) were about to leave it, and a package with no test file makes `vitest run` fail ("No test files found"), which `pnpm check` runs; so the app got a unit test of the logic it will own besides
+  the page, `forceThemeFromAddress` (stubbing `location` and `document`, which Node does not have). Six changes to `theme.ts` each fail a test (tried), rather than a flag that lets the run pass with no tests.
+- Step 15.5 (the import dialog and its five steps). Renames. The app's source is now `app.ts`, `main.ts`, `theme.ts`, the gallery and its sections.
+- Step 15.6 (`<karmania-viewer>`, `createViewer`). **15.6a**: the composition of `app.ts` (the map area, the panel, the wizard, the engine, the panel's state, the datasets and the selection, the file picker) is the element
+  `<karmania-viewer>`, and the app is the toolbar and that element. The viewer's host is a grid of one row that fills what it is in, with the workspace inside as before, **and no `overflow: hidden`**, which the app host has: a tooltip or a
+  focus ring of the panel must not be cut off at the viewer's edge, which would have been a change on screen. **The tests changed in one way and no expectation**: the app's `engine`, `datasets` and `selected` are the viewer's now, and
+  `document.querySelector` does not pierce a shadow root, so the tests that read or set them, or walked from `karmania-app` into the import dialog or the panel, go to `karmania-viewer` (through the app's shadow root in `page.evaluate`, by
+  Playwright's piercing locator elsewhere). The first run of the whole e2e suite after the move found those paths (three failed in `fix-and-retry`, one in `crs-step`; the others did not get that far), and a first, too wide, search-and-replace
+  had also changed locators that are about the app and not the viewer (the toolbar, the visibility of the whole app, the app's size); those were put back, and the second run of the suite passed, 629 tests. **15.6b**: `createViewer(container)`
+  puts a `<karmania-viewer>` in an element and gives `{ openImport(files?), dispose() }`; `dispose` takes the element out of the page, which is the element's own `disconnectedCallback` (the engine, its worker, the window's listeners),
+  twice is no harm, and `openImport` after it throws (a mistake of the caller). The app **uses it as an embedder would** (a `.viewer` container, the viewer made in `firstUpdated`, disposed in `disconnectedCallback`), so every e2e test
+  runs through it. Its unit test runs in Node against a stand-in for the page (seven changes to `create-viewer.ts` each fail a test); the layout files of the e2e suite (150 tests) passed on it. **Two things left as they were, for M23, which
+  is the embedding**: the panel's width is limited by the window and not by the container (`document.documentElement.clientWidth`), and the viewer refuses stray file drops on the whole window (`dragover` and `drop` on `window`), which
+  a page that embeds the viewer may not want of it. Both are moves of the phase 1 behaviour and are not changed here: the step is "no visible change".
+- Step 15.7 (the scene store). `<karmania-viewer>` holds a store made by `createSceneStore` and `syncDatasets(store, datasets)` keeps it to the datasets, after each import and each removal: **the layers of a dataset that is gone are removed
+  first, then a layer is added for each dataset that has none**, with the scene's commands; layers that stay are not touched (their style, visibility and place are the person's), calling it again changes nothing, and tells no one. Because
+  the removal comes first, a dataset that replaces another gets the number of the one removed (`layer-1` again), which is how the scene numbers (from the highest there is). `viewer.scene()` gives the document, on the element and on the
+  handle, which refuses it after `dispose`. **The guard `added.length > 0` was removed**: a mutant that dispatched `addLayers` with nothing passed every test, because nothing to add is the same document and tells no one. A new e2e
+  file, `scene.e2e.ts`, loads files and reads the scene (empty at the start, a layer for a dataset, three layers for a file that holds three and one fewer after a removal); it fails if either call of `syncDatasets` is taken out (tried, each alone).
+- Step 15.8 (import restrictions). `eslint.restrictions.mjs` has a block for each package with `@typescript-eslint/no-restricted-imports` (the core rule cannot tell a type import): `engine` and `ui` import no other package; `scene` imports
+  the types of `engine`; `render` the types of `scene` and `engine`, with no Lit and no ui; `viewer` may use all but the app; the source of `app` imports `@karmania/viewer` and `@karmania/ui` only; `three` only in `render`; no path into another
+  package. **A reading of section 5.2**: it says "render depends on scene types only", but the renderer must also name the engine's `RenderBuffers`, which are types; it is allowed the types of both, and nothing else of them. **The rules are
+  tested**: `packages/app/src/import-restrictions.test.ts` runs ESLint's `Linter` on sample imports with exactly these blocks (7 tests; **44 imports at 41 call sites, one of them in a loop of four**: the commit says 40), and sixteen
+  changes to the blocks each fail it (tried; two of the first attempt had not applied, because prettier had reformatted the text they looked for, and were done again). A real violation is refused by `eslint` itself (tried, removed). The
+  `render` block has no package to lint until 16.1.
+

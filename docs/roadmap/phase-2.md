@@ -369,6 +369,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 15.7 The viewer holds a scene store; datasets loaded or removed add or
   remove layers (nothing drawn yet); tests.
 - [x] 15.8 ESLint import restrictions for the dependency direction (5.2).
+- [x] 15.8a (added) Record the decisions of M15 in the log.
 - [ ] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)
