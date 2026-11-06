@@ -68,6 +68,8 @@ export type { ClassEntry } from './class-entries.js';
 export { BOUND_DASH, MINUS, formatBounds, formatCount, formatNumber } from './numbers.js';
 export { createSceneStore } from './store.js';
 export type { SceneListener, SceneStore } from './store.js';
+export { exportLegendLines } from './export-lines.js';
+export type { ExportLine } from './export-lines.js';
 export { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';
 export type { Fit2dInput, Fit3dInput, To2dInput, To3dInput, Viewport } from './cameras.js';
 export { COMMAND_TYPES, applyCommand } from './commands.js';
