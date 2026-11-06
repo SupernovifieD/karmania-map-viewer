@@ -5,34 +5,22 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './file-step.js';
 import type { DraftChange } from './file-step.js';
-import { applyDraftChange, draftFor } from '@karmania/viewer/import-draft';
-import type { ImportDraft } from '@karmania/viewer/import-draft';
-import { crsBlocker } from '@karmania/viewer/import-crs';
-import { entriesOf, isImportable } from '@karmania/viewer/import-files';
-import { mappingProblems } from '@karmania/viewer/import-mapping';
-import type { FileEntry } from '@karmania/viewer/import-files';
+import { applyDraftChange, draftFor } from './import-draft.js';
+import type { ImportDraft } from './import-draft.js';
+import { crsBlocker } from './import-crs.js';
+import { entriesOf, isImportable } from './import-files.js';
+import { mappingProblems } from './import-mapping.js';
+import type { FileEntry } from './import-files.js';
 import './crs-step.js';
-import '@karmania/viewer/findings';
-import type { GoToStep } from '@karmania/viewer/findings';
+import './findings.js';
+import type { GoToStep } from './findings.js';
 import './mapping-step.js';
 import './nodata-step.js';
-import {
-  buildMapping,
-  groupFindings,
-  IDLE,
-  loadBlocker,
-  loadLabel,
-} from '@karmania/viewer/import-run';
-import type { RunState } from '@karmania/viewer/import-run';
+import { buildMapping, groupFindings, IDLE, loadBlocker, loadLabel } from './import-run.js';
+import type { RunState } from './import-run.js';
 import './review-step.js';
-import {
-  describeStep,
-  FIRST_STEP,
-  IMPORT_STEPS,
-  stepAfter,
-  stepBefore,
-} from '@karmania/viewer/import-steps';
-import type { ImportStep } from '@karmania/viewer/import-steps';
+import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
+import type { ImportStep } from './import-steps.js';
 
 /** The name of the event the dialog sends when it has been closed, by Cancel, Esc or the close button. */
 export const IMPORT_CLOSE = 'karmania-import-close';

@@ -3,9 +3,9 @@ import type { CheckboxChange, InputChange, SelectChange, SelectOption } from '@k
 import { css, html, LitElement, nothing } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
-import type { ImportDraft } from '@karmania/viewer/import-draft';
-import { formatCount, NO_NODATA_NOTE } from '@karmania/viewer/import-files';
-import type { FileEntry } from '@karmania/viewer/import-files';
+import type { ImportDraft } from './import-draft.js';
+import { formatCount, NO_NODATA_NOTE } from './import-files.js';
+import type { FileEntry } from './import-files.js';
 import {
   DECIMAL_NAMES,
   describeOther,
@@ -14,8 +14,8 @@ import {
   tokenLabel,
   withNumber,
   withToken,
-} from '@karmania/viewer/import-nodata';
-import type { EmptyCoordinates } from '@karmania/viewer/import-nodata';
+} from './import-nodata.js';
+import type { EmptyCoordinates } from './import-nodata.js';
 import type { DecimalSeparator } from '@karmania/engine';
 
 const EMPTY_COORDINATE_OPTIONS: readonly SelectOption[] = (

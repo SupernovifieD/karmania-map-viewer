@@ -360,7 +360,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 15.4c The findings list: `findings-text.ts`, `import-steps.ts` and `findings.ts`, with their tests.
   - [x] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.
   - [x] 15.4e `panel.ts`.
-- [ ] 15.5 Move the import dialog and its steps.
+- [x] 15.5 Move the import dialog and its steps.
 - [ ] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes
   toolbar plus viewer; a minimal createViewer(container) and dispose(). Still
   pixel-identical.

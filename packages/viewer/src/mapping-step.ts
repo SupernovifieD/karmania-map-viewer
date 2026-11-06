@@ -4,9 +4,9 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { DRAFT_CHANGE } from './file-step.js';
 import type { DraftChange } from './file-step.js';
-import type { ImportDraft } from '@karmania/viewer/import-draft';
-import { formatCount, NO_COLUMNS_NOTE } from '@karmania/viewer/import-files';
-import type { FileEntry } from '@karmania/viewer/import-files';
+import type { ImportDraft } from './import-draft.js';
+import { formatCount, NO_COLUMNS_NOTE } from './import-files.js';
+import type { FileEntry } from './import-files.js';
 import {
   mappingProblems,
   parseSize,
@@ -18,9 +18,9 @@ import {
   withRename,
   withRole,
   withType,
-} from '@karmania/viewer/import-mapping';
-import type { BlockSizeDraft } from '@karmania/viewer/import-mapping';
-import '@karmania/viewer/findings';
+} from './import-mapping.js';
+import type { BlockSizeDraft } from './import-mapping.js';
+import './findings.js';
 import { COLUMN_TYPES, ROLES } from '@karmania/engine';
 import type { ColumnType, Role } from '@karmania/engine';
 

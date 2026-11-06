@@ -1,7 +1,7 @@
 import { sharedStyles } from '@karmania/ui';
 import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import '@karmania/viewer/findings';
+import './findings.js';
 import {
   describeFile,
   isImportable,
@@ -9,9 +9,9 @@ import {
   KIND_HELP,
   KIND_NAMES,
   KINDS_BY_FORMAT,
-} from '@karmania/viewer/import-files';
-import type { FileEntry } from '@karmania/viewer/import-files';
-import type { ImportDraft } from '@karmania/viewer/import-draft';
+} from './import-files.js';
+import type { FileEntry } from './import-files.js';
+import type { ImportDraft } from './import-draft.js';
 
 /** The name of the event the step sends when a person changes what is to be imported. */
 export const DRAFT_CHANGE = 'karmania-draft-change';
