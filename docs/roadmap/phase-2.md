@@ -272,7 +272,14 @@ or releasing, and whenever the brief says to stop.
 - [ ] 14.4 Colour ramps and palettes with sources and licences; sampling to n
   classes; categorical palette contrast checked against both map backgrounds
   (record any colour under 3:1 and how it is made readable, for example by the
-  outline).
+  outline). Split to stay under the commit size guideline:
+  - [x] 14.4a Colours: `#rrggbb`, mixing, and WCAG contrast.
+  - [ ] 14.4b The ramps (viridis and magma from matplotlib, ColorBrewer sequential and
+    diverging) with their sources and licences, sampling to n classes, the "Data" table
+    of `docs/dependencies.md`, and `validateScene` refusing a ramp that is not one.
+    Cividis is left out until the owner decides (its licence is not CC0 as far as is shown).
+  - [ ] 14.4c The categorical palettes (Okabe-Ito, ColorBrewer Paired), their contrast against
+    the light and the dark map, and the colours of new layers.
 - [ ] 14.5 Default styles (11.6).
 - [ ] 14.6 Commands: layers and visibility.
 - [ ] 14.7 Commands: ordering and groups.
