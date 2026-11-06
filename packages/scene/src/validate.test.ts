@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_PROBLEMS } from './problems.js';
-import { ABSENT, sampleScene, spoil } from './test-support/documents.js';
+import { ABSENT, problemsAfter, sampleScene, spoil } from './test-support/documents.js';
 import { validateScene } from './validate.js';
-
-/** The `code path` of every problem `validateScene` finds in the sample after `path` is set to `value`. */
-function problemsAfter(path: readonly (string | number)[], value: unknown): string[] {
-  return validateScene(spoil(sampleScene(), path, value)).map((p) => `${p.code} ${p.path}`);
-}
 
 describe('validateScene: the document, the frame, the view and the cameras', () => {
   it('finds nothing wrong with a document that uses every field', () => {
