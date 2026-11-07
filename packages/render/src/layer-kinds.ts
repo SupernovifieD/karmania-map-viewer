@@ -5,6 +5,7 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import { createLinesLayer } from './lines-layer.js';
+import { createPolygonsLayer } from './polygons-layer.js';
 import type { LayerMaker } from './layer-set.js';
 import { createPointsLayer } from './points-layer.js';
 
@@ -14,7 +15,8 @@ const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } 
     buffers.kind === 'points' ? createPointsLayer(buffers, look) : undefined,
   lines: (buffers, look) =>
     buffers.kind === 'lines' ? createLinesLayer(buffers, look) : undefined,
-  polygons: undefined,
+  polygons: (buffers, look) =>
+    buffers.kind === 'polygons' ? createPolygonsLayer(buffers, look) : undefined,
   mesh: undefined,
   grid: undefined,
   surface: undefined,
