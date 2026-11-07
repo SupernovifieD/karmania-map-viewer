@@ -746,6 +746,40 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
   });
 
+  it('asks for the classes of points when their style is by classes, and gives them with the layer', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.classifyCalls).toEqual([]);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Au',
+          method: 'quantile',
+          classes: 4,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[0, 'Au', 'quantile', 4]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    expect(t.sink.setLayerClasses.mock.calls[0]?.[1]?.indices).toEqual(Uint8Array.of(0, 1));
+    // And back to one colour: the classes are taken away, and the engine is not asked for a mask of points.
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    expect(t.sink.setLayerClasses).toHaveBeenLastCalledWith('layer-1', undefined);
+    expect(t.classifyCalls).toHaveLength(1);
+  });
+
   it('asks for the classes of a block model as for a grid, and gives them with the layer', async () => {
     const t = setup();
     t.drawable([0, true]);
@@ -773,6 +807,17 @@ describe('LayerPipeline: the classes of a layer', () => {
 
   it('does not ask for classes for a layer of a kind that is not coloured by them, whatever its style says', async () => {
     const t = setup();
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'lines',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0),
+          segments: Uint32Array.of(0, 1),
+          segmentLine: Uint32Array.of(0),
+        },
+        findings: [],
+      });
     t.drawable([0, true]);
     await t.add(0);
     t.scene.dispatch({
