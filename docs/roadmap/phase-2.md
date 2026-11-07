@@ -440,6 +440,14 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.12d The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
 - [ ] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.
+  Split (the grid and the blocks have theirs from 16.11 and 16.12; what is left is a palette change that keeps what is on the card, the cells that
+  have a value when the style is one colour, and the other four kinds, each with its own way to give an element its colour):
+  - [x] 16.13a The same classes with other colours keep the textures and attributes, and only the palette changes.
+  - [ ] 16.13b A grid or a block model in one colour: the cells and blocks that have a value.
+  - [ ] 16.13c Points by class.
+  - [ ] 16.13d Lines by class.
+  - [ ] 16.13e Polygons by class.
+  - [ ] 16.13f Meshes by class.
 - [ ] 16.14 Draw order with depth cleared between layers; pixel tests.
 - [ ] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
   zoomed; no jitter while panning.

@@ -213,6 +213,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     },
     setClasses(next: ClassColouring | undefined) {
       if (next !== undefined && next.indices.length === total) {
+        const same = next.indices === classes;
         classes = next.indices;
         const count = Math.min(next.colours.length, MAX_CLASSES);
         next.colours.slice(0, count).forEach((hex, k) => {
@@ -220,6 +221,11 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
           palette[k]?.set(r, g, b);
         });
         uniforms.uCount.value = count;
+        if (same) {
+          // The same classes of the blocks with other colours (another ramp): the attributes are what they were and only the palette changes.
+          show();
+          return;
+        }
       } else {
         classes = undefined;
         uniforms.uCount.value = 0;
