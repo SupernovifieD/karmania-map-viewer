@@ -27,8 +27,16 @@ export interface Stats {
   };
 }
 
+/** The 2D camera of the scene. */
+export interface Camera {
+  readonly centre: readonly [number, number];
+  readonly unitsPerPixel: number;
+  readonly heading: number;
+}
+
 /** The viewer of the page, in what the tests use of it. */
 interface ViewerElement {
+  scene(): { camera2d: Camera };
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
   dispatch(command: unknown): unknown;
@@ -92,3 +100,14 @@ export function dispatch(page: Page, ...commands: readonly unknown[]): Promise<v
 /** Lets a number of milliseconds pass in the page. */
 export const pause = (page: Page, ms: number): Promise<void> =>
   page.evaluate((time) => new Promise<void>((resolve) => setTimeout(resolve, time)), ms);
+
+/** The 2D camera of the scene as it is now. */
+export function camera(page: Page): Promise<Camera> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    const { centre, unitsPerPixel, heading } = viewer.scene().camera2d;
+    return { centre: [centre[0], centre[1]] as const, unitsPerPixel, heading };
+  });
+}

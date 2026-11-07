@@ -1,7 +1,7 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
-import { createRenderer } from '@karmania/render';
-import type { Renderer, RenderStats } from '@karmania/render';
+import { DEFAULT_SCALE_LIMITS, attachController2d, createRenderer } from '@karmania/render';
+import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
@@ -14,7 +14,7 @@ import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
-import type { DroppedFiles } from './map-area.js';
+import type { DroppedFiles, KarmaniaMapArea } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -177,7 +177,32 @@ export class KarmaniaViewer extends LitElement {
         },
       });
       this.lookThroughCamera();
+      this.controller = this.renderer === undefined ? undefined : this.listenToPerson(area, canvas);
+      area.interactive = this.controller !== undefined;
     }
+  }
+
+  /** What moves the map when a person drags it, turns the wheel or presses a key: it asks the scene for a camera. */
+  private controller: Controller2d | undefined;
+
+  private listenToPerson(
+    area: KarmaniaMapArea,
+    canvas: HTMLCanvasElement,
+  ): Controller2d | undefined {
+    const focusTarget = area.focusTarget;
+    if (focusTarget === undefined) {
+      return undefined;
+    }
+    return attachController2d({
+      element: area,
+      canvas,
+      focusTarget,
+      getCamera: () => this.store.getState().camera2d,
+      getLimits: () => DEFAULT_SCALE_LIMITS,
+      onCamera: (change) => {
+        this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
+      },
+    });
   }
 
   /** Gives the renderer the camera and the origin of the scene. */
@@ -214,6 +239,12 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('resize', this.onWindowResize);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
+    this.controller?.dispose();
+    this.controller = undefined;
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area !== null) {
+      area.interactive = false;
+    }
     this.renderer?.dispose();
     this.renderer = undefined;
     this.engine?.dispose();

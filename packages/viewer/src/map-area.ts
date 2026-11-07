@@ -29,6 +29,7 @@ export class KarmaniaMapArea extends LitElement {
   static override properties = {
     datasets: { type: Number },
     redrawing: { type: Boolean },
+    interactive: { type: Boolean },
     dragging: { state: true },
   };
 
@@ -50,16 +51,36 @@ export class KarmaniaMapArea extends LitElement {
         position: relative;
       }
 
+      /* The area has the keyboard when it is focused, and the ring is drawn inside it, where it is not cut off. */
+      main:focus-visible {
+        outline-offset: calc(var(--k-focus-width) * -1);
+      }
+
+      /* The empty state fills the area, and the map under it is what a pointer is on: only its action is for the pointer. */
+      k-empty-state {
+        pointer-events: none;
+      }
+
+      span[slot='action'] {
+        pointer-events: auto;
+      }
+
       /* The map: it fills the area exactly, whatever the area is, and is under everything else. Its background is
          the colour that the renderer clears it to, which it reads from here: the map has the colour of the area. */
       canvas {
         background-color: var(--k-surface-map);
+        cursor: grab;
         display: block;
         height: 100%;
         inset: 0;
         position: absolute;
+        touch-action: none;
         width: 100%;
         z-index: -1;
+      }
+
+      canvas[data-dragging] {
+        cursor: grabbing;
       }
 
       /* Over the area, 8 inside its edges, and not in the way of the pointer. It is there all
@@ -119,6 +140,11 @@ export class KarmaniaMapArea extends LitElement {
   declare datasets: number;
   /** Whether the map is being drawn again after the graphics card took it away: it says so, in a notice over the map. */
   declare redrawing: boolean;
+  /**
+   * Whether the map can be moved (a drag, the wheel, the keys): the area is then a stop of the keyboard. Before that it is not,
+   * since a stop that does nothing is in a person's way, and the empty state's own button is the first thing after the toolbar.
+   */
+  declare interactive: boolean;
   /** Whether files are being dragged over the area. */
   declare private dragging: boolean;
 
@@ -132,7 +158,13 @@ export class KarmaniaMapArea extends LitElement {
     super();
     this.datasets = 0;
     this.redrawing = false;
+    this.interactive = false;
     this.dragging = false;
+  }
+
+  /** What has the focus when the keys are the map's: there from the first render, and `undefined` until then. */
+  get focusTarget(): HTMLElement | undefined {
+    return this.renderRoot.querySelector('main') ?? undefined;
   }
 
   /** The canvas the map is drawn on: there from the first render, and `undefined` until then. */
@@ -144,6 +176,7 @@ export class KarmaniaMapArea extends LitElement {
     return html`
       <main
         aria-label="Map"
+        tabindex=${this.interactive ? '0' : nothing}
         @dragenter=${this.onDragEnter}
         @dragover=${this.onDragOver}
         @dragleave=${this.onDragLeave}
