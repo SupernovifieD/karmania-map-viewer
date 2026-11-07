@@ -438,7 +438,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.12b The block layer: instanced boxes in parts, the class of each block, the top faces in 2D.
   - [x] 16.12c A layer of blocks that is less than opaque: a depth pass, so that a top with another under it is blended once.
   - [x] 16.12d The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
-- [ ] 16.13 Class colours: palette uniforms from class indices; restyling
+- [x] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.
   Split (the grid and the blocks have theirs from 16.11 and 16.12; what is left is a palette change that keeps what is on the card, the cells that
   have a value when the style is one colour, and the other four kinds, each with its own way to give an element its colour):
@@ -447,7 +447,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.13c Points by class.
   - [x] 16.13d Lines by class.
   - [x] 16.13e Polygons by class.
-  - [ ] 16.13f Meshes by class.
+  - [x] 16.13f Meshes by class.
 - [ ] 16.14 Draw order with depth cleared between layers; pixel tests.
 - [ ] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
   zoomed; no jitter while panning.

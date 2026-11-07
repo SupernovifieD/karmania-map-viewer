@@ -1,5 +1,6 @@
 /**
- * The layer of a mesh (section 9.3 of the brief): its triangles in the one colour of the layer, lit from above. Each triangle is
+ * The layer of a mesh (section 9.3 of the brief): its triangles in the one colour of the layer, or, given their classes (`setClasses`: one for
+ * each triangle), each in the colour of its class, lit from above. Each triangle is
  * shaded flat, with a normal that the fragment shader works out from how the position changes from one pixel to the next
  * (`dFdx`, `dFdy`), so that the vertices are not made again for each triangle and are shared as the engine sent them. The light
  * comes from straight above: a triangle that lies flat has the colour of the layer as it is, and one that slopes is darker the
@@ -7,8 +8,10 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
+import { createClassedTriangles } from './class-triangles.js';
 import type { LayerObject } from './layer-set.js';
 import { colourOf } from './look.js';
+import type { ClassColouring } from './look.js';
 import { createTriangleParts } from './triangle-parts.js';
 
 /**
@@ -50,18 +53,16 @@ void main() {
 
 type MeshBuffers = Pick<Extract<RenderBuffers, { kind: 'mesh' }>, 'positions' | 'triangles'>;
 
-/** The layer of the triangles of `buffers`, looking as `look` says. */
-export function createMeshLayer(
-  buffers: MeshBuffers,
-  look: Parameters<LayerObject['setLook']>[0],
-): LayerObject {
-  const uniforms = {
-    uColour: { value: new Vector3() },
-    uOpacity: { value: 1 },
-    uLight: { value: new Vector3(0, 0, 1) },
-    uAmbient: { value: MESH_AMBIENT },
-  };
-  const material = new ShaderMaterial({
+type MeshUniforms = {
+  uColour: { value: Vector3 };
+  uOpacity: { value: number };
+  uLight: { value: Vector3 };
+  uAmbient: { value: number };
+};
+
+/** A material that lights triangles flat from `uniforms.uLight` and colours them `uniforms.uColour`. */
+function meshMaterial(uniforms: MeshUniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms,
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -73,7 +74,34 @@ export function createMeshLayer(
     depthWrite: true,
     side: DoubleSide,
   });
+}
+
+/** The layer of the triangles of `buffers`, looking as `look` says. */
+export function createMeshLayer(
+  buffers: MeshBuffers,
+  look: Parameters<LayerObject['setLook']>[0],
+): LayerObject {
+  const uniforms = {
+    uColour: { value: new Vector3() },
+    uOpacity: { value: 1 },
+    uLight: { value: new Vector3(0, 0, 1) },
+    uAmbient: { value: MESH_AMBIENT },
+  };
+  const material = meshMaterial(uniforms);
   const triangles = createTriangleParts(buffers, material);
+  // By class, each triangle is drawn in the colour of its class, still lit: a mesh for each class, sharing the light and the opacity.
+  const classed = createClassedTriangles({
+    positions: triangles.positions,
+    triangles: buffers.triangles,
+    parent: triangles.group,
+    make: () => {
+      const colour = new Vector3();
+      return {
+        material: meshMaterial({ ...uniforms, uColour: { value: colour } }),
+        colour,
+      };
+    },
+  });
 
   const layer: LayerObject = {
     object: triangles.group,
@@ -87,7 +115,12 @@ export function createMeshLayer(
     prepareFrame() {
       // (nothing: it has no size in pixels and no outline)
     },
+    setClasses(next: ClassColouring | undefined) {
+      // The triangles by class are drawn in place of the layer's own, which are not drawn while they are (and are, when they are not).
+      material.visible = !classed.set(next);
+    },
     dispose() {
+      classed.dispose();
       triangles.dispose();
       material.dispose();
     },

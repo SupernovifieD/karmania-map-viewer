@@ -107,4 +107,78 @@ describe('createMeshLayer', () => {
     expect(freed.sort()).toEqual(['geometry', 'material']);
     expect(parts(layer)).toHaveLength(0);
   });
+
+  describe('coloured by classes', () => {
+    const colours = ['#ff0000', '#00ff00'];
+    const others = (layer: ReturnType<typeof createMeshLayer>): Mesh[] =>
+      parts(layer).filter((mesh) => mesh.material !== parts(layer)[0]?.material);
+
+    it('draws each triangle in the colour of its class, and not the layer in its one colour', () => {
+      const layer = createMeshLayer(square(), LOOK);
+      const own = parts(layer)[0]?.material as ShaderMaterial;
+      layer.setClasses?.({ indices: Uint8Array.of(1, 0), colours });
+      expect(own.visible).toBe(false);
+      const meshes = others(layer);
+      // The square's triangles are 0, 1, 2 and 0, 2, 3: class 0 is the second of them and class 1 the first.
+      expect(meshes.map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [0, 2, 3],
+        [0, 1, 2],
+      ]);
+      expect(
+        meshes.map(
+          (mesh) => (mesh.material as ShaderMaterial).uniforms['uColour']?.value as unknown,
+        ),
+      ).toMatchObject([
+        { x: 1, y: 0, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ]);
+    });
+
+    it('is lit as the layer is: the meshes of the classes share its light, its ambient and its opacity, and its shader', () => {
+      const layer = createMeshLayer(square(), LOOK);
+      const own = parts(layer)[0]?.material as ShaderMaterial;
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours });
+      for (const mesh of others(layer)) {
+        const material = mesh.material as ShaderMaterial;
+        expect(material.uniforms['uLight']).toBe(own.uniforms['uLight']);
+        expect(material.uniforms['uAmbient']).toBe(own.uniforms['uAmbient']);
+        expect(material.uniforms['uOpacity']).toBe(own.uniforms['uOpacity']);
+        expect(material.fragmentShader).toBe(own.fragmentShader);
+        expect(material.depthWrite).toBe(true);
+        expect(material.depthFunc).toBe(LessDepth);
+      }
+      layer.setLook({ ...LOOK, opacity: 0.3 });
+      expect(own.uniforms['uOpacity']?.value).toBe(0.3);
+    });
+
+    it('draws no triangle with no value, and the one colour again when the classes are taken away or are not for every triangle', () => {
+      const layer = createMeshLayer(square(), LOOK);
+      const own = parts(layer)[0]?.material as ShaderMaterial;
+      layer.setClasses?.({ indices: Uint8Array.of(255, 0), colours });
+      expect(others(layer).map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [0, 2, 3],
+      ]);
+      layer.setClasses?.(undefined);
+      expect(own.visible).toBe(true);
+      expect(others(layer)).toHaveLength(0);
+      layer.setClasses?.({ indices: Uint8Array.of(0), colours });
+      expect(own.visible).toBe(true);
+      expect(others(layer)).toHaveLength(0);
+    });
+
+    it('keeps the meshes for the same classes with other colours, and frees them when it is disposed', () => {
+      const layer = createMeshLayer(square(), LOOK);
+      const indices = Uint8Array.of(0, 1);
+      layer.setClasses?.({ indices, colours });
+      const before = others(layer);
+      layer.setClasses?.({ indices, colours: ['#0000ff', '#ffffff'] });
+      expect(others(layer)).toEqual(before);
+      const freed: string[] = [];
+      for (const [i, mesh] of before.entries()) {
+        mesh.geometry.addEventListener('dispose', () => freed.push(`class ${String(i)}`));
+      }
+      layer.dispose();
+      expect(freed.sort()).toEqual(['class 0', 'class 1']);
+    });
+  });
 });
