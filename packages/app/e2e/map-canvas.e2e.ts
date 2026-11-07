@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { inEveryLayout } from './support/layouts.js';
-import { drawn, pause, stats, withData } from './support/render.js';
+import { camera, drawn, pause, stats, withData } from './support/render.js';
 
 const area = (page: Page) => page.locator('karmania-map-area');
 const canvas = (page: Page) => area(page).locator('canvas');
@@ -89,16 +89,20 @@ test.describe('the map canvas', () => {
       // Until the buffer is the size of the box as it is now, which is not the size it had.
       await expect
         .poll(async () => {
-          const [box, now] = await Promise.all([canvas(page).boundingBox(), stats(page)]);
+          const [box, now, view] = await Promise.all([
+            canvas(page).boundingBox(),
+            stats(page),
+            camera(page),
+          ]);
           return (
             box !== null &&
             now !== undefined &&
             now.width === Math.round(box.width) &&
             now.height === Math.round(box.height) &&
             now.cssWidth === box.width &&
-            // The camera shows the new box too: half of it on each side, a pixel being a unit in the scene's first camera.
-            now.frame.right === box.width / 2 &&
-            now.frame.top === box.height / 2 &&
+            // The camera shows the new box too: half of it on each side, at the scale of the camera of the scene.
+            Math.abs(now.frame.right - (box.width * view.unitsPerPixel) / 2) < 1e-6 &&
+            Math.abs(now.frame.top - (box.height * view.unitsPerPixel) / 2) < 1e-6 &&
             now.width !== before.width
           );
         })

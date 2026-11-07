@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { dispatch, pause, pixels, stats, withData } from './support/render.js';
+import { dispatch, pause, pixels, sceneFrame, stats, withData } from './support/render.js';
 
 const area = (page: Page) => page.locator('karmania-map-area');
 const notice = (page: Page) => area(page).locator('.notice');
@@ -63,7 +63,8 @@ test.describe('the map when the graphics card takes the context away', () => {
     await expect(notice(page)).toHaveCount(0);
     // And the map is drawn again, with the camera it had meanwhile.
     await expect.poll(async () => (await stats(page))?.frames ?? 0).toBeGreaterThan(frames ?? 0);
-    expect((await stats(page))?.frame.position.slice(0, 2)).toEqual([5, 5]);
+    const origin = (await sceneFrame(page))?.origin ?? [0, 0, 0];
+    expect((await stats(page))?.frame.position.slice(0, 2)).toEqual([5 - origin[0], 5 - origin[1]]);
     expect(await pixels(page, [0, 0, 1, 1])).toEqual(await areaColour(page));
   });
 

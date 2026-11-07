@@ -406,14 +406,14 @@ or releasing, and whenever the brief says to stop.
 - [x] 16.4 Context loss and restore (8).
 - [x] 16.5 2D controller: pan, zoom to the pointer, rotate, no tilt; scale
   limits; keyboard (10.2). Tests for each gesture and key.
-- [ ] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or
+- [x] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or
   changed layers, cancel stale requests, upload in chunks, dispose on removal;
   the GPU memory test.
   Split (the pieces are libraries with unit tests, and then they are wired to the real engine and browser):
   - [x] 16.6a The layers on the card: a registry that builds, replaces, steps (in chunks) and frees them.
   - [x] 16.6b The extent of render buffers, in map units.
   - [x] 16.6c The layer pipeline (frame, prepare, cancel, deliver, fit, limits), with a fake engine and renderer.
-  - [ ] 16.6d The pipeline in the viewer, and Home fits; end-to-end tests. (The GPU memory test comes with the first kind
+  - [x] 16.6d The pipeline in the viewer, and Home fits; end-to-end tests. (The GPU memory test comes with the first kind
     of layer, 16.7: with no kind drawn there is nothing on the card to count.)
 - [ ] 16.7 Points layer.
 - [ ] 16.8 Lines layer.

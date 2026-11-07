@@ -30,6 +30,9 @@ function mapAt(
   ];
 }
 
+/** The scale the pipeline fitted the data to, which the limits of the scale are made from. */
+let fitScale = 1;
+
 /** A map with a camera that is easy to read: 2 units a pixel, centred on 1000, 2000, heading 0 (or another). */
 async function start(
   page: Page,
@@ -37,11 +40,8 @@ async function start(
 ): Promise<{ x: number; y: number; width: number; height: number }> {
   await page.goto('/');
   await withData(page);
-  // The frame first: a new map CRS puts the cameras back.
-  await dispatch(page, {
-    type: 'setFrame',
-    frame: { mapCrs: { kind: 'epsg', code: 32640 }, origin: [0, 0, 0], source: 'user' },
-  });
+  // The pipeline has chosen the frame and fitted the camera by now; that scale is what the limits of the scale are made from.
+  fitScale = (await camera(page)).unitsPerPixel;
   await dispatch(page, {
     type: 'setCamera',
     patch: { camera2d: { centre: [1000, 2000], unitsPerPixel: 2, heading } },
@@ -188,11 +188,13 @@ test.describe('moving the 2D map with the pointer', () => {
     const box = await start(page);
     const [x, y] = [box.x + 100, box.y + 100];
     await page.mouse.move(x, y);
-    // (The limits are 1e-6 and 1e9 map units a pixel until the viewer narrows them to the data.)
+    // (The limits are those of the data: a hundred thousand times closer than the fit, and a hundred times farther.)
     for (let i = 0; i < 6; i += 1) {
       await page.mouse.wheel(0, -4000);
     }
-    await expect.poll(async () => (await camera(page)).unitsPerPixel).toBe(1e-6);
+    await expect
+      .poll(async () => (await camera(page)).unitsPerPixel)
+      .toBeCloseTo(fitScale / 100_000, 12);
     const frames = (await stats(page))?.frames;
     await page.mouse.wheel(0, -4000);
     await page.waitForTimeout(300);
@@ -200,7 +202,9 @@ test.describe('moving the 2D map with the pointer', () => {
     for (let i = 0; i < 12; i += 1) {
       await page.mouse.wheel(0, 4000);
     }
-    await expect.poll(async () => (await camera(page)).unitsPerPixel).toBe(1e9);
+    await expect
+      .poll(async () => (await camera(page)).unitsPerPixel)
+      .toBeCloseTo(fitScale * 100, 6);
   });
 });
 

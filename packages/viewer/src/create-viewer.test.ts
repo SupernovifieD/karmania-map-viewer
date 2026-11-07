@@ -9,6 +9,7 @@ function page() {
     remove: ReturnType<typeof vi.fn>;
     scene: ReturnType<typeof vi.fn>;
     dispatch: ReturnType<typeof vi.fn>;
+    fit: ReturnType<typeof vi.fn>;
   }[] = [];
   const tags: string[] = [];
   const createElement = vi.fn((tag: string) => {
@@ -18,6 +19,7 @@ function page() {
       remove: vi.fn(),
       scene: vi.fn(() => scene),
       dispatch: vi.fn((command: unknown) => ({ command })),
+      fit: vi.fn(),
     };
     made.push(element);
     return element;
@@ -62,6 +64,18 @@ describe('createViewer', () => {
     viewer.dispose();
     expect(() => viewer.scene()).toThrow('The viewer has been disposed.');
     expect(made[0]?.scene).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the viewer to fit the data, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.fit();
+    expect(made[0]?.fit).toHaveBeenCalledTimes(1);
+    viewer.dispose();
+    expect(() => {
+      viewer.fit();
+    }).toThrow('The viewer has been disposed.');
+    expect(made[0]?.fit).toHaveBeenCalledTimes(1);
   });
 
   it('hands a command to the scene and gives back what comes of it, and refuses once it was disposed', () => {

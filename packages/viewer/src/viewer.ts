@@ -27,6 +27,8 @@ import {
 } from './panel-state.js';
 import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
+import { LayerPipeline } from './layer-pipeline.js';
+import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -179,6 +181,7 @@ export class KarmaniaViewer extends LitElement {
       this.lookThroughCamera();
       this.controller = this.renderer === undefined ? undefined : this.listenToPerson(area, canvas);
       area.interactive = this.controller !== undefined;
+      this.pipeline?.rendererReady();
     }
   }
 
@@ -198,7 +201,10 @@ export class KarmaniaViewer extends LitElement {
       canvas,
       focusTarget,
       getCamera: () => this.store.getState().camera2d,
-      getLimits: () => DEFAULT_SCALE_LIMITS,
+      getLimits: () => this.pipeline?.limits() ?? DEFAULT_SCALE_LIMITS,
+      onFit: () => {
+        this.fit();
+      },
       onCamera: (change) => {
         this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
       },
@@ -211,10 +217,56 @@ export class KarmaniaViewer extends LitElement {
     this.renderer?.setCamera2d(camera2d, frame?.origin ?? [0, 0, 0]);
   }
 
+  /**
+   * What turns the layers of the scene into layers on the card (prepared in the worker, given to the renderer), and fits the camera
+   * to the data. It needs the engine, so it is made with it, and stopped when the viewer is taken out of the page.
+   */
+  private pipeline: LayerPipeline | undefined;
+
+  private pipelineFor(engine: Engine): LayerPipeline {
+    this.pipeline ??= new LayerPipeline({
+      engine,
+      scene: this.store,
+      sink: () => this.sink(),
+      viewport: () => {
+        const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
+        return { width: box?.width ?? 0, height: box?.height ?? 0 };
+      },
+    });
+    return this.pipeline;
+  }
+
+  /** The renderer, as what the pipeline gives buffers to; `undefined` while there is none. */
+  private sink(): LayerSink | undefined {
+    const renderer = this.renderer;
+    return renderer === undefined
+      ? undefined
+      : {
+          setLayer: (id, buffers) => renderer.setLayer(id, buffers),
+          removeLayer: (id) => renderer.removeLayer(id),
+          get maxTextureSize() {
+            return renderer.stats().maxTextureSize;
+          },
+        };
+  }
+
+  /** Shows the data: the camera goes where all that is visible and prepared fits in the map area. */
+  fit(): void {
+    this.pipeline?.fit();
+  }
+
+  /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
+  layerStates(): [string, LayerState][] {
+    return [...(this.pipeline?.states() ?? [])];
+  }
+
   /** Called when the scene changes: the first layer is what the renderer is for, and the camera is what it looks through. */
   private readonly onScene = (state: SceneDocument, previous: SceneDocument): void => {
     if (Object.keys(state.layers).length > 0) {
       void this.attachRenderer();
+    }
+    if (this.engine !== undefined) {
+      this.pipelineFor(this.engine).update();
     }
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
@@ -239,6 +291,8 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('resize', this.onWindowResize);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
+    this.pipeline?.dispose();
+    this.pipeline = undefined;
     this.controller?.dispose();
     this.controller = undefined;
     const area = this.renderRoot.querySelector('karmania-map-area');
