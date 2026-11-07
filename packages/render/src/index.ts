@@ -1,5 +1,7 @@
 /**
- * `@karmania/render`: the renderer of the map. It is empty until the steps of milestone 16 give it a canvas, cameras,
- * controllers and the layers; three.js is added by the step that first uses it.
+ * `@karmania/render`: the renderer of the map. three.js is used here and nowhere else; the rest sees `createRenderer`.
  */
-export const PACKAGE_NAME = '@karmania/render';
+export { bufferSize } from './buffer-size.js';
+export type { BufferSize } from './buffer-size.js';
+export { createRenderer } from './renderer.js';
+export type { RenderStats, Renderer } from './renderer.js';

@@ -293,6 +293,9 @@ importers:
       '@karmania/engine':
         specifier: workspace:*
         version: link:../engine
+      '@karmania/render':
+        specifier: workspace:*
+        version: link:../render
       '@karmania/scene':
         specifier: workspace:*
         version: link:../scene

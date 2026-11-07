@@ -399,7 +399,7 @@ or releasing, and whenever the brief says to stop.
   with the gzipped size added). Split, since a dependency is added in a commit of its own:
   - [x] 16.1a The empty package, with a test running.
   - [x] 16.1b `three` and `@types/three`, with the gzipped size they add.
-- [ ] 16.2 The map canvas in the map area: fills it, follows resizes and device
+- [x] 16.2 The map canvas in the map area: fills it, follows resizes and device
   pixel ratio, renders on demand; layout tests unchanged.
 - [ ] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
   `--k-surface-map` in both themes, dispose; the idle "no frames" test.
@@ -425,6 +425,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
   phase 1 placeholder text removed. Shell screenshots updated, each change
   explained.
+  The five data-tab states that the canvas of 16.2 changed (text anti-aliasing, see decisions) are updated here too.
 - [ ] 16.G Gate (with `pnpm perf` for 2D).
 
 ## M17: Map furniture and overlays

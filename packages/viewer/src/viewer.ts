@@ -1,5 +1,7 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
+import { createRenderer } from '@karmania/render';
+import type { Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore } from '@karmania/scene';
 import type { SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
@@ -127,11 +129,57 @@ export class KarmaniaViewer extends LitElement {
       : engine.crsInfo(code);
   };
 
+  /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
+  private renderer: Renderer | undefined;
+
+  /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
+  renderStats(): RenderStats | undefined {
+    return this.renderer?.stats();
+  }
+
+  /** Whether the viewer is waiting for the map area's canvas, so that two calls do not make two renderers. */
+  private attaching = false;
+
+  /**
+   * Makes the renderer when there is something to draw, once the map area has made its canvas. **Not before**: a page that
+   * has no data holds no context of the graphics card (the browser allows a few), and the browser draws the text of a page
+   * that has a WebGL canvas in it otherwise than it does without one (greyscale for subpixel anti-aliasing), which would
+   * change every picture of the empty app. The viewer may be taken out of the page while it waits, or put back and ask again
+   * (which does nothing while the first is waiting), so it looks at whether it is in the page after the wait.
+   */
+  private async attachRenderer(): Promise<void> {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null || this.renderer !== undefined || this.attaching) {
+      return;
+    }
+    this.attaching = true;
+    try {
+      await area.updateComplete;
+    } finally {
+      this.attaching = false;
+    }
+    const canvas = area.canvas;
+    if (canvas !== undefined && this.isConnected) {
+      this.renderer = createRenderer(canvas);
+    }
+  }
+
+  /** Called when the scene changes: the first layer is what the renderer is for. */
+  private readonly onScene = (): void => {
+    if (Object.keys(this.store.getState().layers).length > 0) {
+      void this.attachRenderer();
+    }
+  };
+
+  /** Stops listening to the scene; set while the viewer is in a page. */
+  private unlistenScene: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener('dragover', this.refuseStrayFiles);
     window.addEventListener('drop', this.refuseStrayFiles);
     window.addEventListener('resize', this.onWindowResize);
+    this.unlistenScene = this.store.subscribe(this.onScene);
   }
 
   override disconnectedCallback(): void {
@@ -139,6 +187,10 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('dragover', this.refuseStrayFiles);
     window.removeEventListener('drop', this.refuseStrayFiles);
     window.removeEventListener('resize', this.onWindowResize);
+    this.unlistenScene?.();
+    this.unlistenScene = undefined;
+    this.renderer?.dispose();
+    this.renderer = undefined;
     this.engine?.dispose();
     this.engine = undefined;
     // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer

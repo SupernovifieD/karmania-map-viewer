@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PACKAGE_NAME } from './index.js';
+import * as render from './index.js';
 
 describe('@karmania/render', () => {
-  it('exposes its package name', () => {
-    expect(PACKAGE_NAME).toBe('@karmania/render');
+  it('exposes the renderer and the arithmetic of its buffer', () => {
+    expect(Object.keys(render).sort()).toEqual(['bufferSize', 'createRenderer']);
   });
 });

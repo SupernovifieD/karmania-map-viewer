@@ -41,9 +41,22 @@ export class KarmaniaMapArea extends LitElement {
         min-width: 0;
       }
 
+      /* A stacking context of its own, so that the canvas can go behind what is laid over it (the empty state, the
+         drop zone) without going behind the background of the area. */
       main {
         height: 100%;
+        isolation: isolate;
         position: relative;
+      }
+
+      /* The map: it fills the area exactly, whatever the area is, and is under everything else. */
+      canvas {
+        display: block;
+        height: 100%;
+        inset: 0;
+        position: absolute;
+        width: 100%;
+        z-index: -1;
       }
 
       /* Over the area, 8 inside its edges, and not in the way of the pointer. It is there all
@@ -95,6 +108,11 @@ export class KarmaniaMapArea extends LitElement {
     this.dragging = false;
   }
 
+  /** The canvas the map is drawn on: there from the first render, and `undefined` until then. */
+  get canvas(): HTMLCanvasElement | undefined {
+    return this.renderRoot.querySelector('canvas') ?? undefined;
+  }
+
   override render() {
     return html`
       <main
@@ -104,6 +122,7 @@ export class KarmaniaMapArea extends LitElement {
         @dragleave=${this.onDragLeave}
         @drop=${this.onDrop}
       >
+        <canvas aria-hidden="true"></canvas>
         ${this.datasets > 0 ? this.loaded() : this.empty()}
         <div class="drop-zone" ?data-active=${this.dragging} aria-hidden="true">
           <span class="drop-label">Drop to import</span>
