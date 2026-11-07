@@ -264,6 +264,118 @@ describe('LayerPipeline: from the scene to the card', () => {
     expect(t.sink.setLayer).not.toHaveBeenCalled();
   });
 
+  it('does not ask the engine again for a dataset that prepare said cannot be drawn, while the frame is the same', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.prepare = () =>
+      Promise.resolve({ status: 'not_drawn', findings: [finding('display.no_geometry')] });
+    await t.add(0);
+    t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [5, 5] } } });
+    await t.pipeline.idle();
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await t.pipeline.idle();
+    expect(t.prepareCalls).toHaveLength(1);
+  });
+
+  it('prepares a layer again when it can be drawn in the frame it was last prepared for, after a frame it could not be drawn in', async () => {
+    const t = setup();
+    const home: Frame = { ...frame(), source: 'user' };
+    const drawnIn = (chosen: Frame) => () => ({
+      frame: chosen,
+      drawable: [{ id: 0, status: 'drawn' as const, reprojected: false, findings: [] }],
+      findings: [],
+    });
+    t.state.choice = drawnIn(home);
+    await t.add(0);
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(1);
+    // The person chooses a system the dataset cannot be drawn in: it is taken off the card.
+    const away: Frame = { ...frame([5000, 6000, 0]), source: 'user' };
+    t.state.choice = () => ({
+      frame: away,
+      drawable: [
+        {
+          id: 0,
+          status: 'not_drawn',
+          reprojected: false,
+          findings: [finding('display.not_drawn')],
+        },
+      ],
+      findings: [],
+    });
+    t.scene.dispatch({ type: 'setFrame', frame: away });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    // And back to the first frame, which the layer was prepared for: it is prepared again, since it is no longer on the card.
+    t.state.choice = drawnIn(home);
+    t.scene.dispatch({ type: 'setFrame', frame: home });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not give the renderer what was prepared for a layer that is not drawn by the time the renderer is there', async () => {
+    const t = setup(null);
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'preparing', fraction: 1 });
+    // The frame changes to one the dataset cannot be drawn in, before the renderer arrives.
+    const away: Frame = { ...frame([5000, 6000, 0]), source: 'user' };
+    t.state.choice = () => ({
+      frame: away,
+      drawable: [
+        {
+          id: 0,
+          status: 'not_drawn',
+          reprojected: false,
+          findings: [finding('display.not_drawn')],
+        },
+      ],
+      findings: [],
+    });
+    t.scene.dispatch({ type: 'setFrame', frame: away });
+    await t.pipeline.idle();
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    expect(t.sink.setLayer).not.toHaveBeenCalled();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+  });
+
+  it('leaves the heights of a layer that is not drawn out of what the renderer is told', async () => {
+    const t = setup();
+    t.drawable([0, true], [1, true]);
+    // The first layer is from 0 to 5 high, the second from 20 to 30.
+    t.state.prepare = (call) =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'points',
+          positions:
+            call.id === 0 ? Float32Array.of(0, 0, 0, 1, 1, 5) : Float32Array.of(0, 0, 20, 1, 1, 30),
+        },
+        findings: [],
+      });
+    await t.add(0, 1);
+    expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(0, 30);
+    // The first dataset can no longer be drawn: what is drawn is the second's heights.
+    t.state.choice = () => ({
+      frame: frame(),
+      drawable: [
+        {
+          id: 0,
+          status: 'not_drawn',
+          reprojected: false,
+          findings: [finding('display.not_drawn')],
+        },
+        { id: 1, status: 'drawn', reprojected: false, findings: [] },
+      ],
+      findings: [],
+    });
+    t.scene.dispatch({ type: 'setFrame', frame: { ...frame(), source: 'user' } });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(20, 30);
+  });
+
   it('says how far a request has got, and then that it is done', async () => {
     const t = setup();
     t.drawable([0, true]);

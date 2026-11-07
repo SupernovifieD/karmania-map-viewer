@@ -464,6 +464,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
   - [x] 16.F2 The shader programs of a layer are compiled off the main thread before it is first drawn.
   - [x] 16.F3 The renderer is made in a task of its own, not in the one that handles the click that loaded the data.
+  - [x] 16.F4 A layer that is not drawn forgets what it was prepared with: its buffers, its extent and the frame (review round).
 
 ## M17: Map furniture and overlays
 
