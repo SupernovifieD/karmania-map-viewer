@@ -32,8 +32,9 @@ export interface RenderStats {
   /** How many geometries and textures are on the card, as three counts them. */
   readonly geometries: number;
   readonly textures: number;
-  /** How many layers are on the card, and the largest texture the card takes, in cells on a side (what `prepare` cuts a grid to). */
+  /** How many layers are on the card, how many of them the last frame drew (a layer is not drawn until its programs are compiled), and the largest texture the card takes, in cells on a side (what `prepare` cuts a grid to). */
   readonly layers: number;
+  readonly layersDrawn: number;
   readonly maxTextureSize: number;
   /** What the map is cleared to: `#rrggbb`, or `transparent` where the canvas has no opaque background. */
   readonly background: string;
@@ -138,6 +139,13 @@ export function createRenderer(
   const scenes = new Map<string, Scene>();
   /** The ids of the layers from the one that is drawn first (the bottom of the legend) to the one drawn last. */
   let order: readonly string[] = [];
+  /**
+   * The layers whose shader programs are compiled. A layer that is not is not drawn yet: its programs are compiled meanwhile, by the driver
+   * and off this thread (`KHR_parallel_shader_compile`), and a frame is asked for when they are. Linking a program in the frame that first
+   * draws it holds the page for about 50 ms, which is the longest task that a million points or a model of blocks put on it.
+   */
+  const compiled = new Set<string>();
+  const compiling = new Set<string>();
   gl.autoClear = false;
   // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
   // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
@@ -160,6 +168,8 @@ export function createRenderer(
       remove(object, id) {
         scenes.get(id)?.remove(object);
         scenes.delete(id);
+        compiled.delete(id);
+        compiling.delete(id);
       },
     },
     makeLayer,
@@ -173,6 +183,8 @@ export function createRenderer(
   let disposed = false;
   let lost = false;
   let frames = 0;
+  /** How many layers the last frame drew: fewer than there are while the programs of a new one are being compiled. */
+  let layersDrawn = 0;
   let frame: number | undefined;
   let cssWidth = 0;
   let cssHeight = 0;
@@ -221,7 +233,23 @@ export function createRenderer(
   }
   readBackground();
 
-  function draw(): void {
+  /** Starts compiling the programs of a layer that has not been drawn, without holding this thread; a frame is asked for when they are ready. */
+  function warm(id: string, own: Scene): void {
+    if (compiling.has(id)) {
+      return;
+    }
+    compiling.add(id);
+    const done = (): void => {
+      if (compiling.delete(id) && scenes.get(id) === own) {
+        compiled.add(id);
+        invalidate();
+      }
+    };
+    gl.compileAsync(own, camera).then(done, done);
+  }
+
+  /** Draws a frame. `everything` draws every layer now, compiling what has to be compiled (a picture that is read back, which is of all of them). */
+  function draw(everything: boolean): void {
     frame = undefined;
     if (lost) {
       return;
@@ -238,13 +266,22 @@ export function createRenderer(
     });
     // The map's colour first, then each layer over what is there with its own depth: what is higher in the legend is on top, whatever the heights.
     gl.clear();
+    let drawn = 0;
     for (const id of drawOrder()) {
       const own = scenes.get(id);
-      if (own !== undefined) {
-        gl.clearDepth();
-        gl.render(own, camera);
+      if (own === undefined) {
+        continue;
       }
+      if (!everything && !compiled.has(id)) {
+        warm(id, own);
+        continue;
+      }
+      compiled.add(id);
+      gl.clearDepth();
+      gl.render(own, camera);
+      drawn += 1;
     }
+    layersDrawn = drawn;
     frames += 1;
     if (more) {
       invalidate();
@@ -253,7 +290,9 @@ export function createRenderer(
 
   function invalidate(): void {
     if (!disposed && frame === undefined) {
-      frame = view.requestAnimationFrame(draw);
+      frame = view.requestAnimationFrame(() => {
+        draw(false);
+      });
     }
   }
 
@@ -392,7 +431,7 @@ export function createRenderer(
           'The graphics card has taken the context away, so there is nothing to read.',
         );
       }
-      draw();
+      draw(true);
       const pixels = new Uint8Array(width * height * 4);
       context.readPixels(x, y, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
       return pixels;
@@ -409,6 +448,7 @@ export function createRenderer(
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
         layers: layers.size,
+        layersDrawn,
         maxTextureSize: gl.capabilities.maxTextureSize,
         background,
         // What the camera of three has, which is what draws, and not what was worked out for it.

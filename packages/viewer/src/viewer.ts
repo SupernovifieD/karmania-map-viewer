@@ -174,6 +174,11 @@ export class KarmaniaViewer extends LitElement {
     this.attaching = true;
     try {
       await area.updateComplete;
+      // The context and the renderer are made in a task of their own: made in the one that is handling the click that loaded the file, they
+      // held the page for about 50 ms along with what that click does, and no task of the page is to be over 50 ms (section 9.6).
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
     } finally {
       this.attaching = false;
     }
