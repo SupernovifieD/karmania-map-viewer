@@ -4134,3 +4134,11 @@ The third review (one reviewer, only 15.F8 to 15.F10) found one thing that must 
   specifier is not looked at", but a template is read by its first text even with a substitution after it (`` `lit${x}` `` is refused; `` `${x}` `` and `` `./locales/${x}.js` `` are not); the comment says so, and three tests pin it. **Left, said**: what the rules cannot follow (a
   joined specifier, `require` held in a variable, an import through a file that re-exports a package). The reviewer also confirmed: the Lit pattern, the `scripts` block, every row of the dependency table against the manifests, and the count of the app's tests (13).
 
+## M16: 2D rendering
+
+- Step 16.1 (the package, and three). **16.1a** the empty `@karmania/render` (the DOM in its tsconfig, since it draws on a canvas; the engine and the scene as dependencies, of which the import rules allow the types only). **16.1b `three` 0.187.0 (MIT,
+  published on 2026-10-30, the latest) and `@types/three`** as a dependency-only commit, with their licences checked with `pnpm licenses list`: three has no dependencies of its own, and the dev-only type packages are MIT apart from
+  `@dimforge/rapier3d-compat` (Apache-2.0), so the policy allows all of them. **Size, as the brief asks**: a probe bundle importing what the renderer will use is **622,236 bytes, 137,293 gzipped**, against about 55 kB gzipped for the whole of the
+  app's JavaScript before, so the page gains about 2.5 times what it had. The caret on a `0.x` version allows patches only, which is what is wanted of a library whose minors break. The first size is a probe, not the build: the gate of M16 measures the
+  real one, as the build-size rule says.
+

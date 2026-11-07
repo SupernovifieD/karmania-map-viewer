@@ -395,10 +395,10 @@ or releasing, and whenever the brief says to stop.
 
 ## M16: 2D rendering (@karmania/render)
 
-- [ ] 16.1 Package @karmania/render; add three and @types/three (dependency-only,
+- [x] 16.1 Package @karmania/render; add three and @types/three (dependency-only,
   with the gzipped size added). Split, since a dependency is added in a commit of its own:
   - [x] 16.1a The empty package, with a test running.
-  - [ ] 16.1b `three` and `@types/three`, with the gzipped size they add.
+  - [x] 16.1b `three` and `@types/three`, with the gzipped size they add.
 - [ ] 16.2 The map canvas in the map area: fills it, follows resizes and device
   pixel ratio, renders on demand; layout tests unchanged.
 - [ ] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
