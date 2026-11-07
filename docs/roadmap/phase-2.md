@@ -401,7 +401,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.1b `three` and `@types/three`, with the gzipped size they add.
 - [x] 16.2 The map canvas in the map area: fills it, follows resizes and device
   pixel ratio, renders on demand; layout tests unchanged.
-- [ ] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
+- [x] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
   `--k-surface-map` in both themes, dispose; the idle "no frames" test.
 - [ ] 16.4 Context loss and restore (8).
 - [ ] 16.5 2D controller: pan, zoom to the pointer, rotate, no tilt; scale

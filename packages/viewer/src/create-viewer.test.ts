@@ -8,11 +8,17 @@ function page() {
     openImport: ReturnType<typeof vi.fn>;
     remove: ReturnType<typeof vi.fn>;
     scene: ReturnType<typeof vi.fn>;
+    dispatch: ReturnType<typeof vi.fn>;
   }[] = [];
   const tags: string[] = [];
   const createElement = vi.fn((tag: string) => {
     tags.push(tag);
-    const element = { openImport: vi.fn(), remove: vi.fn(), scene: vi.fn(() => scene) };
+    const element = {
+      openImport: vi.fn(),
+      remove: vi.fn(),
+      scene: vi.fn(() => scene),
+      dispatch: vi.fn((command: unknown) => ({ command })),
+    };
     made.push(element);
     return element;
   });
@@ -56,6 +62,17 @@ describe('createViewer', () => {
     viewer.dispose();
     expect(() => viewer.scene()).toThrow('The viewer has been disposed.');
     expect(made[0]?.scene).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a command to the scene and gives back what comes of it, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const command = { type: 'setViewMode', mode: '2d' } as const;
+    expect(viewer.dispatch(command)).toEqual({ command });
+    expect(made[0]?.dispatch).toHaveBeenCalledExactlyOnceWith(command);
+    viewer.dispose();
+    expect(() => viewer.dispatch(command)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.dispatch).toHaveBeenCalledTimes(1);
   });
 
   it('takes the element out of the page when it is disposed, once, however often it is asked', () => {
