@@ -466,6 +466,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F3 The renderer is made in a task of its own, not in the one that handles the click that loaded the data.
   - [x] 16.F4 A layer that is not drawn forgets what it was prepared with: its buffers, its extent and the frame (review round).
   - [x] 16.F5 The pipeline stops a pass when the scene changes, keeps a fit that did not happen for the next look, does not leave a layer `not_drawn` after its classes are no longer refused, and tells nobody of what has not changed (review round).
+  - [x] 16.F6 The renderer keeps the compiled mark of a layer that is replaced by one of its kind, compiles again after a context is given back, and does nothing after it is disposed of (review round).
 
 ## M17: Map furniture and overlays
 
