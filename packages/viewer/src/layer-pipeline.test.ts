@@ -1656,4 +1656,35 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
     expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
   });
+  it('does not give the renderer the buffers of a frame that changed while the classes were being worked out, if the layer could not be prepared again', async () => {
+    const t = gridSetup(null);
+    t.drawable([0, true]);
+    const slow = deferred<ClassifyResult>();
+    t.state.classify = () => slow.promise;
+    t.scene.dispatch({ type: 'addLayers', datasets: [gridDataset(0)] });
+    await vi.waitFor(() => {
+      expect(t.classifyCalls).toHaveLength(1);
+    });
+    // The person chooses another frame while the classes are out, and the layer cannot be prepared for it.
+    const chosen: Frame = {
+      mapCrs: { kind: 'epsg', code: 32641 },
+      origin: [0, 0, 0],
+      source: 'user',
+    };
+    t.state.choice = () => ({
+      frame: chosen,
+      drawable: [{ id: 0, status: 'drawn', reprojected: true, findings: [] }],
+      findings: [],
+    });
+    t.state.prepare = () => Promise.reject(new Error('the worker stopped'));
+    t.scene.dispatch({ type: 'setFrame', frame: chosen });
+    slow.resolve({ status: 'classified', breaks: ranges('Au') });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('failed');
+    // The renderer comes: what was prepared for the frame that was is not for it.
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    expect(t.sink.setLayer).not.toHaveBeenCalled();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('failed');
+  });
 });

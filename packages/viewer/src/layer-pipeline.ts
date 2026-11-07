@@ -463,6 +463,13 @@ export class LayerPipeline {
         // The classes first, so that a layer that is coloured by them is on the card with its colours and is never seen without.
         await this.colour(id, entry, abort.signal);
         if (unwanted()) {
+          // Not given to the renderer, and no longer wanted: what was kept for it is for a frame that is not the one, and it is prepared again.
+          if (this.entries.get(id) === entry) {
+            delete entry.waiting;
+            delete entry.extent;
+            delete entry.preparedWith;
+            this.depth();
+          }
           return;
         }
         this.deliver(id, entry);

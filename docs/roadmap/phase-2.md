@@ -472,6 +472,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F9 Tests that could not fail, or said more than they check, made to (review round).
   - [x] 16.F10 The median frame target is recorded as met by one run of three, not as met (a relaxation of the target is undone; for the owner to decide).
   - [x] 16.F11 The records corrected where the review found them wrong (counts, a claim of coverage, the package lists); the commit sizes and subjects recorded as the rules broken.
+  - [x] 16.F12 What the second review of the fixes found: buffers kept after an aborted prepare, a compile that outlived a reset (review round).
 
 ## M17: Map furniture and overlays
 
