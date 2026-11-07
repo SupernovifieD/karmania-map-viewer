@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colourOf } from './look.js';
+import { MAX_CLASSES, NO_VALUE, colourOf } from './look.js';
 
 describe('colourOf', () => {
   it('reads #rrggbb as three numbers from 0 to 1, as they are', () => {
@@ -30,5 +30,14 @@ describe('colourOf', () => {
     ]) {
       expect(colourOf(text), JSON.stringify(text)).toEqual([0.5, 0.5, 0.5]);
     }
+  });
+});
+
+describe('the classes of a layer', () => {
+  it('say 255 for an element with no value, as the engine does, and hold the colours of 32 classes', () => {
+    expect(NO_VALUE).toBe(255);
+    expect(MAX_CLASSES).toBe(32);
+    // The classes are bytes, and the byte that means no value is not a class that a layer can have.
+    expect(MAX_CLASSES).toBeLessThan(NO_VALUE);
   });
 });

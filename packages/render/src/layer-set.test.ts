@@ -3,7 +3,7 @@ import { Group } from 'three';
 import type { Object3D } from 'three';
 import { describe, expect, it } from 'vitest';
 import { LayerSet } from './layer-set.js';
-import type { FrameInfo, LayerLook } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 import type { LayerObject } from './layer-set.js';
 
 const LOOK: LayerLook = {
@@ -29,7 +29,13 @@ function setup(drawn: readonly RenderBuffers['kind'][] = ['points']) {
     add: (object: Object3D) => inside.add(object),
     remove: (object: Object3D) => inside.delete(object),
   };
-  const made: { object: Group; freed: number; looks: LayerLook[]; frames: FrameInfo[] }[] = [];
+  const made: {
+    object: Group;
+    freed: number;
+    looks: LayerLook[];
+    frames: FrameInfo[];
+    classes: (ClassColouring | undefined)[];
+  }[] = [];
   const set = new LayerSet(container, (buffers, look): LayerObject | undefined => {
     if (!drawn.includes(buffers.kind)) {
       return undefined;
@@ -39,6 +45,7 @@ function setup(drawn: readonly RenderBuffers['kind'][] = ['points']) {
       freed: 0,
       looks: [] as LayerLook[],
       frames: [] as FrameInfo[],
+      classes: [] as (ClassColouring | undefined)[],
     };
     made.push(layer);
     // The look that the layer is made with is the first it has.
@@ -54,6 +61,14 @@ function setup(drawn: readonly RenderBuffers['kind'][] = ['points']) {
       prepareFrame: (info) => {
         layer.frames.push(info);
       },
+      // Only a layer of points takes classes here, as only some of the kinds of the renderer will.
+      ...(buffers.kind === 'points'
+        ? {
+            setClasses: (next: ClassColouring | undefined) => {
+              layer.classes.push(next);
+            },
+          }
+        : {}),
     };
   });
   return { set, inside, made };
@@ -202,5 +217,35 @@ describe('LayerSet', () => {
     // Clearing nothing is fine, and frees nothing twice.
     set.clear();
     expect(made.map((layer) => layer.freed)).toEqual([1, 1, 1]);
+  });
+
+  it('colours the elements of a layer that is coloured by classes, and takes the colouring away', () => {
+    const { set, made } = setup(['points', 'mesh']);
+    set.set('layer-1', points, LOOK);
+    const classes: ClassColouring = {
+      indices: Uint8Array.of(0, 1, 255),
+      colours: ['#112233', '#445566'],
+    };
+    expect(set.setClasses('layer-1', classes)).toBe(true);
+    expect(set.setClasses('layer-1', undefined)).toBe(true);
+    expect(made[0]?.classes).toEqual([classes, undefined]);
+  });
+
+  it('says that there is no layer to colour, or that the layer is not coloured by classes, and does nothing else', () => {
+    const { set, made } = setup(['points', 'mesh']);
+    const classes: ClassColouring = { indices: Uint8Array.of(0), colours: ['#112233'] };
+    expect(set.setClasses('never', classes)).toBe(false);
+    set.set('layer-1', mesh, LOOK);
+    expect(set.setClasses('layer-1', classes)).toBe(false);
+    expect(made[0]?.classes).toEqual([]);
+  });
+
+  it('has a layer that is put in place of another without the colouring that the old one had', () => {
+    const { set, made } = setup();
+    set.set('layer-1', points, LOOK);
+    set.setClasses('layer-1', { indices: Uint8Array.of(0), colours: ['#112233'] });
+    set.set('layer-1', points, LOOK);
+    expect(made[0]?.classes).toHaveLength(1);
+    expect(made[1]?.classes).toEqual([]);
   });
 });

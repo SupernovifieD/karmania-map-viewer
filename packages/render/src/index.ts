@@ -29,8 +29,8 @@ export type { CameraChange, KeyAction, KeyInput, ScaleLimits } from './controls-
 export { LayerSet } from './layer-set.js';
 export type { Container, LayerMaker, LayerObject, LayerOutcome } from './layer-set.js';
 export { OUTLINE_WIDTH, POINTS_PER_PART } from './points-layer.js';
-export { colourOf } from './look.js';
-export type { FrameInfo, LayerLook, Rgb } from './look.js';
+export { MAX_CLASSES, NO_VALUE, colourOf } from './look.js';
+export type { ClassColouring, FrameInfo, LayerLook, Rgb } from './look.js';
 export { SEGMENTS_PER_PART, gatherSegments } from './lines-layer.js';
 export { TRIANGLES_PER_PART } from './triangle-parts.js';
 export { POLYGON_OUTLINE_WIDTH } from './polygons-layer.js';

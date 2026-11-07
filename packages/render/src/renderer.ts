@@ -13,7 +13,7 @@ import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import type { LayerOutcome } from './layer-set.js';
-import type { LayerLook } from './look.js';
+import type { ClassColouring, LayerLook } from './look.js';
 
 /** What the renderer says of itself, for tests and diagnostics. */
 export interface RenderStats {
@@ -71,6 +71,11 @@ export interface Renderer {
   setLayer(id: string, buffers: RenderBuffers, look: LayerLook): LayerOutcome;
   /** Changes how a layer looks (colour, size, opacity, whether it is shown) without building it again. `false` if there is no such layer. */
   setLayerLook(id: string, look: LayerLook): boolean;
+  /**
+   * Colours the elements of a layer by class (`undefined` takes the colouring away), without building the layer again. `false` if there is
+   * no such layer, or it is of a kind that is not coloured by classes.
+   */
+  setLayerClasses(id: string, classes: ClassColouring | undefined): boolean;
   /** Takes a layer off the card and frees what it held. `false` if there was none. */
   removeLayer(id: string): boolean;
   /**
@@ -298,6 +303,11 @@ export function createRenderer(
     },
     setLayerLook(id, look) {
       const known = layers.setLook(id, look);
+      invalidate();
+      return known;
+    },
+    setLayerClasses(id, classes) {
+      const known = layers.setClasses(id, classes);
       invalidate();
       return known;
     },
