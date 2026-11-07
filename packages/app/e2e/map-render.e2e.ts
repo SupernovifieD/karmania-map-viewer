@@ -107,9 +107,13 @@ test.describe('the renderer core', () => {
     expect(now?.frame.right).toBeCloseTo((first.cssWidth * 4) / 2, 6);
     expect(now?.frame.top).toBeCloseTo((first.cssHeight * 4) / 2, 6);
     expect(now?.frame.bottom).toBeCloseTo((-first.cssHeight * 4) / 2, 6);
-    expect(now?.frame.position).toEqual([1500, 2500, 1]);
-    // One unit above the heights that are drawn (none yet: 0 to 0), looking down at them: they are between 1 and 2 away.
-    expect([now?.frame.near, now?.frame.far]).toEqual([0, 2]);
+    expect(now?.frame.position.slice(0, 2)).toEqual([1500, 2500]);
+    // One unit above the heights that are drawn, looking down at them. The file's heights are 109.3 to 120.4, and the layer was prepared
+    // with an origin at z 100 (the middle of them to the nearest 100), so they are 9.3 to 20.4 from it: the camera is at 21.4, the highest is 1
+    // away and the lowest 12.1.
+    expect(now?.frame.position[2]).toBeCloseTo(21.4, 4);
+    expect(now?.frame.near).toBe(0);
+    expect(now?.frame.far).toBeCloseTo(20.4 - 9.3 + 2, 4);
     expect(now?.frame.rotation).toBeCloseTo((-30 * Math.PI) / 180, 12);
     // The origin of the frame is where the positions on the card are measured from, and a new origin in the same system
     // leaves the camera where it is on the map.

@@ -35,12 +35,10 @@ test.describe('from the loaded file to the map', () => {
     ]);
   });
 
-  test('prepares the layer, and says that it is prepared though the kind is not drawn yet', async ({
-    page,
-  }) => {
+  test('prepares the layer, and says that it is drawn', async ({ page }) => {
     await page.goto('/');
     await withData(page);
-    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'unsupported']]);
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
   });
 
   test('fits the camera to the extent of the data, with a margin for the overlays, when the first layer is there', async ({
@@ -126,9 +124,9 @@ test.describe('from the loaded file to the map', () => {
     expect(frame?.mapCrs.code).toBeLessThanOrEqual(32760);
     expect(frame?.source).toBe('auto');
     expect((await layerStatuses(page)).map(([, status]) => status)).toEqual([
-      'unsupported',
-      'unsupported',
-      'unsupported',
+      'drawn',
+      'drawn',
+      'drawn',
     ]);
     // The map is in UTM metres now: a camera that was at 0, 0 is somewhere in the zone, at a scale of metres to a pixel.
     await expect.poll(async () => (await camera(page)).centre[0]).toBeGreaterThan(100_000);
