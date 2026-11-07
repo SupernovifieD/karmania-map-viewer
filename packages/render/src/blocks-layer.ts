@@ -2,7 +2,9 @@
  * The layer of a block model (section 9.3 of the brief): one box for each block, of the model's spacing and turned by its rotation about
  * its own centre, each in the colour of its class. The boxes are instanced: one box on the card, and for each block only its centre (and its
  * class), in parts of 250,000, the first at once and the others between frames. In the view from above only the tops show, so only the
- * tops are drawn (a sixth of the triangles); the nearest top wins, so where blocks are over each other the highest shows.
+ * tops are drawn (a sixth of the triangles); the nearest top wins, so where blocks are over each other the highest shows: also when the layer
+ * is less than opaque, when a first pass writes only depth and the colour is then drawn once, where the nearest top is, and not once for each
+ * block that is under another.
  *
  * The buffers do not have the values of the blocks: they come as the classes of the blocks (`setClasses`), one byte for each block in the
  * order of the centres. Until a model has them, or if what it is given is not one byte for each block, it draws nothing.
@@ -15,6 +17,7 @@ import {
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   LessDepth,
+  LessEqualDepth,
   Mesh,
   NormalBlending,
   ShaderMaterial,
@@ -68,6 +71,19 @@ void main() {
 }
 `;
 
+/** The depth pass: the same blocks are discarded, and nothing is drawn (the colour is not written), so that only what has a colour hides. */
+const DEPTH_FRAGMENT = /* glsl */ `
+uniform float uCount;
+varying float vClass;
+
+void main() {
+  if (floor(vClass + 0.5) >= uCount) {
+    discard;
+  }
+  gl_FragColor = vec4(0.0);
+}
+`;
+
 type BlockBuffers = Pick<
   Extract<RenderBuffers, { kind: 'blocks' }>,
   'centres' | 'spacing' | 'rotation'
@@ -91,21 +107,37 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     fragmentShader: FRAGMENT,
     transparent: true,
     blending: NormalBlending,
-    // Within a layer depth decides, so that the highest top shows (section 9.4).
+    // Within a layer depth decides, so that the highest top shows (section 9.4); how it is written and compared is the look's to say
+    // (`setLook`: one pass when the layer is opaque, the colour after a depth pass when it is not).
+    depthTest: true,
+    side: DoubleSide,
+  });
+  // A layer that is less than opaque is drawn in two passes: depth alone, a little farther than it is, and then the colour where the depth is
+  // the nearest, so that a top that has another under it is blended once. (An opaque layer is one pass.)
+  const depthMaterial = new ShaderMaterial({
+    uniforms,
+    vertexShader: VERTEX,
+    fragmentShader: DEPTH_FRAGMENT,
+    colorWrite: false,
     depthTest: true,
     depthFunc: LessDepth,
     depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
     side: DoubleSide,
   });
   // One box, with its triangles and corners, that every part uses: the blocks are the instances.
   const box = new BoxGeometry(1, 1, 1);
   const top = box.groups[TOP_FACE] ?? { start: 0, count: box.getIndex()?.count ?? 0 };
   const group = new Group();
-  const parts: { geometry: InstancedBufferGeometry; first: number; count: number }[] = [];
+  const parts: { geometry: InstancedBufferGeometry; first: number; count: number; depth: Mesh }[] =
+    [];
   let built = 0;
   let shown = look.visible;
   let classes: Uint8Array | undefined;
   let flat = true;
+  let translucent = false;
 
   function drawRange(geometry: InstancedBufferGeometry): void {
     geometry.setDrawRange(flat ? top.start : 0, flat ? top.count : Infinity);
@@ -140,13 +172,16 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       new InstancedBufferAttribute(buffers.centres.subarray(built * 3, (built + count) * 3), 3),
     );
     geometry.instanceCount = count;
-    const part = { geometry, first: built, count };
+    const depth = new Mesh(geometry, depthMaterial);
+    depth.frustumCulled = false;
+    depth.visible = translucent;
+    const part = { geometry, first: built, count, depth };
     parts.push(part);
     drawRange(geometry);
     classesOf(part);
     const mesh = new Mesh(geometry, material);
     mesh.frustumCulled = false;
-    group.add(mesh);
+    group.add(depth, mesh);
     built += count;
     return built < total;
   }
@@ -159,6 +194,13 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     object: group,
     setLook(next) {
       uniforms.uOpacity.value = next.opacity;
+      translucent = next.opacity < 1;
+      // Less than opaque: the depth pass has the nearest top and the colour is drawn where it is (it writes no depth); opaque: one pass.
+      material.depthFunc = translucent ? LessEqualDepth : LessDepth;
+      material.depthWrite = !translucent;
+      for (const part of parts) {
+        part.depth.visible = translucent;
+      }
       shown = next.visible;
       show();
     },
@@ -194,6 +236,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       }
       box.dispose();
       material.dispose();
+      depthMaterial.dispose();
     },
   };
   layer.setLook(look);

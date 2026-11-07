@@ -1,5 +1,5 @@
 import type { RenderBuffers } from '@karmania/engine/display';
-import { DoubleSide, LessDepth } from 'three';
+import { DoubleSide, LessDepth, LessEqualDepth } from 'three';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { BLOCKS_PER_PART, createBlocksLayer } from './blocks-layer.js';
@@ -34,8 +34,14 @@ const numbered = (count: number): ClassColouring => ({
   colours: Array.from({ length: 8 }, (_, i) => `#${(i * 16).toString(16).padStart(2, '0')}0000`),
 });
 
+/** The meshes that draw the colour, one for each part (the depth pass of a layer that is less than opaque is another for each). */
 const parts = (layer: ReturnType<typeof createBlocksLayer>): Mesh[] =>
-  layer.object.children as Mesh[];
+  (layer.object.children as Mesh[]).filter((mesh) => (mesh.material as ShaderMaterial).transparent);
+/** The meshes that draw only depth, one for each part. */
+const depthPasses = (layer: ReturnType<typeof createBlocksLayer>): Mesh[] =>
+  (layer.object.children as Mesh[]).filter(
+    (mesh) => !(mesh.material as ShaderMaterial).transparent,
+  );
 const geometryOf = (mesh: Mesh | undefined) =>
   mesh?.geometry as InstancedBufferGeometry | undefined;
 const uniforms = (layer: ReturnType<typeof createBlocksLayer>) =>
@@ -216,7 +222,64 @@ describe('createBlocksLayer', () => {
     expect(material.transparent).toBe(true);
   });
 
-  it('frees every part and its material when it is disposed', () => {
+  it('is one pass when it is opaque: no depth pass is drawn, and the colour writes depth, strictly nearer', () => {
+    const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 1), LOOK);
+    layer.step?.();
+    expect(depthPasses(layer)).toHaveLength(2);
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([false, false]);
+    const material = parts(layer)[0]?.material as ShaderMaterial;
+    expect([material.depthWrite, material.depthFunc]).toEqual([true, LessDepth]);
+  });
+
+  it('is two passes when it is less than opaque: the depth first, a little farther, and the colour where it is, writing no depth', () => {
+    const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 1), { ...LOOK, opacity: 0.5 });
+    layer.step?.();
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([true, true]);
+    const depth = depthPasses(layer)[0]?.material as ShaderMaterial;
+    expect(depth.colorWrite).toBe(false);
+    expect(depth.depthWrite).toBe(true);
+    expect(depth.depthTest).toBe(true);
+    expect(depth.depthFunc).toBe(LessDepth);
+    expect(depth.polygonOffset).toBe(true);
+    expect(depth.polygonOffsetFactor).toBeGreaterThan(0);
+    expect(depth.polygonOffsetUnits).toBeGreaterThan(0);
+    const colour = parts(layer)[0]?.material as ShaderMaterial;
+    expect([colour.depthWrite, colour.depthFunc]).toEqual([false, LessEqualDepth]);
+  });
+
+  it('goes from one pass to two and back as the opacity changes, without being built again', () => {
+    const layer = createBlocksLayer(blocks(3), LOOK);
+    const before = parts(layer)[0];
+    layer.setLook({ ...LOOK, opacity: 0.99 });
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([true]);
+    expect((parts(layer)[0]?.material as ShaderMaterial).depthWrite).toBe(false);
+    layer.setLook({ ...LOOK, opacity: 1 });
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([false]);
+    expect((parts(layer)[0]?.material as ShaderMaterial).depthWrite).toBe(true);
+    expect(parts(layer)[0]).toBe(before);
+  });
+
+  it('draws a part later with the pass that the opacity then has', () => {
+    const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 1), { ...LOOK, opacity: 0.5 });
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([true]);
+    layer.step?.();
+    expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([true, true]);
+  });
+
+  it('gives the depth pass the same blocks and the same geometry, and discards what the colour pass does, so that what is not drawn hides nothing', () => {
+    const layer = createBlocksLayer(blocks(3), { ...LOOK, opacity: 0.5 });
+    const depth = depthPasses(layer)[0];
+    const colour = parts(layer)[0];
+    expect(depth?.geometry).toBe(colour?.geometry);
+    const [dm, cm] = [depth?.material as ShaderMaterial, colour?.material as ShaderMaterial];
+    expect(dm.uniforms['uCount']).toBe(cm.uniforms['uCount']);
+    expect(dm.uniforms['uSize']).toBe(cm.uniforms['uSize']);
+    expect(dm.vertexShader).toBe(cm.vertexShader);
+    expect(dm.fragmentShader).toContain('discard');
+    expect(dm.fragmentShader).toContain('uCount');
+  });
+
+  it('frees every part and its materials when it is disposed', () => {
     const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 1), LOOK);
     layer.step?.();
     const freed: string[] = [];
@@ -226,8 +289,11 @@ describe('createBlocksLayer', () => {
     (parts(layer)[0]?.material as ShaderMaterial).addEventListener('dispose', () =>
       freed.push('material'),
     );
+    (depthPasses(layer)[0]?.material as ShaderMaterial).addEventListener('dispose', () =>
+      freed.push('depth material'),
+    );
     layer.dispose();
-    expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
-    expect(parts(layer)).toHaveLength(0);
+    expect(freed.sort()).toEqual(['depth material', 'geometry 0', 'geometry 1', 'material']);
+    expect(layer.object.children).toHaveLength(0);
   });
 });
