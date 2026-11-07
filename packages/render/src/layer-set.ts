@@ -1,7 +1,7 @@
 /**
  * The layers that are on the card, by the id the scene gives them: a layer is made for the buffers of a dataset, replaced when
  * its buffers come again, taken away (and its card memory freed) when it is removed. The container it adds them to is any
- * object that has `add` and `remove` (three's scene is one), so that this is tested without a graphics card.
+ * object that has `add` and `remove`, so that this is tested without a graphics card.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { Object3D } from 'three';
@@ -31,10 +31,10 @@ export interface LayerObject {
 /** Makes the layer of some buffers, looking as `look` says, or `undefined` if buffers of that kind are not drawn (yet). */
 export type LayerMaker = (buffers: RenderBuffers, look: LayerLook) => LayerObject | undefined;
 
-/** What the layers are put in. */
+/** What the layers are put in: told which layer an object is of, so that each can be drawn by itself. */
 export interface Container {
-  add(object: Object3D): unknown;
-  remove(object: Object3D): unknown;
+  add(object: Object3D, id: string): unknown;
+  remove(object: Object3D, id: string): unknown;
 }
 
 /** What `set` came to: the layer is drawn, or buffers of that kind are not drawn and there is no layer. */
@@ -64,7 +64,7 @@ export class LayerSet {
     if (layer.step !== undefined) {
       this.building.add(id);
     }
-    this.container.add(layer.object);
+    this.container.add(layer.object, id);
     return 'drawn';
   }
 
@@ -75,7 +75,7 @@ export class LayerSet {
       return false;
     }
     this.layers.delete(id);
-    this.container.remove(layer.object);
+    this.container.remove(layer.object, id);
     layer.dispose();
     return true;
   }

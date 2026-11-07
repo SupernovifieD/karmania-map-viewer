@@ -25,9 +25,17 @@ const mesh: RenderBuffers = {
 /** A container that says what is in it, and a maker whose layers say when they were freed. */
 function setup(drawn: readonly RenderBuffers['kind'][] = ['points']) {
   const inside = new Set<Object3D>();
+  /** What the container was told, as `add id` and `remove id`. */
+  const told: string[] = [];
   const container = {
-    add: (object: Object3D) => inside.add(object),
-    remove: (object: Object3D) => inside.delete(object),
+    add: (object: Object3D, id: string) => {
+      told.push(`add ${id}`);
+      return inside.add(object);
+    },
+    remove: (object: Object3D, id: string) => {
+      told.push(`remove ${id}`);
+      return inside.delete(object);
+    },
   };
   const made: {
     object: Group;
@@ -71,10 +79,26 @@ function setup(drawn: readonly RenderBuffers['kind'][] = ['points']) {
         : {}),
     };
   });
-  return { set, inside, made };
+  return { set, inside, made, told };
 }
 
 describe('LayerSet', () => {
+  it('tells the container which layer an object is of when it puts it in and when it takes it out, so that each can be drawn by itself', () => {
+    const { set, told } = setup();
+    set.set('layer-1', points, LOOK);
+    set.set('layer-2', points, LOOK);
+    set.remove('layer-1');
+    // A layer put in place of another is taken out and put in under the same id.
+    set.set('layer-2', points, LOOK);
+    expect(told).toEqual([
+      'add layer-1',
+      'add layer-2',
+      'remove layer-1',
+      'remove layer-2',
+      'add layer-2',
+    ]);
+  });
+
   it('puts the layer of some buffers in the container, under an id', () => {
     const { set, inside, made } = setup();
     expect(set.set('layer-1', points, LOOK)).toBe('drawn');

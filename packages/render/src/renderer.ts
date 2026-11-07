@@ -76,6 +76,12 @@ export interface Renderer {
    * no such layer, or it is of a kind that is not coloured by classes.
    */
   setLayerClasses(id: string, classes: ClassColouring | undefined): boolean;
+  /**
+   * The order the layers are drawn in, from the first drawn (the bottom of the legend) to the last, which is on top: each is drawn over
+   * the ones before it with the depth cleared between them, so the order decides what is on top whatever the heights. A layer that is
+   * not named is drawn after those that are.
+   */
+  setLayerOrder(ids: readonly string[]): void;
   /** Takes a layer off the card and frees what it held. `false` if there was none. */
   removeLayer(id: string): boolean;
   /**
@@ -128,7 +134,11 @@ export function createRenderer(
   const maxBuffer =
     typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 ? limit : DEFAULT_MAX_BUFFER;
 
-  const scene = new Scene();
+  // A scene for each layer, so that a layer is drawn by itself over the ones under it, with the depth cleared between them (section 9.4).
+  const scenes = new Map<string, Scene>();
+  /** The ids of the layers from the one that is drawn first (the bottom of the legend) to the one drawn last. */
+  let order: readonly string[] = [];
+  gl.autoClear = false;
   // Any box: `placeCamera` gives it its real one before the first frame, as the canvas gets its size.
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.25, 100);
 
@@ -137,7 +147,26 @@ export function createRenderer(
   let origin: readonly [number, number, number] = [0, 0, 0];
   const depth = { min: 0, max: 0 };
 
-  const layers = new LayerSet(scene, makeLayer);
+  const layers = new LayerSet(
+    {
+      add(object, id) {
+        const own = new Scene();
+        own.add(object);
+        scenes.set(id, own);
+      },
+      remove(object, id) {
+        scenes.get(id)?.remove(object);
+        scenes.delete(id);
+      },
+    },
+    makeLayer,
+  );
+
+  /** The layers in the order they are drawn: as the order says, and any that it does not name after them, as they were put. */
+  function drawOrder(): string[] {
+    const named = order.filter((id) => scenes.has(id));
+    return [...named, ...[...scenes.keys()].filter((id) => !named.includes(id))];
+  }
   let disposed = false;
   let lost = false;
   let frames = 0;
@@ -204,7 +233,15 @@ export function createRenderer(
       flat: true,
       outline,
     });
-    gl.render(scene, camera);
+    // The map's colour first, then each layer over what is there with its own depth: what is higher in the legend is on top, whatever the heights.
+    gl.clear();
+    for (const id of drawOrder()) {
+      const own = scenes.get(id);
+      if (own !== undefined) {
+        gl.clearDepth();
+        gl.render(own, camera);
+      }
+    }
     frames += 1;
     if (more) {
       invalidate();
@@ -310,6 +347,13 @@ export function createRenderer(
       const known = layers.setClasses(id, classes);
       invalidate();
       return known;
+    },
+    setLayerOrder(ids) {
+      if (disposed || (ids.length === order.length && ids.every((id, i) => id === order[i]))) {
+        return;
+      }
+      order = [...ids];
+      invalidate();
     },
     removeLayer(id) {
       const removed = layers.remove(id);
