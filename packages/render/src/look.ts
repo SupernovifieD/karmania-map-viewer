@@ -36,8 +36,8 @@ export interface FrameInfo {
 export const NO_VALUE = 255;
 
 /**
- * The most classes whose colours a layer can hold: the 20 categories and "Other" that the engine makes at most, and room. An element
- * of a class beyond what the layer has a colour for is not drawn, as one with no value is not.
+ * The most classes whose colours a layer can hold: the 20 categories and "Other" that a column of categories has at most (the scene's classes
+ * of ranges are 2 to 20), and room. An element of a class beyond what the layer has a colour for is not drawn, as one with no value is not.
  */
 export const MAX_CLASSES = 32;
 

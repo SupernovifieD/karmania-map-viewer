@@ -80,7 +80,7 @@ describe('createPointsLayer', () => {
     expect(second?.[8]).toBe((POINTS_PER_PART + 3) * 3 - 1);
   });
 
-  it('draws a marker only if it is strictly nearer than one that is there: one at the same height does not overdraw it', () => {
+  it('has the depth test that draws a marker only if it is strictly nearer than one that is there, and writes depth', () => {
     const material = parts(createPointsLayer(points(3), LOOK))[0]?.material as ShaderMaterial;
     expect(material.depthFunc).toBe(LessDepth);
     expect(material.depthTest).toBe(true);

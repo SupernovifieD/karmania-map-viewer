@@ -300,7 +300,7 @@ describe('createGridLayer', () => {
     expect(uniforms(meshes(layer)[0])['uCount']?.value).toBe(MAX_CLASSES);
   });
 
-  it('does not draw a class of no value or one without a colour: the cells are not coloured in the shader, whatever their byte', () => {
+  it('gives the shader the number of colours as the count of classes that are drawn, which a cell of no value is never below (the shader itself is tested in the browser)', () => {
     expect(NO_VALUE).toBeGreaterThanOrEqual(MAX_CLASSES);
     const layer = createGridLayer(grid(), LOOK);
     layer.setClasses?.({

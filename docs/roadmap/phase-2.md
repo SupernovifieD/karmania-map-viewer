@@ -468,6 +468,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F5 The pipeline stops a pass when the scene changes, keeps a fit that did not happen for the next look, does not leave a layer `not_drawn` after its classes are no longer refused, and tells nobody of what has not changed (review round).
   - [x] 16.F6 The renderer keeps the compiled mark of a layer that is replaced by one of its kind, compiles again after a context is given back, and does nothing after it is disposed of (review round).
   - [x] 16.F7 The map area says that the map cannot be drawn when the browser has no WebGL 2 (review round).
+  - [x] 16.F8 Small corrections of code, tests and comments from the review; the sort by class measured (review round).
 
 ## M17: Map furniture and overlays
 

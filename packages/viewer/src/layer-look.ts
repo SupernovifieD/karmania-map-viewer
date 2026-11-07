@@ -1,7 +1,7 @@
 /**
  * What a layer of the scene looks like to the renderer: its style, made into the one colour, the sizes and the opacity that the card
- * needs. A layer coloured by classes is drawn in one grey until its class colours are on the card; a grid and a block model have them (the
- * pipeline gives them, steps 16.11d and 16.12c), and the other kinds will (step 16.13).
+ * needs. A layer coloured by classes is drawn in one grey until its class colours are on the card, which the pipeline gives with the layer
+ * (and in one grey for good if the classes cannot be had).
  */
 import type { LayerLook } from '@karmania/render';
 import { DEFAULT_LINE_WIDTH, DEFAULT_POINT_SIZE, OTHER_COLOUR } from '@karmania/scene';

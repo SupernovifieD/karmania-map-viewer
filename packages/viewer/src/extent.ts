@@ -1,7 +1,8 @@
 /**
  * The extent, in map units, of what some render buffers draw: what "fit to data" shows and what the scale of the map is
  * limited by. The positions in the buffers are relative to the origin of the frame, as the card has them, so the origin is
- * added back, in f64.
+ * added back, in f64 (the corners of a grid are made as floats first, an error of the size of the offset from the origin times 6e-8,
+ * which a fit does not see).
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { BBox } from '@karmania/engine/types';

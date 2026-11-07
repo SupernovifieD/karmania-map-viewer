@@ -124,16 +124,15 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
     if (built >= total) {
       return false;
     }
-    // (The last part is shorter: a view stops at the end of the array.)
-    const end = built + POINTS_PER_PART;
+    // (The last part is shorter.)
+    const end = Math.min(built + POINTS_PER_PART, total);
     const geometry = new BufferGeometry();
     // A view of the part: the card is given those bytes and no others, and the whole array stays here for a context that is lost.
     geometry.setAttribute(
       'position',
       new BufferAttribute(buffers.positions.subarray(built * 3, end * 3), 3),
     );
-    // (A view stops at the end of the array, so the last part's classes are fewer without it being said.)
-    const entry = { geometry, first: built, count: POINTS_PER_PART };
+    const entry = { geometry, first: built, count: end - built };
     geometries.push(entry);
     classesOf(entry);
     const part = new Points(geometry, material);

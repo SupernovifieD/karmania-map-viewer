@@ -8,7 +8,6 @@ describe('sinCos', () => {
     expect(sinCos(180)).toEqual([0, -1]);
     expect(sinCos(270)).toEqual([-1, 0]);
     // (`Math.cos(Math.PI / 2)` is 6e-17, which is why they are not worked out.)
-    expect(Math.cos(Math.PI / 2)).not.toBe(0);
   });
 
   it('takes an angle for the one it is the same as: any number of turns, either way', () => {
