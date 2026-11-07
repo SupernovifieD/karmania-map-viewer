@@ -175,31 +175,46 @@ export class KarmaniaViewer extends LitElement {
     if (area === null || this.renderer !== undefined || this.attaching || this.cannotDraw) {
       return;
     }
+    let canvas: HTMLCanvasElement | undefined;
+    let made: Renderer | undefined;
     this.attaching = true;
     try {
       await area.updateComplete;
-      // The context and the renderer are made in a task of their own: made in the one that is handling the click that loaded the file, they
-      // held the page for about 50 ms along with what that click does, and no task of the page is to be over 50 ms (section 9.6).
+      // The context and the renderer are made in tasks of their own, which is why it is awaited: made in the one that is handling the click
+      // that loaded the file, they held the page for about 50 ms along with what that click does, and no task of the page is to be over
+      // 50 ms (section 9.6). The browser's context and three's own state are two more (and a wait for the card between them).
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 0);
       });
-    } finally {
-      this.attaching = false;
-    }
-    const canvas = area.canvas;
-    if (canvas !== undefined && this.isConnected) {
-      this.renderer = createRenderer(canvas, {
+      canvas = area.canvas;
+      if (canvas === undefined || !this.inPage()) {
+        return;
+      }
+      made = await createRenderer(canvas, {
         // The card took the context away, or gave it back: the map area says so while the map is being drawn again.
         onContextLoss: (lost) => {
           area.redrawing = lost;
         },
       });
-      this.cannotDraw = this.renderer === undefined;
-      this.lookThroughCamera();
-      this.controller = this.renderer === undefined ? undefined : this.listenToPerson(area, canvas);
-      area.interactive = this.controller !== undefined;
-      this.pipeline?.rendererReady();
+    } finally {
+      this.attaching = false;
     }
+    // The viewer was taken out of the page while the renderer was being made: it gives the context up at once.
+    if (!this.inPage()) {
+      made?.dispose();
+      return;
+    }
+    this.renderer = made;
+    this.cannotDraw = made === undefined;
+    this.lookThroughCamera();
+    this.controller = made === undefined ? undefined : this.listenToPerson(area, canvas);
+    area.interactive = this.controller !== undefined;
+    this.pipeline?.rendererReady();
+  }
+
+  /** Whether the viewer is in a page now (asked again after each wait, since it may have been taken out meanwhile). */
+  private inPage(): boolean {
+    return this.isConnected;
   }
 
   /** What moves the map when a person drags it, turns the wheel or presses a key: it asks the scene for a camera. */
@@ -251,6 +266,11 @@ export class KarmaniaViewer extends LitElement {
       },
       onChange: () => {
         this.layerChanges += 1;
+        // The renderer is made when the first buffers are ready to be drawn, and not when the layer is first asked for: made while the worker
+        // is busy preparing them, the card and the worker compete for the machine and the renderer's own start takes 25 to 55 ms of the page.
+        if (this.renderer === undefined && this.pipeline?.hasWaiting() === true) {
+          void this.attachRenderer();
+        }
       },
       firstColumn: (datasetId) => {
         const summary = this.datasets.find((dataset) => dataset.id === datasetId);
@@ -301,11 +321,8 @@ export class KarmaniaViewer extends LitElement {
     return [...(this.pipeline?.states() ?? [])];
   }
 
-  /** Called when the scene changes: the first layer is what the renderer is for, and the camera is what it looks through. */
+  /** Called when the scene changes: the camera is what the renderer looks through. */
   private readonly onScene = (state: SceneDocument, previous: SceneDocument): void => {
-    if (Object.keys(state.layers).length > 0) {
-      void this.attachRenderer();
-    }
     if (this.engine !== undefined) {
       this.pipelineFor(this.engine).update();
     }

@@ -286,9 +286,9 @@ test.describe('a layer of more points than one part holds', () => {
     page,
   }) => {
     test.setTimeout(180_000);
-    // 300,001 points on a grid a metre apart: 250,000 make a part, so there are two. Point i is at (i mod 1000, i div 1000) metres.
+    // 100,001 points on a grid a metre apart: 100,000 make a part, so there are two. Point i is at (i mod 1000, i div 1000) metres.
     const rows = ['Easting,Northing,RL'];
-    for (let i = 0; i <= 300_000; i += 1) {
+    for (let i = 0; i <= 100_000; i += 1) {
       rows.push(`${String(500_000 + (i % 1000))},${String(2_765_000 + Math.floor(i / 1000))},100`);
     }
     await page.goto('/?theme=light');
@@ -310,9 +310,9 @@ test.describe('a layer of more points than one part holds', () => {
       })
       .toEqual(['drawn']);
     const fill = bytes(await layerColour(page));
-    // A point of the second part (the 299,999th: 999 m east and 299 north of the corner), and one of the first.
+    // The one point of the second part (the 100,001st: at the corner's east and 100 m north of it), and one of the first.
     for (const [east, north] of [
-      [999, 299],
+      [0, 100],
       [10, 5],
     ] as const) {
       await dispatch(page, {

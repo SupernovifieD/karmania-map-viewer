@@ -12,6 +12,7 @@ import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import { OTHER_COLOUR, createSceneStore, fitCamera2d } from '@karmania/scene';
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
+import { POSITIONS_PER_TURN } from './extent.js';
 import { FIT_PADDING, LayerPipeline, ZOOM_IN_LIMIT, ZOOM_OUT_LIMIT } from './layer-pipeline.js';
 import type { LayerSink } from './layer-pipeline.js';
 
@@ -150,8 +151,11 @@ function setup(sinkOverride?: LayerSink | null) {
   let firstColumn: (datasetId: number) => string | undefined = () => undefined;
   /** The size of the map area, which the tests may take away (a page that has not laid it out yet has none). */
   let viewport = { width: 1000, height: 500 };
+  /** What the pipeline waits for between the slices of the extent of a big layer: nothing, unless a test holds it. */
+  let turn: () => Promise<void> = () => Promise.resolve();
   const changes = vi.fn();
   const pipeline = new LayerPipeline({
+    turn: () => turn(),
     engine: fake.engine,
     scene,
     sink: () => current,
@@ -195,6 +199,9 @@ function setup(sinkOverride?: LayerSink | null) {
     setViewport: (next: { width: number; height: number }) => {
       viewport = next;
     },
+    setTurn: (next: () => Promise<void>) => {
+      turn = next;
+    },
     ...fake,
   };
 }
@@ -212,7 +219,8 @@ describe('LayerPipeline: from the scene to the card', () => {
     expect(t.scene.getState().frame).toEqual(frame());
     expect(t.prepareCalls).toHaveLength(1);
     expect(t.prepareCalls[0]?.id).toBe(0);
-    expect(t.prepareCalls[0]?.params).toEqual({ frame: frame(), maxTextureSize: 8192 });
+    // A card that takes 8,192 is asked for tiles of 4,096 at most.
+    expect(t.prepareCalls[0]?.params).toEqual({ frame: frame(), maxTextureSize: 4096 });
     expect(t.sink.setLayer).toHaveBeenCalledExactlyOnceWith('layer-1', buffers());
     expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
   });
@@ -379,6 +387,89 @@ describe('LayerPipeline: from the scene to the card', () => {
     await t.pipeline.idle();
     expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
     expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(20, 30);
+  });
+
+  it('works out the extent of a layer of many positions in slices, with a turn for the page between them', async () => {
+    const t = setup();
+    let turns = 0;
+    t.setTurn(() => {
+      turns += 1;
+      return Promise.resolve();
+    });
+    t.drawable([0, true]);
+    // Two slices and a little more: three, so two turns.
+    const positions = new Float32Array((POSITIONS_PER_TURN * 2 + 1) * 3);
+    positions.set([0, 0, 0, 10, 20, 30], 0);
+    t.state.prepare = () =>
+      Promise.resolve({ status: 'drawn', buffers: { kind: 'points', positions }, findings: [] });
+    await t.add(0);
+    expect(turns).toBe(2);
+    // The extent is the whole of it: the camera is fitted to the 10 by 20 of the first two positions and the zeros that are the rest.
+    expect(t.scene.getState().camera2d.centre).toEqual([1000 + 5, 2000 + 10]);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('does not give the renderer what was prepared for a frame that changed while the extent of a big layer was worked out', async () => {
+    const t = setup(null);
+    t.drawable([0, true]);
+    const held = deferred<undefined>();
+    let turns = 0;
+    t.setTurn(() => {
+      turns += 1;
+      return held.promise;
+    });
+    const big = new Float32Array((POSITIONS_PER_TURN + 1) * 3);
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: { kind: 'points', positions: big },
+        findings: [],
+      });
+    t.scene.dispatch({ type: 'addLayers', datasets: [dataset(0)] });
+    await vi.waitFor(() => {
+      expect(turns).toBe(1);
+    });
+    // The person chooses another frame while the page is given its turn, and the layer cannot be prepared for it.
+    const chosen: Frame = {
+      mapCrs: { kind: 'epsg', code: 32641 },
+      origin: [0, 0, 0],
+      source: 'user',
+    };
+    t.state.choice = () => ({
+      frame: chosen,
+      drawable: [{ id: 0, status: 'drawn', reprojected: true, findings: [] }],
+      findings: [],
+    });
+    t.state.prepare = () => Promise.reject(new Error('the worker stopped'));
+    t.scene.dispatch({ type: 'setFrame', frame: chosen });
+    held.resolve(undefined);
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('failed');
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    expect(t.sink.setLayer).not.toHaveBeenCalled();
+  });
+
+  it('says that a layer is waiting for the renderer from when its buffers are ready until the renderer has them', async () => {
+    const t = setup(null);
+    t.drawable([0, true]);
+    expect(t.pipeline.hasWaiting()).toBe(false);
+    await t.add(0);
+    expect(t.pipeline.hasWaiting()).toBe(true);
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    expect(t.pipeline.hasWaiting()).toBe(false);
+  });
+
+  it('tells the one who watches the layers of a change, with the buffers waiting, when they are ready', async () => {
+    const t = setup(null);
+    t.drawable([0, true]);
+    let waiting: boolean | undefined;
+    t.changes.mockImplementation(() => {
+      waiting = waiting === true ? true : t.pipeline.hasWaiting();
+    });
+    await t.add(0);
+    expect(waiting).toBe(true);
   });
 
   it('says how far a request has got, and then that it is done', async () => {
@@ -612,6 +703,50 @@ describe('LayerPipeline: from the scene to the card', () => {
     );
     t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
     expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(0, 0);
+  });
+
+  it('asks for tiles of the size the card takes if that is less than the most a tile is, and the most if there is no card yet', async () => {
+    const small = { ...setup().sink, maxTextureSize: 2048 };
+    const t = setup(small);
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.prepareCalls[0]?.params.maxTextureSize).toBe(2048);
+    expect(small.setLayer).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares a grid again for a card that takes less than the tiles it was prepared for, when the card is there', async () => {
+    const t = gridSetup(null);
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(t.prepareCalls.map((call) => call.params.maxTextureSize)).toEqual([4096]);
+    expect(t.pipeline.hasWaiting()).toBe(true);
+    // The card comes, and takes tiles of 2,048 at most: what was made is not given to it, and the grid is made again for it.
+    const small = { ...t.sink, maxTextureSize: 2048 };
+    t.setSink(small);
+    t.pipeline.rendererReady();
+    await t.pipeline.idle();
+    expect(t.prepareCalls.map((call) => call.params.maxTextureSize)).toEqual([4096, 2048]);
+    expect(small.setLayer).toHaveBeenCalledTimes(1);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('does not prepare a grid again for a card that takes the tiles it was prepared for, or a layer of another kind for a card that takes less', async () => {
+    const t = gridSetup(null);
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    await t.pipeline.idle();
+    expect(t.prepareCalls).toHaveLength(1);
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(1);
+    // Points have no tiles: a card that takes less than 4,096 is no reason to make them again.
+    const p = setup(null);
+    p.drawable([0, true]);
+    await p.add(0);
+    p.setSink({ ...p.sink, maxTextureSize: 2048 });
+    p.pipeline.rendererReady();
+    await p.pipeline.idle();
+    expect(p.prepareCalls).toHaveLength(1);
   });
 
   it('keeps what was prepared until the renderer is there, and gives it then', async () => {

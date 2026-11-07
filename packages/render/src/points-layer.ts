@@ -21,8 +21,12 @@ import type { LayerObject } from './layer-set.js';
 import { MAX_CLASSES, colourOf } from './look.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
-/** The points are put on the card this many at a time (3 MB of positions), the first part at once. */
-export const POINTS_PER_PART = 250_000;
+/**
+ * The points are put on the card this many at a time (1.2 MB of positions), the first part at once. The first frame that draws a part took 33 to 45 ms
+ * with 250,000 to a part (the card's own work, part of it in proportion to the size and part not), and about 20 ms with 50,000: the size is what keeps
+ * that frame, and so a task, under the 50 ms of section 9.6.
+ */
+export const POINTS_PER_PART = 100_000;
 /** The outline of a marker is this wide, in CSS pixels, and is inside the size of the marker. */
 export const OUTLINE_WIDTH = 1;
 

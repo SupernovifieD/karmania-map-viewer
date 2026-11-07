@@ -43,8 +43,8 @@ describe('createFillLayer', () => {
     expect(parts(createFillLayer(fill(0), LOOK))).toHaveLength(0);
   });
 
-  it('puts the triangles in parts of 250,000, the first at once, and the positions once for all of them', () => {
-    expect(TRIANGLES_PER_PART).toBe(250_000);
+  it('puts the triangles in parts of 100,000, the first at once, and the positions once for all of them', () => {
+    expect(TRIANGLES_PER_PART).toBe(100_000);
     const layer = createFillLayer(fill(TRIANGLES_PER_PART + 4), LOOK);
     expect(parts(layer)).toHaveLength(1);
     expect(layer.step?.()).toBe(false);

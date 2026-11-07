@@ -381,10 +381,10 @@ test.describe('the grid layer', () => {
 
 test.describe('a grid wider than the card has a texture for', () => {
   test('is in tiles that meet with no gap and no overlap', async ({ page }) => {
-    // What the card takes is only known once there is a card: a small grid, drawn, tells.
+    // A tile is of 4,096 cells a side at most, and of what the card takes if that is less: a small grid, drawn, tells what the card takes.
     await page.goto('/?theme=light');
     await importAndLoad(page, fixture('grid.asc'), projectionFor('grid.prj'));
-    const limit = (await drawn(page)).maxTextureSize;
+    const limit = Math.min((await drawn(page)).maxTextureSize, 4096);
     // A row of `limit + 20` cells of a metre: the first `limit` have a low value and the last 20 a high one.
     const columns = limit + 20;
     const values = Array.from({ length: columns }, (_, i) => (i < limit ? '1' : '100')).join(' ');
