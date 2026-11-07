@@ -139,6 +139,40 @@ test.describe('the map canvas', () => {
     });
     expect(lost).toEqual({ stats: null, lost: true });
   });
+
+  test('draws nothing after the viewer is taken out of the page, though a frame was waiting when a picture was read', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    const drawnAfter = await page.evaluate(async () => {
+      // Every clear of the buffer is a frame drawn (or a picture read), which is counted from here.
+      const proto = WebGL2RenderingContext.prototype;
+      const clear = Reflect.get(proto, 'clear');
+      let clears = 0;
+      proto.clear = function (this: WebGL2RenderingContext, mask: number): void {
+        clears += 1;
+        clear.call(this, mask);
+      };
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as HTMLElement & {
+        dispatch(command: unknown): unknown;
+        renderPixels(x: number, y: number, width: number, height: number): unknown;
+      };
+      // A frame is asked for (the camera turns), a picture is read (it draws now, and the frame that was asked for is still to come), and the viewer goes.
+      viewer.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 10 } } });
+      viewer.renderPixels(0, 0, 1, 1);
+      const before = clears;
+      viewer.remove();
+      for (let i = 0; i < 3; i += 1) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      proto.clear = clear;
+      return clears - before;
+    });
+    expect(drawnAfter).toBe(0);
+  });
 });
 
 test.describe('the map canvas on a screen of twice the density', () => {

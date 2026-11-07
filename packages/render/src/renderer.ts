@@ -9,6 +9,7 @@ import { Color, OrthographicCamera, Scene, SRGBColorSpace, WebGLRenderer } from 
 import { bufferSize } from './buffer-size.js';
 import { orthographicFrame } from './camera-2d.js';
 import type { OrthographicFrame } from './camera-2d.js';
+import { CompiledLayers } from './compiled-layers.js';
 import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
@@ -144,8 +145,7 @@ export function createRenderer(
    * and off this thread (`KHR_parallel_shader_compile`), and a frame is asked for when they are. Linking a program in the frame that first
    * draws it holds the page for about 50 ms, which is the longest task that a million points or a model of blocks put on it.
    */
-  const compiled = new Set<string>();
-  const compiling = new Set<string>();
+  const programs = new CompiledLayers();
   gl.autoClear = false;
   // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
   // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
@@ -168,8 +168,6 @@ export function createRenderer(
       remove(object, id) {
         scenes.get(id)?.remove(object);
         scenes.delete(id);
-        compiled.delete(id);
-        compiling.delete(id);
       },
     },
     makeLayer,
@@ -235,13 +233,11 @@ export function createRenderer(
 
   /** Starts compiling the programs of a layer that has not been drawn, without holding this thread; a frame is asked for when they are ready. */
   function warm(id: string, own: Scene): void {
-    if (compiling.has(id)) {
+    if (!programs.start(id, own)) {
       return;
     }
-    compiling.add(id);
     const done = (): void => {
-      if (compiling.delete(id) && scenes.get(id) === own) {
-        compiled.add(id);
+      if (programs.finish(id, own, scenes.get(id) === own)) {
         invalidate();
       }
     };
@@ -250,8 +246,12 @@ export function createRenderer(
 
   /** Draws a frame. `everything` draws every layer now, compiling what has to be compiled (a picture that is read back, which is of all of them). */
   function draw(everything: boolean): void {
-    frame = undefined;
-    if (lost) {
+    // The frame that was asked for and has not come is this one: it is not drawn twice, nor after the renderer is gone.
+    if (frame !== undefined) {
+      view.cancelAnimationFrame(frame);
+      frame = undefined;
+    }
+    if (disposed || lost) {
       return;
     }
     readBackground();
@@ -272,11 +272,11 @@ export function createRenderer(
       if (own === undefined) {
         continue;
       }
-      if (!everything && !compiled.has(id)) {
+      if (!everything && !programs.has(id)) {
         warm(id, own);
         continue;
       }
-      compiled.add(id);
+      programs.add(id);
       gl.clearDepth();
       gl.render(own, camera);
       drawn += 1;
@@ -359,6 +359,8 @@ export function createRenderer(
     background = '';
     readBackground();
     gl.setSize(size.width, size.height, false);
+    // And its programs are gone: they are compiled again, a layer at a time and off this thread, before the layers are drawn.
+    programs.reset();
     invalidate();
   };
   canvas.addEventListener('webglcontextlost', onLost);
@@ -376,16 +378,30 @@ export function createRenderer(
       invalidate();
     },
     setLayer(id, buffers, look) {
+      if (disposed) {
+        return 'unsupported';
+      }
       const outcome = layers.set(id, buffers, look);
+      if (outcome === 'drawn') {
+        programs.put(id, buffers.kind);
+      } else {
+        programs.remove(id);
+      }
       invalidate();
       return outcome;
     },
     setLayerLook(id, look) {
+      if (disposed) {
+        return false;
+      }
       const known = layers.setLook(id, look);
       invalidate();
       return known;
     },
     setLayerClasses(id, classes) {
+      if (disposed) {
+        return false;
+      }
       const known = layers.setClasses(id, classes);
       invalidate();
       return known;
@@ -398,7 +414,11 @@ export function createRenderer(
       invalidate();
     },
     removeLayer(id) {
+      if (disposed) {
+        return false;
+      }
       const removed = layers.remove(id);
+      programs.remove(id);
       invalidate();
       return removed;
     },
@@ -425,6 +445,9 @@ export function createRenderer(
         throw new RangeError(
           `The rectangle ${String(width)} x ${String(height)} at ${String(x)}, ${String(y)} is not in the buffer of ${String(size.width)} x ${String(size.height)}.`,
         );
+      }
+      if (disposed) {
+        throw new Error('The renderer has been disposed of, so there is nothing to read.');
       }
       if (lost) {
         throw new Error(
@@ -480,6 +503,7 @@ export function createRenderer(
         frame = undefined;
       }
       layers.clear();
+      programs.reset();
       gl.dispose();
       // A context that is away already has nothing to give up.
       if (!lost) {
