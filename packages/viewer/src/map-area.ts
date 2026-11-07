@@ -1,5 +1,5 @@
 import { kButton, sharedStyles } from '@karmania/ui';
-import { css, html, LitElement } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
 
@@ -28,6 +28,7 @@ export interface DroppedFiles {
 export class KarmaniaMapArea extends LitElement {
   static override properties = {
     datasets: { type: Number },
+    redrawing: { type: Boolean },
     dragging: { state: true },
   };
 
@@ -85,6 +86,27 @@ export class KarmaniaMapArea extends LitElement {
         visibility: visible;
       }
 
+      /* A notice over the map, at the top in the middle, 16 from the edge: it is laid over the area and moves nothing. */
+      .notice {
+        align-items: center;
+        background: var(--k-surface-raised);
+        border: var(--k-border-width) solid var(--k-border);
+        border-radius: var(--k-radius-lg);
+        box-sizing: border-box;
+        color: var(--k-text);
+        display: flex;
+        font-size: var(--k-font-size-caption);
+        height: var(--k-space-24);
+        inset-block-start: var(--k-space-16);
+        inset-inline-start: 50%;
+        line-height: var(--k-line-height-caption);
+        padding: 0 var(--k-space-12);
+        pointer-events: none;
+        position: absolute;
+        transform: translateX(-50%);
+        white-space: nowrap;
+      }
+
       .drop-label {
         font-size: var(--k-font-size-section-title);
         font-weight: var(--k-weight-medium);
@@ -95,6 +117,8 @@ export class KarmaniaMapArea extends LitElement {
 
   /** How many datasets are loaded. */
   declare datasets: number;
+  /** Whether the map is being drawn again after the graphics card took it away: it says so, in a notice over the map. */
+  declare redrawing: boolean;
   /** Whether files are being dragged over the area. */
   declare private dragging: boolean;
 
@@ -107,6 +131,7 @@ export class KarmaniaMapArea extends LitElement {
   constructor() {
     super();
     this.datasets = 0;
+    this.redrawing = false;
     this.dragging = false;
   }
 
@@ -126,6 +151,7 @@ export class KarmaniaMapArea extends LitElement {
       >
         <canvas aria-hidden="true"></canvas>
         ${this.datasets > 0 ? this.loaded() : this.empty()}
+        ${this.redrawing ? html`<div class="notice" role="status">Redrawing the map…</div>` : nothing}
         <div class="drop-zone" ?data-active=${this.dragging} aria-hidden="true">
           <span class="drop-label">Drop to import</span>
         </div>

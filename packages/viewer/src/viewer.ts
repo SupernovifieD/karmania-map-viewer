@@ -170,7 +170,12 @@ export class KarmaniaViewer extends LitElement {
     }
     const canvas = area.canvas;
     if (canvas !== undefined && this.isConnected) {
-      this.renderer = createRenderer(canvas);
+      this.renderer = createRenderer(canvas, {
+        // The card took the context away, or gave it back: the map area says so while the map is being drawn again.
+        onContextLoss: (lost) => {
+          area.redrawing = lost;
+        },
+      });
       this.lookThroughCamera();
     }
   }
