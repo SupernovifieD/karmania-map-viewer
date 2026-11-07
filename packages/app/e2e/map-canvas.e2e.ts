@@ -34,7 +34,7 @@ test.describe('the map canvas', () => {
     });
   });
 
-  test('is under what is laid over the map area, and takes nothing from the pointer', async ({
+  test('is under what is laid over the map area, which lets the pointer through to it', async ({
     page,
   }) => {
     await page.goto('/');
@@ -42,18 +42,26 @@ test.describe('the map canvas', () => {
     const heading = area(page).locator('k-empty-state');
     const box = await heading.boundingBox();
     expect(box).not.toBeNull();
-    const top = await page.evaluate(
-      ([x, y]) => {
-        // Through the shadow roots: what is at the middle of the empty state, from the top.
+    const middle = [
+      (box?.x ?? 0) + (box?.width ?? 0) / 2,
+      (box?.y ?? 0) + (box?.height ?? 0) / 2,
+    ] as const;
+    /** What is at the middle of the empty state, from the top, through the shadow roots. */
+    const topmost = (): Promise<string | undefined> =>
+      page.evaluate(([x, y]) => {
         const find = (root: Document | ShadowRoot): Element | null => {
-          const element = root.elementFromPoint(x ?? 0, y ?? 0);
+          const element = root.elementFromPoint(x, y);
           return element?.shadowRoot ? (find(element.shadowRoot) ?? element) : element;
         };
         return find(document)?.tagName.toLowerCase();
-      },
-      [(box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2],
-    );
-    expect(top).not.toBe('canvas');
+      }, middle);
+    // The empty state fills the area and does not take the pointer, so the map is what the pointer is on...
+    expect(await topmost()).toBe('canvas');
+    // ...and it is over the map: with the pointer given back to it, it is what is on top there.
+    await heading.evaluate((element) => {
+      element.style.pointerEvents = 'auto';
+    });
+    expect(await topmost()).not.toBe('canvas');
   });
 
   test('draws a frame when it is asked for and not otherwise: an idle page draws none', async ({
