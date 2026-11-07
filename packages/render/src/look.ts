@@ -21,6 +21,13 @@ export interface LayerLook {
 export interface FrameInfo {
   /** Device pixels to a CSS pixel. */
   readonly pixelRatio: number;
+  /**
+   * Whether the view is flat (2D): then the height of a thing within a layer does not show, because a layer is one colour, and a layer that
+   * is half opaque must not be darker where its own parts overlap, which parts at different heights would make.
+   */
+  readonly flat: boolean;
+  /** The size of the drawing buffer, in device pixels (what a layer that is drawn in screen space needs to turn clip space into pixels). */
+  readonly viewport: readonly [number, number];
   /** The colour of outlines, `[r, g, b]` each from 0 to 1 in sRGB: the colour of the text, which contrasts with the map. */
   readonly outline: readonly [number, number, number];
 }

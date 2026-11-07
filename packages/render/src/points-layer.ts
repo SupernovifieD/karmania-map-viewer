@@ -10,6 +10,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Group,
+  LessDepth,
   NormalBlending,
   Points,
   ShaderMaterial,
@@ -73,6 +74,8 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
     transparent: true,
     blending: NormalBlending,
     depthTest: true,
+    // Strictly nearer (three's own is nearer or as near): a fragment at the depth of one that is there does not overdraw it.
+    depthFunc: LessDepth,
     depthWrite: true,
   });
   const group = new Group();

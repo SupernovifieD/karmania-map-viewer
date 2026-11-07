@@ -192,7 +192,13 @@ export function createRenderer(
     readBackground();
     // The next part of what is still being built goes on the card before the frame, and another frame is asked for if there is more.
     const more = layers.step();
-    layers.prepareFrame({ pixelRatio: size.pixelRatio, outline });
+    layers.prepareFrame({
+      pixelRatio: size.pixelRatio,
+      viewport: [size.width, size.height],
+      // This renderer draws the 2D view (the 3D view of M18 is not flat).
+      flat: true,
+      outline,
+    });
     gl.render(scene, camera);
     frames += 1;
     if (more) {
