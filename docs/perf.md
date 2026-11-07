@@ -412,7 +412,29 @@ The median is the period of the display: 60 Hz is 16.67 ms and the browser's clo
 it passes or fails on the reading of the clock and not on the speed of the renderer. An earlier version of this section read "under" as "at or under" and
 said every target was met; that was a relaxation of a target, which the brief forbids ("Do not relax a target on your own"), and it is undone. Whether
 the target means "keeps up with the display" or is to be measured another way (the renderer's own time for a frame, from a timer query of the card,
-which does not depend on the display's period) is the owner's to say. **Every other target is met on this machine.**
+which does not depend on the display's period) is the owner's to say. **The other targets of the table are met in every run; the last, no task of the main thread over 50 ms, is not met in every run (see the final gate below).**
+
+**The final gate of M16** (head `ce09d96`; five runs of `pnpm perf`, the first in the gate and four after it, the same machine and card; and four runs of the head before the review round, `bd1f17e`, under the same conditions):
+
+| | 1,000,000 points | 4,000,000 cells | 1,000,000 blocks | Target |
+| --- | ---: | ---: | ---: | --- |
+| Loading to the first frame, ms | 222 to 355 | 449 to 505 | 350 to 440 | 1,500; 1,500; 3,000 |
+| Median frame time, ms, in the five runs | 16.7, 16.6, 16.6, 16.7, 16.6 | | | under 16.7 |
+| 95th percentile, ms | 17.6 to 18.8 | | | under 33 |
+| New classes to the picture, ms | | 140 to 181 | | 300 |
+| Frames drawn for the 300 changes of the camera | 299 in every run | | | (the test asks for 290) |
+| Longest task of the main thread, ms | 55 in one run of five | 52 in one run of five | none in five | 50 |
+
+The tests of Phase 1 in the same `pnpm perf` (a CSV of 1,000,000 points and a grid of 4,000,000 cells, through the preview, the import, the load and the scroll of the table) had
+tasks over the line too: in the five runs, a task of the load of 52, 51, 51 and 52 ms (with 54 ms for a preview) and, in the scroll of the table, 84, 84 and 107 ms; on the head before the review round, in four
+runs, a load of 60 ms and scrolls of 53 and 50 ms, and a task of 50 ms in the points of M16. **So a task a few milliseconds over the line (51 to 60; 84 and 107 in scrolls) comes in some of the measurements, in the tests of Phase 1, which M16 does not touch, as in its own.
+None came in the three runs after step 16.F3 (the table above); they came in 9 of the 45 measurements of the five runs of this head; and when the two heads were run in turn, three
+runs each, at the end, they came in 8 of 27 measurements of the head before the review round and in 8 of 27 of this one: the same, so the review round did not cause them, and how often they come depends
+on the state of the machine at the time, which got noisier as the session went on. The target "no task of the main thread over 50 ms" is met when the machine is quiet and not always otherwise, and
+`pnpm perf` is red in four of the five runs of this head** (the strict median, in two; a long task, in all four that fail; the fifth run is green). Whether those tasks are the page's or the browser's (a
+collection of garbage, the process of the card, the machine) I could not tell: a trace (`KARMANIA_PROFILE=1`) shows tasks of 54 to 70 ms in the points in all three traced runs, which the trace may
+cause, so it cannot be used to catch them. The brief says to stop and report the numbers when a target is missed after reasonable effort (steps 16.F1 to 16.F3 took the tasks from 186, 292 and 210 ms to
+the line), and this is that report: **the decision of whether to merge with `pnpm perf` red on these two targets is the owner's.**
 
 How it got there. The first measurement on the card, before any change, met the times and missed the last target in all three: a first frame of 630 to 862 ms
 and a median of 16.6 ms (p95 18.5), but a longest task of 186 ms for the points, 292 for the grid and 210 for the blocks, and, in later runs, of 51 to 58
