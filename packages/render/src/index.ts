@@ -32,3 +32,7 @@ export { OUTLINE_WIDTH, POINTS_PER_PART } from './points-layer.js';
 export { colourOf } from './look.js';
 export type { FrameInfo, LayerLook, Rgb } from './look.js';
 export { SEGMENTS_PER_PART, gatherSegments } from './lines-layer.js';
+export { TRIANGLES_PER_PART } from './fill-layer.js';
+export { POLYGON_OUTLINE_WIDTH } from './polygons-layer.js';
+export { combineLayers } from './layer-combine.js';
+export type { Combination } from './layer-combine.js';

@@ -417,7 +417,7 @@ or releasing, and whenever the brief says to stop.
     of layer, 16.7: with no kind drawn there is nothing on the card to count.)
 - [x] 16.7 Points layer.
 - [x] 16.8 Lines layer.
-- [ ] 16.9 Polygons layer.
+- [x] 16.9 Polygons layer.
 - [ ] 16.10 Mesh layer (derivative flat shading, light from above).
 - [ ] 16.11 Grid image layer (NEAREST, transparent no-value, rotation, tiles,
   warp).
