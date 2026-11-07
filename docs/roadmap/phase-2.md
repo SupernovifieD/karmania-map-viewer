@@ -459,7 +459,7 @@ or releasing, and whenever the brief says to stop.
   Split (the states and their tests; then the pictures that they and the canvas changed):
   - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
   - [x] 16.17b The screenshots that changed, each looked at and explained.
-- [ ] 16.G Gate (with `pnpm perf` for 2D): run again on the final head after 16.F13 to 16.F15 (below).
+- [ ] 16.G Gate (with `pnpm perf` for 2D): run again on the final head after 16.F13 to 16.F15.
   - [x] 16.G1 The 2D render performance measured (the real GPU of the machine, section 9.6).
   - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
   - [x] 16.F2 The shader programs of a layer are compiled off the main thread before it is first drawn.
@@ -473,9 +473,10 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F10 The median frame target is recorded as met by one run of three, not as met (a relaxation of the target is undone; for the owner to decide).
   - [x] 16.F11 The records corrected where the review found them wrong (counts, a claim of coverage, the package lists); the commit sizes and subjects recorded as the rules broken.
     - [x] 16.G2 The final gate run on the final head (`ce09d96`): check, e2e (761), visual (114) and axe (103) pass; `pnpm perf` fails on the median frame (under 16.7 is met by 16.6, not by 16.7) and, now and then, on a task of 51 to 60 ms over the line of 50 (in the Phase 1 tests too, and on the head before the review); results in `docs/perf.md`.
-  - [x] 16.F12  What the second review of the fixes found: buffers kept after an aborted prepare, a compile that outlived a reset (review round).
+  - [x] 16.F12 What the second review of the fixes found: buffers kept after an aborted prepare, a compile that outlived a reset (review round).
   - [x] 16.F13 No main-thread task over 50 ms: the extent in slices, the renderer made in pieces when the first buffers are ready, parts of 100,000, tiles of at most 4,096; the median frame is measured against the display's beat (owner's reading); the harness says what a long frame was made of.
   - [x] 16.F14 The owner's answers to the M14 questions: cividis is added (Battelle's licence, its notice whole in THIRD_PARTY_NOTICES.md), and `collapsed` stays document state with `setGroupCollapsed`, as the brief has it.
+  - [x] 16.F15 What the third review found in the performance changes: a context lost while the renderer is made, a renderer made with nothing waiting, and the threshold of the Long Animation Frames API.
 
 ## M17: Map furniture and overlays
 

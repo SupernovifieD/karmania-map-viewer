@@ -399,12 +399,14 @@ describe('LayerPipeline: from the scene to the card', () => {
     t.drawable([0, true]);
     // Two slices and a little more: three, so two turns.
     const positions = new Float32Array((POSITIONS_PER_TURN * 2 + 1) * 3);
-    positions.set([0, 0, 0, 10, 20, 30], 0);
+    // The least is in the first slice and the greatest in the last.
+    positions.set([0, 0, 0], 0);
+    positions.set([10, 20, 30], positions.length - 3);
     t.state.prepare = () =>
       Promise.resolve({ status: 'drawn', buffers: { kind: 'points', positions }, findings: [] });
     await t.add(0);
     expect(turns).toBe(2);
-    // The extent is the whole of it: the camera is fitted to the 10 by 20 of the first two positions and the zeros that are the rest.
+    // The extent is the whole of it, the last slice among it: the camera is fitted to 10 by 20 and the zeros that are the rest.
     expect(t.scene.getState().camera2d.centre).toEqual([1000 + 5, 2000 + 10]);
     expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
   });

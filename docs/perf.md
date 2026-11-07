@@ -415,8 +415,7 @@ brief forbids, and it was undone before the owner decided.)
 
 **The long tasks, and step 16.F13.** After steps 16.F1 to 16.F3 the three runs above had no task over 50 ms. Runs made at the end of the review round did (tasks of 51 to 60 ms
 in some 10 to 30 percent of the measurements, 84 and 107 ms in two scrolls of the table; the same on the head before the review round, which is how it was known not to come from
-it, and in the Phase 1 tests of the same `pnpm perf`, which M16 does not touch). The harness now records the frames over 45 ms with the scripts in them (the Long Animation Frames
-API, printed as `SLOW`), which a trace of the browser cannot do (it adds tasks of its own), and the product code was timed with probes for a day. What was in the tasks, all of it the
+it, and in the Phase 1 tests of the same `pnpm perf`, which M16 does not touch). The harness now records the frames over 50 ms (where the Long Animation Frames API starts to report) with the scripts in them (printed as `SLOW`), which a trace of the browser cannot do (it adds tasks of its own), and the product code was timed with probes for a day. What was in the tasks, all of it the
 page's own work and none of it the browser's: **(1)** the pass over the positions for the extent of a layer, 32 to 70 ms for 1,000,000 points or blocks in the browser (an array made for each
 position, six indexed calls); **(2)** the making of the renderer, in one task with the rest of the layer's arrival: 14 to 34 ms for the browser's context and 10 to 15 for three's own state, and up to
 76 ms for three's when the worker was preparing a big dataset at the same moment, since the card's process and the worker compete for the machine; **(3)** the first frame that draws a part of a
@@ -437,8 +436,7 @@ need the card). **Six runs of `pnpm perf` after it** (the same machine and card;
 
 The tests of Phase 1 in the same runs (a CSV of 1,000,000 points and a grid of 4,000,000 cells, through the preview, the import, the load and the scroll of the table) had no task over 50 ms in any
 of their 36 measurements, where before they had them in some (a load of 51 to 60 ms, scrolls of 84 and 107): the same causes. For comparison, with the two heads run in turn before the fix, tasks over 50 ms
-were in 8 of 27 measurements on each. **What is not changed**: the first frame that draws a layer is still the card's own work in a task of its own (20 ms was measured with parts of 50,000 and 33 to 45 with 250,000; with the 100,000 now it was not timed apart, and no task over 50 ms was seen), and the frames over 45 ms that
-`SLOW` shows outside the windows that the targets name (the start-up of the page, 45 to 90 ms to evaluate its script, and in the import wizard the frame after a click on Next with the
+were in 8 of 27 measurements on each. **What is not changed**: the first frame that draws a layer is still the card's own work in a task of its own (20 ms was measured with parts of 50,000 and 33 to 45 with 250,000; with the 100,000 now it was not timed apart, and no task over 50 ms was seen), and the frames over 50 ms that `SLOW` shows outside the windows that the targets name (the start-up of the page, 45 to 90 ms to evaluate its script, and in the import wizard the frame after a click on Next with the
 1,000,000-row file, 110 to 226 ms of layout) are the Phase 1 interface's and are not held by any target; they are for the owner to say whether to look at.
 
 How it got there. The first measurement on the card, before any change, met the times and missed the last target in all three: a first frame of 630 to 862 ms
