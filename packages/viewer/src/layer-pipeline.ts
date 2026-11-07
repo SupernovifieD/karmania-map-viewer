@@ -9,12 +9,12 @@
  * Everything is in the pipeline and nothing in it is a time: the same scene and data give the same calls in the same order.
  */
 import type { Engine } from '@karmania/engine';
-import type { Frame, RenderBuffers } from '@karmania/engine/display';
+import type { ClassBreaks, Frame, RenderBuffers } from '@karmania/engine/display';
 import type { BBox, Finding } from '@karmania/engine/types';
 import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import type { ScaleLimits } from '@karmania/render';
-import { fitCamera2d } from '@karmania/scene';
-import type { LayerId, SceneStore } from '@karmania/scene';
+import type { ClassColouring, ScaleLimits } from '@karmania/render';
+import { OTHER_COLOUR, classColours, fitCamera2d } from '@karmania/scene';
+import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
 import { extentOf } from './extent.js';
 
 /** Where a layer is. */
@@ -33,6 +33,8 @@ export type LayerState =
 /** What the pipeline gives the buffers to: the renderer, which may not be there yet. */
 export interface LayerSink {
   setLayer(id: string, buffers: RenderBuffers): 'drawn' | 'unsupported';
+  /** Colours the elements of a layer by class (`undefined` takes the colouring away). */
+  setLayerClasses(id: string, classes: ClassColouring | undefined): void;
   removeLayer(id: string): boolean;
   /** The heights that are drawn, relative to the origin of the frame: what the card's camera has to see. */
   setDepthRange(min: number, max: number): void;
@@ -42,7 +44,7 @@ export interface LayerSink {
 
 /** What the pipeline needs. */
 export interface PipelineOptions {
-  readonly engine: Pick<Engine, 'chooseFrame' | 'prepare'>;
+  readonly engine: Pick<Engine, 'chooseFrame' | 'prepare' | 'classify' | 'classIndex'>;
   readonly scene: SceneStore;
   /** The renderer, or `undefined` while there is none; buffers wait for it. */
   sink(): LayerSink | undefined;
@@ -60,9 +62,35 @@ export const ZOOM_OUT_LIMIT = 100;
 /** What `prepare` is told the card's texture limit is while there is no card yet (the engine's own default). */
 const DEFAULT_TEXTURE_SIZE = 4096;
 
+/**
+ * The kinds of buffers whose layers take the class of each element: a grid's cells are coloured by it. (The other kinds are drawn in one
+ * colour until step 16.13 gives them a colour for each element.)
+ */
+const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set(['grid']);
+
+/** A text that is the same for styles that have the same classes: the column, the method and how many (the ramp is not of the classes). */
+function classKeyOf(colour: Extract<LayerColour, { mode: 'classes' }>): string {
+  return [colour.column, colour.method, String(colour.classes)].join('\u0000');
+}
+
 /** What the pipeline knows of one layer. */
 interface Entry {
   readonly datasetId: number;
+  /** The kind of the buffers that were prepared, once there are some. */
+  kind?: RenderBuffers['kind'];
+  /** What the classes are of (the column, the method, how many); the breaks and the indices below are for it. */
+  classKey?: string;
+  breaks?: ClassBreaks;
+  indices?: Uint8Array;
+  /** What the layer is coloured with, and a text that says it (the key and the colours), so that what has been given is not given again. */
+  classes?: ClassColouring;
+  signature?: string;
+  /** Whether the renderer has the layer now. */
+  onCard?: boolean;
+  /** The signature of what the renderer has for the layer that is on the card now. */
+  sent?: string;
+  /** The engine could not give the classes that the style asks for (`key`): why, as the layer's state. It is not asked again for the same classes. */
+  problem?: { readonly key: string; readonly state: LayerState };
   state: LayerState;
   abort?: AbortController;
   /** The frame the buffers were made for; the layer is up to date while this is the frame. */
@@ -262,6 +290,8 @@ export class LayerPipeline {
         continue;
       }
       await this.prepare(id, entry);
+      // A change of the style that is of the classes or of their colours, or the classes of a layer that was prepared before it was coloured.
+      await this.colour(id, entry);
     }
     if (!this.dirty && !this.disposed) {
       this.view();
@@ -335,6 +365,7 @@ export class LayerPipeline {
     }
     if (!verdict.drawn) {
       entry.state = { status: 'not_drawn', findings: verdict.findings };
+      this.forget(entry);
       this.options.sink()?.removeLayer(id);
       this.changed();
       return;
@@ -347,6 +378,10 @@ export class LayerPipeline {
     }
     const abort = new AbortController();
     entry.abort = abort;
+    // The request is no longer wanted: aborted, the pipeline is stopped, or the layer is gone or is another. (A function, so that it is
+    // looked at again after each wait.)
+    const unwanted = (): boolean =>
+      abort.signal.aborted || this.disposed || this.entries.get(id) !== entry;
     try {
       const result = await this.options.engine.prepare(
         entry.datasetId,
@@ -362,14 +397,16 @@ export class LayerPipeline {
         },
       );
       // What came back is of no use if it was asked for something else meanwhile.
-      if (abort.signal.aborted || this.disposed || this.entries.get(id) !== entry) {
+      if (unwanted()) {
         return;
       }
       if (result.status === 'not_drawn') {
         entry.state = { status: 'not_drawn', findings: result.findings };
+        this.forget(entry);
         this.options.sink()?.removeLayer(id);
       } else {
         entry.preparedWith = frame;
+        entry.kind = result.buffers.kind;
         const extent = extentOf(result.buffers, frame.origin);
         if (extent === undefined) {
           delete entry.extent;
@@ -378,6 +415,11 @@ export class LayerPipeline {
         }
         entry.waiting = result.buffers;
         entry.state = { status: 'preparing', fraction: 1 };
+        // The classes first, so that a layer that is coloured by them is on the card with its colours and is never seen without.
+        await this.colour(id, entry, abort.signal);
+        if (unwanted()) {
+          return;
+        }
         this.deliver(id, entry);
       }
       this.changed();
@@ -403,7 +445,168 @@ export class LayerPipeline {
     delete entry.waiting;
     // The heights first: the layer is drawn within them as soon as it is there.
     this.depth();
-    entry.state = { status: sink.setLayer(id, buffers) === 'drawn' ? 'drawn' : 'unsupported' };
+    const outcome = sink.setLayer(id, buffers);
+    // A layer that is put in place of another has none of the classes that the old one had.
+    delete entry.sent;
+    if (outcome === 'unsupported') {
+      delete entry.onCard;
+      entry.state = { status: 'unsupported' };
+    } else {
+      entry.onCard = true;
+      // Drawn, unless the classes could not be had, or are to be had and are not here yet.
+      entry.state =
+        entry.problem?.state ??
+        (this.waitsForClasses(id, entry)
+          ? { status: 'preparing', fraction: 1 }
+          : { status: 'drawn' });
+    }
+    this.give(id, entry);
+    this.changed();
+  }
+
+  /** Whether the layer is of a kind that is coloured by classes, and is to be, and does not have them yet. */
+  private waitsForClasses(id: LayerId, entry: Entry): boolean {
+    return (
+      entry.kind !== undefined &&
+      COLOURED_BY_CLASS.has(entry.kind) &&
+      entry.classes === undefined &&
+      this.options.scene.getState().layers[id]?.style.colour.mode === 'classes'
+    );
+  }
+
+  /** Gives the renderer the classes of the layer if it has a layer on the card and does not have these, or takes them away. */
+  private give(id: LayerId, entry: Entry): void {
+    const sink = this.options.sink();
+    if (sink === undefined || entry.onCard !== true) {
+      return;
+    }
+    const { classes, signature } = entry;
+    if (classes === undefined || signature === undefined) {
+      if (entry.sent !== undefined) {
+        sink.setLayerClasses(id, undefined);
+        delete entry.sent;
+      }
+      return;
+    }
+    if (entry.sent !== signature) {
+      sink.setLayerClasses(id, classes);
+      entry.sent = signature;
+    }
+    entry.state = { status: 'drawn' };
+    this.changed();
+  }
+
+  /** Forgets that the layer is on the card, of what kind it is and its classes: it is not drawn, or is to be made again. */
+  private forget(entry: Entry): void {
+    delete entry.onCard;
+    delete entry.kind;
+    delete entry.classKey;
+    delete entry.breaks;
+    delete entry.indices;
+    delete entry.classes;
+    delete entry.signature;
+    delete entry.sent;
+    delete entry.problem;
+  }
+
+  /**
+   * Works out the classes of the layer for its style, if it is of a kind that is coloured by classes, and gives them to the renderer: the
+   * engine is asked only if the column, the method or the number of classes is not what the classes that are held are of (the colours of
+   * the classes are the scene's, from the ramp, and need no engine). Nothing is done if the layer has what its style asks for.
+   * `signal` is the request that this is part of, if it is part of one.
+   */
+  private async colour(id: LayerId, entry: Entry, signal?: AbortSignal): Promise<void> {
+    const colour = this.options.scene.getState().layers[id]?.style.colour;
+    if (colour === undefined || entry.kind === undefined || !COLOURED_BY_CLASS.has(entry.kind)) {
+      return;
+    }
+    if (colour.mode !== 'classes') {
+      // One colour for a grid has no classes to colour by here: it is not drawn until a later step says which cells have a value.
+      delete entry.problem;
+      delete entry.classes;
+      delete entry.signature;
+      this.give(id, entry);
+      return;
+    }
+    const key = classKeyOf(colour);
+    if (entry.problem !== undefined && entry.problem.key !== key) {
+      delete entry.problem;
+    }
+    if (entry.problem !== undefined) {
+      // The engine was asked for these classes and could not give them: it is asked again when the style asks for other classes.
+      return;
+    }
+    if (entry.classKey !== key) {
+      // An answer is of no use once the layer is gone, the request it was part of is aborted, or the style has asked for other classes
+      // meanwhile (the pipeline looks at the scene again only when it is done with this, so the style is looked at here).
+      const stale = (): boolean => {
+        const now = this.options.scene.getState().layers[id]?.style.colour;
+        return (
+          this.disposed ||
+          signal?.aborted === true ||
+          this.entries.get(id) !== entry ||
+          now?.mode !== 'classes' ||
+          classKeyOf(now) !== key
+        );
+      };
+      try {
+        const result = await this.options.engine.classify(
+          entry.datasetId,
+          colour.column,
+          colour.method,
+          colour.classes,
+        );
+        if (stale()) {
+          return;
+        }
+        if (result.status === 'not_classified') {
+          this.refuse(id, entry, key, { status: 'not_drawn', findings: result.findings });
+          return;
+        }
+        const indices = await this.options.engine.classIndex(entry.datasetId, result.breaks);
+        if (stale()) {
+          return;
+        }
+        entry.classKey = key;
+        entry.breaks = result.breaks;
+        entry.indices = indices;
+      } catch (error) {
+        if (stale()) {
+          return;
+        }
+        this.refuse(id, entry, key, {
+          status: 'failed',
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
+    const { breaks, indices } = entry;
+    if (breaks === undefined || indices === undefined) {
+      return;
+    }
+    // The classes of a column of categories have "Other" after them, which is a grey of the scene's own.
+    const colours = [
+      ...classColours(colour, breaks),
+      ...(breaks.kind === 'categories' && breaks.other !== undefined ? [OTHER_COLOUR] : []),
+    ];
+    const signature = `${key}\u0001${colours.join(',')}`;
+    if (signature !== entry.signature) {
+      entry.signature = signature;
+      entry.classes = { indices, colours };
+    }
+    this.give(id, entry);
+  }
+
+  /** The classes could not be had: the layer says why, the renderer has no classes for it, and they are not asked for again. */
+  private refuse(id: LayerId, entry: Entry, key: string, state: LayerState): void {
+    entry.problem = { key, state };
+    delete entry.classes;
+    delete entry.signature;
+    if (entry.onCard === true) {
+      entry.state = state;
+    }
+    this.give(id, entry);
     this.changed();
   }
 

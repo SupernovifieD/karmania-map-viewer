@@ -1,8 +1,15 @@
-import type { PrepareOptions, PrepareParams } from '@karmania/engine';
-import type { Frame, FrameChoice, PrepareResult, RenderBuffers } from '@karmania/engine/display';
+import type { Engine, PrepareOptions, PrepareParams } from '@karmania/engine';
+import type {
+  ClassBreaks,
+  ClassifyResult,
+  Frame,
+  FrameChoice,
+  PrepareResult,
+  RenderBuffers,
+} from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
 import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import { createSceneStore, fitCamera2d } from '@karmania/scene';
+import { OTHER_COLOUR, createSceneStore, fitCamera2d } from '@karmania/scene';
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
 import { FIT_PADDING, LayerPipeline, ZOOM_IN_LIMIT, ZOOM_OUT_LIMIT } from './layer-pipeline.js';
@@ -41,6 +48,17 @@ const finding = (code: string): Finding =>
     examples: [],
   }) as unknown as Finding;
 
+type ClassMethodName = Parameters<Engine['classify']>[2];
+
+/** The classes of two ranges of a column. */
+const ranges = (column: string): ClassBreaks => ({
+  kind: 'ranges',
+  column,
+  bounds: [0, 1, 2],
+  counts: [1, 1],
+  nulls: 0,
+});
+
 /** A promise that is settled from outside, so that a request can be held in flight. */
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -62,16 +80,29 @@ interface PrepareCall {
 function fakeEngine() {
   const chooseCalls: (Frame['mapCrs'] | undefined)[] = [];
   const prepareCalls: PrepareCall[] = [];
+  const classifyCalls: [id: number, column: string, method: string, classes: number][] = [];
+  const classIndexCalls: [id: number, breaks: ClassBreaks][] = [];
   const state: {
     choice: () => FrameChoice;
     prepare: (call: PrepareCall) => Promise<PrepareResult>;
+    classify: (
+      id: number,
+      column: string,
+      method: string,
+      classes: number,
+    ) => Promise<ClassifyResult>;
+    classIndex: (id: number, breaks: ClassBreaks) => Promise<Uint8Array>;
   } = {
     choice: () => ({ frame: frame(), drawable: [], findings: [] }),
     prepare: () => Promise.resolve({ status: 'drawn', buffers: buffers(), findings: [] }),
+    classify: (_id, column) => Promise.resolve({ status: 'classified', breaks: ranges(column) }),
+    classIndex: () => Promise.resolve(Uint8Array.of(0, 1)),
   };
   return {
     chooseCalls,
     prepareCalls,
+    classifyCalls,
+    classIndexCalls,
     state,
     engine: {
       chooseFrame: (preferred?: Frame['mapCrs']): Promise<FrameChoice> => {
@@ -87,6 +118,19 @@ function fakeEngine() {
         prepareCalls.push(call);
         return state.prepare(call);
       },
+      classify: (
+        id: number,
+        column: string,
+        method: ClassMethodName,
+        classes: number,
+      ): Promise<ClassifyResult> => {
+        classifyCalls.push([id, column, method, classes]);
+        return state.classify(id, column, method, classes);
+      },
+      classIndex: (id: number, breaks: ClassBreaks): Promise<Uint8Array> => {
+        classIndexCalls.push([id, breaks]);
+        return state.classIndex(id, breaks);
+      },
     },
   };
 }
@@ -96,6 +140,7 @@ function setup(sinkOverride?: LayerSink | null) {
   const fake = fakeEngine();
   const sink = {
     setLayer: vi.fn((): 'drawn' | 'unsupported' => 'drawn'),
+    setLayerClasses: vi.fn<LayerSink['setLayerClasses']>(),
     removeLayer: vi.fn(() => true),
     setDepthRange: vi.fn(),
     maxTextureSize: 8192,
@@ -628,5 +673,473 @@ describe('LayerPipeline: the view of the data', () => {
     });
     expect(ZOOM_IN_LIMIT).toBe(100_000);
     expect(ZOOM_OUT_LIMIT).toBe(100);
+  });
+});
+
+/** A grid of two cells, with one column of numbers: its layer is coloured by classes of that column, as a grid's is at first. */
+const gridDataset = (id: number): NewDataset => ({
+  id,
+  name: `Grid ${String(id)}`,
+  kind: 'grid',
+  elementCount: 2,
+  columns: [{ name: 'Au', type: 'float', nullCount: 0 }],
+});
+
+const gridBuffers = (): RenderBuffers => ({
+  kind: 'grid',
+  size: [2, 1],
+  tiles: [{ i0: 0, j0: 0, nx: 2, ny: 1 }],
+  placement: { origin: [0, 0, 0], spacing: [10, 10], rotation: 0 },
+});
+
+/** A set-up whose datasets are grids. */
+function gridSetup(sinkOverride?: LayerSink | null) {
+  const t = setup(sinkOverride);
+  t.state.prepare = () =>
+    Promise.resolve({ status: 'drawn', buffers: gridBuffers(), findings: [] });
+  const addGrid = async (...ids: number[]): Promise<void> => {
+    t.scene.dispatch({ type: 'addLayers', datasets: ids.map(gridDataset) });
+    await t.pipeline.idle();
+  };
+  return { ...t, addGrid };
+}
+
+describe('LayerPipeline: the classes of a layer', () => {
+  it('asks the engine for the classes of the column the style names, and gives the renderer the class of each cell with a colour for each class', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    // The default style of a grid: its first column of numbers, in 7 classes of equal intervals, from viridis.
+    expect(t.classifyCalls).toEqual([[0, 'Au', 'equal', 7]]);
+    expect(t.classIndexCalls).toEqual([[0, ranges('Au')]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    const [id, classes] = t.sink.setLayerClasses.mock.calls[0] ?? [];
+    expect(id).toBe('layer-1');
+    expect(classes?.indices).toEqual(Uint8Array.of(0, 1));
+    // The colours of two classes: the first and last of viridis, as the legend has them.
+    expect(classes?.colours).toHaveLength(2);
+    expect(classes?.colours.every((colour: string) => /^#[0-9a-f]{6}$/.test(colour))).toBe(true);
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+  });
+
+  it('has the classes ready before the layer is on the card, and gives them straight after it: the layer is not on the card without them', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(t.sink.setLayer.mock.invocationCallOrder[0]).toBeGreaterThan(0);
+    expect(t.sink.setLayerClasses.mock.invocationCallOrder[0]).toBeGreaterThan(
+      t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
+    );
+  });
+
+  it('does not ask for classes for a kind that is not coloured by them', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.classifyCalls).toEqual([]);
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
+  });
+
+  it('does not ask for classes for a layer of a kind that is not coloured by them, whatever its style says', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Au',
+          method: 'equal',
+          classes: 7,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([]);
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+  });
+
+  it('gives new colours, and asks the engine for nothing, when only the ramp changes, or its direction', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    const first = t.sink.setLayerClasses.mock.calls[0]?.[1];
+    const style = t.scene.getState().layers['layer-1']?.style.colour;
+    expect(style?.mode).toBe('classes');
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...(style as object), reverse: true } as never },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.classIndexCalls).toHaveLength(1);
+    expect(t.prepareCalls).toHaveLength(1);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(2);
+    const second = t.sink.setLayerClasses.mock.calls[1]?.[1];
+    // The same classes of the cells (the same array, not worked out again), the colours the other way round.
+    expect(second?.indices).toBe(first?.indices);
+    expect(second?.colours).toEqual([...(first?.colours ?? [])].reverse());
+  });
+
+  it('asks the engine again, and only the engine, when the column, the method or the number of classes changes', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    const style = t.scene.getState().layers['layer-1']?.style.colour as {
+      mode: 'classes';
+      column: string;
+      method: string;
+      classes: number;
+      ramp: string;
+      reverse: boolean;
+    };
+    let now = style;
+    for (const patch of [{ method: 'quantile' }, { classes: 5 }, { column: 'Cu' }]) {
+      now = { ...now, ...patch };
+      t.scene.dispatch({
+        type: 'setStyle',
+        layerId: 'layer-1',
+        patch: { colour: now as never },
+      });
+      await t.pipeline.idle();
+    }
+    expect(t.classifyCalls).toEqual([
+      [0, 'Au', 'equal', 7],
+      [0, 'Au', 'quantile', 7],
+      [0, 'Au', 'quantile', 5],
+      [0, 'Cu', 'quantile', 5],
+    ]);
+    expect(t.classIndexCalls).toHaveLength(4);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(4);
+    expect(t.prepareCalls).toHaveLength(1);
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives nothing more for a change of the scene that is not of the classes: the visibility, the opacity, the camera', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await t.pipeline.idle();
+    t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [5, 5] } } });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives the classes again, without asking the engine, to the layer that is made again when the frame changes', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.state.choice = () => ({
+      frame: frame([5000, 6000, 0]),
+      drawable: [{ id: 0, status: 'drawn', reprojected: false, findings: [] }],
+      findings: [],
+    });
+    t.scene.dispatch({
+      type: 'setFrame',
+      frame: { ...frame([5000, 6000, 0]), source: 'user' },
+    });
+    await t.pipeline.idle();
+    expect(t.prepareCalls).toHaveLength(2);
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(2);
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(2);
+    expect(t.sink.setLayerClasses.mock.calls[1]?.[1]).toBe(
+      t.sink.setLayerClasses.mock.calls[0]?.[1],
+    );
+  });
+
+  it('answers only the last request when the style changes while the engine is working', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    const slow = deferred<ClassifyResult>();
+    t.state.classify = (_id, column, method) =>
+      method === 'quantile'
+        ? slow.promise
+        : Promise.resolve({ status: 'classified', breaks: ranges(`${column}-${method}`) });
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, method: 'quantile' } as never },
+    });
+    await Promise.resolve();
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, method: 'jenks' } as never },
+    });
+    slow.resolve({ status: 'classified', breaks: ranges('late') });
+    await t.pipeline.idle();
+    await Promise.resolve();
+    expect(t.classIndexCalls.map(([, breaks]) => (breaks as { column: string }).column)).toEqual([
+      'Au',
+      'Au-jenks',
+    ]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(2);
+  });
+
+  it('says that the layer is being prepared, and not drawn, while it is on the card without the classes that it is to be coloured by', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    const slow = deferred<ClassifyResult>();
+    const log: string[] = [];
+    t.sink.setLayer.mockImplementation(() => {
+      log.push('setLayer');
+      return 'drawn';
+    });
+    t.changes.mockImplementation(() => {
+      log.push(t.pipeline.states().get('layer-1')?.status ?? 'none');
+    });
+    t.state.classify = (_id, column, method) =>
+      method === 'equal'
+        ? slow.promise
+        : Promise.resolve({ status: 'classified', breaks: ranges(column) });
+    t.scene.dispatch({ type: 'addLayers', datasets: [gridDataset(0)] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The style asks for other classes while the first are being worked out: the answer is dropped, and the layer goes on the card all the same.
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, method: 'quantile' } as never },
+    });
+    slow.resolve({ status: 'classified', breaks: ranges('late') });
+    await t.pipeline.idle();
+    const after = log.slice(log.indexOf('setLayer') + 1);
+    expect(after[0]).toBe('preparing');
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+  });
+
+  it('says that a layer whose column cannot be classified is not drawn, with the findings, and keeps the layer for when it can', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    t.state.classify = () =>
+      Promise.resolve({ status: 'not_classified', findings: [finding('classes.column.missing')] });
+    await t.addGrid(0);
+    expect(t.pipeline.states().get('layer-1')).toEqual({
+      status: 'not_drawn',
+      findings: [finding('classes.column.missing')],
+    });
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
+    expect(t.classIndexCalls).toEqual([]);
+    expect(t.sink.removeLayer).not.toHaveBeenCalled();
+    // The engine said no once, and is not asked again for the same classes whatever else changes.
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await t.pipeline.idle();
+    t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [5, 5] } } });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    // A column it can be classified by makes it drawn.
+    t.state.classify = (_id, column) =>
+      Promise.resolve({ status: 'classified', breaks: ranges(column) });
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, column: 'Cu' } as never },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes the classes away when the style asks for classes that cannot be had, and has them again, without the engine, when it asks for those that it had', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.state.classify = (_id, column) =>
+      column === 'Cu'
+        ? Promise.resolve({
+            status: 'not_classified',
+            findings: [finding('classes.column.missing')],
+          })
+        : Promise.resolve({ status: 'classified', breaks: ranges(column) });
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, column: 'Cu' } as never },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    expect(t.sink.setLayerClasses).toHaveBeenLastCalledWith('layer-1', undefined);
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { colour: style as never } });
+    await t.pipeline.idle();
+    // The classes of the first column were kept: they are given again and the engine is not asked.
+    expect(t.classifyCalls).toEqual([
+      [0, 'Au', 'equal', 7],
+      [0, 'Cu', 'equal', 7],
+    ]);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(3);
+    expect(t.sink.setLayerClasses.mock.calls[2]?.[1]?.indices).toBe(
+      t.sink.setLayerClasses.mock.calls[0]?.[1]?.indices,
+    );
+  });
+
+  it('says that a layer has failed when the engine fails to classify it', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    t.state.classify = () => Promise.reject(new Error('the worker stopped'));
+    await t.addGrid(0);
+    expect(t.pipeline.states().get('layer-1')).toEqual({
+      status: 'failed',
+      message: 'the worker stopped',
+    });
+    // It is not asked again for the same classes, and is for other classes, which it can give.
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toHaveLength(1);
+    t.state.classify = (_id, column) =>
+      Promise.resolve({ status: 'classified', breaks: ranges(column) });
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, classes: 5 } as never },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('takes the classes away, and does not draw the cells, when the layer is given one colour', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    expect(t.sink.setLayerClasses).toHaveBeenLastCalledWith('layer-1', undefined);
+    // And back to classes: the engine's answer for the same classes is not asked for twice.
+    const first = t.sink.setLayerClasses.mock.calls[0]?.[1];
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Au',
+          method: 'equal',
+          classes: 7,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(3);
+    expect(t.sink.setLayerClasses.mock.calls[2]?.[1]?.colours).toEqual(first?.colours);
+  });
+
+  it('gives a layer of categories the grey of "Other" after the colours of its classes, when there are others', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    t.state.classify = (_id, column) =>
+      Promise.resolve({
+        status: 'classified',
+        breaks: {
+          kind: 'categories',
+          column,
+          values: ['granite', 'basalt'],
+          counts: [3, 2],
+          other: 1,
+          nulls: 0,
+        },
+      });
+    await t.addGrid(0);
+    const colours = t.sink.setLayerClasses.mock.calls[0]?.[1]?.colours;
+    expect(colours).toHaveLength(3);
+    expect(colours?.[2]).toBe(OTHER_COLOUR);
+    // And none when there are not.
+    const u = gridSetup();
+    u.drawable([0, true]);
+    u.state.classify = (_id, column) =>
+      Promise.resolve({
+        status: 'classified',
+        breaks: { kind: 'categories', column, values: ['granite'], counts: [3], nulls: 0 },
+      });
+    await u.addGrid(0);
+    expect(u.sink.setLayerClasses.mock.calls[0]?.[1]?.colours).toHaveLength(1);
+  });
+
+  it('works out the classes without the renderer, and gives them with the layer when it is there', async () => {
+    const t = gridSetup(null);
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(t.classifyCalls).toHaveLength(1);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'preparing', fraction: 1 });
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
+    t.setSink(t.sink);
+    t.pipeline.rendererReady();
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(1);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('gives nothing for a layer that was removed while the engine worked on its classes', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    const slow = deferred<ClassifyResult>();
+    t.state.classify = () => slow.promise;
+    t.scene.dispatch({ type: 'addLayers', datasets: [gridDataset(0)] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
+    slow.resolve({ status: 'classified', breaks: ranges('Au') });
+    await t.pipeline.idle();
+    expect(t.sink.setLayer).not.toHaveBeenCalled();
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
+    expect(t.classIndexCalls).toEqual([]);
+  });
+
+  it('does not say that the layer is drawn again for the classes that a grid that is not drawn in the frame had', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    // The map moves to a system that the grid cannot be drawn in: it is taken off the card.
+    t.state.choice = () => ({
+      frame: frame([5000, 6000, 0]),
+      drawable: [
+        {
+          id: 0,
+          status: 'not_drawn',
+          reprojected: false,
+          findings: [finding('display.not_drawn')],
+        },
+      ],
+      findings: [],
+    });
+    t.scene.dispatch({ type: 'setFrame', frame: { ...frame([5000, 6000, 0]), source: 'user' } });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({
+      status: 'not_drawn',
+      findings: [finding('display.not_drawn')],
+    });
+    // A change of the colours afterwards does not bring it back.
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, reverse: true } as never },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
   });
 });
