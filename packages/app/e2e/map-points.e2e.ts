@@ -248,7 +248,7 @@ test.describe('the points layer', () => {
     await pause(page, 100);
   });
 
-  test('has the layer in the order of the scene and takes nothing from a point that is outside the map', async ({
+  test('does not draw a point that is a long way outside the map, and it is no error', async ({
     page,
   }) => {
     // A point a long way off the map is not drawn and is no error; the map is the map.

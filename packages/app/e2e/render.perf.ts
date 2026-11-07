@@ -55,7 +55,13 @@ interface Measured {
   /** From pressing Load to the first frame that has the layer in it. */
   readonly firstFrameMs: number;
   /** The frames of a scripted pan, zoom and rotate, as the time between two of them, in ms. */
-  readonly frames?: { readonly median: number; readonly p95: number; readonly count: number };
+  readonly frames?: {
+    readonly median: number;
+    readonly p95: number;
+    readonly count: number;
+    /** How many frames the renderer drew meanwhile, which is what makes the gaps those of drawing and not of an idle page. */
+    readonly drawn: number;
+  };
   /** From asking for new classes to the picture having them. */
   readonly restyleMs?: number;
   /** The longest task of the main thread, from pressing Load to the end. */
@@ -137,11 +143,12 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   if (options.path) {
     // The path: 100 frames of pan, 100 of zoom in and out, 100 of rotate, the camera given a new place each frame, and the time between
     // the frames that the browser gave, which is what a person sees as smooth or not.
-    const gaps = await inPage<number[]>(
+    const { gaps, drawn } = await inPage<{ gaps: number[]; drawn: number }>(
       page,
       `const v = perf.viewer();
        const doc = v.scene();
        const start = doc.camera2d;
+       const framesBefore = v.renderStats().frames;
        const gaps = [];
        let last = performance.now();
        const wait = () => new Promise((resolve) => requestAnimationFrame(resolve));
@@ -158,13 +165,14 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
          gaps.push(now - last);
          last = now;
        }
-       return gaps;`,
+       return { gaps, drawn: v.renderStats().frames - framesBefore };`,
     );
     const sorted = [...gaps].sort((a, b) => a - b);
     frames = {
       median: Math.round((sorted[Math.floor(sorted.length / 2)] ?? 0) * 100) / 100,
       p95: Math.round((sorted[Math.floor(sorted.length * 0.95)] ?? 0) * 100) / 100,
       count: gaps.length,
+      drawn,
     };
   }
 
@@ -271,9 +279,12 @@ test.describe('the 2D view with the large files', () => {
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
-    // The display's period is 16.67 ms and the browser's clock has a resolution of 0.1 ms, so the best a frame can be is the 16.7 that it reads:
-    // under 16.7 is read as at that, with every frame given and none dropped (the 95th percentile says how far the rest are).
-    expect(result.frames?.median, 'median frame time').toBeLessThanOrEqual(16.7);
+    // The renderer drew a frame for each of the 300 changes of the camera: the gaps below are those of a page that draws, not of one that is idle.
+    expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
+    // As the brief has it: under 16.7 ms. The display's period is 16.67 ms and the clock of the browser reads 0.1 ms, so on a display of 60 Hz the
+    // median reads 16.6 or 16.7: it is at the period of the display, and "under" is met by the 16.6 and missed by the 16.7. The target is not read
+    // as "at or under" here, which is the owner's to say (docs/perf.md).
+    expect(result.frames?.median, 'median frame time').toBeLessThan(16.7);
     expect(result.frames?.p95, '95th percentile frame time').toBeLessThan(33);
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });

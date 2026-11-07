@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { pickFiles } from './support/picker.js';
 import type { Pick } from './support/picker.js';
+import { expectLayersDrawn } from './support/render.js';
 
 function parts(page: Page) {
   const host = page.locator('karmania-import-dialog');
@@ -103,7 +104,7 @@ test.describe('loading what was imported', () => {
     await p.next.click();
     await expect(p.dialog).toBeHidden();
     await expect(p.map).toHaveCount(0);
-    await expect(page.locator('karmania-map-area canvas')).toHaveCount(1);
+    await expectLayersDrawn(page, 1);
   });
 
   test('selects the new dataset, and keeps what the engine holds', async ({ page }) => {
@@ -178,6 +179,7 @@ test.describe('loading what was imported', () => {
     expect(state.datasets.length).toBeGreaterThan(1);
     expect(state.selected).toBe(state.datasets[0]?.[0]);
     await expect(p.map).toHaveCount(0);
+    await expectLayersDrawn(page, state.datasets.length);
   });
 
   test('goes on to the next file when several were given, and the first is loaded by then', async ({
@@ -197,8 +199,9 @@ test.describe('loading what was imported', () => {
     await expect(p.row('b.csv').locator('.status')).toHaveText('Importing now');
     await expect(p.host.locator('karmania-file-step .about h3')).toHaveText('Settings for b.csv');
     await expect(p.host.locator('karmania-file-step k-input input')).toHaveValue('b');
-    // What the first made is loaded and selected, and the map area has been told.
+    // What the first made is loaded and selected, and the map has a layer for it, drawn.
     await expect(p.map).toHaveCount(0);
+    await expectLayersDrawn(page, 1);
     const first = await appState(page);
     expect(first.datasets.map((each) => each.slice(1))).toEqual([['a', 2]]);
     expect(first.selected).toBe(first.datasets[0]?.[0]);
@@ -214,6 +217,7 @@ test.describe('loading what was imported', () => {
     // The one loaded last is the one selected.
     expect(second.selected).toBe(second.datasets[1]?.[0]);
     await expect(p.map).toHaveCount(0);
+    await expectLayersDrawn(page, 2);
   });
 
   test('passes by a file that cannot be imported when it goes on to the next', async ({ page }) => {
@@ -249,6 +253,7 @@ test.describe('loading what was imported', () => {
     const state = await appState(page);
     expect(state.datasets.map((each) => each.slice(1))).toEqual([['a', 2]]);
     await expect(p.map).toHaveCount(0);
+    await expectLayersDrawn(page, 1);
   });
 
   test('says nothing is loaded when the wizard is cancelled before anything was', async ({

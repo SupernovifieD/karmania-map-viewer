@@ -62,10 +62,10 @@ test.describe('the renderer core', () => {
       document.documentElement.dataset['theme'] = 'dark';
     });
     await expect.poll(async () => (await stats(page))?.background).not.toBe(first.background);
+    // Once for the change (the read of the pixels below is a frame too, which is why it is counted before it).
+    expect((await stats(page))?.frames).toBe((before ?? 0) + 1);
     const dark = await areaColour(page);
     expect(await corner(page)).toEqual(dark);
-    // Once for the change (the read of the pixels is a frame too, which is why it is counted before it).
-    expect((await stats(page))?.frames).toBeGreaterThan(before ?? 0);
     await page.evaluate(() => {
       document.documentElement.dataset['theme'] = 'light';
     });

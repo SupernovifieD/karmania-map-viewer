@@ -5,6 +5,7 @@
  */
 import { expect, test } from '@playwright/test';
 import type { Pick } from './support/picker.js';
+import { expectLayersDrawn } from './support/render.js';
 import { goTo, kept, startWizard, textsOf, wizard } from './support/wizard.js';
 
 test.describe('importing', () => {
@@ -60,6 +61,7 @@ test.describe('importing', () => {
     // Loaded: the dialog has gone, the Data tab is open, the map area has no empty state any more (it is the map).
     await expect(w.dialog).toBeHidden();
     await expect(w.map).toHaveCount(0);
+    await expectLayersDrawn(page, 1);
     await expect(w.tabs.filter({ hasText: 'Data' })).toHaveAttribute('aria-selected', 'true');
     const result = await kept(page);
     expect(result.datasets).toHaveLength(1);
@@ -210,6 +212,7 @@ test.describe('importing', () => {
 
     await expect(w.dialog).toBeHidden();
     await expect(w.map).toHaveCount(0);
+    await expectLayersDrawn(page, 3);
     const result = await kept(page);
     expect(result.datasets.map((dataset) => dataset.kind).sort()).toEqual([
       'lines',

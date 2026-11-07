@@ -129,6 +129,8 @@ test.describe('the polygons layer coloured by classes', () => {
       await Promise.all([-21, -20, -19].map((across) => colourAt(page, view, SQUARES.B, across)))
     ).reduce((a, b) => ((a[2] ?? 0) <= (b[2] ?? 0) ? a : b));
     expect(strongest[1]).toBeGreaterThanOrEqual(225);
+    // (The fill is as green: what tells the outline from it is that it is not blended with the map, so it has less blue than the fill has.)
+    expect(strongest[2]).toBeLessThanOrEqual((over(LAST, 0.6, map)[2] ?? 0) - 25);
     // C has no value: nothing of it, inside or on its edge, is not the map.
     for (const across of [-22, -21, -20, -19, -18, 0, 18, 19, 20, 21, 22]) {
       expect(await colourAt(page, view, SQUARES.C, across), `across ${String(across)}`).toEqual(

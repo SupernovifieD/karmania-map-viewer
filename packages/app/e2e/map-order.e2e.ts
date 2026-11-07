@@ -102,6 +102,7 @@ test.describe('the order the layers are drawn in', () => {
   }) => {
     await loadBoth(page);
     const a = bytes(await layerColour(page, 'layer-1'));
+    const b = bytes(await layerColour(page, 'layer-2'));
     // The legend is B, A (top to bottom); the group goes under both.
     await dispatch(page, { type: 'createGroup', name: 'Bottom', index: 2 });
     const group = await page.evaluate(() => {
@@ -116,6 +117,18 @@ test.describe('the order the layers are drawn in', () => {
     // The layer that is on top goes into a group at the bottom of the legend, under the other: the other is on top.
     await dispatch(page, { type: 'moveNode', id: 'layer-2', to: { parent: group, index: 0 } });
     await expect.poll(async () => distance(await colourAt(page, 75, 75), a)).toBeLessThanOrEqual(2);
+    // The layer in the group is still drawn, under the other: where only it is, its own colour (A is on top at the overlap whether or not B is
+    // drawn, so that alone would pass if it were not).
+    expect(distance(await colourAt(page, 125, 125), b)).toBeLessThanOrEqual(2);
+    const held = await page.evaluate((id) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        scene(): { legend: { type: string; id: string; children?: string[] }[] };
+      };
+      return viewer.scene().legend.find((node) => node.id === id)?.children;
+    }, group);
+    expect(held).toEqual(['layer-2']);
   });
 
   test('does not draw a layer that is hidden, and shows what was under it', async ({ page }) => {

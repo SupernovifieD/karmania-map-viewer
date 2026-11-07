@@ -167,6 +167,7 @@ test.describe('the polygons layer', () => {
     await loadSquare(page);
     const view = await lookAtSquare(page);
     const map = await mapColour(page);
+    const own = bytes(await layerColour(page));
     await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.2 } });
     const inside = at(view, -35, 0);
     await expect
@@ -177,11 +178,17 @@ test.describe('the polygons layer', () => {
         ),
       )
       .toBeLessThanOrEqual(2);
-    // The outline is as strong as it was, along the bottom edge of the square (the pixel the line is mostly in).
-    const block = await around(page, at(view, 0, -50).x, at(view, 0, -50).y, 2);
-    const own = bytes(await layerColour(page));
-    const strongest = Math.min(...block.all().map(([, , px]) => distance(px, own)));
-    expect(strongest).toBeLessThanOrEqual(130);
+    // The outline is as strong as it was, by the model of the test above: across the left edge of the square a pixel is covered by
+    // `max(0, 1 - |the distance of its middle from the edge|)` of the colour of the layer, over the fill (at 0.2 now) or the map. An outline
+    // that took the opacity too would be a fifth of that.
+    const filled = over(own, 0.2, map);
+    for (const across of [-2, -1, 0, 1, 2]) {
+      const p = at(view, -50 + across, 5);
+      const px = (await around(page, p.x, p.y, 0)).at(0, 0);
+      const middle = p.x + 0.5 - (view.width / 2 - 50);
+      const expected = over(own, Math.max(0, 1 - Math.abs(middle)), middle < 0 ? map : filled);
+      expect(distance(px, expected), `across ${String(across)}`).toBeLessThanOrEqual(3);
+    }
     await dispatch(page, {
       type: 'setStyle',
       layerId: 'layer-1',
