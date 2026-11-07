@@ -50,7 +50,7 @@ async function setDatasets(
   page: Page,
   datasets: readonly Record<string, unknown>[],
 ): Promise<void> {
-  await page.locator('karmania-app').evaluate(async (element, list) => {
+  await page.locator('karmania-viewer').evaluate(async (element, list) => {
     const app = element as unknown as {
       datasets: readonly unknown[];
       selected: number | undefined;
@@ -65,11 +65,11 @@ async function setDatasets(
 
 /**
  * Crafted datasets have no engine behind them, so the app is given one that only says what a code
- * means, with `answer` (the source of a function of the code). It is the app that is given it, not the
- * summary: the app hands its own lookup down again each time it draws.
+ * means, with `answer` (the source of a function of the code). It is the viewer that is given it, not the
+ * summary: the viewer hands its own lookup down again each time it draws.
  */
 function answerCodesWith(page: Page, answer: string): Promise<void> {
-  return page.locator('karmania-app').evaluate((element, source) => {
+  return page.locator('karmania-viewer').evaluate((element, source) => {
     (element as unknown as { engine: unknown }).engine = {
       crsInfo: (0, eval)(source) as (code: number) => Promise<unknown>,
       dispose: () => undefined,

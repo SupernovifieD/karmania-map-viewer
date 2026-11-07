@@ -46,7 +46,9 @@ export interface Kept {
 /** What the app has kept of what was loaded, and what the engine holds. */
 export function kept(page: Page): Promise<Kept> {
   return page.evaluate(() => {
-    const app = document.querySelector('karmania-app') as unknown as {
+    const app = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
       datasets: Record<string, unknown>[];
       selected: number | undefined;
       engine: { datasets: () => { id: number }[] } | undefined;

@@ -81,7 +81,9 @@ const GAP: Pick[] = [
 /** How many datasets the app's engine holds. */
 const loadedInEngine = (page: Page): Promise<number> =>
   page.evaluate(() => {
-    const app = document.querySelector('karmania-app') as unknown as {
+    const app = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
       engine: { datasets: () => unknown[] } | undefined;
     };
     return app.engine?.datasets().length ?? 0;

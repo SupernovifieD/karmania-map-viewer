@@ -534,6 +534,7 @@ test.describe('the coordinate system step', () => {
       page.evaluate(() => {
         const root = document
           .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer')
           ?.shadowRoot?.querySelector('karmania-import-dialog')
           ?.shadowRoot?.querySelector('karmania-crs-step')?.shadowRoot;
         const box = root?.querySelector('.matches');

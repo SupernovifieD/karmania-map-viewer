@@ -3998,3 +3998,139 @@ The third review (one reviewer on the cheaper model, only the fixes 14.F7 and 14
   kept**: an extent wider than the largest number (from -1.7e308 to 1.7e308) has no camera in 2D, though its true scale is finite, because the width itself overflows; that is a design limit and not a wrong
   camera.
 
+## After M14: the owner's decisions
+
+The owner answered the open items of the M14 report before M15 was started. Cividis is still left out and the owner asked for the reasons, which are given in the report and in the entry of step 14.4b; the layout rules, the
+default line colours and the rest were accepted as they are (the owner will change them at the end of the implementation if anything is needed, and the colours when a visibility problem shows).
+
+- Step 14.10a, changed by the owner (number labels). **Bounds are written as they are, not rounded.** The owner's words: "show them as is, don't round them. Later, we can add a choice by the user can decide to see a
+  rounded version, or the numbers as is." So `formatBounds` writes each bound by itself, whatever the bounds next to it are: `0, 2.5, 5, 7.5, 10` read `0`, `2.5`, `5`, `7.5`, `10` (no `0.0`), and `0.1234567` and
+  `0.1234568` read as that. Kept from the brief: thousands commas and the true minus sign (U+2212); the en dash between two bounds is unchanged. **One judgement, which the owner did not decide, and is open to change**: the
+  digits are those of the shortest text that gives the number back, **trimmed at 15 significant digits**, which takes off only the noise of arithmetic (the bounds of equal classes are sums and products: `0.1 + 0.2` would
+  read `0.30000000000000004`, and `8 / 7` is `1.14285714285714`) and can change no number that a file writes with 15 digits or fewer. It is the rule of the table of the Data tab, so the legend and the table write a
+  value alike. A number that the platform writes with an exponent (below 1e-6, from 1e21) keeps it (`1e-7`, `1e+21`), as the old code did for the large ones; a bound that is not finite is written as it is. **The rounded rule
+  (a tenth of the narrowest class, never more than 6 significant digits, the same decimals for every bound) is gone from the code and is in the history, in the commit `5676067`, for the choice that the owner
+  will add later.** The class of a single value still reads that value alone. The tests of the old rule were replaced by tests of the new one, and nine changes to the code each fail one (tried: the 15 digits changed to 14, 16
+  and 17, the minus sign dropped or made a hyphen, the absolute value dropped, the commas dropped, the sign test made `<=`, the non-finite case removed); a tenth change, a guard for numbers with an exponent, did
+  nothing (the commas of a whole part that has no three digits in a row are none), so the guard was removed.
+
+## M15: the viewer package
+
+The components of the app move into `@karmania/viewer` (steps 15.1 to 15.5), are composed into `<karmania-viewer>` with a `createViewer(container)` (15.6), the viewer holds a scene store (15.7), and ESLint enforces the
+direction of the dependencies (15.8). Nothing changes on screen. The moves are `git mv` renames: a file moved with no change but its imports of other files that moved, and the commit says which lines.
+
+- Step 15.1 (the package). `@karmania/viewer` has a manifest, a tsconfig with the DOM (as the app's), an entry and a test, and `vitest`, `lint` and `typecheck` cover it with the others. Dependencies were added by the step that first needed
+  each (the engine and the ui at 15.2a, lit at 15.2b, the scene at 15.7). **The style test of the ui package scans `packages/viewer/src` as well** (`styles.test.ts` had a list of roots), so that the CSS of a component that moves is
+  still held to "no raw colours, lengths or durations"; without that, moving a component would have taken it out of the test.
+- Step 15.2 (the map area, split in 15.2a and 15.2b). **The viewer may not import from the app**, so what a component imports moves before it, or with it: the map area needs `carriesFiles` (`drag.ts`) and `formatCount`
+  (`import-files.ts`, with its test), which moved first (15.2a). **The viewer exports every module of its source under `./*`** while the pieces move, so that the app can import `@karmania/viewer/map-area`; at 15.6 the app
+  stopped needing them, and **the pattern is kept for one reason**: `e2e/mapping-wording.e2e.ts` (a test that opens no page and compares the wizard's wording with `docs/validation-codes.md`) imports `import-mapping`. The ESLint
+  rule of 15.8 forbids the app's source from using them, and its tests may. The map area has no unit test of its own: `map-area.e2e.ts` and the screenshots cover it.
+- Step 15.3 and 15.4 (the panel, the Data tab; split in 15.4a to 15.4e). **The brief's order is kept in name but not in every file**: `panel.ts` imports `data-tab.js`, which registers `<karmania-data-tab>`, which registers the dataset list and
+  the summary, which import `datasets.ts`, `import-run.ts`, `findings.ts` and what those import, so the panel could not move before the Data tab without importing from the app. **15.3 moved the panel's tabs, state (with its test) and
+  resize handle** (`panel-tabs.ts`, `panel-state.ts`, `resize-handle.ts`); **15.4 was split**: 15.4a `datasets.ts` and `import-crs.ts`; 15.4b `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and `import-run.ts`; 15.4c
+  `findings-text.ts`, `import-steps.ts` and `findings.ts`; 15.4d the Data tab, the dataset list and the summary; **15.4e `panel.ts`**. Each piece moved after what it imports. **A step the brief does not have, 15.4c0**: the last two unit tests
+  of the app (`findings-text`, `import-steps`) were about to leave it, and a package with no test file makes `vitest run` fail ("No test files found"), which `pnpm check` runs; so the app got a unit test of the logic it will own besides
+  the page, `forceThemeFromAddress` (stubbing `location` and `document`, which Node does not have). Six changes to `theme.ts` each fail a test (tried), rather than a flag that lets the run pass with no tests.
+- Step 15.5 (the import dialog and its five steps). Renames. The app's source is now `app.ts`, `main.ts`, `theme.ts`, the gallery and its sections.
+- Step 15.6 (`<karmania-viewer>`, `createViewer`). **15.6a**: the composition of `app.ts` (the map area, the panel, the wizard, the engine, the panel's state, the datasets and the selection, the file picker) is the element
+  `<karmania-viewer>`, and the app is the toolbar and that element. The viewer's host is a grid of one row that fills what it is in, with the workspace inside as before, **and no `overflow: hidden`**, which the app host has: a tooltip or a
+  focus ring of the panel must not be cut off at the viewer's edge, which would have been a change on screen. **The tests changed in one way and no expectation**: the app's `engine`, `datasets` and `selected` are the viewer's now, and
+  `document.querySelector` does not pierce a shadow root, so the tests that read or set them, or walked from `karmania-app` into the import dialog or the panel, go to `karmania-viewer` (through the app's shadow root in `page.evaluate`, by
+  Playwright's piercing locator elsewhere). The first run of the whole e2e suite after the move found those paths (three failed in `fix-and-retry`, one in `crs-step`; the others did not get that far), and a first, too wide, search-and-replace
+  had also changed locators that are about the app and not the viewer (the toolbar, the visibility of the whole app, the app's size); those were put back, and the second run of the suite passed, 629 tests. **15.6b**: `createViewer(container)`
+  puts a `<karmania-viewer>` in an element and gives `{ openImport(files?), dispose() }`; `dispose` takes the element out of the page, which is the element's own `disconnectedCallback` (the engine, its worker, the window's listeners),
+  twice is no harm, and `openImport` after it throws (a mistake of the caller). The app **uses it as an embedder would** (a `.viewer` container, the viewer made in `firstUpdated`, disposed in `disconnectedCallback`), so every e2e test
+  runs through it. Its unit test runs in Node against a stand-in for the page (seven changes to `create-viewer.ts` each fail a test); the layout files of the e2e suite (150 tests) passed on it. **Two things left as they were, for M23, which
+  is the embedding**: the panel's width is limited by the window and not by the container (`document.documentElement.clientWidth`), and the viewer refuses stray file drops on the whole window (`dragover` and `drop` on `window`), which
+  a page that embeds the viewer may not want of it. Both are moves of the phase 1 behaviour and are not changed here: the step is "no visible change".
+- Step 15.7 (the scene store). `<karmania-viewer>` holds a store made by `createSceneStore` and `syncDatasets(store, datasets)` keeps it to the datasets, after each import and each removal: **the layers of a dataset that is gone are removed
+  first, then a layer is added for each dataset that has none**, with the scene's commands; layers that stay are not touched (their style, visibility and place are the person's), calling it again changes nothing, and tells no one. Because
+  the removal comes first, a dataset that replaces another gets the number of the one removed (`layer-1` again), which is how the scene numbers (from the highest there is). `viewer.scene()` gives the document, on the element and on the
+  handle, which refuses it after `dispose`. **The guard `added.length > 0` was removed**: a mutant that dispatched `addLayers` with nothing passed every test, because nothing to add is the same document and tells no one. A new e2e
+  file, `scene.e2e.ts`, loads files and reads the scene (empty at the start, a layer for a dataset, three layers for a file that holds three and one fewer after a removal); it fails if either call of `syncDatasets` is taken out (tried, each alone).
+- Step 15.8 (import restrictions). `eslint.restrictions.mjs` has a block for each package with `@typescript-eslint/no-restricted-imports` (the core rule cannot tell a type import): `engine` and `ui` import no other package; `scene` imports
+  the types of `engine`; `render` the types of `scene` and `engine`, with no Lit and no ui; `viewer` may use all but the app; the source of `app` imports `@karmania/viewer` and `@karmania/ui` only; `three` only in `render`; no path into another
+  package. **A reading of section 5.2**: it says "render depends on scene types only", but the renderer must also name the engine's `RenderBuffers`, which are types; it is allowed the types of both, and nothing else of them. **The rules are
+  tested**: `packages/app/src/import-restrictions.test.ts` runs ESLint's `Linter` on sample imports with exactly these blocks (7 tests; **44 imports at 41 call sites, one of them in a loop of four**: the commit says 40), and sixteen
+  changes to the blocks each fail it (tried; two of the first attempt had not applied, because prettier had reformatted the text they looked for, and were done again). A real violation is refused by `eslint` itself (tried, removed). The
+  `render` block has no package to lint until 16.1.
+
+### M15 gate, first round
+
+The gate ran on `790f4df` (`pnpm check`, the e2e suite (14 + 632 tests), the screenshots (102, **no baseline changed**) and axe (102), each alone on a quiet machine) and then three reviewers on the cheaper model, one for the moves,
+one for the viewer, `createViewer` and the app, one for the scene sync, the ESLint rules and the first commit. What follows is each finding acted on, by its step, and what was **not** changed and why.
+
+- Step 15.F1 (what the documents say). **Reviewer of the moves, right**: `docs/dependencies.md` was not updated for the dependencies M15 added (viewer for lit, vitest and vite; app for `@types/node`; the rule is that a
+  dependency is recorded in the commit that adds it), `docs/conventions.md` listed three packages of five, the roadmap said `panel.ts` moves as "15.4d" (it is 15.4e), and the README did not mention the scene. All corrected. **Corrections to
+  commit messages, which are pushed and not rewritten**: `f53ceea` says "2 more for createViewer" (it added one test, `scene()`; the 6 for `syncDatasets` are right); `d4de12b` says "40 sample imports" (44, at 41 call sites; said in 15.8a); `53df934`
+  is **599 changed lines**, over the guideline of about 150 and with no word about it: `app.ts` was split into the viewer's `viewer.ts` and a thin `app.ts`, which git does not see as a move (the file that stays is not the one that
+  moved), so the rule that moves do not count could not apply; it was not split into smaller commits because the half-way states would not build. `d4de12b` (about 300 lines, of which 174 are the test), `f53ceea` (237) and `5371035` (172)
+  are over the guideline too, and `b7347aa` (173). The earlier commits of this PR are renames with a few changed import lines.
+  **Left for M23 (embedding), found by the reviewer and true**: two viewers on one page share the panel's saved state (`PANEL_STORAGE_KEY` is one constant, and each viewer writes its whole in-memory state, so one can undo the other's
+  change after a reload); the events of the map area and the panel are `composed` and so leave the viewer's shadow root (nothing listens to them outside, and each viewer listens only to its own children, so two viewers do not hear
+  each other, but a page can hear them); the panel's width follows the window, and the stray drops are refused on the window (already said at 15.6). They are the phase 1 behaviour moved as it was, and M23.3 is the step that puts two
+  viewers on one page and makes them independent. **Not changed, pre-existing and not reachable from the interface**: `onDatasetRemove` computes the next selection before its `await` and writes it after (an import that finishes during the
+  await would be overwritten; both the import and the removal are modal dialogs), and it reads `engine.datasets()` after the await (a viewer disposed in between would throw `EngineDisposedError` as an unhandled rejection from an event
+  handler); both are the code of `app.ts` on `main`, to be looked at in M24 (hardening). **For M20**: derived datasets (contours) have their own summary and `syncDatasets` would give each a plain layer beside the derived layer the
+  scene makes; step 20.4 has to skip a summary with `derivedFrom` there.
+- Step 15.F2 (number labels). **Reviewer of the scene and the lint rules, right in each**: the comments of `numbers.ts` said that 15 digits "keep every number that a file can write" and that "two bounds that differ read differently", which
+  is false for a number of more than 15 digits (`9007199254740992` reads `9,007,199,254,740,990`, and `1` and `1.0000000000000002` read alike); the owner's decision in this log said it correctly ("no number that a file writes with 15
+  digits or fewer"), and the code comments and the commit body of `b7347aa` overclaimed. **The comments say what 15 digits do now, and a test pins it** (five bounds). **A bug that the same look found**: `Number.MAX_VALUE` was written
+  `Infinity`, because `Number('1.79769313486232e+308')` is past the largest number; a bound that 15 digits would carry out of range is written with all its digits now (`1.7976931348623157e+308`), with `1.5e308` and the smallest
+  number as neighbours in the test. The exponent of a number that has one is as the platform writes it (`−1e-7`: the true minus is the sign in front only), which the comment says. Three changes to the code each fail a test (tried).
+- Step 15.F3 (`openImport` with no files). **Reviewer of the viewer, right**: the doc said "or the file picker when there are none to give", the code looked only for `undefined`, and `importFiles` returns at once for an empty list, so
+  `openImport([])` opened neither the wizard nor the picker. An empty list is no files now: the picker. New e2e file `viewer.e2e.ts` (what the viewer offers a page): the wizard on files, the picker and then the wizard for none and for an
+  empty list; the empty list failed before the fix (the picker never opened, 10 s) and passes after.
+- Step 15.F4 (one viewer in the app). **Reviewer of the viewer, right, and reproduced**: Lit does a first render even if the element was taken out of the page before it, so `firstUpdated` made a viewer while the app was out; put back, the app's
+  `connectedCallback` made another, and the first was never disposed (and, being in the page again, kept its listeners on the window). `mount()` makes the viewer once now. The e2e test makes an app, takes it out at once, lets the
+  render happen, puts it back and counts the viewers in it: 2 before the fix, 1 after.
+- Step 15.F5 (a viewer taken out of the page). **Reviewer of the viewer, right, and reproduced**: `disconnectedCallback` disposed the engine and kept the list of datasets, the selection and (since 15.7) the layers, so a viewer moved in the
+  page listed datasets that no engine could give rows of. **They are emptied with the engine now** (`datasets`, `selected`, and `syncDatasets` with nothing, which removes the layers): a viewer put back starts again, and works (the e2e test
+  loads a file, moves the viewer, finds the list, the selection, the engine and the scene empty, and loads the file again). **The same reviewer found that nothing tested that dispose frees the listeners** (a change that kept the
+  `dragover` listener passed every test): the second test drops a file on the page, which the viewer refuses while it is in it (`defaultPrevented`), takes the viewer out, and drops again; with the listener kept it fails (tried).
+- Step 15.F6 (two small things in tests). **Reviewer of the viewer, right**: the theme test compared with `toEqual({})`, which ignores a property whose value is `undefined`, so a `forceThemeFromAddress` that wrote `undefined` for a
+  wrong theme (which a browser turns into `data-theme="undefined"`) passed; it is `toStrictEqual({})` now, and that change to the code fails it (tried). A comment of `dataset-summary.e2e.ts` said "the app" for what is the viewer's.
+- Step 15.F7 (the import rules, hardened). **Reviewer of the scene and the lint rules, right in each, and each probed by the reviewer with ESLint's `Linter`**: (1) **`import { type X } from '@karmania/engine/display'` was allowed** in the scene
+  (the typescript-eslint rule counts an import whose specifiers are all `type` as a type import), **but `verbatimModuleSyntax` emits it as `import {} from '...'`, which loads the module**: the scene would load the engine at run time,
+  which section 5.2 forbids. The scene and render blocks now also have `@typescript-eslint/no-import-type-side-effects`, so it must be `import type { X }`. (2) **`import()`, `require()` and `import('x').T` were not seen** by the import
+  rule; **`no-restricted-syntax` selectors refuse them for a workspace package, three or Lit** (every block; a file of the package itself, `node:fs` and a specifier that is worked out are not looked at, and the engine's
+  one dynamic import is inside a string). (3) **The path rule missed `./../../viewer/...` and an absolute path through `packages/<package>/`**: both are caught. (4) **The comment said the app's tests may "look inside the viewer and nothing
+  else" but they could import the engine, the scene or the renderer**: they may not now, like the source. (5) `lit-html` and `lit-element` are in the no-Lit rule. (6) **The test could pass on what it could not read**: `said` kept only the
+  messages of the rule, and a statement that does not parse has none, so `allowed(...)` passed on it; it fails on a fatal message now, and a test shows that it does. Three more tests (ten in all): the dynamic forms, the app's tests, and the
+  parse guard, with the type imports in the scene's. **Ten changes to the blocks each fail exactly one test, against a baseline of ten passing, and taking the guard out fails the eleventh** (tried: the side-effect rule off in the scene or in the renderer; `import()`, `require()` or `import('x').T` not refused;
+  three or Lit left out of the pattern; the path without `./` or without the absolute form; the app's tests allowed the engine; a first attempt had a baseline that failed one test, which made every result look like a catch, and was
+  repeated with the baseline repaired). **The app declares `eslint` and `typescript-eslint`**, which its test imports (they resolved only through the root's `node_modules`). **Not changed**: a package reached through another file
+  that re-exports it, which no import rule sees.
+
+### M15 gate, second round
+
+The second review (one reviewer on the cheaper model, only the fixes 15.F1 to 15.F7) ran after the gate was clean again on `2812286` (`pnpm check`; e2e 14 + 638; screenshots 102, no baseline changed; axe 102). It found one thing that must be
+fixed and several that should be; each is acted on below.
+
+- Step 15.F8 (the rule on `import()`, again). **Reviewer, must-fix, right, and it was my own claim that was false**: 15.F7 and its commit said that `import()`, `require()` and `import('x').T` are refused for a workspace package, three
+  **or Lit** in every block, and that `lit-html` and `lit-element` are covered, but the pattern for the dynamic forms (`DYNAMIC`) had `lit` and `lit/...` only, while the static rule had `lit-html`, `lit-element`, `@lit/*` and
+  `@lit-labs/*`; `import('lit-html')`, `import('@lit/reactive-element')` and `import('lit-html').Foo` passed, and the test used `lit/decorators.js` only, so it could not see it. **The pattern has all of them now** (`lit`, `lit-`...,
+  `@lit/`, `@lit-labs/`), and the test has each (dynamic and as a type), with `react` and `literal` as imports that are not refused. **Should-fix, right**: the selector for `import('x').T` used `argument.literal.value`, which the
+  typescript-eslint parser warns is deprecated (the app's test run printed it; a warning is a signal): it is `source.value` now, and the warning is gone. **Should-fix, right**: **a template with no substitution**
+  (`` import(`@karmania/engine`) ``, `` import(`...`).T ``) is a string, not a "specifier that is worked out", and passed; two selectors read its first part. Not looked at, and said so here: a specifier that is joined
+  (`'@karmania' + '/engine'`) and `require` held in a variable (`const r = require; r('...')`), which no selector can follow. Six changes to the rule each fail a test (tried: the old pattern for Lit, no `lit-`, no `@lit/`,
+  no template selector for `import()` or for the type, `TSImportType` not selected).
+- Step 15.F9 (the root lint). **Reviewer, noted as outside the PR, and true; checked on `main` in a worktree**: `pnpm lint` (`eslint .` at the root) fails with three `no-undef` errors in `scripts/generate-fixtures.mjs` (`process`, `console`), as it does on `main`
+  (the script came with M13). It went unnoticed because `pnpm check` runs `pnpm -r lint`, which lints the packages, and not the root; CI runs `pnpm check`. **A block of config gives `scripts/**/*.mjs` the two globals**, and the root
+  `pnpm lint` passes (exit 0). `pnpm check` is not changed to run it (it would make the check longer for the sake of one script file, and the owner may want it); said here for the owner.
+- Step 15.F10 (the table, and what was left). **Reviewer, should-fix, right**: the table that 15.F1 corrected still left out `@karmania/ui` and `@karmania/app` in the row of vite and `@karmania/ui` in the row of `@types/node` (its tests read files with
+  Node), and the row of `lucide-static` said `^1.62.0` where the manifest and the lockfile say `^1.61.0` (older than this PR, found by the same look); all three rows are as the manifests are. **Corrections to the commit messages of the fixes**: `2812286`
+  says "app 17 tests" (13: 3 of `theme.ts` and 10 of the import rules, which was ten after 15.F7 and is ten still); it also made changes to `docs/conventions.md` and `docs/dependencies.md` that its message does not mention; and "five bounds" of
+  15.F2 is five checks over seven bounds. **Not changed, said here**: `import-dialog.ts` keeps the engine it was given when a `<karmania-viewer>` is taken out of the page and put back with the wizard open (the viewer's own engine is cleared and made
+  again at the next import, which gives the wizard the new one); the wizard is a modal dialog and nothing in the interface moves the viewer, so it is reached only by a page that moves the element itself.
+
+### M15 gate, third round
+
+The third review (one reviewer, only 15.F8 to 15.F10) found one thing that must be fixed and one wording; reviewing stopped after it, as in M14, because what it finds now is about forms of a call that nothing in the repository uses.
+
+- Step 15.F11 (`require` of a template). **Reviewer, must-fix, right**: `` require(`three`) `` was not refused (the selector for `require` read `arguments.0.value`, which a template does not have), though the comment said a template is a string like any other and the log said
+  `require` is refused in every block. A selector reads its first text, and the tests have `` require(`three`) `` and `` require(`@karmania/ui`) `` refused and `` require(`literal`) `` allowed; the selector off fails a test (tried). **Nit, right**: the comment said that "a worked-out
+  specifier is not looked at", but a template is read by its first text even with a substitution after it (`` `lit${x}` `` is refused; `` `${x}` `` and `` `./locales/${x}.js` `` are not); the comment says so, and three tests pin it. **Left, said**: what the rules cannot follow (a
+  joined specifier, `require` held in a variable, an import through a file that re-exports a package). The reviewer also confirmed: the Lit pattern, the `scripts` block, every row of the dependency table against the manifests, and the count of the app's tests (13).
+

@@ -299,8 +299,8 @@ or releasing, and whenever the brief says to stop.
     that `validateScene` refuses.
   - [x] 14.9b `createSceneStore`.
 - [x] 14.10 Legend model with number labels (11.7). Split to stay under the commit size guideline:
-  - [x] 14.10a Number labels: thousands commas, and the fewest decimals at which each bound reads as itself to less
-    than a tenth of the narrowest class (a departure from the brief's "keep neighbouring bounds distinct", see decisions).
+  - [x] 14.10a Number labels: thousands commas and a true minus sign, and each bound as it is, not rounded (the owner's
+    choice after M14, see decisions; the brief's rule was "the fewest decimals that keep neighbouring bounds distinct").
   - [x] 14.10b The colours of the classes, and the entries of a layer's classes with their labels and counts.
   - [x] 14.10c The legend model: groups, layers, class entries and the notices of layers that are not drawn.
 - [x] 14.11 Furniture model: north arrow and scale bar (nice lengths, unit
@@ -341,19 +341,57 @@ or releasing, and whenever the brief says to stop.
 
 ## M15: The viewer package (a move, no visible change)
 
-- [ ] 15.1 Package @karmania/viewer, empty, with tests running.
-- [ ] 15.2 Move the map area component and its tests. Every screenshot and e2e
-  test unchanged.
-- [ ] 15.3 Move the panel (tabs, resize handle, panel state).
-- [ ] 15.4 Move the Data tab, dataset list and summary.
-- [ ] 15.5 Move the import dialog and its steps.
-- [ ] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes
-  toolbar plus viewer; a minimal createViewer(container) and dispose(). Still
-  pixel-identical.
-- [ ] 15.7 The viewer holds a scene store; datasets loaded or removed add or
+- [x] 15.1 Package @karmania/viewer, empty, with tests running.
+- [x] 15.2 Move the map area component and its tests. Every screenshot and e2e
+  test unchanged. Split, because the map area needs two helpers that the rest of the app uses too, and
+  the viewer may not import from the app:
+  - [x] 15.2a Move the helpers: `drag.ts` and `import-files.ts` with its test.
+  - [x] 15.2b Move `map-area.ts`.
+- [x] 15.3 Move the panel (tabs, resize handle, panel state): `panel-tabs.ts`, `panel-state.ts` with its test and
+  `resize-handle.ts`. The panel element itself, `panel.ts`, imports the Data tab (it registers `<karmania-data-tab>`),
+  so it moves after the Data tab, as step 15.4e.
+- [x] 15.4 Move the Data tab, dataset list and summary, and the panel that holds them. Each piece moves after what it
+  imports, since the viewer may not import from the app:
+  - [x] 15.4a `datasets.ts` and `import-crs.ts`, with their tests.
+  - [x] 15.4b The import logic that the summary uses: `import-mapping.ts`, `import-nodata.ts`, `import-draft.ts` and
+    `import-run.ts`, with their tests.
+  - [x] 15.4c0 A unit test for the app's own `theme.ts`: with `findings-text` and `import-steps` the last unit
+    tests leave the app, and a package with no test file fails `vitest run`. (Added; not in the brief.)
+  - [x] 15.4c The findings list: `findings-text.ts`, `import-steps.ts` and `findings.ts`, with their tests.
+  - [x] 15.4d `data-tab.ts`, `dataset-list.ts` and `dataset-summary.ts`.
+  - [x] 15.4e `panel.ts`.
+- [x] 15.5 Move the import dialog and its steps.
+- [x] 15.6 `<karmania-viewer>` composes them with an engine; the app becomes toolbar plus viewer; a minimal
+  createViewer(container) and dispose(). Still pixel-identical. Split:
+  - [x] 15.6a `<karmania-viewer>`: the composition of `app.ts` (the map area, the panel, the wizard, the engine and
+    the state) moves into the viewer; the app is the toolbar and `<karmania-viewer>`.
+  - [x] 15.6b `createViewer(container)` and `dispose()`; the app uses them.
+- [x] 15.7 The viewer holds a scene store; datasets loaded or removed add or
   remove layers (nothing drawn yet); tests.
-- [ ] 15.8 ESLint import restrictions for the dependency direction (5.2).
-- [ ] 15.G Gate.
+- [x] 15.8 ESLint import restrictions for the dependency direction (5.2).
+- [x] 15.8a (added) Record the decisions of M15 in the log.
+- [x] 15.F1 Gate fix, review of M15: the dependency table, the list of packages, a step number and the README say what is
+  true, and what the review found but this milestone leaves is recorded.
+- [x] 15.F2 Gate fix, review of M15: the largest number is not written as `Infinity`, and the comments and the
+  tests say what 15 significant digits do (a longer bound is rounded to 15).
+- [x] 15.F3 Gate fix, review of M15: `openImport` with an empty list opens the file picker, as it does with no list.
+- [x] 15.F4 Gate fix, review of M15: an app that was taken out of the page before its first render and put back has one
+  viewer, not two.
+- [x] 15.F5 Gate fix, review of M15: a viewer taken out of the page forgets the datasets and layers that its engine held,
+  and a test shows that it frees its listeners on the window.
+- [x] 15.F6 Gate fix, review of M15: the theme test tells "left alone" from "set to `undefined`", and a comment says
+  the viewer where it said the app.
+- [x] 15.F7 Gate fix, review of M15: the import rules also refuse `import { type X }` where only types may be named,
+  `import()` and `require()` of packages, more forms of a path, and the app's tests reaching past the viewer; the test
+  of the rules cannot pass on a statement it cannot read.
+- [x] 15.F8 Gate fix, second review of M15: the rule on `import()` covers `lit-html`, `@lit/*` and `@lit-labs/*` as it said,
+  a template without substitution is looked at, and the deprecated `argument` of `TSImportType` is `source`.
+- [x] 15.F9 (added) Gate fix, second review of M15: the root `pnpm lint` passes: the scripts have their Node globals.
+- [x] 15.F10 Gate fix, second review of M15: the dependency table lists every package that declares vite and
+  `@types/node`, and the version of lucide-static that is installed; the log says what was left.
+- [x] 15.F11 Gate fix, third review of M15: `require()` of a template string is refused like `import()`, and the comment
+  says what a template is read by.
+- [x] 15.G Gate.
 
 ## M16: 2D rendering (@karmania/render)
 
