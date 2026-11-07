@@ -8,8 +8,12 @@
  */
 export class CompiledLayers {
   private readonly compiled = new Set<string>();
-  /** The layers whose programs are being compiled, and what for: a layer that is replaced meanwhile is compiled again for the new one. */
-  private readonly compiling = new Map<string, object>();
+  /**
+   * The layers whose programs are being compiled, and the scene each is for: a layer that is replaced meanwhile is compiled again for the new
+   * one. Each compiling is an object of its own (its token), so that the end of one that was let go (by a reset, say) is not taken for the end
+   * of a later one for the same scene.
+   */
+  private readonly compiling = new Map<string, { readonly scene: object }>();
   private readonly kinds = new Map<string, string>();
 
   /** Whether the programs of the layer are compiled. */
@@ -38,22 +42,23 @@ export class CompiledLayers {
     this.kinds.delete(id);
   }
 
-  /** Whether to start compiling `scene`, the one of the layer now: not if it is being compiled already. */
-  start(id: string, scene: object): boolean {
-    if (this.compiling.get(id) === scene) {
-      return false;
+  /** Starts compiling `scene`, the one of the layer now, and gives the token to end it with; `undefined` if it is being compiled already. */
+  start(id: string, scene: object): object | undefined {
+    if (this.compiling.get(id)?.scene === scene) {
+      return undefined;
     }
-    this.compiling.set(id, scene);
-    return true;
+    const token = { scene };
+    this.compiling.set(id, token);
+    return token;
   }
 
   /**
-   * Says that the compiling of `scene` has ended. `current` is whether it is still the scene of the layer. `true` if the layer is compiled now,
-   * which is when a frame is to be asked for; an end that is not of the compiling that was started last (the layer was replaced or removed, or the
-   * context was lost, meanwhile) says nothing.
+   * Says that the compiling with `token` has ended. `current` is whether its scene is still the scene of the layer. `true` if the layer is
+   * compiled now, which is when a frame is to be asked for; an end that is not of the compiling that was started last (the layer was replaced
+   * or removed, or the context was lost, meanwhile) says nothing.
    */
-  finish(id: string, scene: object, current: boolean): boolean {
-    if (this.compiling.get(id) !== scene) {
+  finish(id: string, token: object, current: boolean): boolean {
+    if (this.compiling.get(id) !== token) {
       return false;
     }
     this.compiling.delete(id);

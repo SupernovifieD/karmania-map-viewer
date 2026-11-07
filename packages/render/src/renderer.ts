@@ -233,11 +233,12 @@ export function createRenderer(
 
   /** Starts compiling the programs of a layer that has not been drawn, without holding this thread; a frame is asked for when they are ready. */
   function warm(id: string, own: Scene): void {
-    if (!programs.start(id, own)) {
+    const token = programs.start(id, own);
+    if (token === undefined) {
       return;
     }
     const done = (): void => {
-      if (programs.finish(id, own, scenes.get(id) === own)) {
+      if (programs.finish(id, token, scenes.get(id) === own)) {
         invalidate();
       }
     };
