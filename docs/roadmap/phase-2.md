@@ -452,13 +452,13 @@ or releasing, and whenever the brief says to stop.
 - [x] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
   zoomed; no jitter while panning.
 - [x] 16.16 Render golden images for 2D (10.8), reviewed.
-- [ ] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
+- [x] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
   phase 1 placeholder text removed. Shell screenshots updated, each change
   explained.
   The five data-tab states that the canvas of 16.2 changed (text anti-aliasing, see decisions) are updated here too.
   Split (the states and their tests; then the pictures that they and the canvas changed):
   - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
-  - [ ] 16.17b The screenshots that changed, each looked at and explained.
+  - [x] 16.17b The screenshots that changed, each looked at and explained.
 - [ ] 16.G Gate (with `pnpm perf` for 2D).
 
 ## M17: Map furniture and overlays
