@@ -1,4 +1,5 @@
 import type { RenderBuffers } from '@karmania/engine/display';
+import { LessDepth } from 'three';
 import type { Points, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { FrameInfo, LayerLook } from './look.js';
@@ -11,7 +12,12 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 2,
 };
-const INFO: FrameInfo = { pixelRatio: 2, outline: [0.1, 0.2, 0.3] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [800, 600],
+  flat: true,
+  outline: [0.1, 0.2, 0.3],
+};
 
 const points = (count: number): Extract<RenderBuffers, { kind: 'points' }> => ({
   kind: 'points',
@@ -71,6 +77,14 @@ describe('createPointsLayer', () => {
     expect(second?.length).toBe(9);
     // The last point of the second part is the last point there is.
     expect(second?.[8]).toBe((POINTS_PER_PART + 3) * 3 - 1);
+  });
+
+  it('draws a marker only if it is strictly nearer than one that is there: one at the same height does not overdraw it', () => {
+    const material = parts(createPointsLayer(points(3), LOOK))[0]?.material as ShaderMaterial;
+    expect(material.depthFunc).toBe(LessDepth);
+    expect(material.depthTest).toBe(true);
+    expect(material.depthWrite).toBe(true);
+    expect(material.transparent).toBe(true);
   });
 
   it('is not culled by a box, since none was worked out', () => {
