@@ -146,12 +146,15 @@ function setup(sinkOverride?: LayerSink | null) {
     maxTextureSize: 8192,
   };
   let current: LayerSink | undefined = sinkOverride === null ? undefined : (sinkOverride ?? sink);
+  /** The first column of numbers of a dataset, which the viewer knows and the tests say. */
+  let firstColumn: (datasetId: number) => string | undefined = () => undefined;
   const changes = vi.fn();
   const pipeline = new LayerPipeline({
     engine: fake.engine,
     scene,
     sink: () => current,
     viewport: () => ({ width: 1000, height: 500 }),
+    firstColumn: (datasetId) => firstColumn(datasetId),
     onChange: changes,
   });
   scene.subscribe(() => {
@@ -183,6 +186,9 @@ function setup(sinkOverride?: LayerSink | null) {
     drawable,
     setSink: (next: LayerSink | undefined) => {
       current = next;
+    },
+    setFirstColumn: (next: (datasetId: number) => string | undefined) => {
+      firstColumn = next;
     },
     ...fake,
   };
@@ -1040,7 +1046,7 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
   });
 
-  it('takes the classes away, and does not draw the cells, when the layer is given one colour', async () => {
+  it('takes the classes away, and does not draw the cells, when the layer is given one colour and the dataset has no column of numbers to say which cells have a value', async () => {
     const t = gridSetup();
     t.drawable([0, true]);
     await t.addGrid(0);
@@ -1071,6 +1077,105 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.classifyCalls).toHaveLength(1);
     expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(3);
     expect(t.sink.setLayerClasses.mock.calls[2]?.[1]?.colours).toEqual(first?.colours);
+  });
+
+  it('colours the cells that have a value in the one colour of the style, as one class of the first column of numbers', async () => {
+    const t = gridSetup();
+    t.setFirstColumn(() => 'Au');
+    t.drawable([0, true]);
+    t.scene.dispatch({ type: 'addLayers', datasets: [gridDataset(0)] });
+    await t.pipeline.idle();
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    // The first asked for the classes of the style it was made with, the second for one class of the first column.
+    expect(t.classifyCalls).toEqual([
+      [0, 'Au', 'equal', 7],
+      [0, 'Au', 'equal', 1],
+    ]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(2);
+    expect(t.sink.setLayerClasses.mock.calls[1]?.[1]?.colours).toEqual(['#0072b2']);
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('gives a new colour for the mask without asking the engine again, and asks only once for the column of the mask', async () => {
+    const t = gridSetup();
+    t.setFirstColumn(() => 'Au');
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    for (const value of ['#0072b2', '#d55e00', '#009e73']) {
+      t.scene.dispatch({
+        type: 'setStyle',
+        layerId: 'layer-1',
+        patch: { colour: { mode: 'single', value } },
+      });
+      await t.pipeline.idle();
+    }
+    expect(t.classifyCalls).toEqual([
+      [0, 'Au', 'equal', 7],
+      [0, 'Au', 'equal', 1],
+    ]);
+    const given = t.sink.setLayerClasses.mock.calls.map(([, classes]) => classes?.colours);
+    expect(given.slice(1)).toEqual([['#0072b2'], ['#d55e00'], ['#009e73']]);
+    const indices = t.sink.setLayerClasses.mock.calls
+      .slice(1)
+      .map(([, classes]) => classes?.indices);
+    expect(indices[1]).toBe(indices[0]);
+    expect(indices[2]).toBe(indices[0]);
+  });
+
+  it('asks for the mask of the first column of the dataset it is of', async () => {
+    const t = gridSetup();
+    t.setFirstColumn((datasetId) => `Column of ${String(datasetId)}`);
+    t.drawable([4, true]);
+    // (A grid with no column in its summary starts in one colour; the viewer says which column the mask is of.)
+    t.scene.dispatch({ type: 'addLayers', datasets: [{ ...gridDataset(4), columns: [] }] });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[4, 'Column of 4', 'equal', 1]]);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[4, 'Column of 4', 'equal', 1]]);
+  });
+
+  it('asks again for the mask when the column that says which cells have a value is another', async () => {
+    const t = gridSetup();
+    let column = 'Au';
+    t.setFirstColumn(() => column);
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    column = 'Cu';
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#d55e00' } },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls.slice(1)).toEqual([
+      [0, 'Au', 'equal', 1],
+      [0, 'Cu', 'equal', 1],
+    ]);
+  });
+
+  it('does not ask for a mask for a kind whose elements all have a value, in one colour', async () => {
+    const t = setup();
+    t.setFirstColumn(() => 'Au');
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.classifyCalls).toEqual([]);
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
   });
 
   it('gives a layer of categories the grey of "Other" after the colours of its classes, when there are others', async () => {

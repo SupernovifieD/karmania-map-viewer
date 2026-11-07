@@ -2,7 +2,7 @@ import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
 import { DEFAULT_SCALE_LIMITS, attachController2d, createRenderer } from '@karmania/render';
 import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
-import { createSceneStore } from '@karmania/scene';
+import { createSceneStore, firstNumericColumn } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
@@ -232,6 +232,10 @@ export class KarmaniaViewer extends LitElement {
       viewport: () => {
         const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
         return { width: box?.width ?? 0, height: box?.height ?? 0 };
+      },
+      firstColumn: (datasetId) => {
+        const summary = this.datasets.find((dataset) => dataset.id === datasetId);
+        return summary === undefined ? undefined : firstNumericColumn(summary);
       },
     });
     return this.pipeline;

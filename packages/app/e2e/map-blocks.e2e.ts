@@ -201,6 +201,45 @@ test.describe('the block layer', () => {
     expect(distance(await colourAt(page, view, ...empty), lower)).toBeLessThanOrEqual(1);
   });
 
+  test('draws the blocks that have a value in the one colour of the style, and a block with no value hides nothing', async ({
+    page,
+  }) => {
+    await loadBlocks(
+      page,
+      [
+        'XC,YC,ZC,Density,Domain',
+        '500005,2765005,105,10,a',
+        '500015,2765005,95,55,c',
+        '500025,2765005,105,,n',
+        '500025,2765005,95,55,m',
+        '',
+      ].join('\n'),
+    );
+    const centre = [CORNER[0] + 1.5 * BLOCK, CORNER[1] + BLOCK / 2] as const;
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera2d: { centre, unitsPerPixel: 1, heading: 0 } },
+    });
+    const now = await drawn(page);
+    const view: View = { width: now.width, height: now.height, ratio: now.pixelRatio, centre };
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    for (const [i, j] of [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+    ] as const) {
+      await expect
+        .poll(async () => distance(await colourAt(page, view, ...middleOf(i, j)), [0, 114, 178]), {
+          message: `${String(i)},${String(j)}`,
+        })
+        .toBeLessThanOrEqual(2);
+    }
+  });
+
   test('is as wide as its blocks are along x and as long as they are along y: 10 by 20 metres', async ({
     page,
   }) => {

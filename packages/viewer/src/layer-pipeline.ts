@@ -14,7 +14,7 @@
  * Everything is in the pipeline and nothing in it is a time: the same scene and data give the same calls in the same order.
  */
 import type { Engine } from '@karmania/engine';
-import type { ClassBreaks, Frame, RenderBuffers } from '@karmania/engine/display';
+import type { ClassBreaks, ClassMethod, Frame, RenderBuffers } from '@karmania/engine/display';
 import type { BBox, Finding } from '@karmania/engine/types';
 import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import type { ClassColouring, ScaleLimits } from '@karmania/render';
@@ -55,6 +55,11 @@ export interface PipelineOptions {
   sink(): LayerSink | undefined;
   /** The size of the map area in CSS pixels, for the fit. */
   viewport(): { readonly width: number; readonly height: number };
+  /**
+   * The column of a dataset that says which of its cells or blocks have a value: its first of numbers (the one the default style colours a
+   * grid by), or `undefined` for none. A layer in one colour is drawn where that has a value.
+   */
+  firstColumn?(datasetId: number): string | undefined;
   /** Called whenever the state of a layer changes. */
   onChange?(): void;
 }
@@ -72,6 +77,12 @@ const DEFAULT_TEXTURE_SIZE = 4096;
  * kinds are drawn in one colour until step 16.13 gives them a colour for each element.)
  */
 const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'blocks']);
+
+/**
+ * The kinds whose cells or blocks may have no value, and so are not all drawn when the layer is in one colour: they are given one class
+ * (the cells that have a value in the first column of numbers) and the colour of the style.
+ */
+const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'blocks']);
 
 /** A text that is the same for styles that have the same classes: the column, the method and how many (the ramp is not of the classes). */
 function classKeyOf(colour: Extract<LayerColour, { mode: 'classes' }>): string {
@@ -525,15 +536,16 @@ export class LayerPipeline {
     if (colour === undefined || entry.kind === undefined || !COLOURED_BY_CLASS.has(entry.kind)) {
       return;
     }
-    if (colour.mode !== 'classes') {
-      // One colour for a grid has no classes to colour by here: it is not drawn until a later step says which cells have a value.
+    const wanted = this.classesWanted(entry, colour);
+    if (wanted === undefined) {
+      // Nothing to colour by (one colour for a kind that has no cells with no value, or no column of numbers to say which have one).
       delete entry.problem;
       delete entry.classes;
       delete entry.signature;
       this.give(id, entry);
       return;
     }
-    const key = classKeyOf(colour);
+    const { key } = wanted;
     if (entry.problem !== undefined && entry.problem.key !== key) {
       delete entry.problem;
     }
@@ -550,16 +562,16 @@ export class LayerPipeline {
           this.disposed ||
           signal?.aborted === true ||
           this.entries.get(id) !== entry ||
-          now?.mode !== 'classes' ||
-          classKeyOf(now) !== key
+          now === undefined ||
+          this.classesWanted(entry, now)?.key !== key
         );
       };
       try {
         const result = await this.options.engine.classify(
           entry.datasetId,
-          colour.column,
-          colour.method,
-          colour.classes,
+          wanted.column,
+          wanted.method,
+          wanted.classes,
         );
         if (stale()) {
           return;
@@ -590,17 +602,45 @@ export class LayerPipeline {
     if (breaks === undefined || indices === undefined) {
       return;
     }
-    // The classes of a column of categories have "Other" after them, which is a grey of the scene's own.
-    const colours = [
-      ...classColours(colour, breaks),
-      ...(breaks.kind === 'categories' && breaks.other !== undefined ? [OTHER_COLOUR] : []),
-    ];
+    // The classes of a column of categories have "Other" after them, which is a grey of the scene's own; one colour is one class.
+    const colours =
+      colour.mode === 'single'
+        ? [colour.value]
+        : [
+            ...classColours(colour, breaks),
+            ...(breaks.kind === 'categories' && breaks.other !== undefined ? [OTHER_COLOUR] : []),
+          ];
     const signature = `${key}\u0001${colours.join(',')}`;
     if (signature !== entry.signature) {
       entry.signature = signature;
       entry.classes = { indices, colours };
     }
     this.give(id, entry);
+  }
+
+  /**
+   * What the engine is to be asked for the style: a layer by classes asks for those of its column, a kind that can have cells with no value, in
+   * one colour, for one class of the cells that have a value (in the first column of numbers). `undefined` for a style that has nothing to ask.
+   */
+  private classesWanted(
+    entry: Entry,
+    colour: LayerColour,
+  ): { key: string; column: string; method: ClassMethod; classes: number } | undefined {
+    if (colour.mode === 'classes') {
+      return {
+        key: classKeyOf(colour),
+        column: colour.column,
+        method: colour.method,
+        classes: colour.classes,
+      };
+    }
+    if (entry.kind === undefined || !NEEDS_MASK.has(entry.kind)) {
+      return undefined;
+    }
+    const column = this.options.firstColumn?.(entry.datasetId);
+    return column === undefined
+      ? undefined
+      : { key: ['single', column].join('\u0000'), column, method: 'equal', classes: 1 };
   }
 
   /** The classes could not be had: the layer says why, the renderer has no classes for it, and they are not asked for again. */
