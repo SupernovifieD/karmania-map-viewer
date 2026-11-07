@@ -168,6 +168,21 @@ describe('createBlocksLayer', () => {
     expect(second?.byteOffset).toBe(BLOCKS_PER_PART);
   });
 
+  it('keeps the classes it has when it is given the same ones with other colours: only the palette changes', () => {
+    const layer = createBlocksLayer(blocks(3), LOOK);
+    const classes = numbered(3);
+    layer.setClasses?.(classes);
+    const attribute = geometryOf(parts(layer)[0])?.getAttribute('aClass');
+    layer.setClasses?.({ indices: classes.indices, colours: ['#ff0000', '#00ff00'] });
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aClass')).toBe(attribute);
+    expect(uniforms(layer)['uCount']?.value).toBe(2);
+    const palette = uniforms(layer)['uPalette']?.value as { x: number }[];
+    expect(palette[0]?.x).toBe(1);
+    expect(layer.object.visible).toBe(true);
+    layer.setClasses?.({ indices: Uint8Array.from(classes.indices), colours: classes.colours });
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aClass')).not.toBe(attribute);
+  });
+
   it('has the colours of the classes in the palette, as many as there are, and no more than it can hold', () => {
     const layer = createBlocksLayer(blocks(3), LOOK);
     layer.setClasses?.({ indices: new Uint8Array(3), colours: ['#ff0000', '#00ff00'] });

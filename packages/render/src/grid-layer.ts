@@ -176,11 +176,25 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
   const [columns, rows] = buffers.size;
   let shown = look.visible;
   let coloured = false;
+  /** The classes of the cells that the textures are made from. */
+  let held: Uint8Array | undefined;
 
   function show(): void {
     group.visible = shown;
     for (const entry of tiles) {
       entry.mesh.visible = coloured;
+    }
+  }
+
+  /** The colours of the classes, as many as there are and no more than there is room for. */
+  function paint(colours: readonly string[]): void {
+    const count = Math.min(colours.length, MAX_CLASSES);
+    colours.slice(0, count).forEach((hex, k) => {
+      const [r, g, b] = colourOf(hex);
+      palette[k]?.set(r, g, b);
+    });
+    for (const entry of tiles) {
+      entry.uniforms.uCount.value = count;
     }
   }
 
@@ -206,14 +220,18 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
       // (nothing)
     },
     setClasses(classes: ClassColouring | undefined) {
+      if (classes !== undefined && classes.indices === held) {
+        // The same classes of the cells with other colours (another ramp): the textures are what they were and only the palette changes.
+        paint(classes.colours);
+        show();
+        return;
+      }
       forgetTextures();
       coloured = false;
+      held = undefined;
       if (classes !== undefined && classes.indices.length === columns * rows) {
-        const count = Math.min(classes.colours.length, MAX_CLASSES);
-        classes.colours.slice(0, count).forEach((hex, k) => {
-          const [r, g, b] = colourOf(hex);
-          palette[k]?.set(r, g, b);
-        });
+        paint(classes.colours);
+        held = classes.indices;
         for (const entry of tiles) {
           const texture = new DataTexture(
             cut(classes.indices, columns, entry.tile),
@@ -232,7 +250,6 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
           texture.needsUpdate = true;
           entry.texture = texture;
           entry.uniforms.uCells.value = texture;
-          entry.uniforms.uCount.value = count;
         }
         coloured = true;
       }

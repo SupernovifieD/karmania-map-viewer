@@ -323,6 +323,38 @@ describe('createGridLayer', () => {
     expect(meshes(layer).map((mesh) => mesh.visible)).toEqual([false]);
   });
 
+  it('keeps its textures when it is given the same classes of the cells with other colours: only the palette changes', () => {
+    const layer = createGridLayer(grid(), LOOK);
+    const classes = numbered();
+    layer.setClasses?.(classes);
+    const texture = textureOf(meshes(layer)[0]);
+    const freed: string[] = [];
+    texture?.addEventListener('dispose', () => freed.push('texture'));
+    const version = texture?.version;
+    layer.setClasses?.({ indices: classes.indices, colours: ['#ff0000', '#00ff00'] });
+    expect(textureOf(meshes(layer)[0])).toBe(texture);
+    expect(texture?.version).toBe(version);
+    expect(freed).toEqual([]);
+    expect(uniforms(meshes(layer)[0])['uCount']?.value).toBe(2);
+    const palette = uniforms(meshes(layer)[0])['uPalette']?.value as { x: number }[];
+    expect(palette[0]?.x).toBe(1);
+    expect(meshes(layer)[0]?.visible).toBe(true);
+    // Other classes of the cells, though the same length, are new textures.
+    layer.setClasses?.({ indices: Uint8Array.from(classes.indices), colours: classes.colours });
+    expect(textureOf(meshes(layer)[0])).not.toBe(texture);
+    expect(freed).toEqual(['texture']);
+  });
+
+  it('does not keep what it was given as the same classes once they were taken away', () => {
+    const layer = createGridLayer(grid(), LOOK);
+    const classes = numbered();
+    layer.setClasses?.(classes);
+    layer.setClasses?.(undefined);
+    layer.setClasses?.(classes);
+    expect(textureOf(meshes(layer)[0])).toBeInstanceOf(DataTexture);
+    expect(meshes(layer)[0]?.visible).toBe(true);
+  });
+
   it('frees the textures of the old classes when it is given new ones, and when they are taken away', () => {
     const layer = createGridLayer(grid(), LOOK);
     layer.setClasses?.(numbered());
