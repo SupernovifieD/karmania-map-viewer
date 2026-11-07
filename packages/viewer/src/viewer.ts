@@ -1,7 +1,9 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
-import { createSceneStore } from '@karmania/scene';
-import type { SceneDocument } from '@karmania/scene';
+import { DEFAULT_SCALE_LIMITS, attachController2d, createRenderer } from '@karmania/render';
+import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
+import { createSceneStore, firstNumericColumn } from '@karmania/scene';
+import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
@@ -12,7 +14,7 @@ import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
-import type { DroppedFiles } from './map-area.js';
+import type { DroppedFiles, KarmaniaMapArea } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -25,6 +27,11 @@ import {
 } from './panel-state.js';
 import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
+import { layerLook } from './layer-look.js';
+import { LayerPipeline } from './layer-pipeline.js';
+import type { LayerSink, LayerState } from './layer-pipeline.js';
+import { drawOrder } from './draw-order.js';
+import { summariseLayers } from './layer-summary.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -45,6 +52,8 @@ export class KarmaniaViewer extends LitElement {
     panel: { state: true },
     viewportWidth: { state: true },
     datasets: { state: true },
+    layerChanges: { state: true },
+    cannotDraw: { state: true },
     selected: { state: true },
   };
 
@@ -83,6 +92,10 @@ export class KarmaniaViewer extends LitElement {
   declare private viewportWidth: number;
   /** The datasets that have been loaded and kept, in the order they were loaded. */
   declare private datasets: readonly Summary[];
+  /** Counts the changes of where the layers are (being prepared, drawn, not drawn): what the map area says of them is made again for each. */
+  declare private layerChanges: number;
+  /** Whether the browser could not give the page a renderer (it has no WebGL 2): the map area says so, and the page does not try again. */
+  declare private cannotDraw: boolean;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
 
@@ -91,6 +104,8 @@ export class KarmaniaViewer extends LitElement {
     this.panel = loadPanelState(browserStorage());
     this.viewportWidth = document.documentElement.clientWidth;
     this.datasets = [];
+    this.layerChanges = 0;
+    this.cannotDraw = false;
     this.selected = undefined;
   }
 
@@ -106,6 +121,11 @@ export class KarmaniaViewer extends LitElement {
   /** The scene as it is now. */
   scene(): SceneDocument {
     return this.store.getState();
+  }
+
+  /** Changes the scene by a command (the same that the controls of the viewer use), and gives the document that comes of it. */
+  dispatch(command: Command): SceneDocument {
+    return this.store.dispatch(command);
   }
 
   /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the viewer is. */
@@ -127,11 +147,192 @@ export class KarmaniaViewer extends LitElement {
       : engine.crsInfo(code);
   };
 
+  /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
+  private renderer: Renderer | undefined;
+
+  /** A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer. */
+  renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined {
+    return this.renderer?.readPixels(x, y, width, height);
+  }
+
+  /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
+  renderStats(): RenderStats | undefined {
+    return this.renderer?.stats();
+  }
+
+  /** Whether the viewer is waiting for the map area's canvas, so that two calls do not make two renderers. */
+  private attaching = false;
+
+  /**
+   * Makes the renderer when there is something to draw, once the map area has made its canvas. **Not before**: a page that
+   * has no data holds no context of the graphics card (the browser allows a few), and the browser draws the text of a page
+   * that has a WebGL canvas in it otherwise than it does without one (greyscale for subpixel anti-aliasing), which would
+   * change every picture of the empty app. The viewer may be taken out of the page while it waits, or put back and ask again
+   * (which does nothing while the first is waiting), so it looks at whether it is in the page after the wait.
+   */
+  private async attachRenderer(): Promise<void> {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null || this.renderer !== undefined || this.attaching || this.cannotDraw) {
+      return;
+    }
+    this.attaching = true;
+    try {
+      await area.updateComplete;
+      // The context and the renderer are made in a task of their own: made in the one that is handling the click that loaded the file, they
+      // held the page for about 50 ms along with what that click does, and no task of the page is to be over 50 ms (section 9.6).
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    } finally {
+      this.attaching = false;
+    }
+    const canvas = area.canvas;
+    if (canvas !== undefined && this.isConnected) {
+      this.renderer = createRenderer(canvas, {
+        // The card took the context away, or gave it back: the map area says so while the map is being drawn again.
+        onContextLoss: (lost) => {
+          area.redrawing = lost;
+        },
+      });
+      this.cannotDraw = this.renderer === undefined;
+      this.lookThroughCamera();
+      this.controller = this.renderer === undefined ? undefined : this.listenToPerson(area, canvas);
+      area.interactive = this.controller !== undefined;
+      this.pipeline?.rendererReady();
+    }
+  }
+
+  /** What moves the map when a person drags it, turns the wheel or presses a key: it asks the scene for a camera. */
+  private controller: Controller2d | undefined;
+
+  private listenToPerson(
+    area: KarmaniaMapArea,
+    canvas: HTMLCanvasElement,
+  ): Controller2d | undefined {
+    const focusTarget = area.focusTarget;
+    if (focusTarget === undefined) {
+      return undefined;
+    }
+    return attachController2d({
+      element: area,
+      canvas,
+      focusTarget,
+      getCamera: () => this.store.getState().camera2d,
+      getLimits: () => this.pipeline?.limits() ?? DEFAULT_SCALE_LIMITS,
+      onFit: () => {
+        this.fit();
+      },
+      onCamera: (change) => {
+        this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
+      },
+    });
+  }
+
+  /** Gives the renderer the camera and the origin of the scene. */
+  private lookThroughCamera(): void {
+    const { camera2d, frame } = this.store.getState();
+    this.renderer?.setCamera2d(camera2d, frame?.origin ?? [0, 0, 0]);
+  }
+
+  /**
+   * What turns the layers of the scene into layers on the card (prepared in the worker, given to the renderer), and fits the camera
+   * to the data. It needs the engine, so it is made with it, and stopped when the viewer is taken out of the page.
+   */
+  private pipeline: LayerPipeline | undefined;
+
+  private pipelineFor(engine: Engine): LayerPipeline {
+    this.pipeline ??= new LayerPipeline({
+      engine,
+      scene: this.store,
+      sink: () => this.sink(),
+      viewport: () => {
+        const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
+        return { width: box?.width ?? 0, height: box?.height ?? 0 };
+      },
+      onChange: () => {
+        this.layerChanges += 1;
+      },
+      firstColumn: (datasetId) => {
+        const summary = this.datasets.find((dataset) => dataset.id === datasetId);
+        return summary === undefined ? undefined : firstNumericColumn(summary);
+      },
+    });
+    return this.pipeline;
+  }
+
+  /** The renderer, as what the pipeline gives buffers to; `undefined` while there is none. */
+  private sink(): LayerSink | undefined {
+    const renderer = this.renderer;
+    return renderer === undefined
+      ? undefined
+      : {
+          setLayer: (id, buffers) => {
+            const state = this.store.getState();
+            const layer = state.layers[id];
+            // (A layer that is gone is not given buffers; the look is the scene's own for the one that is there.)
+            const outcome =
+              layer === undefined
+                ? 'unsupported'
+                : renderer.setLayer(id, buffers, layerLook(layer));
+            // The order it is drawn in is the legend's, which the renderer is told with the first layer it has, and when the legend changes.
+            renderer.setLayerOrder(drawOrder(state));
+            return outcome;
+          },
+          setLayerClasses: (id, classes) => {
+            renderer.setLayerClasses(id, classes);
+          },
+          removeLayer: (id) => renderer.removeLayer(id),
+          setDepthRange: (min, max) => {
+            renderer.setDepthRange(min, max);
+          },
+          get maxTextureSize() {
+            return renderer.stats().maxTextureSize;
+          },
+        };
+  }
+
+  /** Shows the data: the camera goes where all that is visible and prepared fits in the map area. */
+  fit(): void {
+    this.pipeline?.fit();
+  }
+
+  /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
+  layerStates(): [string, LayerState][] {
+    return [...(this.pipeline?.states() ?? [])];
+  }
+
+  /** Called when the scene changes: the first layer is what the renderer is for, and the camera is what it looks through. */
+  private readonly onScene = (state: SceneDocument, previous: SceneDocument): void => {
+    if (Object.keys(state.layers).length > 0) {
+      void this.attachRenderer();
+    }
+    if (this.engine !== undefined) {
+      this.pipelineFor(this.engine).update();
+    }
+    if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
+      this.lookThroughCamera();
+    }
+    // What is higher in the legend is drawn over what is lower.
+    if (state.legend !== previous.legend) {
+      this.renderer?.setLayerOrder(drawOrder(state));
+    }
+    // A layer whose style or visibility changed looks different, and is not built again for it.
+    for (const [id, layer] of Object.entries(state.layers)) {
+      if (layer !== previous.layers[id]) {
+        this.renderer?.setLayerLook(id, layerLook(layer));
+      }
+    }
+  };
+
+  /** Stops listening to the scene; set while the viewer is in a page. */
+  private unlistenScene: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener('dragover', this.refuseStrayFiles);
     window.addEventListener('drop', this.refuseStrayFiles);
     window.addEventListener('resize', this.onWindowResize);
+    this.unlistenScene = this.store.subscribe(this.onScene);
   }
 
   override disconnectedCallback(): void {
@@ -139,6 +340,19 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('dragover', this.refuseStrayFiles);
     window.removeEventListener('drop', this.refuseStrayFiles);
     window.removeEventListener('resize', this.onWindowResize);
+    this.unlistenScene?.();
+    this.unlistenScene = undefined;
+    this.pipeline?.dispose();
+    this.pipeline = undefined;
+    this.controller?.dispose();
+    this.controller = undefined;
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area !== null) {
+      area.interactive = false;
+    }
+    this.renderer?.dispose();
+    this.renderer = undefined;
+    this.cannotDraw = false;
     this.engine?.dispose();
     this.engine = undefined;
     // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer
@@ -191,6 +405,11 @@ export class KarmaniaViewer extends LitElement {
   /** Does what a person asked of the panel, and keeps the panel that way. */
   private readonly onPanelChange = (event: CustomEvent<PanelChange>): void => {
     this.changePanel(event.detail);
+  };
+
+  /** The map area says nothing can be drawn and sends people to the Legend, which says why for each layer. */
+  private readonly onShowLegend = (): void => {
+    this.changePanel({ tab: 'legend', collapsed: false });
   };
 
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
@@ -250,6 +469,7 @@ export class KarmaniaViewer extends LitElement {
     // The width that was asked for, or what the window allows of it.
     const width = clampPanelWidth(this.panel.width, this.viewportWidth);
     const limits = panelWidthLimits(this.viewportWidth);
+    const layers = summariseLayers(this.pipeline?.states().values() ?? []);
     return html`
       <div
         class="workspace"
@@ -258,6 +478,11 @@ export class KarmaniaViewer extends LitElement {
       >
         <karmania-map-area
           .datasets=${this.datasets.length}
+          .unavailable=${this.cannotDraw}
+          .preparing=${layers.preparing}
+          .progress=${layers.progress}
+          .reasons=${layers.reasons}
+          @karmania-show-legend=${this.onShowLegend}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
