@@ -10,7 +10,7 @@
  * redistribute these colormaps, but do not impose any legal restrictions." Licence: CC0-1.0. Each component is
  * multiplied by 255 and rounded (half up).
  *
- * cividis: matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`, `_cividis_data` (256 colours), which is the colormap of github.com/pnnl/cmaputil by
+ * cividis: matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`, `_cividis_data` (256 colours), which is the colormap of github.com/pnnl/cmaputil
  * (described in "Optimizing colormaps with consideration for color vision deficiency to enable accurate interpretation of scientific data",
  * doi:10.1371/journal.pone.0199239), Copyright (c) 2017, Battelle Memorial Institute. **It is not CC0**: it is
  * under Battelle's own permissive licence (use, copy, modify, merge, publish, distribute, sublicense and sell, with the copyright notice and the

@@ -2,7 +2,7 @@
  * The layer of a grid (section 9.3 of the brief): an image of its cells, each cell the colour of its class, sampled NEAREST and never
  * linearly, so that every cell shows its own class and nothing between cells. A cell with no value is not drawn (the map shows through
  * it). The image goes where the engine's placement says, rotated as it says, in one texture for each of its tiles (the engine cuts the
- * grid so that no tile is larger than the card's largest texture).
+ * grid so that no tile is larger than the card's largest texture, or than 4,096 cells a side if that is less: `MAX_TILE_SIZE` of the pipeline).
  *
  * The buffers do not have the cells' values: they come as the classes of the cells (`setClasses`), one byte for each cell in lattice
  * order, `i` fastest, which are cut up by the tiles here. Until a grid has them, or if what it is given is not one byte for each cell, it

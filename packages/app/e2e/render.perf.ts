@@ -28,12 +28,12 @@ const WATCH = `(() => {
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) long.push({ start: entry.startTime, duration: entry.duration });
   }).observe({ type: 'longtask', buffered: true });
-  /** The frames that took over 45 ms, with the scripts that ran in them (the Long Animation Frames API): what a long task was made of. */
+  /** The frames that took over 50 ms (where the Long Animation Frames API starts to report), with the scripts that ran in them: what a long task was made of. */
   const slow = [];
   try {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (entry.duration < 45) continue;
+        
         slow.push({
           start: Math.round(entry.startTime), duration: Math.round(entry.duration), blocking: Math.round(entry.blockingDuration),
           renderStart: Math.round(entry.renderStart - entry.startTime), layoutStart: Math.round(entry.styleAndLayoutStart - entry.startTime),
@@ -77,6 +77,8 @@ interface Measured {
     readonly median: number;
     readonly p95: number;
     readonly count: number;
+    /** How many of the gaps were over one and a half beats (a frame that was late: the 95th percentile is what is held to), for the record. */
+    readonly late: number;
     /** The beat of the display: the median gap between animation frames of the same page with nothing happening, in ms. */
     readonly displayMs: number;
     /** How many frames the renderer drew meanwhile, which is what makes the gaps those of drawing and not of an idle page. */
@@ -205,6 +207,8 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
       displayMs: Math.round((idleSorted[Math.floor(idleSorted.length / 2)] ?? 0) * 100) / 100,
       median: Math.round((sorted[Math.floor(sorted.length / 2)] ?? 0) * 100) / 100,
       p95: Math.round((sorted[Math.floor(sorted.length * 0.95)] ?? 0) * 100) / 100,
+      late: gaps.filter((gap) => gap > (idleSorted[Math.floor(idleSorted.length / 2)] ?? 0) * 1.5)
+        .length,
       count: gaps.length,
       drawn,
     };
@@ -228,7 +232,7 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   }
 
   const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
-  // The frames over 45 ms and the scripts in them, for what a long task was made of (printed, not asserted).
+  // The frames over 50 ms and the scripts in them, for what a long task was made of (printed, not asserted).
   const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
   const slowAfter = slow.filter((frame) => frame.start >= started);
   if (slowAfter.length > 0) {

@@ -63,6 +63,38 @@ test.describe('the map canvas', () => {
     expect(await asks()).toBe(before);
   });
 
+  test('is made all the same when the card takes the context away while the renderer is being made, and gives it back', async ({
+    page,
+  }) => {
+    // The first context that the page asks for is lost at once, and given back 30 ms later: a reset of the card in the middle of the start.
+    await page.addInitScript(() => {
+      const original = Reflect.get(HTMLCanvasElement.prototype, 'getContext') as (
+        this: HTMLCanvasElement,
+        ...args: unknown[]
+      ) => unknown;
+      let first = true;
+      Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+        configurable: true,
+        value(this: HTMLCanvasElement, kind: string, ...rest: unknown[]): unknown {
+          const context = original.call(this, kind, ...rest);
+          if (kind === 'webgl2' && first && context !== null) {
+            first = false;
+            const lose = (context as WebGL2RenderingContext).getExtension('WEBGL_lose_context');
+            lose?.loseContext();
+            window.setTimeout(() => {
+              lose?.restoreContext();
+            }, 30);
+          }
+          return context;
+        },
+      });
+    });
+    await page.goto('/');
+    await withData(page);
+    expect((await stats(page))?.contextLost).toBe(false);
+    await expect(area(page).getByText('The map cannot be drawn')).toHaveCount(0);
+  });
+
   test('fills the map area exactly, at every window size in both themes', async ({ page }) => {
     await inEveryLayout(page, '/', async ({ name }) => {
       await withData(page);

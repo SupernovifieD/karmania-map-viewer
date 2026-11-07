@@ -33,7 +33,7 @@ export interface RenderStats {
   /** How many geometries and textures are on the card, as three counts them. */
   readonly geometries: number;
   readonly textures: number;
-  /** How many layers are on the card, how many of them the last frame drew (a layer is not drawn until its programs are compiled), and the largest texture the card takes, in cells on a side (what `prepare` cuts a grid to). */
+  /** How many layers are on the card, how many of them the last frame drew (a layer is not drawn until its programs are compiled), and the largest texture the card takes, in cells on a side (a grid is cut to that, or to 4,096 if that is less). */
   readonly layers: number;
   readonly layersDrawn: number;
   readonly maxTextureSize: number;
@@ -123,6 +123,29 @@ async function untilSettled(gl: WebGL2RenderingContext, view: Window): Promise<v
   gl.deleteSync(fence);
 }
 
+/**
+ * Waits for the card to give the context back, if it took it away while the context was being settled (a reset of the card), for at most
+ * two seconds: three is not there yet to say that it may be given back, which it does (by refusing the event) once it is made.
+ */
+async function untilBack(
+  canvas: HTMLCanvasElement,
+  gl: WebGL2RenderingContext,
+  view: Window,
+): Promise<void> {
+  if (!gl.isContextLost()) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    const done = (): void => {
+      canvas.removeEventListener('webglcontextrestored', done);
+      view.clearTimeout(timer);
+      resolve();
+    };
+    const timer = view.setTimeout(done, 2000);
+    canvas.addEventListener('webglcontextrestored', done);
+  });
+}
+
 /** What the context of the card is asked for: what three would ask for with the options it is given below. */
 const CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
   alpha: true,
@@ -157,7 +180,21 @@ export async function createRenderer(
   if (made === null) {
     return undefined;
   }
-  await untilSettled(made, view);
+  // A loss while the context is settled has no listener to refuse it (three's own come with it): refused here, so that the card may give the
+  // context back, and waited for. If it does not, there is no context to draw on.
+  const refuse = (event: Event): void => {
+    event.preventDefault();
+  };
+  canvas.addEventListener('webglcontextlost', refuse);
+  try {
+    await untilSettled(made, view);
+    await untilBack(canvas, made, view);
+  } finally {
+    canvas.removeEventListener('webglcontextlost', refuse);
+  }
+  if (made.isContextLost()) {
+    return undefined;
+  }
   let gl: WebGLRenderer;
   try {
     gl = new WebGLRenderer({
@@ -170,6 +207,8 @@ export async function createRenderer(
       powerPreference: 'high-performance',
     });
   } catch {
+    // three could not make its state from the context: the context is let go.
+    made.getExtension('WEBGL_lose_context')?.loseContext();
     return undefined;
   }
   gl.setPixelRatio(1);

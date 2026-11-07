@@ -187,7 +187,8 @@ export class KarmaniaViewer extends LitElement {
         setTimeout(resolve, 0);
       });
       canvas = area.canvas;
-      if (canvas === undefined || !this.inPage()) {
+      // Nothing may be waiting any more (the layer was removed, or cannot be drawn, in the turns that it took to get here): no context then.
+      if (canvas === undefined || !this.inPage() || !this.hasWaiting()) {
         return;
       }
       made = await createRenderer(canvas, {
@@ -210,6 +211,11 @@ export class KarmaniaViewer extends LitElement {
     this.controller = made === undefined ? undefined : this.listenToPerson(area, canvas);
     area.interactive = this.controller !== undefined;
     this.pipeline?.rendererReady();
+  }
+
+  /** Whether a layer is prepared and waits for the renderer (asked again after each wait, since the pipeline may be gone or the layer too). */
+  private hasWaiting(): boolean {
+    return this.pipeline?.hasWaiting() === true;
   }
 
   /** Whether the viewer is in a page now (asked again after each wait, since it may have been taken out meanwhile). */
@@ -268,8 +274,11 @@ export class KarmaniaViewer extends LitElement {
         this.layerChanges += 1;
         // The renderer is made when the first buffers are ready to be drawn, and not when the layer is first asked for: made while the worker
         // is busy preparing them, the card and the worker compete for the machine and the renderer's own start takes 25 to 55 ms of the page.
-        if (this.renderer === undefined && this.pipeline?.hasWaiting() === true) {
-          void this.attachRenderer();
+        if (this.renderer === undefined && this.hasWaiting()) {
+          // (If it fails for a reason that is not the lack of WebGL 2, the map cannot be drawn all the same, and the message says so.)
+          void this.attachRenderer().catch(() => {
+            this.cannotDraw = true;
+          });
         }
       },
       firstColumn: (datasetId) => {
