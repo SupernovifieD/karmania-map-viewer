@@ -14,12 +14,16 @@ const LOOK: LayerLook = {
   lineWidth: 2,
 };
 
-/** `count` triangles on a strip of `count + 2` vertices. */
+/** `count` triangles on a strip of `count + 2` vertices, which are all of the one polygon. */
 const fill = (
   count: number,
-): Pick<Extract<RenderBuffers, { kind: 'polygons' }>, 'positions' | 'triangles'> => ({
+): Pick<
+  Extract<RenderBuffers, { kind: 'polygons' }>,
+  'positions' | 'triangles' | 'trianglePolygon'
+> => ({
   positions: Float32Array.from({ length: (count + 2) * 3 }, (_, i) => i),
   triangles: Uint32Array.from({ length: count * 3 }, (_, i) => Math.floor(i / 3) + (i % 3)),
+  trianglePolygon: new Uint32Array(count),
 });
 
 const parts = (layer: ReturnType<typeof createFillLayer>): Mesh[] =>
@@ -106,5 +110,95 @@ describe('createFillLayer', () => {
     layer.dispose();
     expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
     expect(parts(layer)).toHaveLength(0);
+  });
+
+  describe('coloured by classes', () => {
+    /** Four triangles of two polygons (the first two of polygon 0, the others of polygon 1), on a strip of 6 vertices. */
+    const two = () => ({
+      ...fill(4),
+      trianglePolygon: Uint32Array.of(0, 0, 1, 1),
+    });
+    const classMeshes = (layer: ReturnType<typeof createFillLayer>): Mesh[] =>
+      (layer.object.children as Mesh[]).filter(
+        (mesh) => mesh.material !== parts(layer)[0]?.material,
+      );
+    const colours = ['#ff0000', '#00ff00'];
+
+    it('draws the triangles of each polygon in the colour of its class, and not the layer in its one colour', () => {
+      const layer = createFillLayer(two(), LOOK);
+      const own = parts(layer)[0]?.material as ShaderMaterial;
+      layer.setClasses?.({ indices: Uint8Array.of(1, 0), colours });
+      expect(own.visible).toBe(false);
+      const meshes = (layer.object.children as Mesh[]).filter((mesh) => mesh.material !== own);
+      // Class 0 is polygon 1 (triangles 2 and 3) and class 1 is polygon 0 (triangles 0 and 1).
+      expect(meshes.map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [2, 3, 4, 3, 4, 5],
+        [0, 1, 2, 1, 2, 3],
+      ]);
+      expect(
+        meshes.map(
+          (mesh) => (mesh.material as ShaderMaterial).uniforms['uColour']?.value as unknown,
+        ),
+      ).toMatchObject([
+        // (Class 0 is red and class 1 green: the mesh of polygon 1 is red and that of polygon 0 is green.)
+        { x: 1, y: 0, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ]);
+    });
+
+    it('draws no triangle of a polygon with no value', () => {
+      const layer = createFillLayer(two(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(255, 0), colours });
+      expect(classMeshes(layer).map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [2, 3, 4, 3, 4, 5],
+      ]);
+    });
+
+    it('draws them in the opacity of the layer, whichever it is, and shows or hides them with the layer', () => {
+      const layer = createFillLayer(two(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours });
+      layer.setLook({ ...LOOK, opacity: 0.25 });
+      for (const mesh of classMeshes(layer)) {
+        expect((mesh.material as ShaderMaterial).uniforms['uOpacity']?.value).toBe(0.25);
+      }
+      layer.setLook({ ...LOOK, visible: false });
+      expect(layer.object.visible).toBe(false);
+    });
+
+    it('is its one colour again when the classes are taken away, or are not for every polygon', () => {
+      const layer = createFillLayer(two(), LOOK);
+      const own = parts(layer)[0]?.material as ShaderMaterial;
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours });
+      expect(own.visible).toBe(false);
+      layer.setClasses?.(undefined);
+      expect(own.visible).toBe(true);
+      expect(classMeshes(layer)).toHaveLength(0);
+      layer.setClasses?.({ indices: Uint8Array.of(0), colours });
+      expect(own.visible).toBe(true);
+      expect(classMeshes(layer)).toHaveLength(0);
+    });
+
+    it('shares the positions of its parts with the meshes of the classes, and keeps the meshes for the same classes with other colours', () => {
+      const layer = createFillLayer(two(), LOOK);
+      const indices = Uint8Array.of(0, 1);
+      layer.setClasses?.({ indices, colours });
+      const before = classMeshes(layer);
+      expect(before[0]?.geometry.getAttribute('position')).toBe(
+        parts(layer)[0]?.geometry.getAttribute('position'),
+      );
+      layer.setClasses?.({ indices, colours: ['#0000ff', '#ffffff'] });
+      expect(classMeshes(layer)).toEqual(before);
+    });
+
+    it('frees the meshes of the classes when it is disposed', () => {
+      const layer = createFillLayer(two(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours });
+      const freed: string[] = [];
+      for (const [i, mesh] of classMeshes(layer).entries()) {
+        mesh.geometry.addEventListener('dispose', () => freed.push(`class ${String(i)}`));
+      }
+      layer.dispose();
+      expect(freed.sort()).toEqual(['class 0', 'class 1']);
+    });
   });
 });

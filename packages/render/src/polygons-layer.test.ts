@@ -114,4 +114,75 @@ describe('createPolygonsLayer', () => {
     expect(freed.sort()).toEqual(['fill', 'outline']);
     expect(layer.object.children).toHaveLength(0);
   });
+
+  describe('coloured by classes', () => {
+    /** Two squares, each of two triangles and an outline of four segments, as the engine makes them. */
+    const squares = (): Extract<RenderBuffers, { kind: 'polygons' }> => ({
+      kind: 'polygons',
+      positions: Float32Array.of(
+        0,
+        0,
+        0,
+        10,
+        0,
+        0,
+        10,
+        10,
+        0,
+        0,
+        10,
+        0,
+        20,
+        0,
+        0,
+        30,
+        0,
+        0,
+        30,
+        10,
+        0,
+        20,
+        10,
+        0,
+      ),
+      triangles: Uint32Array.of(0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7),
+      trianglePolygon: Uint32Array.of(0, 0, 1, 1),
+      outline: Uint32Array.of(0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4),
+      outlinePolygon: Uint32Array.of(0, 0, 0, 0, 1, 1, 1, 1),
+    });
+    const colouring = { indices: Uint8Array.of(1, 0), colours: ['#ff0000', '#00ff00'] };
+
+    it('colours the fill and the outline of a polygon by its class', () => {
+      const layer = createPolygonsLayer(squares(), LOOK);
+      layer.setClasses?.(colouring);
+      const { fill, outline } = groups(layer);
+      // The fill has its own part (not drawn, with no classes) and a mesh for each class.
+      expect(fill.length).toBeGreaterThanOrEqual(3);
+      const outlineClasses = outline.map((mesh) => [
+        ...(mesh.geometry as InstancedBufferGeometry).getAttribute('aClass').array,
+      ]);
+      expect(outlineClasses).toEqual([[1, 1, 1, 1, 0, 0, 0, 0]]);
+      expect(uniformsOf(outline[0])['uClassed']?.value).toBe(1);
+    });
+
+    it('is the one colour again when the classes are taken away', () => {
+      const layer = createPolygonsLayer(squares(), LOOK);
+      layer.setClasses?.(colouring);
+      layer.setClasses?.(undefined);
+      const { fill, outline } = groups(layer);
+      expect(fill).toHaveLength(1);
+      expect((fill[0]?.material as ShaderMaterial).visible).toBe(true);
+      expect(uniformsOf(outline[0])['uClassed']?.value).toBe(0);
+    });
+
+    it('does not draw the outline of a polygon with no value either', () => {
+      const layer = createPolygonsLayer(squares(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(255, 0), colours: colouring.colours });
+      const { outline } = groups(layer);
+      const classes = [
+        ...(outline[0]?.geometry as InstancedBufferGeometry).getAttribute('aClass').array,
+      ];
+      expect(classes).toEqual([255, 255, 255, 255, 0, 0, 0, 0]);
+    });
+  });
 });

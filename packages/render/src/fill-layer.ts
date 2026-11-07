@@ -6,8 +6,10 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
+import { createClassedTriangles } from './class-triangles.js';
 import type { LayerObject } from './layer-set.js';
 import { colourOf } from './look.js';
+import type { ClassColouring } from './look.js';
 import { createTriangleParts } from './triangle-parts.js';
 
 const VERTEX = /* glsl */ `
@@ -25,15 +27,17 @@ void main() {
 }
 `;
 
-type FillBuffers = Pick<Extract<RenderBuffers, { kind: 'polygons' }>, 'positions' | 'triangles'>;
+type FillBuffers = Pick<
+  Extract<RenderBuffers, { kind: 'polygons' }>,
+  'positions' | 'triangles' | 'trianglePolygon'
+>;
 
-/** The fill of the triangles of `buffers`, looking as `look` says. */
-export function createFillLayer(
-  buffers: FillBuffers,
-  look: Parameters<LayerObject['setLook']>[0],
-): LayerObject {
-  const uniforms = { uColour: { value: new Vector3() }, uOpacity: { value: 1 } };
-  const material = new ShaderMaterial({
+/** A material that draws triangles in `uniforms.uColour` at `uniforms.uOpacity`, writing no depth. */
+function fillMaterial(uniforms: {
+  uColour: { value: Vector3 };
+  uOpacity: { value: number };
+}): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms,
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -45,7 +49,30 @@ export function createFillLayer(
     // A triangle is seen from above whichever way the engine wound it.
     side: DoubleSide,
   });
+}
+
+/** The fill of the triangles of `buffers`, looking as `look` says. */
+export function createFillLayer(
+  buffers: FillBuffers,
+  look: Parameters<LayerObject['setLook']>[0],
+): LayerObject {
+  const uniforms = { uColour: { value: new Vector3() }, uOpacity: { value: 1 } };
+  const material = fillMaterial(uniforms);
   const triangles = createTriangleParts(buffers, material);
+  // By class, a triangle is drawn in the colour of its polygon's class: a mesh for each class, which share the opacity of the layer.
+  const classed = createClassedTriangles({
+    positions: triangles.positions,
+    triangles: buffers.triangles,
+    owners: buffers.trianglePolygon,
+    parent: triangles.group,
+    make: () => {
+      const colour = new Vector3();
+      return {
+        material: fillMaterial({ uColour: { value: colour }, uOpacity: uniforms.uOpacity }),
+        colour,
+      };
+    },
+  });
 
   const layer: LayerObject = {
     object: triangles.group,
@@ -59,7 +86,12 @@ export function createFillLayer(
     prepareFrame() {
       // (nothing: it has no size in pixels and no outline of its own)
     },
+    setClasses(next: ClassColouring | undefined) {
+      // The triangles by class are drawn in place of the layer's own, which are not drawn while they are (and are, when they are not).
+      material.visible = !classed.set(next);
+    },
     dispose() {
+      classed.dispose();
       triangles.dispose();
       material.dispose();
     },

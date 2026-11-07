@@ -1,10 +1,10 @@
 /**
  * One layer made of several: a fill and its outline, say. It is one object in the scene, steps all its parts, looks as each part is
- * told, and frees them all.
+ * told, gives the classes it is given to the parts that take them, and frees them all.
  */
 import { Group } from 'three';
 import type { LayerObject } from './layer-set.js';
-import type { FrameInfo, LayerLook } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
 /** How a layer of several parts is made: the parts, in the order they are drawn, and the look that each of them is given. */
 export interface Combination {
@@ -22,6 +22,7 @@ export function combineLayers(combination: Combination): LayerObject {
     group.add(part.object);
   }
   const building = parts.filter((part) => part.step !== undefined);
+  const colourable = parts.filter((part) => part.setClasses !== undefined);
   const layer: LayerObject = {
     object: group,
     setLook(look) {
@@ -40,6 +41,16 @@ export function combineLayers(combination: Combination): LayerObject {
         part.dispose();
       }
     },
+    // The classes go to the parts that take them (a layer of parts that none takes is not coloured by classes).
+    ...(colourable.length === 0
+      ? {}
+      : {
+          setClasses(classes: ClassColouring | undefined) {
+            for (const part of colourable) {
+              part.setClasses?.(classes);
+            }
+          },
+        }),
   };
   if (building.length === 0) {
     return layer;

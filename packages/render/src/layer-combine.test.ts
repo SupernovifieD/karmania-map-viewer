@@ -91,4 +91,35 @@ describe('combineLayers', () => {
     expect(c.told.filter((line) => line === 'c step')).toHaveLength(1);
     expect(b.told).toEqual([]);
   });
+
+  it('gives the classes to the parts that take them, and has no `setClasses` when none does', () => {
+    const [a, b, c] = [part('a'), part('b'), part('c')];
+    const taken: string[] = [];
+    const colouring = { indices: Uint8Array.of(0), colours: ['#ff0000'] };
+    a.layer.setClasses = (classes) => {
+      taken.push(`a ${String(classes === colouring)}`);
+    };
+    c.layer.setClasses = (classes) => {
+      taken.push(`c ${String(classes === undefined)}`);
+    };
+    const combined = combineLayers({
+      parts: [a.layer, b.layer, c.layer],
+      lookOf: (_, look) => look,
+    });
+    combined.setClasses?.(colouring);
+    combined.setClasses?.(undefined);
+    expect(taken).toEqual(['a true', 'c false', 'a false', 'c true']);
+    const [d, e] = [part('d'), part('e')];
+    expect(
+      'setClasses' in combineLayers({ parts: [d.layer, e.layer], lookOf: (_, look) => look }),
+    ).toBe(false);
+  });
+
+  it('keeps taking classes when it is also being built a part at a time', () => {
+    const a = part('a', 2);
+    a.layer.setClasses = () => undefined;
+    const combined = combineLayers({ parts: [a.layer], lookOf: (_, look) => look });
+    expect('step' in combined).toBe(true);
+    expect('setClasses' in combined).toBe(true);
+  });
 });
