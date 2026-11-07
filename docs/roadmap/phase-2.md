@@ -419,10 +419,10 @@ or releasing, and whenever the brief says to stop.
 - [x] 16.8 Lines layer.
 - [x] 16.9 Polygons layer.
   - [x] 16.9a A mend: three tests of 16.6d (the layers' state, and the camera's depth) described a map with nothing drawn, which 16.7 to 16.9 made false.
-- [ ] 16.10 Mesh layer (derivative flat shading, light from above).
+- [x] 16.10 Mesh layer (derivative flat shading, light from above).
   Split (the triangles in parts are shared with the fill, so that comes first, as a change with no new behaviour):
   - [x] 16.10a The triangles of a layer in parts, shared by the fill and the mesh.
-  - [ ] 16.10b The mesh layer.
+  - [x] 16.10b The mesh layer.
 - [ ] 16.11 Grid image layer (NEAREST, transparent no-value, rotation, tiles,
   warp).
 - [ ] 16.12 Block layer (instanced, top faces in 2D).
