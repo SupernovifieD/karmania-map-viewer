@@ -15,6 +15,7 @@ export interface Stats {
   readonly geometries: number;
   readonly textures: number;
   readonly layers: number;
+  readonly layersDrawn: number;
   readonly maxTextureSize: number;
   readonly background: string;
   readonly frame: {

@@ -462,6 +462,8 @@ or releasing, and whenever the brief says to stop.
 - [ ] 16.G Gate (with `pnpm perf` for 2D).
   - [x] 16.G1 The 2D render performance measured (the real GPU of the machine, section 9.6).
   - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
+  - [x] 16.F2 The shader programs of a layer are compiled off the main thread before it is first drawn.
+  - [x] 16.F3 The renderer is made in a task of its own, not in the one that handles the click that loaded the data.
 
 ## M17: Map furniture and overlays
 
