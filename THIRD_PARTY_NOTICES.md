@@ -71,11 +71,49 @@ earcut crate is not called until step 13.8): steps 23.5, 23.6 and 24.5 put this 
 
 ## Colour ramps
 
-The colour ramps of `@karmania/scene` (`packages/scene/src/ramp-data.ts`) are data copied from two sources:
+The colour ramps of `@karmania/scene` (`packages/scene/src/ramp-data.ts`) are data copied from three sources:
 
 - **viridis and magma**, from matplotlib 3.10.0, which has the numbers of the original `colormaps.py` of
   github.com/BIDS/colormap by Nathaniel J. Smith, Stefan van der Walt and Eric Firing. They are released under the
   CC0 license / public domain dedication, and ask for credit, which is given here.
+- **cividis**, from matplotlib 3.10.0, which has the colormap of github.com/pnnl/cmaputil, Copyright (c) 2017, Battelle
+  Memorial Institute (described in "Optimizing colormaps with consideration for color vision deficiency to enable
+  accurate interpretation of scientific data", doi:10.1371/journal.pone.0199239). It is not CC0: it is under the licence
+  of that repository, which is a text of its own and is reproduced whole here, as it asks. The name of Battelle is used
+  here to say where the colormap comes from and for nothing else.
+
+    Copyright (c) 2017, Battelle Memorial Institute
+
+    1.  Battelle Memorial Institute (hereinafter Battelle) hereby grants
+    permission to any person or entity lawfully obtaining a copy of this software
+    and associated documentation files (hereinafter “the Software”) to
+    redistribute and use the Software in source and binary forms, with or without
+    modification. Such person or entity may use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and may permit
+    others to do so, subject to the following conditions:
+
+    + Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimers.
+
+    + Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+    + Other than as used herein, neither the name Battelle Memorial Institute or
+    Battelle may be used in any form whatsoever without the express written
+    consent of Battelle.
+
+    2.  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+    THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+    ARE DISCLAIMED. IN NO EVENT SHALL BATTELLE OR CONTRIBUTORS BE LIABLE FOR ANY
+    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+    ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 - **ColorBrewer** colour schemes: this product includes color specifications and designs developed by Cynthia
   Brewer (<http://colorbrewer.org/>), under the Apache License, Version 2.0
   (<http://www.apache.org/licenses/LICENSE-2.0>), as packaged at github.com/axismaps/colorbrewer.
