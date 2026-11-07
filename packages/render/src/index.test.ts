@@ -8,6 +8,7 @@ describe('@karmania/render', () => {
       'KEY_PAN_PIXELS',
       'KEY_ROTATE_DEGREES',
       'KEY_ZOOM_FACTOR',
+      'LayerSet',
       'angleAbout',
       'attachController2d',
       'bufferSize',

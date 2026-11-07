@@ -3,12 +3,16 @@
  * the canvas and the device pixel ratio, and a frame that is drawn only when something asks for one. three.js stays in
  * this package; what the viewer sees is the small interface below.
  */
+import type { RenderBuffers } from '@karmania/engine/display';
 import type { Camera2d } from '@karmania/scene';
 import { Color, OrthographicCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
 import { bufferSize } from './buffer-size.js';
 import { orthographicFrame } from './camera-2d.js';
 import type { OrthographicFrame } from './camera-2d.js';
 import { parseCssColour } from './css-colour.js';
+import { makeLayer } from './layer-kinds.js';
+import { LayerSet } from './layer-set.js';
+import type { LayerOutcome } from './layer-set.js';
 
 /** What the renderer says of itself, for tests and diagnostics. */
 export interface RenderStats {
@@ -27,6 +31,9 @@ export interface RenderStats {
   /** How many geometries and textures are on the card, as three counts them. */
   readonly geometries: number;
   readonly textures: number;
+  /** How many layers are on the card, and the largest texture the card takes, in cells on a side (what `prepare` cuts a grid to). */
+  readonly layers: number;
+  readonly maxTextureSize: number;
   /** What the map is cleared to: `#rrggbb`, or `transparent` where the canvas has no opaque background. */
   readonly background: string;
   /** The box the orthographic camera of three shows now, where it is and how it is turned. */
@@ -51,6 +58,13 @@ export interface Renderer {
    * A frame is asked for if either changed.
    */
   setCamera2d(camera: Camera2d, origin: readonly [number, number, number]): void;
+  /**
+   * Puts the layer of some buffers on the card, in place of the one of the same id; a big layer is built a part at a time over the
+   * next frames. `unsupported` if buffers of that kind are not drawn: there is no layer then, and the old one is gone.
+   */
+  setLayer(id: string, buffers: RenderBuffers): LayerOutcome;
+  /** Takes a layer off the card and frees what it held. `false` if there was none. */
+  removeLayer(id: string): boolean;
   /**
    * Draws a frame now and reads back a rectangle of the drawing buffer: `x` and `y` from the bottom left, in device pixels,
    * four bytes (red, green, blue, alpha) for each, rows from the bottom as the card has them. For tests and pictures.
@@ -110,6 +124,7 @@ export function createRenderer(
   let origin: readonly [number, number, number] = [0, 0, 0];
   const depth = { min: 0, max: 0 };
 
+  const layers = new LayerSet(scene, makeLayer);
   let disposed = false;
   let lost = false;
   let frames = 0;
@@ -161,8 +176,13 @@ export function createRenderer(
       return;
     }
     readBackground();
+    // The next part of what is still being built goes on the card before the frame, and another frame is asked for if there is more.
+    const more = layers.step();
     gl.render(scene, camera);
     frames += 1;
+    if (more) {
+      invalidate();
+    }
   }
 
   function invalidate(): void {
@@ -250,6 +270,16 @@ export function createRenderer(
       placeCamera();
       invalidate();
     },
+    setLayer(id, buffers) {
+      const outcome = layers.set(id, buffers);
+      invalidate();
+      return outcome;
+    },
+    removeLayer(id) {
+      const removed = layers.remove(id);
+      invalidate();
+      return removed;
+    },
     readPixels(x, y, width, height) {
       const whole = [x, y, width, height].every(Number.isInteger);
       if (
@@ -286,6 +316,8 @@ export function createRenderer(
         contextLost: lost,
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
+        layers: layers.size,
+        maxTextureSize: gl.capabilities.maxTextureSize,
         background,
         // What the camera of three has, which is what draws, and not what was worked out for it.
         frame: {
@@ -315,6 +347,7 @@ export function createRenderer(
         view.cancelAnimationFrame(frame);
         frame = undefined;
       }
+      layers.clear();
       gl.dispose();
       // A context that is away already has nothing to give up.
       if (!lost) {
