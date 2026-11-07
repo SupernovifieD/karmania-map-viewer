@@ -118,25 +118,55 @@ function cut(indices: Uint8Array, columns: number, tile: Tile): Uint8Array {
   return out;
 }
 
-/** The layer of the grid of `buffers`, looking as `look` says, or `undefined` for a grid that is warped (not drawn yet). */
-export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObject | undefined {
-  if (buffers.placement === undefined) {
-    return undefined;
-  }
-  const placed: Extract<GridBuffers, { placement: object }> = buffers;
+/** A quad for each tile, placed where the placement says, with the texture of the tile across it. */
+function placedGeometries(
+  buffers: Extract<GridBuffers, { placement: object }>,
+): { tile: Tile; geometry: BufferGeometry }[] {
+  return buffers.tiles.map((tile) => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(corners(buffers, tile), 3));
+    geometry.setAttribute('uv', new BufferAttribute(Float32Array.of(0, 0, 1, 0, 1, 1, 0, 1), 2));
+    geometry.setIndex(new BufferAttribute(Uint32Array.of(0, 1, 2, 0, 2, 3), 1));
+    return { tile, geometry };
+  });
+}
+
+/**
+ * The mesh of each tile of a grid in another coordinate system: the positions and the `uv`s are one attribute each that every tile uses (the
+ * vertex numbers run on from tile to tile), and the triangles of a tile are the next `tileTriangles[t]` of the list, a view of it. The
+ * triangles that would have used a vertex that could not be placed are not in it, so no position that is NaN is ever drawn.
+ */
+function warpedGeometries(
+  buffers: Extract<GridBuffers, { warp: object }>,
+): { tile: Tile; geometry: BufferGeometry }[] {
+  const { warp } = buffers;
+  const positions = new BufferAttribute(warp.positions, 3);
+  const uvs = new BufferAttribute(warp.uvs, 2);
+  let first = 0;
+  return buffers.tiles.map((tile, t) => {
+    const end = first + (warp.tileTriangles[t] ?? 0) * 3;
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', positions);
+    geometry.setAttribute('uv', uvs);
+    geometry.setIndex(new BufferAttribute(warp.triangles.subarray(first, end), 1));
+    first = end;
+    return { tile, geometry };
+  });
+}
+
+/** The layer of the grid of `buffers`, looking as `look` says. */
+export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObject {
   const group = new Group();
   const palette = Array.from({ length: MAX_CLASSES }, () => new Vector3());
-  const tiles = placed.tiles.map((tile) => {
+  const laidOut =
+    buffers.placement === undefined ? warpedGeometries(buffers) : placedGeometries(buffers);
+  const tiles = laidOut.map(({ tile, geometry }) => {
     const uniforms = {
       uCells: { value: null as DataTexture | null },
       uPalette: { value: palette },
       uCount: { value: 0 },
       uOpacity: { value: 1 },
     };
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(corners(placed, tile), 3));
-    geometry.setAttribute('uv', new BufferAttribute(Float32Array.of(0, 0, 1, 0, 1, 1, 0, 1), 2));
-    geometry.setIndex(new BufferAttribute(Uint32Array.of(0, 1, 2, 0, 2, 3), 1));
     const material = new ShaderMaterial({
       uniforms,
       vertexShader: VERTEX,
@@ -161,7 +191,7 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
       texture: undefined as DataTexture | undefined,
     };
   });
-  const [columns, rows] = placed.size;
+  const [columns, rows] = buffers.size;
   let shown = look.visible;
   let coloured = false;
 

@@ -429,7 +429,7 @@ or releasing, and whenever the brief says to stop.
   first, and the pipeline that brings them, with the end-to-end tests of the grid, comes last):
   - [x] 16.11a The classes of a layer's elements: the type, and the way to a layer that takes them.
   - [x] 16.11b The grid image: a texture of classes for each tile, NEAREST, cells with no value not drawn, placed and rotated.
-  - [ ] 16.11c The warped grid: the mesh of each tile with its texture.
+  - [x] 16.11c The warped grid: the mesh of each tile with its texture.
   - [ ] 16.11d The pipeline brings the classes of a layer coloured by classes (classify, class index, colours) to the renderer;
     end-to-end tests of the grid. (Restyling by recomputing only the classes, and the other kinds, are 16.13.)
 - [ ] 16.12 Block layer (instanced, top faces in 2D).
