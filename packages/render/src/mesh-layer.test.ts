@@ -42,7 +42,7 @@ describe('createMeshLayer', () => {
     expect(Object.keys(geometry?.attributes ?? {})).toEqual(['position']);
   });
 
-  it('works out the normal in the fragment shader, from the change of the position from one pixel to the next', () => {
+  it('reads the change of the position from one pixel to the next in the fragment shader, which the normal is worked out from (the shading is tested in the browser)', () => {
     const { fragmentShader } = material(createMeshLayer(square(), LOOK));
     expect(fragmentShader).toContain('dFdx(vView)');
     expect(fragmentShader).toContain('dFdy(vView)');
