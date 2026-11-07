@@ -437,7 +437,9 @@ test.describe('importing', () => {
     // The kernel's own rule, which the wizard keeps a person from reaching: with no coordinate
     // system an import is stopped, and the finding says that the coordinate system step can fix it.
     const refused = await page.evaluate(async () => {
-      const app = document.querySelector('karmania-app') as unknown as {
+      const app = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
         engine: {
           importFiles: (
             files: File[],
@@ -508,7 +510,9 @@ test.describe('importing', () => {
       const file = new File(parts, 'large.csv', { type: 'text/csv' });
       const prj = new File(['PROJCS["x",AUTHORITY["EPSG","32640"]]'], 'large.prj');
       (
-        document.querySelector('karmania-app') as unknown as {
+        document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
           importFiles: (files: File[]) => void;
         }
       ).importFiles([file, prj]);

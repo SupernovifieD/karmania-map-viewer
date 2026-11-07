@@ -94,7 +94,9 @@ test.describe('the shell', () => {
     const borders = await page.evaluate(() => {
       const app = document.querySelector('karmania-app');
       const toolbar = app?.shadowRoot?.querySelector('header');
-      const panel = app?.shadowRoot?.querySelector('karmania-panel');
+      const panel = app?.shadowRoot
+        ?.querySelector('karmania-viewer')
+        ?.shadowRoot?.querySelector('karmania-panel');
       const style = (element: Element | null | undefined) =>
         element === null || element === undefined ? undefined : getComputedStyle(element);
       return {

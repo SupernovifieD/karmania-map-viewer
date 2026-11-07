@@ -1,0 +1,26 @@
+{
+  "name": "@karmania/viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Karmania viewer: the map area, the panel and the import wizard, composed into one viewer that a page can embed",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@karmania/engine": "workspace:*",
+    "@karmania/scene": "workspace:*",
+    "@karmania/ui": "workspace:*",
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

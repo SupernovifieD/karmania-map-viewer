@@ -1,9 +1,8 @@
 /**
- * Numbers as the legend writes them (section 11.7 of the brief): thousands separated by commas, the fewest decimals at
- * which each bound reads as itself (to less than a tenth of the narrowest class: `formatBounds` says why that departs
- * from the brief's "keep neighbouring bounds distinct"), never more than 6 significant digits, and a true minus sign. The
- * bounds are finite, as the engine's own checks make them. Plain arithmetic
- * on text: the same text on every machine, in every locale (nothing here asks the platform how to write a number).
+ * Numbers as the legend writes them (section 11.7 of the brief): thousands separated by commas, a bound as it is and
+ * not rounded (`formatBounds` says why that departs from the brief), and a true minus sign. The bounds are finite, as
+ * the engine's own checks make them. Plain arithmetic on text: the same text on every machine, in every locale
+ * (nothing here asks the platform how to write a number).
  */
 
 /** The sign of a negative number, `−` (U+2212), which is not the hyphen and not the dash between two bounds. */
@@ -45,41 +44,38 @@ export function formatCount(count: number): string {
   return formatNumber(count, 0);
 }
 
-/** How many decimals a number can have before it has more than 6 significant digits (none for 100,000 or more). */
-function decimalsFor(value: number): number {
-  if (value === 0 || !Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, SIGNIFICANT_DIGITS - 1 - Math.floor(Math.log10(Math.abs(value))));
-}
+/** How many significant digits a bound keeps when it is written as it is: all that a double has, less the one or two of its noise. */
+const AS_IS_DIGITS = 15;
 
-/** How far `bound` is from what it reads as with `decimals` decimals. */
-function roundingError(bound: number, decimals: number): number {
-  return Number.isFinite(bound) && Math.abs(bound) < 1e21
-    ? Math.abs(Number(bound.toFixed(decimals)) - bound)
-    : 0;
+/**
+ * A bound written as it is, and not rounded: its own digits, thousands separated by commas, a true minus sign. The
+ * digits are those of the shortest text that gives the number back, **trimmed at 15 significant digits**: a number
+ * of 15 digits or fewer, which is what a file writes, is as it was, and one of more is rounded to 15 (`9007199254740992`
+ * reads `9,007,199,254,740,990`), which takes off the noise of arithmetic (the bounds of equal classes are sums
+ * and products, and `0.1 + 0.2` would otherwise read `0.30000000000000004`), as the table of the Data tab does. A
+ * number that the platform writes with an exponent (below 1e-6, from 1e21) keeps it, written as the platform does
+ * (`1e-7`, with `−` in front if it is negative), and one that 15 digits would carry past the largest number (the
+ * largest itself) is written with all its digits. One that is not finite is written as it is.
+ */
+function formatAsIs(bound: number): string {
+  if (!Number.isFinite(bound)) {
+    return String(bound);
+  }
+  const trimmed = Number(Math.abs(bound).toPrecision(AS_IS_DIGITS));
+  const text = String(Number.isFinite(trimmed) ? trimmed : Math.abs(bound));
+  const [whole = '0', fraction] = text.split('.');
+  const body = grouped(whole) + (fraction === undefined ? '' : `.${fraction}`);
+  return bound < 0 ? `${MINUS}${body}` : body;
 }
 
 /**
- * The labels of a list of bounds (ascending), all with the same number of decimals. **The fewest decimals** that
- * **leave each bound reading as itself, to less than a tenth of the narrowest class** (which also keeps each bound
- * apart from the next that is different, as the brief asks, and leaves equal neighbours with the same label): without that,
- * the bounds 0, 2.5 and 5 would read 0, 3 and 5, which are apart but are not the bounds, and a value of 2.7 would be
- * in a class that reads "3 – 5". Never more than the 6 significant digits of the bound that can have most; if two
- * bounds that differ are closer than that, they have the same label. With no class to measure by (one bound, or all
- * equal) a bound reads as itself to a millionth of the largest.
+ * The labels of a list of bounds: **each bound as it is, whatever the others are** (the owner's choice, step 14.10a
+ * after the milestone: the brief's "the fewest decimals that keep neighbouring bounds distinct" rounds a bound, and
+ * a rounded or a plain reading is to be a choice of the person later; the rounding rule, with its tenth of the
+ * narrowest class, is in the history of this file, in the commit `5676067`). So the bounds 0, 2.5 and 5 read `0`,
+ * `2.5` and `5`. Two bounds that differ within their first 15 digits read differently; two that differ only beyond them
+ * (`1` and `1.0000000000000002`) read alike.
  */
 export function formatBounds(bounds: readonly number[]): string[] {
-  const most = Math.min(MOST_DECIMALS, Math.max(0, ...bounds.map(decimalsFor)));
-  const widths = bounds.flatMap((bound, i) => {
-    const next = bounds[i + 1];
-    return next !== undefined && next > bound ? [next - bound] : [];
-  });
-  const tolerance =
-    widths.length > 0 ? Math.min(...widths) / 10 : Math.max(0, ...bounds.map(Math.abs)) * 1e-6;
-  let decimals = 0;
-  while (decimals < most && !bounds.every((bound) => roundingError(bound, decimals) < tolerance)) {
-    decimals += 1;
-  }
-  return bounds.map((bound) => formatNumber(bound, decimals));
+  return bounds.map(formatAsIs);
 }

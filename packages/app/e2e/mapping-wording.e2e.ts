@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { EMPTY_BLOCK_SIZE, mappingProblems } from '../src/import-mapping.js';
-import type { ColumnDraft } from '../src/import-mapping.js';
+import { EMPTY_BLOCK_SIZE, mappingProblems } from '@karmania/viewer/import-mapping';
+import type { ColumnDraft } from '@karmania/viewer/import-mapping';
 
 /** The documented wording of the kernel's findings, from docs/validation-codes.md. */
 const docs = readFileSync(

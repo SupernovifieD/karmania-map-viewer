@@ -60,7 +60,7 @@ export async function setDatasets(
   page: Page,
   list: readonly Record<string, unknown>[],
 ): Promise<void> {
-  await page.locator('karmania-app').evaluate(
+  await page.locator('karmania-viewer').evaluate(
     async (element, [datasets, coordinate, column]) => {
       const target = element as unknown as {
         datasets: readonly unknown[];

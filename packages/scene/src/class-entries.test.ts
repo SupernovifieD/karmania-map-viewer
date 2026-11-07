@@ -96,9 +96,11 @@ describe('the lines under a layer, by ranges', () => {
     ]);
   });
 
-  it('write the bounds with the decimals they need, the same for all, and the minus sign', () => {
+  it('write each bound as it is, with the minus sign, and not rounded to what keeps the bounds apart', () => {
     const labels = classEntries(style, ranges([-2.5, 0, 2.5, 5], [1, 1, 1])).map((e) => e.label);
-    expect(labels).toEqual([`${MINUS}2.5 – 0.0`, '0.0 – 2.5', '2.5 – 5.0']);
+    expect(labels).toEqual([`${MINUS}2.5 – 0`, '0 – 2.5', '2.5 – 5']);
+    const close = classEntries(style, ranges([0.1234567, 0.1234568, 0.1234569], [1, 1]));
+    expect(close.map((e) => e.label)).toEqual(['0.1234567 – 0.1234568', '0.1234568 – 0.1234569']);
   });
 
   it('read a class of one value, the largest being a class of its own, as that value and not as a range of it', () => {
