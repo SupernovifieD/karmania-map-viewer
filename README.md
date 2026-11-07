@@ -71,6 +71,7 @@ files ──► @karmania/app        the page: a toolbar and the viewer
           @karmania/viewer     the map area, the panel, the import wizard and the Data tab (Lit web components)
               │  uses            @karmania/ui has the components: tabs, dialog, table, ...
               │                  @karmania/scene has the scene of a map: layers, legend, cameras
+              │                  @karmania/render draws it on a canvas (three.js, WebGL 2)
               ▼
           @karmania/engine     a TypeScript API that runs the Rust code in a Web Worker
               │  messages
@@ -91,6 +92,7 @@ files ──► @karmania/app        the page: a toolbar and the viewer
 - **`@karmania/engine`** starts a worker, sends it files and asks, and hands back datasets, summaries and pages of rows. A file never blocks the page, and a table asks only for the rows in view.
 - **`@karmania/ui`** is the set of components and the design tokens (colours, sizes, light and dark themes). The app is built from them.
 - **`@karmania/scene`** is the scene of a map and what is worked out from it: the layers and their styles, the legend, the cameras, the colour ramps, the north arrow and the scale bar, and the layout of an exported picture. It has no DOM and draws nothing.
+- **`@karmania/render`** draws the layers of a scene on a canvas with three.js and WebGL 2, in 2D for now: points, lines, polygons, meshes, grids and blocks, coloured by one colour or by classes, from the buffers that the engine makes. It has no interface of its own.
 - **`@karmania/viewer`** is the viewer a page embeds: the map area, the side panel with the Data tab, and the import wizard, as the element `<karmania-viewer>`.
 - **`@karmania/app`** is the page itself: a toolbar over the viewer, and the gallery of the components.
 

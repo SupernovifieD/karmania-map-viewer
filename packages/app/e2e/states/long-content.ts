@@ -78,9 +78,15 @@ export const SHOTS: Shot[] = [
   {
     name: 'long-map-area',
     show: async (page) => {
+      // The only text the map area has over a map that is there is the chip that counts the layers being prepared.
       await page.locator('karmania-map-area').evaluate(async (element) => {
-        const area = element as unknown as { datasets: number; updateComplete: Promise<boolean> };
+        const area = element as unknown as {
+          datasets: number;
+          preparing: number;
+          updateComplete: Promise<boolean>;
+        };
         area.datasets = 10_000_000;
+        area.preparing = 10_000_000;
         await area.updateComplete;
       });
       return rest(page);

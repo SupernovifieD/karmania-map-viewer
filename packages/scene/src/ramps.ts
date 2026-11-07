@@ -3,7 +3,14 @@
  * its colours come from and under what licence (the data is in `ramp-data.ts`, with the sources written out).
  */
 import { mix, parseHex, toHex, type Rgb } from './colour.js';
-import { BREWER_DIVERGING, BREWER_PAIRED, BREWER_SEQUENTIAL, MAGMA, VIRIDIS } from './ramp-data.js';
+import {
+  BREWER_DIVERGING,
+  BREWER_PAIRED,
+  BREWER_SEQUENTIAL,
+  CIVIDIS,
+  MAGMA,
+  VIRIDIS,
+} from './ramp-data.js';
 import type { RampId } from './types.js';
 
 /**
@@ -40,6 +47,10 @@ const OKABE_ITO = '#e69f00#56b4e9#009e73#d55e00#0072b2#cc79a7#f0e442#000000';
 
 const MATPLOTLIB = 'matplotlib 3.10.0 (original: github.com/BIDS/colormap)';
 const COLORBREWER = 'ColorBrewer, Cynthia Brewer (colorbrewer.org)';
+const CMAPUTIL =
+  'matplotlib 3.10.0 (original: github.com/pnnl/cmaputil, Copyright (c) 2017, Battelle Memorial Institute)';
+/** Battelle's licence for cividis: a permissive text of its own, whole in `THIRD_PARTY_NOTICES.md`; the SPDX identifier of one that has none. */
+const BATTELLE_LICENCE = 'LicenseRef-Battelle-cmaputil';
 
 /** The colours that a string of `#rrggbb` written one after the other is made of. */
 export function colourList(data: string): readonly string[] {
@@ -74,6 +85,7 @@ const brewer = (id: RampId, name: string, kind: RampKind, data: string): Ramp =>
 export const RAMPS: readonly Ramp[] = [
   defineRamp('viridis', 'Viridis', 'sequential', VIRIDIS, MATPLOTLIB, 'CC0-1.0'),
   defineRamp('magma', 'Magma', 'sequential', MAGMA, MATPLOTLIB, 'CC0-1.0'),
+  defineRamp('cividis', 'Cividis', 'sequential', CIVIDIS, CMAPUTIL, BATTELLE_LICENCE),
   brewer('blues', 'Blues', 'sequential', BREWER_SEQUENTIAL.blues),
   brewer('greens', 'Greens', 'sequential', BREWER_SEQUENTIAL.greens),
   brewer('oranges', 'Oranges', 'sequential', BREWER_SEQUENTIAL.oranges),

@@ -25,6 +25,7 @@ describe('the ramps', () => {
       expect([
         'CC0-1.0',
         'Apache-2.0',
+        'LicenseRef-Battelle-cmaputil',
         'none stated (a published list of eight colours)',
       ]).toContain(entry.licence);
       expect(entry.colours.every((c) => /^#[0-9a-f]{6}$/.test(c))).toBe(true);
@@ -44,6 +45,15 @@ describe('the ramps', () => {
         expect.stringContaining('ColorBrewer'),
       ]);
     }
+  });
+
+  it('say that cividis is Battelle`s, under a licence of its own and not CC0, and where its notice is', () => {
+    const cividis = get('cividis');
+    expect(cividis.kind).toBe('sequential');
+    expect(cividis.licence).toBe('LicenseRef-Battelle-cmaputil');
+    expect(cividis.source).toContain('github.com/pnnl/cmaputil');
+    expect(cividis.source).toContain('Battelle Memorial Institute');
+    expect(cividis.colours).toHaveLength(256);
   });
 
   it('are found by id, and an id that is not one gives nothing', () => {

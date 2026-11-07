@@ -395,35 +395,89 @@ or releasing, and whenever the brief says to stop.
 
 ## M16: 2D rendering (@karmania/render)
 
-- [ ] 16.1 Package @karmania/render; add three and @types/three (dependency-only,
-  with the gzipped size added).
-- [ ] 16.2 The map canvas in the map area: fills it, follows resizes and device
+- [x] 16.1 Package @karmania/render; add three and @types/three (dependency-only,
+  with the gzipped size added). Split, since a dependency is added in a commit of its own:
+  - [x] 16.1a The empty package, with a test running.
+  - [x] 16.1b `three` and `@types/three`, with the gzipped size they add.
+- [x] 16.2 The map canvas in the map area: fills it, follows resizes and device
   pixel ratio, renders on demand; layout tests unchanged.
-- [ ] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
+- [x] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
   `--k-surface-map` in both themes, dispose; the idle "no frames" test.
-- [ ] 16.4 Context loss and restore (8).
-- [ ] 16.5 2D controller: pan, zoom to the pointer, rotate, no tilt; scale
+- [x] 16.4 Context loss and restore (8).
+- [x] 16.5 2D controller: pan, zoom to the pointer, rotate, no tilt; scale
   limits; keyboard (10.2). Tests for each gesture and key.
-- [ ] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or
+- [x] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or
   changed layers, cancel stale requests, upload in chunks, dispose on removal;
-  the GPU memory test.
-- [ ] 16.7 Points layer.
-- [ ] 16.8 Lines layer.
-- [ ] 16.9 Polygons layer.
-- [ ] 16.10 Mesh layer (derivative flat shading, light from above).
-- [ ] 16.11 Grid image layer (NEAREST, transparent no-value, rotation, tiles,
+  the GPU memory test (it came with the first kind of layer, 16.7: see 16.6d).
+  Split (the pieces are libraries with unit tests, and then they are wired to the real engine and browser):
+  - [x] 16.6a The layers on the card: a registry that builds, replaces, steps (in chunks) and frees them.
+  - [x] 16.6b The extent of render buffers, in map units.
+  - [x] 16.6c The layer pipeline (frame, prepare, cancel, deliver, fit, limits), with a fake engine and renderer.
+  - [x] 16.6d The pipeline in the viewer, and Home fits; end-to-end tests. (The GPU memory test comes with the first kind
+    of layer, 16.7: with no kind drawn there is nothing on the card to count.)
+- [x] 16.7 Points layer.
+- [x] 16.8 Lines layer.
+- [x] 16.9 Polygons layer.
+  - [x] 16.9a A mend: three tests of 16.6d (the layers' state, and the camera's depth) described a map with nothing drawn, which 16.7 to 16.9 made false.
+- [x] 16.10 Mesh layer (derivative flat shading, light from above).
+  Split (the triangles in parts are shared with the fill, so that comes first, as a change with no new behaviour):
+  - [x] 16.10a The triangles of a layer in parts, shared by the fill and the mesh.
+  - [x] 16.10b The mesh layer.
+- [x] 16.11 Grid image layer (NEAREST, transparent no-value, rotation, tiles,
   warp).
-- [ ] 16.12 Block layer (instanced, top faces in 2D).
-- [ ] 16.13 Class colours: palette uniforms from class indices; restyling
+  Split (the buffers of a grid have no values: its colour is the class of each cell, so the way for classes to reach a layer comes
+  first, and the pipeline that brings them, with the end-to-end tests of the grid, comes last):
+  - [x] 16.11a The classes of a layer's elements: the type, and the way to a layer that takes them.
+  - [x] 16.11b The grid image: a texture of classes for each tile, NEAREST, cells with no value not drawn, placed and rotated.
+  - [x] 16.11c The warped grid: the mesh of each tile with its texture.
+  - [x] 16.11d The pipeline brings the classes of a layer coloured by classes (classify, class index, colours) to the renderer;
+    end-to-end tests of the grid. (Restyling by recomputing only the classes, and the other kinds, are 16.13.)
+- [x] 16.12 Block layer (instanced, top faces in 2D).
+  Split (blocks are turned as grids are, so that moves first; the layer; a mend found by the browser; then the pipeline gives blocks their classes, and the browser tests):
+  - [x] 16.12a The exact sine and cosine of a rotation, shared by the grid and the blocks.
+  - [x] 16.12b The block layer: instanced boxes in parts, the class of each block, the top faces in 2D.
+  - [x] 16.12c A layer of blocks that is less than opaque: a depth pass, so that a top with another under it is blended once.
+  - [x] 16.12d The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
+- [x] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.
-- [ ] 16.14 Draw order with depth cleared between layers; pixel tests.
-- [ ] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
+  Split (the grid and the blocks have theirs from 16.11 and 16.12; what is left is a palette change that keeps what is on the card, the cells that
+  have a value when the style is one colour, and the other four kinds, each with its own way to give an element its colour):
+  - [x] 16.13a The same classes with other colours keep the textures and attributes, and only the palette changes.
+  - [x] 16.13b A grid or a block model in one colour: the cells and blocks that have a value.
+  - [x] 16.13c Points by class.
+  - [x] 16.13d Lines by class.
+  - [x] 16.13e Polygons by class.
+  - [x] 16.13f Meshes by class.
+- [x] 16.14 Draw order with depth cleared between layers; pixel tests.
+- [x] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
   zoomed; no jitter while panning.
-- [ ] 16.16 Render golden images for 2D (10.8), reviewed.
-- [ ] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
+- [x] 16.16 Render golden images for 2D (10.8), reviewed.
+- [x] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
   phase 1 placeholder text removed. Shell screenshots updated, each change
   explained.
-- [ ] 16.G Gate (with `pnpm perf` for 2D).
+  The five data-tab states that the canvas of 16.2 changed (text anti-aliasing, see decisions) are updated here too.
+  Split (the states and their tests; then the pictures that they and the canvas changed):
+  - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
+  - [x] 16.17b The screenshots that changed, each looked at and explained.
+- [x] 16.G Gate (with `pnpm perf` for 2D): green on the final head `7bc85c3` (16.G3).
+  - [x] 16.G1 The 2D render performance measured (the real GPU of the machine, section 9.6).
+  - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
+  - [x] 16.F2 The shader programs of a layer are compiled off the main thread before it is first drawn.
+  - [x] 16.F3 The renderer is made in a task of its own, not in the one that handles the click that loaded the data.
+  - [x] 16.F4 A layer that is not drawn forgets what it was prepared with: its buffers, its extent and the frame (review round).
+  - [x] 16.F5 The pipeline stops a pass when the scene changes, keeps a fit that did not happen for the next look, does not leave a layer `not_drawn` after its classes are no longer refused, and tells nobody of what has not changed (review round).
+  - [x] 16.F6 The renderer keeps the compiled mark of a layer that is replaced by one of its kind, compiles again after a context is given back, and does nothing after it is disposed of (review round).
+  - [x] 16.F7 The map area says that the map cannot be drawn when the browser has no WebGL 2 (review round).
+  - [x] 16.F8 Small corrections of code, tests and comments from the review; the sort by class measured (review round).
+  - [x] 16.F9 Tests that could not fail, or said more than they check, made to (review round).
+  - [x] 16.F10 The median frame target is recorded as met by one run of three, not as met (a relaxation of the target is undone; for the owner to decide).
+  - [x] 16.F11 The records corrected where the review found them wrong (counts, a claim of coverage, the package lists); the commit sizes and subjects recorded as the rules broken.
+    - [x] 16.G2 The final gate run on the final head (`ce09d96`): check, e2e (761), visual (114) and axe (103) pass; `pnpm perf` fails on the median frame (under 16.7 is met by 16.6, not by 16.7) and, now and then, on a task of 51 to 60 ms over the line of 50 (in the Phase 1 tests too, and on the head before the review); results in `docs/perf.md`.
+  - [x] 16.F12 What the second review of the fixes found: buffers kept after an aborted prepare, a compile that outlived a reset (review round).
+  - [x] 16.F13 No main-thread task over 50 ms: the extent in slices, the renderer made in pieces when the first buffers are ready, parts of 100,000, tiles of at most 4,096; the median frame is measured against the display's beat (owner's reading); the harness says what a long frame was made of.
+  - [x] 16.F14 The owner's answers to the M14 questions: cividis is added (Battelle's licence, its notice whole in THIRD_PARTY_NOTICES.md), and `collapsed` stays document state with `setGroupCollapsed`, as the brief has it.
+  - [x] 16.F15 What the third review found in the performance changes: a context lost while the renderer is made, a renderer made with nothing waiting, and the threshold of the Long Animation Frames API.
+  - [x] 16.G3 The final gate on the final head (`7bc85c3`): check, e2e (762), visual (114), axe (103) and `pnpm perf` (5 of 5) pass.
 
 ## M17: Map furniture and overlays
 
