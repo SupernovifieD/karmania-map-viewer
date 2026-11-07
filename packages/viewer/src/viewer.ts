@@ -250,6 +250,9 @@ export class KarmaniaViewer extends LitElement {
               ? 'unsupported'
               : renderer.setLayer(id, buffers, layerLook(layer));
           },
+          setLayerClasses: (id, classes) => {
+            renderer.setLayerClasses(id, classes);
+          },
           removeLayer: (id) => renderer.removeLayer(id),
           setDepthRange: (min, max) => {
             renderer.setDepthRange(min, max);
