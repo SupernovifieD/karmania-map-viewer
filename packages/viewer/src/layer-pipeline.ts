@@ -214,16 +214,16 @@ export class LayerPipeline {
 
   /**
    * Shows the data: the camera is put where all of the visible layers that were prepared fit in the map area, with the heading it
-   * has. Nothing happens if there is nothing to show, or the map area has no size yet.
+   * has. Nothing happens if there is nothing to show, or the map area has no size yet. Says whether the camera was moved.
    */
-  fit(): void {
+  fit(): boolean {
     const doc = this.options.scene.getState();
     const extents = [...this.entries]
       .filter(([id]) => doc.layers[id]?.visible === true)
       .flatMap(([, entry]) => (entry.extent === undefined ? [] : [entry.extent]));
     const first = extents[0];
     if (first === undefined) {
-      return;
+      return false;
     }
     const extent: BBox = {
       min: [
@@ -243,10 +243,12 @@ export class LayerPipeline {
       heading: doc.camera2d.heading,
       padding: FIT_PADDING,
     });
-    if (camera !== undefined) {
-      this.scale = camera.unitsPerPixel;
-      this.options.scene.dispatch({ type: 'setCamera', patch: { camera2d: camera } });
+    if (camera === undefined) {
+      return false;
     }
+    this.scale = camera.unitsPerPixel;
+    this.options.scene.dispatch({ type: 'setCamera', patch: { camera2d: camera } });
+    return true;
   }
 
   /** Stops: every request is aborted, and nothing more is done. The renderer frees the layers it has. */
@@ -315,6 +317,11 @@ export class LayerPipeline {
       await this.prepare(id, entry);
       // A change of the style that is of the classes or of their colours, or the classes of a layer that was prepared before it was coloured.
       await this.colour(id, entry);
+      // The scene changed meanwhile (a frame the person chose, say): the rest are looked at in the next pass, for what the scene is now, and
+      // not prepared for the frame that was.
+      if (this.dirty) {
+        break;
+      }
     }
     if (!this.dirty && !this.disposed) {
       this.view();
@@ -387,6 +394,15 @@ export class LayerPipeline {
       return;
     }
     if (!verdict.drawn) {
+      // Said once: it is not said again at each look at the scene (a move of the camera is one) while nothing about it has changed.
+      if (
+        entry.state.status === 'not_drawn' &&
+        entry.state.findings === verdict.findings &&
+        entry.preparedWith === undefined &&
+        entry.onCard !== true
+      ) {
+        return;
+      }
       entry.state = { status: 'not_drawn', findings: verdict.findings };
       this.forget(entry);
       // What it was prepared for is of no use: it is prepared again when the frame is one it can be drawn in, even this one.
@@ -521,8 +537,10 @@ export class LayerPipeline {
       sink.setLayerClasses(id, classes);
       entry.sent = signature;
     }
-    entry.state = { status: 'drawn' };
-    this.changed();
+    if (entry.state.status !== 'drawn') {
+      entry.state = { status: 'drawn' };
+      this.changed();
+    }
   }
 
   /**
@@ -561,6 +579,11 @@ export class LayerPipeline {
       delete entry.classes;
       delete entry.signature;
       this.give(id, entry);
+      // A layer that was refused its classes has none to be refused now: it is on the card in its one colour, and says so.
+      if (entry.onCard === true && entry.state.status !== 'drawn') {
+        entry.state = { status: 'drawn' };
+        this.changed();
+      }
       return;
     }
     const { key } = wanted;
@@ -692,8 +715,10 @@ export class LayerPipeline {
   private view(): void {
     const prepared = [...this.entries.values()].some((entry) => entry.extent !== undefined);
     if (prepared && (this.fittedFor === undefined || !sameSystem(this.fittedFor, this.frame))) {
-      this.fittedFor = this.frame;
-      this.fit();
+      // Counted only if the camera was moved: a map area with no size yet, or only hidden layers, are fitted at a later look at the scene.
+      if (this.fit()) {
+        this.fittedFor = this.frame;
+      }
     }
   }
 }
