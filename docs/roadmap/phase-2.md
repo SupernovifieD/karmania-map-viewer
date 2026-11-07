@@ -435,7 +435,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 16.12 Block layer (instanced, top faces in 2D).
   Split (blocks are turned as grids are, so that moves first; the layer; then the pipeline gives blocks their classes, and the browser tests):
   - [x] 16.12a The exact sine and cosine of a rotation, shared by the grid and the blocks.
-  - [ ] 16.12b The block layer: instanced boxes in parts, the class of each block, the top faces in 2D.
+  - [x] 16.12b The block layer: instanced boxes in parts, the class of each block, the top faces in 2D.
   - [ ] 16.12c The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
 - [ ] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.

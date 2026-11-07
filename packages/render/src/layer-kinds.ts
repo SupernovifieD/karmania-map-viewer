@@ -4,6 +4,7 @@
  * of buffers a compile error until it has an entry here.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
+import { createBlocksLayer } from './blocks-layer.js';
 import { createGridLayer } from './grid-layer.js';
 import { createLinesLayer } from './lines-layer.js';
 import { createMeshLayer } from './mesh-layer.js';
@@ -22,7 +23,8 @@ const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } 
   mesh: (buffers, look) => (buffers.kind === 'mesh' ? createMeshLayer(buffers, look) : undefined),
   grid: (buffers, look) => (buffers.kind === 'grid' ? createGridLayer(buffers, look) : undefined),
   surface: undefined,
-  blocks: undefined,
+  blocks: (buffers, look) =>
+    buffers.kind === 'blocks' ? createBlocksLayer(buffers, look) : undefined,
 };
 
 /** The layer for some buffers, or `undefined` if buffers of that kind are not drawn (yet). */
