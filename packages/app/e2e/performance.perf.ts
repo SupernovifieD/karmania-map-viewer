@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
+import { warmTheGraphicsProcess } from './support/warm.js';
 import { goTo, wizard } from './support/wizard.js';
 
 const GENERATED = (name: string): string =>
@@ -229,6 +230,11 @@ async function measure(page: Page, data: string, sidecar: string): Promise<Measu
 const RESULTS: Measured[] = [];
 
 test.describe('the large files', () => {
+  // The map is drawn as soon as the data is loaded, so the first page of a browser would pay for the start of its graphics process.
+  test.beforeAll(async ({ browser }) => {
+    await warmTheGraphicsProcess(browser);
+  });
+
   test.beforeAll(() => {
     for (const name of ['points-1m.csv', 'points-1m.prj', 'grid-4m.asc', 'grid-4m.prj']) {
       if (!existsSync(GENERATED(name))) {
