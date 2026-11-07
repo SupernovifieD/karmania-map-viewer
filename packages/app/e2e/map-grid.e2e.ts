@@ -251,6 +251,45 @@ test.describe('the grid layer', () => {
     expect(distance(middle, LAST)).toBeGreaterThan(40);
   });
 
+  test('draws the cells that have a value in the one colour of the style, and leaves the cell with no value to the map', async ({
+    page,
+  }) => {
+    await loadGrid(page);
+    const view = await lookAtGrid(page);
+    const map = await mapColour(page);
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await expect
+      .poll(async () => distance(await colourAt(page, view, ...middleOf(0, 0)), [0, 114, 178]))
+      .toBeLessThanOrEqual(2);
+    for (let i = 0; i < 4; i += 1) {
+      for (const j of [0, 2]) {
+        expect(
+          distance(await colourAt(page, view, ...middleOf(i, j)), [0, 114, 178]),
+          `${String(i)},${String(j)}`,
+        ).toBeLessThanOrEqual(2);
+      }
+    }
+    expect(
+      distance(await colourAt(page, view, ...middleOf(0, 1)), [0, 114, 178]),
+    ).toBeLessThanOrEqual(2);
+    expect(await colourAt(page, view, ...middleOf(2, 1))).toEqual(map);
+    // A new colour is a new palette and nothing else: the same texture.
+    const before = await drawn(page);
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#d55e00' } },
+    });
+    await expect
+      .poll(async () => distance(await colourAt(page, view, ...middleOf(0, 0)), [213, 94, 0]))
+      .toBeLessThanOrEqual(2);
+    expect((await drawn(page)).textures).toBe(before.textures);
+  });
+
   test('takes the opacity of the layer, over the map', async ({ page }) => {
     await loadGrid(page);
     const view = await lookAtGrid(page);
