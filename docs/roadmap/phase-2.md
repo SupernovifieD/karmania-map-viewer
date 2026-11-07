@@ -459,7 +459,7 @@ or releasing, and whenever the brief says to stop.
   Split (the states and their tests; then the pictures that they and the canvas changed):
   - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
   - [x] 16.17b The screenshots that changed, each looked at and explained.
-- [ ] 16.G Gate (with `pnpm perf` for 2D): run again on the final head after 16.F13 to 16.F15.
+- [x] 16.G Gate (with `pnpm perf` for 2D): green on the final head `7bc85c3` (16.G3).
   - [x] 16.G1 The 2D render performance measured (the real GPU of the machine, section 9.6).
   - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
   - [x] 16.F2 The shader programs of a layer are compiled off the main thread before it is first drawn.
@@ -477,6 +477,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F13 No main-thread task over 50 ms: the extent in slices, the renderer made in pieces when the first buffers are ready, parts of 100,000, tiles of at most 4,096; the median frame is measured against the display's beat (owner's reading); the harness says what a long frame was made of.
   - [x] 16.F14 The owner's answers to the M14 questions: cividis is added (Battelle's licence, its notice whole in THIRD_PARTY_NOTICES.md), and `collapsed` stays document state with `setGroupCollapsed`, as the brief has it.
   - [x] 16.F15 What the third review found in the performance changes: a context lost while the renderer is made, a renderer made with nothing waiting, and the threshold of the Long Animation Frames API.
+  - [x] 16.G3 The final gate on the final head (`7bc85c3`): check, e2e (762), visual (114), axe (103) and `pnpm perf` (5 of 5) pass.
 
 ## M17: Map furniture and overlays
 
