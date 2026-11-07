@@ -6,7 +6,7 @@
  * is taken off the card, and a change of the frame's origin or map CRS has every layer prepared again, since its positions
  * are relative to the origin. The first view of the data, and the limits of the scale, come from the extents of what was prepared.
  *
- * A layer of a kind that is coloured by classes (points, lines, a grid or a block model, for now) whose style is by classes also has the class of each of
+ * A layer of a kind that is coloured by classes (points, lines, polygons, a grid or a block model, for now) whose style is by classes also has the class of each of
  * its elements worked out by the engine (`classify`, then `classIndex`) and the colour of each class from the scene, and gives both to the
  * renderer with the layer. A change of the style that is only of colours (the ramp, reversing it) gives the renderer new colours for the
  * classes it has; one that changes the classes (the column, the method, how many) asks the engine again; neither prepares the layer again.
@@ -73,12 +73,13 @@ export const ZOOM_OUT_LIMIT = 100;
 const DEFAULT_TEXTURE_SIZE = 4096;
 
 /**
- * The kinds of buffers whose layers take the class of each element: a point, a line, a grid's cell and a model's block are coloured by it. (The other
+ * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a grid's cell and a model's block are coloured by it. (The other
  * kinds are drawn in one colour until the steps of 16.13 give them a colour for each element.)
  */
 const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
   'points',
   'lines',
+  'polygons',
   'grid',
   'blocks',
 ]);

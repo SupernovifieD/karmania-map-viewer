@@ -780,6 +780,42 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.classifyCalls).toHaveLength(1);
   });
 
+  it('asks for the classes of polygons when their style is by classes, and gives them with the layer', async () => {
+    const t = setup();
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'polygons',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
+          triangles: Uint32Array.of(0, 1, 2),
+          trianglePolygon: Uint32Array.of(0),
+          outline: Uint32Array.of(0, 1, 1, 2, 2, 0),
+          outlinePolygon: Uint32Array.of(0, 0, 0),
+        },
+        findings: [],
+      });
+    t.drawable([0, true]);
+    await t.add(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Tonnes',
+          method: 'equal',
+          classes: 3,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[0, 'Tonnes', 'equal', 3]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+  });
+
   it('asks for the classes of lines when their style is by classes, and gives them with the layer', async () => {
     const t = setup();
     t.state.prepare = () =>
@@ -846,12 +882,9 @@ describe('LayerPipeline: the classes of a layer', () => {
       Promise.resolve({
         status: 'drawn',
         buffers: {
-          kind: 'polygons',
+          kind: 'mesh',
           positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
           triangles: Uint32Array.of(0, 1, 2),
-          trianglePolygon: Uint32Array.of(0),
-          outline: Uint32Array.of(0, 1, 1, 2, 2, 0),
-          outlinePolygon: Uint32Array.of(0, 0, 0),
         },
         findings: [],
       });
