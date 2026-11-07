@@ -14,6 +14,8 @@ export interface Stats {
   readonly contextLost: boolean;
   readonly geometries: number;
   readonly textures: number;
+  readonly layers: number;
+  readonly maxTextureSize: number;
   readonly background: string;
   readonly frame: {
     readonly left: number;
@@ -43,7 +45,11 @@ export interface SceneFrame {
 
 /** The viewer of the page, in what the tests use of it. */
 interface ViewerElement {
-  scene(): { camera2d: Camera; frame: SceneFrame | null };
+  scene(): {
+    camera2d: Camera;
+    frame: SceneFrame | null;
+    layers: Record<string, { style: { colour: { mode: string; value?: string } } }>;
+  };
   layerStates(): [string, { status: string; fraction?: number; message?: string }][];
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
@@ -156,4 +162,73 @@ export function layerStatuses(page: Page): Promise<[string, string][]> {
       ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
     return viewer.layerStates().map(([id, state]): [string, string] => [id, state.status]);
   });
+}
+
+/** The colour of the first layer of the scene, `#rrggbb`: the one its points are drawn in. */
+export function layerColour(page: Page, id = 'layer-1'): Promise<string> {
+  return page.evaluate((layerId) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    const colour = viewer.scene().layers[layerId]?.style.colour;
+    return colour?.value ?? '';
+  }, id);
+}
+
+/** `#rrggbb` as `[r, g, b]` bytes. */
+export function bytes(hex: string): [number, number, number] {
+  return [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)) as [
+    number,
+    number,
+    number,
+  ];
+}
+
+/** A square of the buffer, read back: `at(dx, dy)` is the pixel `dx` right and `dy` up of its middle. */
+export interface Block {
+  readonly half: number;
+  at(dx: number, dy: number): [number, number, number, number];
+  /** Every pixel of the block, as `[dx, dy, [r, g, b, a]]`. */
+  all(): [number, number, [number, number, number, number]][];
+}
+
+/** Reads the `2 * half + 1` pixels square whose middle is the pixel `(x, y)` of the buffer (from the bottom left). */
+export async function around(page: Page, x: number, y: number, half: number): Promise<Block> {
+  const side = 2 * half + 1;
+  const flat = await pixels(page, [x - half, y - half, side, side]);
+  const at = (dx: number, dy: number): [number, number, number, number] => {
+    const at4 = ((dy + half) * side + (dx + half)) * 4;
+    return [flat[at4] ?? -1, flat[at4 + 1] ?? -1, flat[at4 + 2] ?? -1, flat[at4 + 3] ?? -1];
+  };
+  return {
+    half,
+    at,
+    all: () =>
+      Array.from(
+        { length: side * side },
+        (_, i): [number, number, [number, number, number, number]] => {
+          const [dx, dy] = [(i % side) - half, Math.floor(i / side) - half];
+          return [dx, dy, at(dx, dy)];
+        },
+      ),
+  };
+}
+
+/** How far the pixel is from a colour, as the largest difference of a channel. */
+export function distance(pixel: readonly number[], colour: readonly number[]): number {
+  return Math.max(...colour.map((channel, i) => Math.abs((pixel[i] ?? 0) - channel)));
+}
+
+/** The box (in pixels from the middle of the block) of the pixels that are not the background, and how many there are. */
+export function marked(block: Block, background: readonly number[], tolerance = 8) {
+  const inside = block.all().filter(([, , pixel]) => distance(pixel, background) > tolerance);
+  const xs = inside.map(([dx]) => dx);
+  const ys = inside.map(([, dy]) => dy);
+  return {
+    count: inside.length,
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+  };
 }

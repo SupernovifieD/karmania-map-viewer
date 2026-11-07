@@ -415,7 +415,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.6c The layer pipeline (frame, prepare, cancel, deliver, fit, limits), with a fake engine and renderer.
   - [x] 16.6d The pipeline in the viewer, and Home fits; end-to-end tests. (The GPU memory test comes with the first kind
     of layer, 16.7: with no kind drawn there is nothing on the card to count.)
-- [ ] 16.7 Points layer.
+- [x] 16.7 Points layer.
 - [ ] 16.8 Lines layer.
 - [ ] 16.9 Polygons layer.
 - [ ] 16.10 Mesh layer (derivative flat shading, light from above).

@@ -34,6 +34,8 @@ export type LayerState =
 export interface LayerSink {
   setLayer(id: string, buffers: RenderBuffers): 'drawn' | 'unsupported';
   removeLayer(id: string): boolean;
+  /** The heights that are drawn, relative to the origin of the frame: what the card's camera has to see. */
+  setDepthRange(min: number, max: number): void;
   /** The largest texture the card takes, in cells on a side. */
   readonly maxTextureSize: number;
 }
@@ -128,6 +130,7 @@ export class LayerPipeline {
         this.options.sink()?.removeLayer(id);
         this.entries.delete(id);
         this.changed();
+        this.depth();
       }
     }
     const chosen = doc.frame?.source === 'user' ? doc.frame : null;
@@ -398,8 +401,25 @@ export class LayerPipeline {
     }
     const buffers = entry.waiting;
     delete entry.waiting;
+    // The heights first: the layer is drawn within them as soon as it is there.
+    this.depth();
     entry.state = { status: sink.setLayer(id, buffers) === 'drawn' ? 'drawn' : 'unsupported' };
     this.changed();
+  }
+
+  /** Tells the renderer the heights of what was prepared, relative to the origin: the least and the greatest, or 0 for none. */
+  private depth(): void {
+    const sink = this.options.sink();
+    const origin = this.frame?.origin[2] ?? 0;
+    const heights = [...this.entries.values()].flatMap((entry) =>
+      entry.extent === undefined
+        ? []
+        : [entry.extent.min[2] - origin, entry.extent.max[2] - origin],
+    );
+    sink?.setDepthRange(
+      heights.length === 0 ? 0 : Math.min(...heights),
+      heights.length === 0 ? 0 : Math.max(...heights),
+    );
   }
 
   /** The first view of data that was just prepared, and again when the map's coordinate system changes. */

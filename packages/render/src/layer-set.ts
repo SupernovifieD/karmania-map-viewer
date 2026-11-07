@@ -5,6 +5,7 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { Object3D } from 'three';
+import type { FrameInfo, LayerLook } from './look.js';
 
 /**
  * A layer on the card: the object to draw, and how to free what it holds (geometries, textures, materials). A layer too big to be
@@ -16,10 +17,14 @@ export interface LayerObject {
   readonly object: Object3D;
   dispose(): void;
   step?(): boolean;
+  /** Changes how the layer looks (its colour, size, opacity, whether it is shown) without building it again. */
+  setLook(look: LayerLook): void;
+  /** Called before each frame with what is true of the screen and the theme then. */
+  prepareFrame(info: FrameInfo): void;
 }
 
-/** Makes the layer of some buffers, or `undefined` if buffers of that kind are not drawn (yet). */
-export type LayerMaker = (buffers: RenderBuffers) => LayerObject | undefined;
+/** Makes the layer of some buffers, looking as `look` says, or `undefined` if buffers of that kind are not drawn (yet). */
+export type LayerMaker = (buffers: RenderBuffers, look: LayerLook) => LayerObject | undefined;
 
 /** What the layers are put in. */
 export interface Container {
@@ -41,12 +46,12 @@ export class LayerSet {
   ) {}
 
   /**
-   * Puts the layer of `buffers` under `id`, in place of the one that was there (which is freed). If the buffers are of a
+   * Puts the layer of `buffers` under `id`, looking as `look` says, in place of the one that was there (which is freed). If the buffers are of a
    * kind that is not drawn the old layer is gone all the same and there is none.
    */
-  set(id: string, buffers: RenderBuffers): LayerOutcome {
+  set(id: string, buffers: RenderBuffers, look: LayerLook): LayerOutcome {
     this.remove(id);
-    const layer = this.make(buffers);
+    const layer = this.make(buffers, look);
     if (layer === undefined) {
       return 'unsupported';
     }
@@ -68,6 +73,20 @@ export class LayerSet {
     this.container.remove(layer.object);
     layer.dispose();
     return true;
+  }
+
+  /** Changes how a layer looks. `false` if there is no such layer. */
+  setLook(id: string, look: LayerLook): boolean {
+    const layer = this.layers.get(id);
+    layer?.setLook(look);
+    return layer !== undefined;
+  }
+
+  /** Tells every layer what is true of the screen and the theme for the frame that is about to be drawn. */
+  prepareFrame(info: FrameInfo): void {
+    for (const layer of this.layers.values()) {
+      layer.prepareFrame(info);
+    }
   }
 
   has(id: string): boolean {
