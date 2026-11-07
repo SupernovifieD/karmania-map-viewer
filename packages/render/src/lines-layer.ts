@@ -1,5 +1,7 @@
 /**
- * The layer of lines (section 9.3 of the brief): a width in screen pixels, one colour for the layer. Each segment is one instance of
+ * The layer of lines (section 9.3 of the brief): a width in screen pixels, one colour for the layer, or the colour of the class of each line when
+ * it is given its classes (`setClasses`: a class for each line, which each of its segments takes; a line with no value, or whose class has no
+ * colour, is not drawn). Each segment is one instance of
  * a quad that the shader makes as big as the segment and a half width more all round; the fragment shader draws the segment with
  * round ends at the distance of each pixel from it, smoothed over a pixel. The ends being round, a vertex between two segments is
  * joined as a circle, and in the flat view the segments of a layer are all at one depth, so the depth test (strictly nearer) lets the first
@@ -10,7 +12,6 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import {
   BufferAttribute,
-  BufferGeometry,
   DoubleSide,
   Group,
   LessDepth,
@@ -23,8 +24,9 @@ import {
   Vector3,
 } from 'three';
 import type { LayerObject } from './layer-set.js';
-import { colourOf } from './look.js';
-import type { FrameInfo, LayerLook } from './look.js';
+import { classesOfPieces, coversOwners } from './class-map.js';
+import { MAX_CLASSES, colourOf } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
 /** The segments are put on the card this many at a time (2.4 MB of ends), the first part at once. */
 export const SEGMENTS_PER_PART = 100_000;
@@ -33,13 +35,16 @@ const VERTEX = /* glsl */ `
 attribute vec2 corner;
 attribute vec3 aStart;
 attribute vec3 aEnd;
+attribute float aClass;
 uniform vec2 uViewport;
 uniform float uWidth;
 uniform float uDepthScale;
 varying vec2 vStart;
 varying vec2 vEnd;
+varying float vClass;
 
 void main() {
+  vClass = aClass;
   vec4 a = projectionMatrix * modelViewMatrix * vec4(aStart, 1.0);
   vec4 b = projectionMatrix * modelViewMatrix * vec4(aEnd, 1.0);
   // The ends in pixels of the buffer.
@@ -64,8 +69,12 @@ const FRAGMENT = /* glsl */ `
 uniform float uWidth;
 uniform vec3 uColour;
 uniform float uOpacity;
+uniform vec3 uPalette[${String(MAX_CLASSES)}];
+uniform float uCount;
+uniform float uClassed;
 varying vec2 vStart;
 varying vec2 vEnd;
+varying float vClass;
 
 void main() {
   vec2 along = vEnd - vStart;
@@ -76,7 +85,16 @@ void main() {
   if (inside <= 0.0) {
     discard;
   }
-  gl_FragColor = vec4(uColour, inside * uOpacity);
+  vec3 colour = uColour;
+  if (uClassed > 0.5) {
+    // By class: a line with no colour for its class (255 is no value) is not drawn.
+    float line = floor(vClass + 0.5);
+    if (line >= uCount) {
+      discard;
+    }
+    colour = uPalette[int(line)];
+  }
+  gl_FragColor = vec4(colour, inside * uOpacity);
 }
 `;
 
@@ -118,6 +136,9 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     uDepthScale: { value: 0 },
     uColour: { value: new Vector3() },
     uOpacity: { value: 1 },
+    uPalette: { value: Array.from({ length: MAX_CLASSES }, () => new Vector3()) },
+    uCount: { value: 0 },
+    uClassed: { value: 0 },
   };
   const material = new ShaderMaterial({
     uniforms,
@@ -133,11 +154,32 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     side: DoubleSide,
   });
   const group = new Group();
-  const geometries: BufferGeometry[] = [];
+  const parts: { geometry: InstancedBufferGeometry; first: number; count: number }[] = [];
   const total = Math.floor(buffers.segments.length / 2);
+  /** The classes of the lines that the segments are coloured by, if they are. */
+  let classes: Uint8Array | undefined;
   let built = 0;
   let width = look.lineWidth;
   let ratio = 1;
+
+  /** Gives a part the class of each of its segments (that of its line), or takes the classes away. */
+  function classesOf(part: {
+    geometry: InstancedBufferGeometry;
+    first: number;
+    count: number;
+  }): void {
+    if (classes === undefined) {
+      part.geometry.deleteAttribute('aClass');
+      return;
+    }
+    part.geometry.setAttribute(
+      'aClass',
+      new InstancedBufferAttribute(
+        classesOfPieces(classes, buffers.segmentLine, part.first, part.count),
+        1,
+      ),
+    );
+  }
 
   /** Puts the next part of the segments on the card. `true` if there are more to come. */
   function addPart(): boolean {
@@ -158,7 +200,9 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     geometry.setAttribute('aStart', new InstancedBufferAttribute(starts, 3));
     geometry.setAttribute('aEnd', new InstancedBufferAttribute(ends, 3));
     geometry.instanceCount = end - built;
-    geometries.push(geometry);
+    const entry = { geometry, first: built, count: end - built };
+    parts.push(entry);
+    classesOf(entry);
     const part = new Mesh(geometry, material);
     part.frustumCulled = false;
     group.add(part);
@@ -182,9 +226,34 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       uniforms.uViewport.value.set(info.viewport[0], info.viewport[1]);
       uniforms.uDepthScale.value = info.flat ? 0 : 1;
     },
+    setClasses(next: ClassColouring | undefined) {
+      if (next !== undefined && coversOwners(next.indices, buffers.segmentLine)) {
+        const same = next.indices === classes;
+        classes = next.indices;
+        const count = Math.min(next.colours.length, MAX_CLASSES);
+        next.colours.slice(0, count).forEach((hex, k) => {
+          const [r, g, b] = colourOf(hex);
+          uniforms.uPalette.value[k]?.set(r, g, b);
+        });
+        uniforms.uCount.value = count;
+        uniforms.uClassed.value = 1;
+        if (same) {
+          // The same classes with other colours (another ramp): the attributes are what they were and only the palette changes.
+          return;
+        }
+      } else {
+        // Not coloured by classes: the segments are the colour of the layer, whatever the classes were.
+        classes = undefined;
+        uniforms.uClassed.value = 0;
+        uniforms.uCount.value = 0;
+      }
+      for (const part of parts) {
+        classesOf(part);
+      }
+    },
     dispose() {
       group.clear();
-      for (const geometry of geometries) {
+      for (const { geometry } of parts) {
         geometry.dispose();
       }
       material.dispose();

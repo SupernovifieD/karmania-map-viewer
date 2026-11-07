@@ -445,7 +445,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.13a The same classes with other colours keep the textures and attributes, and only the palette changes.
   - [x] 16.13b A grid or a block model in one colour: the cells and blocks that have a value.
   - [x] 16.13c Points by class.
-  - [ ] 16.13d Lines by class.
+  - [x] 16.13d Lines by class.
   - [ ] 16.13e Polygons by class.
   - [ ] 16.13f Meshes by class.
 - [ ] 16.14 Draw order with depth cleared between layers; pixel tests.
