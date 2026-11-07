@@ -408,7 +408,7 @@ or releasing, and whenever the brief says to stop.
   limits; keyboard (10.2). Tests for each gesture and key.
 - [x] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or
   changed layers, cancel stale requests, upload in chunks, dispose on removal;
-  the GPU memory test.
+  the GPU memory test (it came with the first kind of layer, 16.7: see 16.6d).
   Split (the pieces are libraries with unit tests, and then they are wired to the real engine and browser):
   - [x] 16.6a The layers on the card: a registry that builds, replaces, steps (in chunks) and frees them.
   - [x] 16.6b The extent of render buffers, in map units.
@@ -471,6 +471,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F8 Small corrections of code, tests and comments from the review; the sort by class measured (review round).
   - [x] 16.F9 Tests that could not fail, or said more than they check, made to (review round).
   - [x] 16.F10 The median frame target is recorded as met by one run of three, not as met (a relaxation of the target is undone; for the owner to decide).
+  - [x] 16.F11 The records corrected where the review found them wrong (counts, a claim of coverage, the package lists); the commit sizes and subjects recorded as the rules broken.
 
 ## M17: Map furniture and overlays
 
