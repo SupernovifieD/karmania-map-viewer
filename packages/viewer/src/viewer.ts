@@ -53,6 +53,7 @@ export class KarmaniaViewer extends LitElement {
     viewportWidth: { state: true },
     datasets: { state: true },
     layerChanges: { state: true },
+    cannotDraw: { state: true },
     selected: { state: true },
   };
 
@@ -93,6 +94,8 @@ export class KarmaniaViewer extends LitElement {
   declare private datasets: readonly Summary[];
   /** Counts the changes of where the layers are (being prepared, drawn, not drawn): what the map area says of them is made again for each. */
   declare private layerChanges: number;
+  /** Whether the browser could not give the page a renderer (it has no WebGL 2): the map area says so, and the page does not try again. */
+  declare private cannotDraw: boolean;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
 
@@ -102,6 +105,7 @@ export class KarmaniaViewer extends LitElement {
     this.viewportWidth = document.documentElement.clientWidth;
     this.datasets = [];
     this.layerChanges = 0;
+    this.cannotDraw = false;
     this.selected = undefined;
   }
 
@@ -168,7 +172,7 @@ export class KarmaniaViewer extends LitElement {
    */
   private async attachRenderer(): Promise<void> {
     const area = this.renderRoot.querySelector('karmania-map-area');
-    if (area === null || this.renderer !== undefined || this.attaching) {
+    if (area === null || this.renderer !== undefined || this.attaching || this.cannotDraw) {
       return;
     }
     this.attaching = true;
@@ -190,6 +194,7 @@ export class KarmaniaViewer extends LitElement {
           area.redrawing = lost;
         },
       });
+      this.cannotDraw = this.renderer === undefined;
       this.lookThroughCamera();
       this.controller = this.renderer === undefined ? undefined : this.listenToPerson(area, canvas);
       area.interactive = this.controller !== undefined;
@@ -347,6 +352,7 @@ export class KarmaniaViewer extends LitElement {
     }
     this.renderer?.dispose();
     this.renderer = undefined;
+    this.cannotDraw = false;
     this.engine?.dispose();
     this.engine = undefined;
     // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer
@@ -472,6 +478,7 @@ export class KarmaniaViewer extends LitElement {
       >
         <karmania-map-area
           .datasets=${this.datasets.length}
+          .unavailable=${this.cannotDraw}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}

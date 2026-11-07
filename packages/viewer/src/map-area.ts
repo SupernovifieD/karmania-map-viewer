@@ -32,6 +32,7 @@ export class KarmaniaMapArea extends LitElement {
   static override properties = {
     datasets: { type: Number },
     redrawing: { type: Boolean },
+    unavailable: { type: Boolean },
     preparing: { type: Number },
     progress: { type: Number },
     reasons: { attribute: false },
@@ -167,6 +168,8 @@ export class KarmaniaMapArea extends LitElement {
   declare datasets: number;
   /** Whether the map is being drawn again after the graphics card took it away: it says so, in a notice over the map. */
   declare redrawing: boolean;
+  /** Whether the browser cannot draw the map at all (it has no WebGL 2): with data, it says so, and says nothing of layers. */
+  declare unavailable: boolean;
   /** How many layers are being prepared (0 for none): the chip at the top says so. */
   declare preparing: number;
   /** How far along the layers are, from 0 to 1, for the bar of the chip. */
@@ -191,6 +194,7 @@ export class KarmaniaMapArea extends LitElement {
     super();
     this.datasets = 0;
     this.redrawing = false;
+    this.unavailable = false;
     this.preparing = 0;
     this.progress = 0;
     this.reasons = [];
@@ -219,11 +223,19 @@ export class KarmaniaMapArea extends LitElement {
         @drop=${this.onDrop}
       >
         <canvas aria-hidden="true"></canvas>
-        ${this.datasets === 0 ? this.empty() : this.reasons.length > 0 ? this.blocked() : nothing}
+        ${
+          this.datasets === 0
+            ? this.empty()
+            : this.unavailable
+              ? this.cannotDraw()
+              : this.reasons.length > 0
+                ? this.blocked()
+                : nothing
+        }
         ${
           this.redrawing
             ? html`<div class="notice" role="status">Redrawing the map…</div>`
-            : this.preparing > 0
+            : this.preparing > 0 && !this.unavailable
               ? this.chip()
               : nothing
         }
@@ -309,6 +321,16 @@ export class KarmaniaMapArea extends LitElement {
         <span slot="action"
           >${kButton({ icon: 'layers', children: 'Show the Legend', onClick: this.onShowLegend })}</span
         >
+      </k-empty-state>
+    `;
+  }
+
+  /** Data, and the browser cannot draw it: the layers are fine, and the Legend has nothing to add. */
+  private cannotDraw() {
+    return html`
+      <k-empty-state icon="map" heading="The map cannot be drawn">
+        This browser or its graphics card does not give the page WebGL 2, which the map needs. Try a
+        current version of Chrome, Edge, Firefox or Safari, with hardware acceleration on.
       </k-empty-state>
     `;
   }
