@@ -475,6 +475,7 @@ or releasing, and whenever the brief says to stop.
     - [x] 16.G2 The final gate run on the final head (`ce09d96`): check, e2e (761), visual (114) and axe (103) pass; `pnpm perf` fails on the median frame (under 16.7 is met by 16.6, not by 16.7) and, now and then, on a task of 51 to 60 ms over the line of 50 (in the Phase 1 tests too, and on the head before the review); results in `docs/perf.md`.
   - [x] 16.F12  What the second review of the fixes found: buffers kept after an aborted prepare, a compile that outlived a reset (review round).
   - [x] 16.F13 No main-thread task over 50 ms: the extent in slices, the renderer made in pieces when the first buffers are ready, parts of 100,000, tiles of at most 4,096; the median frame is measured against the display's beat (owner's reading); the harness says what a long frame was made of.
+  - [x] 16.F14 The owner's answers to the M14 questions: cividis is added (Battelle's licence, its notice whole in THIRD_PARTY_NOTICES.md), and `collapsed` stays document state with `setGroupCollapsed`, as the brief has it.
 
 ## M17: Map furniture and overlays
 

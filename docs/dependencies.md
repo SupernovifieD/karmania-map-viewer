@@ -15,6 +15,9 @@ The project license is Apache-2.0 (see `LICENSE`). Allowed for dependencies:
   (section 2.1 of the phase 2 brief). It was accepted once before at step 2.16 and left
   the policy when the crate was removed at step 3.25b. The label covers the crate, not
   necessarily the data in it: see the EPSG terms below the Rust crates table.
+- The licence of the cividis colour table (Battelle Memorial Institute's own permissive text, from github.com/pnnl/cmaputil),
+  accepted by the owner at step 16.F14 (2026-11-08) for that table only, with the notice kept and Battelle's name used for
+  nothing but saying where it comes from. See the Data table below.
 - MPL-2.0, accepted at step 0.12 for dev-only build tools that are never shipped
   as part of Karmania. It is compatible with Apache-2.0: MPL's copyleft applies
   per file to MPL-licensed code, so using an unmodified MPL tool at build time
@@ -139,9 +142,6 @@ top of that file says where each table was taken from and how it was converted.
 | viridis and magma colour ramps (256 colours each) | matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`: the same numbers as the original `colormaps.py` of github.com/BIDS/colormap, by Nathaniel J. Smith, Stefan van der Walt and Eric Firing (checked equal when they were taken) | CC0-1.0. The original says: "This file and the colormaps in it are released under the CC0 license / public domain dedication. We would appreciate credit if you use or redistribute these colormaps, but do not impose any legal restrictions." | `packages/scene/src/ramp-data.ts` | step 14.4b |
 | ColorBrewer colour schemes: Blues, Greens, Oranges, Reds, Purples, YlGnBu, YlOrRd (sequential, 9), RdBu, PuOr, BrBG (diverging, 11), Paired (qualitative, 12) | github.com/axismaps/colorbrewer, `export/colorbrewer.js`, by Cynthia Brewer (colorbrewer.org). Its header: "This product includes color specifications and designs developed by Cynthia Brewer (http://colorbrewer.org/)." | Apache-2.0 (the licence file of that repository is the Apache License 2.0) | `packages/scene/src/ramp-data.ts` | step 14.4b |
 | Okabe-Ito categorical palette (8 colours, black last) | Masataka Okabe and Kei Ito, Color Universal Design (jfly.uni-koeln.de/color); also Bang Wong, Nature Methods 8, 441 (2011). A published list of colour values | none stated (a list of eight colour values; credited in `THIRD_PARTY_NOTICES.md`) | `packages/scene/src/ramps.ts` | step 14.4c |
+| cividis colour ramp (256 colours) | matplotlib 3.10.0, `lib/matplotlib/_cm_listed.py`, `_cividis_data`: the colormap of github.com/pnnl/cmaputil, Copyright (c) 2017, Battelle Memorial Institute | **Battelle's own licence, not CC0** (the brief called cividis CC0, which it is not): permission to use, copy, modify, merge, publish, distribute, sublicense and sell, with the copyright notice and the disclaimers kept in source and reproduced in binary form, and without using the name of Battelle in any form without its written consent. **Approved by the owner on 2026-11-08** (decision 16.F14); the whole text is in `THIRD_PARTY_NOTICES.md` | `packages/scene/src/ramp-data.ts` | step 16.F14 |
 
-Not taken: cividis. The brief names it with viridis and magma as CC0, but the repository it comes from
-(github.com/pnnl/cmaputil, Battelle Memorial Institute) has a licence of its own, a permissive text of the BSD kind that
-forbids the use of Battelle's name without consent, and no statement was found that the colormap is CC0. The policy
-above says anything not named needs the owner's approval, so it is left out until the owner decides (step 14.4b in
-`docs/decisions.md`).
+The cividis row was held back at step 14.4b (the licence is not the one the brief said, and the policy above says anything not named needs the owner's approval) until the owner decided, on 2026-11-08, to add it.

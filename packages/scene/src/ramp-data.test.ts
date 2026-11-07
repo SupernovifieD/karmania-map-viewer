@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BREWER_DIVERGING, BREWER_PAIRED, BREWER_SEQUENTIAL, MAGMA, VIRIDIS } from './ramp-data.js';
+import {
+  BREWER_DIVERGING,
+  BREWER_PAIRED,
+  BREWER_SEQUENTIAL,
+  CIVIDIS,
+  MAGMA,
+  VIRIDIS,
+} from './ramp-data.js';
 
 /** FNV-1a, 32 bits, over the characters: a checksum that is the same everywhere and needs no library. */
 function checksum(text: string): string {
@@ -13,6 +20,7 @@ function checksum(text: string): string {
 const TABLES: [string, string, number, string][] = [
   ['viridis', VIRIDIS, 256, 'e9921c7b'],
   ['magma', MAGMA, 256, 'dbf31a7c'],
+  ['cividis', CIVIDIS, 256, '7993387a'],
   ['blues', BREWER_SEQUENTIAL.blues, 9, '9ef5de15'],
   ['greens', BREWER_SEQUENTIAL.greens, 9, '02805fd0'],
   ['oranges', BREWER_SEQUENTIAL.oranges, 9, 'c78e5898'],
@@ -36,9 +44,11 @@ describe('the colour data', () => {
     },
   );
 
-  it('has the end points that viridis and magma are known by', () => {
+  it('has the end points that viridis, magma and cividis are known by', () => {
     expect([VIRIDIS.slice(0, 7), VIRIDIS.slice(-7)]).toEqual(['#440154', '#fde725']);
     expect([MAGMA.slice(0, 7), MAGMA.slice(-7)]).toEqual(['#000004', '#fcfdbf']);
+    // (0, 0.135112, 0.304751) and (0.995737, 0.909344, 0.217772) of matplotlib's table, times 255 and rounded.
+    expect([CIVIDIS.slice(0, 7), CIVIDIS.slice(-7)]).toEqual(['#00224e', '#fee838']);
   });
 
   it('has the end points that ColorBrewer`s schemes are known by', () => {
