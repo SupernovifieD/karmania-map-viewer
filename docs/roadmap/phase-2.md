@@ -449,7 +449,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.13e Polygons by class.
   - [x] 16.13f Meshes by class.
 - [x] 16.14 Draw order with depth cleared between layers; pixel tests.
-- [ ] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
+- [x] 16.15 Precision e2e (9.1): UTM-sized points 1 cm apart stay apart when
   zoomed; no jitter while panning.
 - [ ] 16.16 Render golden images for 2D (10.8), reviewed.
 - [ ] 16.17 Map area states: preparing chip, "Nothing can be drawn yet", the
