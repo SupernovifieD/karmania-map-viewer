@@ -5,7 +5,7 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { Object3D } from 'three';
-import type { FrameInfo, LayerLook } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
 /**
  * A layer on the card: the object to draw, and how to free what it holds (geometries, textures, materials). A layer too big to be
@@ -21,6 +21,11 @@ export interface LayerObject {
   setLook(look: LayerLook): void;
   /** Called before each frame with what is true of the screen and the theme then. */
   prepareFrame(info: FrameInfo): void;
+  /**
+   * Colours the elements by class (or, with `undefined`, takes the colouring away). A layer that is not coloured by classes has no
+   * such method. What it does with indices that do not fit its elements is its own to say.
+   */
+  setClasses?(classes: ClassColouring | undefined): void;
 }
 
 /** Makes the layer of some buffers, looking as `look` says, or `undefined` if buffers of that kind are not drawn (yet). */
@@ -80,6 +85,16 @@ export class LayerSet {
     const layer = this.layers.get(id);
     layer?.setLook(look);
     return layer !== undefined;
+  }
+
+  /** Colours the elements of a layer by class. `false` if there is no such layer, or it is not one that is coloured by classes. */
+  setClasses(id: string, classes: ClassColouring | undefined): boolean {
+    const layer = this.layers.get(id);
+    if (layer?.setClasses === undefined) {
+      return false;
+    }
+    layer.setClasses(classes);
+    return true;
   }
 
   /** Tells every layer what is true of the screen and the theme for the frame that is about to be drawn. */

@@ -32,6 +32,23 @@ export interface FrameInfo {
   readonly outline: readonly [number, number, number];
 }
 
+/** The class of an element that has no value to put in a class: what the engine's class index says. Such an element is not drawn. */
+export const NO_VALUE = 255;
+
+/**
+ * The most classes whose colours a layer can hold: the 20 categories and "Other" that the engine makes at most, and room. An element
+ * of a class beyond what the layer has a colour for is not drawn, as one with no value is not.
+ */
+export const MAX_CLASSES = 32;
+
+/** What colours the elements of a layer that is coloured by classes: the class of each element, and the colour of each class. */
+export interface ClassColouring {
+  /** One for each element of the dataset, in its order (a grid's cells are in lattice order, `i` fastest): its class, or `NO_VALUE`. */
+  readonly indices: Uint8Array;
+  /** `#rrggbb` for each class, in the order of the classes; at most `MAX_CLASSES`. */
+  readonly colours: readonly string[];
+}
+
 /** A layer's colour as three numbers from 0 to 1, in sRGB, as the shaders take it. */
 export type Rgb = readonly [number, number, number];
 

@@ -425,6 +425,13 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.10b The mesh layer.
 - [ ] 16.11 Grid image layer (NEAREST, transparent no-value, rotation, tiles,
   warp).
+  Split (the buffers of a grid have no values: its colour is the class of each cell, so the way for classes to reach a layer comes
+  first, and the pipeline that brings them, with the end-to-end tests of the grid, comes last):
+  - [x] 16.11a The classes of a layer's elements: the type, and the way to a layer that takes them.
+  - [ ] 16.11b The grid image: a texture of classes for each tile, NEAREST, cells with no value not drawn, placed and rotated.
+  - [ ] 16.11c The warped grid: the mesh of each tile with its texture.
+  - [ ] 16.11d The pipeline brings the classes of a layer coloured by classes (classify, class index, colours) to the renderer;
+    end-to-end tests of the grid. (Restyling by recomputing only the classes, and the other kinds, are 16.13.)
 - [ ] 16.12 Block layer (instanced, top faces in 2D).
 - [ ] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.

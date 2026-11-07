@@ -9,6 +9,8 @@ describe('@karmania/render', () => {
       'KEY_ROTATE_DEGREES',
       'KEY_ZOOM_FACTOR',
       'LayerSet',
+      'MAX_CLASSES',
+      'NO_VALUE',
       'OUTLINE_WIDTH',
       'POINTS_PER_PART',
       'POLYGON_OUTLINE_WIDTH',
