@@ -39,6 +39,12 @@ test.describe('the map canvas', () => {
   }) => {
     await page.goto('/');
     await withData(page);
+    // What is laid over the map: the words of the area when none of it can be drawn (told here, as the viewer would).
+    await area(page).evaluate(async (element) => {
+      const held = element as unknown as { reasons: string[]; updateComplete: Promise<boolean> };
+      held.reasons = ['Not drawn.'];
+      await held.updateComplete;
+    });
     const heading = area(page).locator('k-empty-state');
     const box = await heading.boundingBox();
     expect(box).not.toBeNull();

@@ -57,9 +57,9 @@ test.describe('importing', () => {
     await expect(w.next).toHaveText('Load');
     await w.next.click();
 
-    // Loaded: the dialog has gone, the Data tab is open, the map area has been told.
+    // Loaded: the dialog has gone, the Data tab is open, the map area has no empty state any more (it is the map).
     await expect(w.dialog).toBeHidden();
-    await expect(w.map).toContainText('1 dataset loaded');
+    await expect(w.map).toHaveCount(0);
     await expect(w.tabs.filter({ hasText: 'Data' })).toHaveAttribute('aria-selected', 'true');
     const result = await kept(page);
     expect(result.datasets).toHaveLength(1);
@@ -209,7 +209,7 @@ test.describe('importing', () => {
     await w.next.click();
 
     await expect(w.dialog).toBeHidden();
-    await expect(w.map).toContainText('3 datasets loaded');
+    await expect(w.map).toHaveCount(0);
     const result = await kept(page);
     expect(result.datasets.map((dataset) => dataset.kind).sort()).toEqual([
       'lines',

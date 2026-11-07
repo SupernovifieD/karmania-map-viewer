@@ -83,6 +83,12 @@ test.describe('the map when the graphics card takes the context away', () => {
   test('puts the notice at the top, in the middle, 16 from the edge, and moves nothing', async ({
     page,
   }) => {
+    // Something laid over the map to see that the notice moves: the words of the area when none of it can be drawn (told here).
+    await area(page).evaluate(async (element) => {
+      const held = element as unknown as { reasons: string[]; updateComplete: Promise<boolean> };
+      held.reasons = ['Not drawn.'];
+      await held.updateComplete;
+    });
     const heading = area(page).locator('k-empty-state');
     const before = await heading.boundingBox();
     const map = await area(page).boundingBox();

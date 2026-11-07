@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { camera, dispatch, layerStatuses, sceneFrame, stats, withData } from './support/render.js';
-import { importAndLoad, kept } from './support/wizard.js';
+import { fixture, projectionFor } from './support/fixtures.js';
+import { goTo, importAndLoad, kept, startWizard, wizard } from './support/wizard.js';
 
 const PADDING = 24;
 
@@ -169,5 +170,50 @@ test.describe('from the loaded file to the map', () => {
     });
     await page.waitForTimeout(500);
     expect(errors).toEqual([]);
+  });
+
+  test('says that nothing can be drawn when the only layer cannot be, with the reason the engine gives, and the button opens the Legend', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    const w = wizard(page);
+    await startWizard(page, fixture('blocks.csv'), projectionFor('blocks.prj'));
+    await goTo(page, 'mapping');
+    const sizes = w.host.locator('karmania-mapping-step .block-size input');
+    for (let axis = 0; axis < 3; axis += 1) {
+      await sizes.nth(axis).fill('10');
+    }
+    for (const step of ['nodata', 'crs', 'review']) {
+      await goTo(page, step);
+    }
+    await w.next.click();
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    const area = page.locator('karmania-map-area k-empty-state');
+    await expect(area).toHaveCount(0);
+    // The map is made another system than the model's, and a block model is drawn only in its own: the one layer is not drawn.
+    await dispatch(page, {
+      type: 'setFrame',
+      frame: { mapCrs: { kind: 'epsg', code: 32641 }, origin: [0, 0, 0], source: 'user' },
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'not_drawn']]);
+    await expect(area.locator('.heading')).toHaveText('Nothing can be drawn yet');
+    await expect(area).toContainText(
+      "a block model is drawn only in the map's own coordinate system",
+    );
+    await expect(area).toContainText(
+      "Change the map's coordinate system to the one this dataset is in.",
+    );
+    await page.locator('karmania-panel k-tabs').getByRole('tab', { name: 'Data' }).click();
+    await area.getByRole('button', { name: 'Show the Legend' }).click();
+    await expect(
+      page.locator('karmania-panel k-tabs').getByRole('tab', { name: 'Legend' }),
+    ).toHaveAttribute('aria-selected', 'true');
+    // The map's own system again: drawn, and the empty state is gone.
+    await dispatch(page, {
+      type: 'setFrame',
+      frame: { mapCrs: { kind: 'epsg', code: 32640 }, origin: [0, 0, 0], source: 'user' },
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect(area).toHaveCount(0);
   });
 });

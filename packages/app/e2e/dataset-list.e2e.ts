@@ -328,7 +328,7 @@ test.describe('loading and removing datasets', () => {
     await q.keep.click();
     await expect(q.dialog).toBeHidden();
     await expect(q.rows).toHaveCount(1);
-    await expect(q.map).toContainText('1 dataset loaded');
+    await expect(q.map).toHaveCount(0);
   });
 
   test('keeps the dataset when the dialog is closed with Esc', async ({ page }) => {
@@ -341,12 +341,10 @@ test.describe('loading and removing datasets', () => {
     await expect(q.rows).toHaveCount(1);
   });
 
-  test('removes it when that is confirmed, from the engine and from the list, and the map area says so', async ({
-    page,
-  }) => {
+  test('removes it when that is confirmed, from the engine and from the list', async ({ page }) => {
     const q = parts(page);
     await importAndLoad(page, 'mixed.geojson');
-    await expect(q.map).toContainText('3 datasets loaded');
+    await expect(q.map).toHaveCount(0);
     const before = await page
       .locator('karmania-viewer')
       .evaluate((app) =>
@@ -356,7 +354,7 @@ test.describe('loading and removing datasets', () => {
     await q.rows.nth(1).locator('.remove k-button button').click();
     await q.confirm.click();
     await expect(q.rows).toHaveCount(2);
-    await expect(q.map).toContainText('2 datasets loaded');
+    await expect(q.map).toHaveCount(0);
     const state = await page.locator('karmania-viewer').evaluate((app) => {
       const held = app as unknown as {
         datasets: { id: number }[];

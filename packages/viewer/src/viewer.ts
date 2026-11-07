@@ -31,6 +31,7 @@ import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { drawOrder } from './draw-order.js';
+import { summariseLayers } from './layer-summary.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -51,6 +52,7 @@ export class KarmaniaViewer extends LitElement {
     panel: { state: true },
     viewportWidth: { state: true },
     datasets: { state: true },
+    layerChanges: { state: true },
     selected: { state: true },
   };
 
@@ -89,6 +91,8 @@ export class KarmaniaViewer extends LitElement {
   declare private viewportWidth: number;
   /** The datasets that have been loaded and kept, in the order they were loaded. */
   declare private datasets: readonly Summary[];
+  /** Counts the changes of where the layers are (being prepared, drawn, not drawn): what the map area says of them is made again for each. */
+  declare private layerChanges: number;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
 
@@ -97,6 +101,7 @@ export class KarmaniaViewer extends LitElement {
     this.panel = loadPanelState(browserStorage());
     this.viewportWidth = document.documentElement.clientWidth;
     this.datasets = [];
+    this.layerChanges = 0;
     this.selected = undefined;
   }
 
@@ -233,6 +238,9 @@ export class KarmaniaViewer extends LitElement {
       viewport: () => {
         const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
         return { width: box?.width ?? 0, height: box?.height ?? 0 };
+      },
+      onChange: () => {
+        this.layerChanges += 1;
       },
       firstColumn: (datasetId) => {
         const summary = this.datasets.find((dataset) => dataset.id === datasetId);
@@ -388,6 +396,11 @@ export class KarmaniaViewer extends LitElement {
     this.changePanel(event.detail);
   };
 
+  /** The map area says nothing can be drawn and sends people to the Legend, which says why for each layer. */
+  private readonly onShowLegend = (): void => {
+    this.changePanel({ tab: 'legend', collapsed: false });
+  };
+
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
     this.selected = event.detail.id;
   };
@@ -445,6 +458,7 @@ export class KarmaniaViewer extends LitElement {
     // The width that was asked for, or what the window allows of it.
     const width = clampPanelWidth(this.panel.width, this.viewportWidth);
     const limits = panelWidthLimits(this.viewportWidth);
+    const layers = summariseLayers(this.pipeline?.states().values() ?? []);
     return html`
       <div
         class="workspace"
@@ -453,6 +467,10 @@ export class KarmaniaViewer extends LitElement {
       >
         <karmania-map-area
           .datasets=${this.datasets.length}
+          .preparing=${layers.preparing}
+          .progress=${layers.progress}
+          .reasons=${layers.reasons}
+          @karmania-show-legend=${this.onShowLegend}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
