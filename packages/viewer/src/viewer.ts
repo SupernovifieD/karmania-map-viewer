@@ -30,6 +30,7 @@ import type { ResizeRequest } from './resize-handle.js';
 import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
+import { drawOrder } from './draw-order.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -248,11 +249,16 @@ export class KarmaniaViewer extends LitElement {
       ? undefined
       : {
           setLayer: (id, buffers) => {
-            const layer = this.store.getState().layers[id];
+            const state = this.store.getState();
+            const layer = state.layers[id];
             // (A layer that is gone is not given buffers; the look is the scene's own for the one that is there.)
-            return layer === undefined
-              ? 'unsupported'
-              : renderer.setLayer(id, buffers, layerLook(layer));
+            const outcome =
+              layer === undefined
+                ? 'unsupported'
+                : renderer.setLayer(id, buffers, layerLook(layer));
+            // The order it is drawn in is the legend's, which the renderer is told with the first layer it has, and when the legend changes.
+            renderer.setLayerOrder(drawOrder(state));
+            return outcome;
           },
           setLayerClasses: (id, classes) => {
             renderer.setLayerClasses(id, classes);
@@ -287,6 +293,10 @@ export class KarmaniaViewer extends LitElement {
     }
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
+    }
+    // What is higher in the legend is drawn over what is lower.
+    if (state.legend !== previous.legend) {
+      this.renderer?.setLayerOrder(drawOrder(state));
     }
     // A layer whose style or visibility changed looks different, and is not built again for it.
     for (const [id, layer] of Object.entries(state.layers)) {
