@@ -403,7 +403,7 @@ or releasing, and whenever the brief says to stop.
   pixel ratio, renders on demand; layout tests unchanged.
 - [x] 16.3 Renderer core: 2D orthographic camera from camera2d, clear colour from
   `--k-surface-map` in both themes, dispose; the idle "no frames" test.
-- [ ] 16.4 Context loss and restore (8).
+- [x] 16.4 Context loss and restore (8).
 - [ ] 16.5 2D controller: pan, zoom to the pointer, rotate, no tilt; scale
   limits; keyboard (10.2). Tests for each gesture and key.
 - [ ] 16.6 Layer pipeline: on scene changes, chooseFrame and prepare for new or

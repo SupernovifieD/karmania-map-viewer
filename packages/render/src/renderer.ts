@@ -22,6 +22,8 @@ export interface RenderStats {
   readonly cssHeight: number;
   /** Device pixels to a CSS pixel in the buffer: the page's, or less where the card's limit was in the way. */
   readonly pixelRatio: number;
+  /** Whether the graphics card has taken the context away (and not yet given it back). */
+  readonly contextLost: boolean;
   /** How many geometries and textures are on the card, as three counts them. */
   readonly geometries: number;
   readonly textures: number;
@@ -29,6 +31,15 @@ export interface RenderStats {
   readonly background: string;
   /** The box the orthographic camera of three shows now, where it is and how it is turned. */
   readonly frame: OrthographicFrame;
+}
+
+/** What a renderer is told of how it is to behave. */
+export interface RendererOptions {
+  /**
+   * Called when the graphics card takes the context away (`true`) and when it gives it back (`false`). While it is away nothing is drawn;
+   * when it is back the map is drawn again, from what the renderer holds.
+   */
+  readonly onContextLoss?: (lost: boolean) => void;
 }
 
 /** A renderer on a canvas. */
@@ -45,6 +56,7 @@ export interface Renderer {
    * four bytes (red, green, blue, alpha) for each, rows from the bottom as the card has them. For tests and pictures.
    *
    * @throws RangeError if the rectangle is not whole pixels inside the buffer.
+   * @throws Error while the card has the context away: there is nothing to read.
    */
   readPixels(x: number, y: number, width: number, height: number): Uint8Array;
   stats(): RenderStats;
@@ -59,7 +71,10 @@ const DEFAULT_MAX_BUFFER = 4096;
  * Makes a renderer that draws on `canvas`, which the page sizes (the drawing buffer follows its box). `undefined` if
  * WebGL2 cannot be had, which is a fact of the browser and not a mistake: the viewer says so to the person.
  */
-export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined {
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  options: RendererOptions = {},
+): Renderer | undefined {
   const owner = canvas.ownerDocument.defaultView;
   if (owner === null) {
     return undefined;
@@ -96,6 +111,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
   const depth = { min: 0, max: 0 };
 
   let disposed = false;
+  let lost = false;
   let frames = 0;
   let frame: number | undefined;
   let cssWidth = 0;
@@ -141,6 +157,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
 
   function draw(): void {
     frame = undefined;
+    if (lost) {
+      return;
+    }
     readBackground();
     gl.render(scene, camera);
     frames += 1;
@@ -197,6 +216,29 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
   const scheme = view.matchMedia('(prefers-color-scheme: dark)');
   scheme.addEventListener('change', invalidate);
 
+  /**
+   * The card can take the context away at any time (a driver reset, too many contexts on the page, a tab that was in the
+   * background) and gives it back later. three keeps what it needs to make its objects again, and does so when a frame is drawn
+   * after the context is back; this says so to the page, draws nothing in between, and asks for a frame when it is back.
+   */
+  const onLost = (): void => {
+    // (three has refused the event already, which is what makes the browser give the context back.)
+    lost = true;
+    options.onContextLoss?.(true);
+  };
+  const onRestored = (): void => {
+    lost = false;
+    options.onContextLoss?.(false);
+    // three made its state again with the context (its clear colour among it), so what was set is set again; and the buffer
+    // is as the card made it, which may not be the size it had.
+    background = '';
+    readBackground();
+    gl.setSize(size.width, size.height, false);
+    invalidate();
+  };
+  canvas.addEventListener('webglcontextlost', onLost);
+  canvas.addEventListener('webglcontextrestored', onRestored);
+
   return {
     invalidate,
     setCamera2d(camera, nextOrigin) {
@@ -223,6 +265,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
           `The rectangle ${String(width)} x ${String(height)} at ${String(x)}, ${String(y)} is not in the buffer of ${String(size.width)} x ${String(size.height)}.`,
         );
       }
+      if (lost) {
+        throw new Error(
+          'The graphics card has taken the context away, so there is nothing to read.',
+        );
+      }
       draw();
       const pixels = new Uint8Array(width * height * 4);
       context.readPixels(x, y, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
@@ -236,6 +283,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
         cssWidth,
         cssHeight,
         pixelRatio: size.pixelRatio,
+        contextLost: lost,
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
         background,
@@ -260,13 +308,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
       observer.disconnect();
       themeObserver.disconnect();
       scheme.removeEventListener('change', invalidate);
+      canvas.removeEventListener('webglcontextlost', onLost);
+      canvas.removeEventListener('webglcontextrestored', onRestored);
       ratioQuery?.removeEventListener('change', onRatio);
       if (frame !== undefined) {
         view.cancelAnimationFrame(frame);
         frame = undefined;
       }
       gl.dispose();
-      gl.forceContextLoss();
+      // A context that is away already has nothing to give up.
+      if (!lost) {
+        gl.forceContextLoss();
+      }
     },
   };
 }

@@ -11,6 +11,7 @@ export interface Stats {
   readonly cssWidth: number;
   readonly cssHeight: number;
   readonly pixelRatio: number;
+  readonly contextLost: boolean;
   readonly geometries: number;
   readonly textures: number;
   readonly background: string;
