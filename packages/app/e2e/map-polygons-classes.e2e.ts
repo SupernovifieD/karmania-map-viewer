@@ -117,14 +117,17 @@ test.describe('the polygons layer coloured by classes', () => {
     expect(
       distance(await colourAt(page, view, SQUARES.B), over(LAST, 0.6, map)),
     ).toBeLessThanOrEqual(2);
-    // The outline is the colour of the class and not transparent: along the west edge of B, the pixel the outline covers most (the least blue,
-    // since the last colour is the least blue of them) is still green as the last colour and the fill are, where the layer's own orange
-    // would have taken the green out of it.
+    // The outline is the colour of the class, not transparent, and over the fill: across the west edge of A, whose class is the first and whose
+    // colour is the darkest, the pixel that the outline covers most is darker than the fill is (a fill drawn over its outline would be paler).
+    const filled = over(FIRST, 0.6, map);
     const edge = await Promise.all(
-      [-21, -20, -19].map((across) => colourAt(page, view, SQUARES.B, across)),
+      [-21, -20, -19].map((across) => colourAt(page, view, SQUARES.A, across)),
     );
-    const strongest = edge.reduce((a, b) => ((a[2] ?? 0) <= (b[2] ?? 0) ? a : b));
-    expect(strongest[2]).toBeLessThan(over(LAST, 0.6, map)[2] ?? 0);
+    expect(Math.min(...edge.map((px) => px[0] ?? 255))).toBeLessThanOrEqual((filled[0] ?? 0) - 25);
+    // And the outline of B, which is the last colour, is as green as the colour and not as the layer's own orange would leave it.
+    const strongest = (
+      await Promise.all([-21, -20, -19].map((across) => colourAt(page, view, SQUARES.B, across)))
+    ).reduce((a, b) => ((a[2] ?? 0) <= (b[2] ?? 0) ? a : b));
     expect(strongest[1]).toBeGreaterThanOrEqual(225);
     // C has no value: nothing of it, inside or on its edge, is not the map.
     for (const across of [-22, -21, -20, -19, -18, 0, 18, 19, 20, 21, 22]) {
