@@ -407,34 +407,39 @@ context that is made and used before the first measurement):
 | Longest task of the main thread, ms | none over 50 | none over 50 | none over 50 | 50 |
 
 The median is the period of the display: 60 Hz is 16.67 ms and the browser's clock reads 0.1 ms, so the best a frame can be is the 16.6 or
-16.7 that it reads, which is a frame at every beat with none dropped (the 95th percentile, 18 ms, says how far the others are). **The target says
-"under 16.7 ms", and by that it is met in one of the three runs (16.6) and not in two (16.7).** The test asserts it as the brief has it (`< 16.7`), so
-it passes or fails on the reading of the clock and not on the speed of the renderer. An earlier version of this section read "under" as "at or under" and
-said every target was met; that was a relaxation of a target, which the brief forbids ("Do not relax a target on your own"), and it is undone. Whether
-the target means "keeps up with the display" or is to be measured another way (the renderer's own time for a frame, from a timer query of the card,
-which does not depend on the display's period) is the owner's to say. **The other targets of the table are met in every run; the last, no task of the main thread over 50 ms, is not met in every run (see the final gate below).**
+16.7 that it reads, which is a frame at every beat with none dropped (the 95th percentile, 18 ms, says how far the others are). **The brief says "under
+16.7 ms", which at 60 Hz is not something a display can show; the owner's reading (2026-11-08) is that it means keeping up with the display**, and the test
+asserts that: the median gap between the frames of the scripted camera is at the beat of the display, which the same page measures with nothing happening in it, to
+within 5% (decision 16.F13). (An earlier version of this section read "under" as "at or under" on my own and said every target was met; that was a relaxation, which the
+brief forbids, and it was undone before the owner decided.)
 
-**The final gate of M16** (head `ce09d96`; five runs of `pnpm perf`, the first in the gate and four after it, the same machine and card; and four runs of the head before the review round, `bd1f17e`, under the same conditions):
+**The long tasks, and step 16.F13.** After steps 16.F1 to 16.F3 the three runs above had no task over 50 ms. Runs made at the end of the review round did (tasks of 51 to 60 ms
+in some 10 to 30 percent of the measurements, 84 and 107 ms in two scrolls of the table; the same on the head before the review round, which is how it was known not to come from
+it, and in the Phase 1 tests of the same `pnpm perf`, which M16 does not touch). The harness now records the frames over 45 ms with the scripts in them (the Long Animation Frames
+API, printed as `SLOW`), which a trace of the browser cannot do (it adds tasks of its own), and the product code was timed with probes for a day. What was in the tasks, all of it the
+page's own work and none of it the browser's: **(1)** the pass over the positions for the extent of a layer, 32 to 70 ms for 1,000,000 points or blocks in the browser (an array made for each
+position, six indexed calls); **(2)** the making of the renderer, in one task with the rest of the layer's arrival: 14 to 34 ms for the browser's context and 10 to 15 for three's own state, and up to
+76 ms for three's when the worker was preparing a big dataset at the same moment, since the card's process and the worker compete for the machine; **(3)** the first frame that draws a part of a
+layer, 33 to 45 ms for a part of 250,000 points or blocks (20 ms for 50,000), the card's work, part of it in proportion to the size. Step 16.F13 changed each: the extent is looked at 200,000
+positions at a time with a turn for the page between, in a loop that allocates nothing (10 to 12 ms cold in Node for a million instead of 17 or 18); the renderer is made when the first
+buffers are ready, and not when the layer is first asked for (three's own state then takes 9 to 36 ms, mostly 14 to 18, and the page waits for the card to finish the context with a fence, a
+turn at a time, instead of being held by the first question that three asks it); and the parts are of 100,000 (the tiles of a grid of at most 4,096 cells a side, so that the first prepare does not
+need the card). **Six runs of `pnpm perf` after it** (the same machine and card; all six green):
 
 | | 1,000,000 points | 4,000,000 cells | 1,000,000 blocks | Target |
 | --- | ---: | ---: | ---: | --- |
-| Loading to the first frame, ms | 222 to 355 | 449 to 505 | 350 to 440 | 1,500; 1,500; 3,000 |
-| Median frame time, ms, in the five runs | 16.7, 16.6, 16.6, 16.7, 16.6 | | | under 16.7 |
-| 95th percentile, ms | 17.6 to 18.8 | | | under 33 |
-| New classes to the picture, ms | | 140 to 181 | | 300 |
-| Frames drawn for the 300 changes of the camera | 299 in every run | | | (the test asks for 290) |
-| Longest task of the main thread, ms | 55 in one run of five | 52 in one run of five | none in five | 50 |
+| Loading to the first frame, ms | 231 to 352 | 467 to 542 | 319 to 447 | 1,500; 1,500; 3,000 |
+| Median frame time of the pan, zoom and rotation, ms | 16.7 in all six (the display's beat, measured in the same page: 16.5 to 16.7) | | | at the beat of the display |
+| 95th percentile of the same, ms | 17.2 to 18.7 | | | under 33 |
+| Frames the renderer drew for the 300 changes of the camera | 299 in every run | | | (the test asks for 290) |
+| New classes to the picture, ms | | 176 to 240 | | 300 |
+| Longest task of the main thread, ms | none over 50 | none over 50 | none over 50 | 50 |
 
-The tests of Phase 1 in the same `pnpm perf` (a CSV of 1,000,000 points and a grid of 4,000,000 cells, through the preview, the import, the load and the scroll of the table) had
-tasks over the line too: in the five runs, a task of the load of 52, 51, 51 and 52 ms (with 54 ms for a preview) and, in the scroll of the table, 84, 84 and 107 ms; on the head before the review round, in four
-runs, a load of 60 ms and scrolls of 53 and 50 ms, and a task of 50 ms in the points of M16. **So a task a few milliseconds over the line (51 to 60; 84 and 107 in scrolls) comes in some of the measurements, in the tests of Phase 1, which M16 does not touch, as in its own.
-None came in the three runs after step 16.F3 (the table above); they came in 9 of the 45 measurements of the five runs of this head; and when the two heads were run in turn, three
-runs each, at the end, they came in 8 of 27 measurements of the head before the review round and in 8 of 27 of this one: the same, so the review round did not cause them, and how often they come depends
-on the state of the machine at the time, which got noisier as the session went on. The target "no task of the main thread over 50 ms" is met when the machine is quiet and not always otherwise, and
-`pnpm perf` is red in four of the five runs of this head** (the strict median, in two; a long task, in all four that fail; the fifth run is green). Whether those tasks are the page's or the browser's (a
-collection of garbage, the process of the card, the machine) I could not tell: a trace (`KARMANIA_PROFILE=1`) shows tasks of 54 to 70 ms in the points in all three traced runs, which the trace may
-cause, so it cannot be used to catch them. The brief says to stop and report the numbers when a target is missed after reasonable effort (steps 16.F1 to 16.F3 took the tasks from 186, 292 and 210 ms to
-the line), and this is that report: **the decision of whether to merge with `pnpm perf` red on these two targets is the owner's.**
+The tests of Phase 1 in the same runs (a CSV of 1,000,000 points and a grid of 4,000,000 cells, through the preview, the import, the load and the scroll of the table) had no task over 50 ms in any
+of their 36 measurements, where before they had them in some (a load of 51 to 60 ms, scrolls of 84 and 107): the same causes. For comparison, with the two heads run in turn before the fix, tasks over 50 ms
+were in 8 of 27 measurements on each. **What is not changed**: the first frame that draws a layer is still the card's own work in a task of its own (20 ms was measured with parts of 50,000 and 33 to 45 with 250,000; with the 100,000 now it was not timed apart, and no task over 50 ms was seen), and the frames over 45 ms that
+`SLOW` shows outside the windows that the targets name (the start-up of the page, 45 to 90 ms to evaluate its script, and in the import wizard the frame after a click on Next with the
+1,000,000-row file, 110 to 226 ms of layout) are the Phase 1 interface's and are not held by any target; they are for the owner to say whether to look at.
 
 How it got there. The first measurement on the card, before any change, met the times and missed the last target in all three: a first frame of 630 to 862 ms
 and a median of 16.6 ms (p95 18.5), but a longest task of 186 ms for the points, 292 for the grid and 210 for the blocks, and, in later runs, of 51 to 58

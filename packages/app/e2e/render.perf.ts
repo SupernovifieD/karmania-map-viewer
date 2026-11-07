@@ -1,8 +1,9 @@
 /**
  * How the 2D view performs with the large files of `scripts/generate-fixtures` (section 9.6 of the phase 2 brief), in a real browser:
  *
- *   - 1,000,000 points: from loading to the first frame under 1.5 s; the frame time of a scripted pan, zoom and rotate, median under 16.7 ms
- *     and 95th percentile under 33 ms;
+ *   - 1,000,000 points: from loading to the first frame under 1.5 s; the frame time of a scripted pan, zoom and rotate keeping up with the
+ *     display (the median at the beat of the display, which is 16.7 ms at 60 Hz: the owner's reading of the brief's "under 16.7 ms") and the
+ *     95th percentile under 33 ms;
  *   - a grid of 4,000,000 cells: from loading to the first frame under 1.5 s; new classes visible under 300 ms;
  *   - a model of 1,000,000 blocks: from loading to the first frame under 3 s (its 3D orbit is a later milestone's);
  *   - no task on the main thread over 50 ms in any of them.
@@ -27,6 +28,23 @@ const WATCH = `(() => {
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) long.push({ start: entry.startTime, duration: entry.duration });
   }).observe({ type: 'longtask', buffered: true });
+  /** The frames that took over 45 ms, with the scripts that ran in them (the Long Animation Frames API): what a long task was made of. */
+  const slow = [];
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration < 45) continue;
+        slow.push({
+          start: Math.round(entry.startTime), duration: Math.round(entry.duration), blocking: Math.round(entry.blockingDuration),
+          renderStart: Math.round(entry.renderStart - entry.startTime), layoutStart: Math.round(entry.styleAndLayoutStart - entry.startTime),
+          scripts: entry.scripts.map((s) => ({
+            type: s.invokerType, invoker: s.invoker, url: s.sourceURL.split('/').pop(), fn: s.sourceFunctionName, at: s.sourceCharPosition,
+            ms: Math.round(s.duration), forced: Math.round(s.forcedStyleAndLayoutDuration), pause: Math.round(s.pauseDuration),
+          })),
+        });
+      }
+    }).observe({ type: 'long-animation-frame', buffered: true });
+  } catch (error) { /* a browser without the API: the long tasks are still counted */ }
   const viewer = () => document.querySelector('karmania-app').shadowRoot.querySelector('karmania-viewer');
   const frames = () => (viewer().renderStats() ?? { frames: 0 }).frames;
   /** Waits a frame at a time until \`check\` says yes; says when. */
@@ -43,7 +61,7 @@ const WATCH = `(() => {
       tick();
     });
   }
-  window.perf = { long, viewer, frames, until };
+  window.perf = { long, slow, viewer, frames, until };
 })()`;
 
 const inPage = <T>(page: Page, body: string): Promise<T> =>
@@ -59,6 +77,8 @@ interface Measured {
     readonly median: number;
     readonly p95: number;
     readonly count: number;
+    /** The beat of the display: the median gap between animation frames of the same page with nothing happening, in ms. */
+    readonly displayMs: number;
     /** How many frames the renderer drew meanwhile, which is what makes the gaps those of drawing and not of an idle page. */
     readonly drawn: number;
   };
@@ -143,15 +163,27 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   if (options.path) {
     // The path: 100 frames of pan, 100 of zoom in and out, 100 of rotate, the camera given a new place each frame, and the time between
     // the frames that the browser gave, which is what a person sees as smooth or not.
-    const { gaps, drawn } = await inPage<{ gaps: number[]; drawn: number }>(
+    const { gaps, drawn, idle } = await inPage<{ gaps: number[]; drawn: number; idle: number[] }>(
       page,
       `const v = perf.viewer();
        const doc = v.scene();
        const start = doc.camera2d;
+       const wait = () => new Promise((resolve) => requestAnimationFrame(resolve));
+       // The beat of the display: 60 frames of the page with nothing happening in it (the rest of the layer is on the card by now: a part comes
+       // in each frame, and a million points are ten of them).
+       const idle = [];
+       await new Promise((resolve) => setTimeout(resolve, 500));
+       await wait();
+       let before = performance.now();
+       for (let i = 0; i < 60; i += 1) {
+         await wait();
+         const at = performance.now();
+         idle.push(at - before);
+         before = at;
+       }
        const framesBefore = v.renderStats().frames;
        const gaps = [];
        let last = performance.now();
-       const wait = () => new Promise((resolve) => requestAnimationFrame(resolve));
        for (let i = 0; i < 300; i += 1) {
          const t = i % 100;
          const camera2d = i < 100
@@ -165,10 +197,12 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
          gaps.push(now - last);
          last = now;
        }
-       return { gaps, drawn: v.renderStats().frames - framesBefore };`,
+       return { gaps, drawn: v.renderStats().frames - framesBefore, idle };`,
     );
     const sorted = [...gaps].sort((a, b) => a - b);
+    const idleSorted = [...idle].sort((a, b) => a - b);
     frames = {
+      displayMs: Math.round((idleSorted[Math.floor(idleSorted.length / 2)] ?? 0) * 100) / 100,
       median: Math.round((sorted[Math.floor(sorted.length / 2)] ?? 0) * 100) / 100,
       p95: Math.round((sorted[Math.floor(sorted.length * 0.95)] ?? 0) * 100) / 100,
       count: gaps.length,
@@ -194,6 +228,12 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   }
 
   const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
+  // The frames over 45 ms and the scripts in them, for what a long task was made of (printed, not asserted).
+  const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
+  const slowAfter = slow.filter((frame) => frame.start >= started);
+  if (slowAfter.length > 0) {
+    console.info(`SLOW ${options.data} ${JSON.stringify(slowAfter)}`);
+  }
   if (profiled) {
     const trace = JSON.parse((await browser.stopTracing()).toString()) as {
       traceEvents: {
@@ -281,10 +321,14 @@ test.describe('the 2D view with the large files', () => {
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
     // The renderer drew a frame for each of the 300 changes of the camera: the gaps below are those of a page that draws, not of one that is idle.
     expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
-    // As the brief has it: under 16.7 ms. The display's period is 16.67 ms and the clock of the browser reads 0.1 ms, so on a display of 60 Hz the
-    // median reads 16.6 or 16.7: it is at the period of the display, and "under" is met by the 16.6 and missed by the 16.7. The target is not read
-    // as "at or under" here, which is the owner's to say (docs/perf.md).
-    expect(result.frames?.median, 'median frame time').toBeLessThan(16.7);
+    // Keeping up with the display, which is what the owner says the brief's "under 16.7 ms" means at 60 Hz (decision 16.F13): the median gap
+    // between the frames of the scripted camera is the beat of the display, which the same page measures with nothing happening in it, to
+    // within 5% (the clock reads 0.1 ms, and the beat that is read varies by that much from run to run: 16.5 to 16.7 were seen). A frame missed
+    // at every other beat would be a median of twice the beat.
+    expect(
+      result.frames?.median,
+      'median frame time, at the beat of the display',
+    ).toBeLessThanOrEqual((result.frames?.displayMs ?? 0) * 1.05);
     expect(result.frames?.p95, '95th percentile frame time').toBeLessThan(33);
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
