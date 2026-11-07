@@ -139,6 +139,9 @@ export function createRenderer(
   /** The ids of the layers from the one that is drawn first (the bottom of the legend) to the one drawn last. */
   let order: readonly string[] = [];
   gl.autoClear = false;
+  // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
+  // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
+  gl.sortObjects = false;
   // Any box: `placeCamera` gives it its real one before the first frame, as the canvas gets its size.
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.25, 100);
 

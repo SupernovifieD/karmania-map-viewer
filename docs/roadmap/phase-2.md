@@ -460,6 +460,8 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
   - [x] 16.17b The screenshots that changed, each looked at and explained.
 - [ ] 16.G Gate (with `pnpm perf` for 2D).
+  - [x] 16.G1 The 2D render performance measured (the real GPU of the machine, section 9.6).
+  - [x] 16.F1 Objects of a layer are drawn in the order they were put (found by the render measurements and the golden images).
 
 ## M17: Map furniture and overlays
 
