@@ -780,6 +780,39 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.classifyCalls).toHaveLength(1);
   });
 
+  it('asks for the classes of the triangles of a mesh when its style is by classes, and gives them with the layer', async () => {
+    const t = setup();
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'mesh',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
+          triangles: Uint32Array.of(0, 1, 2),
+        },
+        findings: [],
+      });
+    t.drawable([0, true]);
+    await t.add(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Slope',
+          method: 'quantile',
+          classes: 4,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[0, 'Slope', 'quantile', 4]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+  });
+
   it('asks for the classes of polygons when their style is by classes, and gives them with the layer', async () => {
     const t = setup();
     t.state.prepare = () =>
@@ -881,10 +914,12 @@ describe('LayerPipeline: the classes of a layer', () => {
     t.state.prepare = () =>
       Promise.resolve({
         status: 'drawn',
+        // The one kind that no layer is coloured by classes for: a surface, the picture of a grid with elevations, which 2D does not draw.
         buffers: {
-          kind: 'mesh',
+          kind: 'surface',
           positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
           triangles: Uint32Array.of(0, 1, 2),
+          triangleCell: Uint32Array.of(0),
         },
         findings: [],
       });
