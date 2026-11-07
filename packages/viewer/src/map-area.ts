@@ -49,8 +49,10 @@ export class KarmaniaMapArea extends LitElement {
         position: relative;
       }
 
-      /* The map: it fills the area exactly, whatever the area is, and is under everything else. */
+      /* The map: it fills the area exactly, whatever the area is, and is under everything else. Its background is
+         the colour that the renderer clears it to, which it reads from here: the map has the colour of the area. */
       canvas {
+        background-color: var(--k-surface-map);
         display: block;
         height: 100%;
         inset: 0;

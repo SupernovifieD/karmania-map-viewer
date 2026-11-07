@@ -1,53 +1,10 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { inEveryLayout } from './support/layouts.js';
-import { importAndLoad } from './support/wizard.js';
+import { drawn, pause, stats, withData } from './support/render.js';
 
 const area = (page: Page) => page.locator('karmania-map-area');
 const canvas = (page: Page) => area(page).locator('canvas');
-
-/** What the renderer says of itself (`RenderStats`). */
-interface Stats {
-  readonly frames: number;
-  readonly width: number;
-  readonly height: number;
-  readonly cssWidth: number;
-  readonly cssHeight: number;
-  readonly pixelRatio: number;
-  readonly geometries: number;
-  readonly textures: number;
-}
-
-/** The renderer's account of itself, reached through the viewer; `undefined` while there is no renderer. */
-function stats(page: Page): Promise<Stats | undefined> {
-  return page.evaluate(() => {
-    const viewer = document
-      .querySelector('karmania-app')
-      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
-      renderStats(): Stats | undefined;
-    };
-    return viewer.renderStats();
-  });
-}
-
-/** Waits until a frame has been drawn: the renderer is made just after the first render, and draws when its canvas has a size. */
-async function drawn(page: Page): Promise<Stats> {
-  await expect.poll(async () => (await stats(page))?.frames ?? 0).toBeGreaterThan(0);
-  const now = await stats(page);
-  if (now === undefined) {
-    throw new Error('There is no renderer.');
-  }
-  return now;
-}
-
-/** Loads a file, which gives the scene its first layer, and so the viewer its renderer; waits for the first frame. */
-async function withData(page: Page): Promise<Stats> {
-  await importAndLoad(page, 'points.csv', 'points.prj');
-  return drawn(page);
-}
-
-const pause = (page: Page, ms: number): Promise<void> =>
-  page.evaluate((time) => new Promise<void>((resolve) => setTimeout(resolve, time)), ms);
 
 test.describe('the map canvas', () => {
   test('has no renderer, and holds no context of the graphics card, until there is something to draw', async ({
@@ -131,6 +88,9 @@ test.describe('the map canvas', () => {
             now.width === Math.round(box.width) &&
             now.height === Math.round(box.height) &&
             now.cssWidth === box.width &&
+            // The camera shows the new box too: half of it on each side, a pixel being a unit in the scene's first camera.
+            now.frame.right === box.width / 2 &&
+            now.frame.top === box.height / 2 &&
             now.width !== before.width
           );
         })

@@ -3,8 +3,12 @@
  * the canvas and the device pixel ratio, and a frame that is drawn only when something asks for one. three.js stays in
  * this package; what the viewer sees is the small interface below.
  */
-import { OrthographicCamera, Scene, WebGLRenderer } from 'three';
+import type { Camera2d } from '@karmania/scene';
+import { Color, OrthographicCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
 import { bufferSize } from './buffer-size.js';
+import { orthographicFrame } from './camera-2d.js';
+import type { OrthographicFrame } from './camera-2d.js';
+import { parseCssColour } from './css-colour.js';
 
 /** What the renderer says of itself, for tests and diagnostics. */
 export interface RenderStats {
@@ -21,12 +25,28 @@ export interface RenderStats {
   /** How many geometries and textures are on the card, as three counts them. */
   readonly geometries: number;
   readonly textures: number;
+  /** What the map is cleared to: `#rrggbb`, or `transparent` where the canvas has no opaque background. */
+  readonly background: string;
+  /** The box the orthographic camera of three shows now, where it is and how it is turned. */
+  readonly frame: OrthographicFrame;
 }
 
 /** A renderer on a canvas. */
 export interface Renderer {
   /** Asks for a frame: one is drawn soon, however many times this is called before it. After `dispose` it does nothing. */
   invalidate(): void;
+  /**
+   * Looks at the map through `camera`, with `origin` the point (in map units) that the positions on the card are relative to.
+   * A frame is asked for if either changed.
+   */
+  setCamera2d(camera: Camera2d, origin: readonly [number, number, number]): void;
+  /**
+   * Draws a frame now and reads back a rectangle of the drawing buffer: `x` and `y` from the bottom left, in device pixels,
+   * four bytes (red, green, blue, alpha) for each, rows from the bottom as the card has them. For tests and pictures.
+   *
+   * @throws RangeError if the rectangle is not whole pixels inside the buffer.
+   */
+  readPixels(x: number, y: number, width: number, height: number): Uint8Array;
   stats(): RenderStats;
   /** Stops watching the canvas, frees what is on the card and gives the context up. Calling it again does nothing. */
   dispose(): void;
@@ -67,7 +87,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
     typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 ? limit : DEFAULT_MAX_BUFFER;
 
   const scene = new Scene();
-  const camera = new OrthographicCamera(-1, 1, 1, -1, -1, 1);
+  // Any box: `placeCamera` gives it its real one before the first frame, as the canvas gets its size.
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.25, 100);
+
+  /** What the map is looking at, and the heights that are drawn (relative to the origin). */
+  let look: Camera2d = { centre: [0, 0], unitsPerPixel: 1, heading: 0 };
+  let origin: readonly [number, number, number] = [0, 0, 0];
+  const depth = { min: 0, max: 0 };
 
   let disposed = false;
   let frames = 0;
@@ -76,8 +102,46 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
   let cssHeight = 0;
   let size = bufferSize(cssWidth, cssHeight, view.devicePixelRatio, maxBuffer);
 
+  /** Puts the orthographic camera where `look` says, for the box that the canvas has now. */
+  function placeCamera(): void {
+    const box = orthographicFrame(look, origin, { width: cssWidth, height: cssHeight }, depth);
+    camera.left = box.left;
+    camera.right = box.right;
+    camera.top = box.top;
+    camera.bottom = box.bottom;
+    camera.near = box.near;
+    camera.far = box.far;
+    camera.position.set(...box.position);
+    camera.rotation.z = box.rotation;
+    camera.updateProjectionMatrix();
+  }
+
+  /** What the map is cleared to is the background of the canvas, which the page gives (the token `--k-surface-map`). */
+  let background = '';
+  function readBackground(): void {
+    const colour = parseCssColour(view.getComputedStyle(canvas).backgroundColor);
+    const opaque = colour !== undefined && colour.a > 0 ? colour : undefined;
+    const text =
+      opaque === undefined
+        ? 'transparent'
+        : `#${[opaque.r, opaque.g, opaque.b]
+            .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
+            .join('')}`;
+    if (text !== background) {
+      background = text;
+      gl.setClearColor(
+        opaque === undefined
+          ? new Color(0, 0, 0)
+          : new Color().setRGB(opaque.r / 255, opaque.g / 255, opaque.b / 255, SRGBColorSpace),
+        opaque === undefined ? 0 : opaque.a,
+      );
+    }
+  }
+  readBackground();
+
   function draw(): void {
     frame = undefined;
+    readBackground();
     gl.render(scene, camera);
     frames += 1;
   }
@@ -95,6 +159,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
       gl.setSize(next.width, next.height, false);
     }
     size = next;
+    placeCamera();
     invalidate();
   }
 
@@ -120,8 +185,49 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
   }
   watchRatio();
 
+  /**
+   * The colour of the map follows the theme: a page says which with an attribute or a class on its root, or leaves it to the
+   * system's preference, so a change of either is looked for (the colour itself is read when a frame is drawn).
+   */
+  const themeObserver = new MutationObserver(invalidate);
+  themeObserver.observe(canvas.ownerDocument.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme', 'class', 'style'],
+  });
+  const scheme = view.matchMedia('(prefers-color-scheme: dark)');
+  scheme.addEventListener('change', invalidate);
+
   return {
     invalidate,
+    setCamera2d(camera, nextOrigin) {
+      if (disposed) {
+        return;
+      }
+      look = camera;
+      origin = nextOrigin;
+      placeCamera();
+      invalidate();
+    },
+    readPixels(x, y, width, height) {
+      const whole = [x, y, width, height].every(Number.isInteger);
+      if (
+        !whole ||
+        x < 0 ||
+        y < 0 ||
+        width < 1 ||
+        height < 1 ||
+        x + width > size.width ||
+        y + height > size.height
+      ) {
+        throw new RangeError(
+          `The rectangle ${String(width)} x ${String(height)} at ${String(x)}, ${String(y)} is not in the buffer of ${String(size.width)} x ${String(size.height)}.`,
+        );
+      }
+      draw();
+      const pixels = new Uint8Array(width * height * 4);
+      context.readPixels(x, y, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
+      return pixels;
+    },
     stats() {
       return {
         frames,
@@ -132,6 +238,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
         pixelRatio: size.pixelRatio,
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
+        background,
+        // What the camera of three has, which is what draws, and not what was worked out for it.
+        frame: {
+          left: camera.left,
+          right: camera.right,
+          top: camera.top,
+          bottom: camera.bottom,
+          near: camera.near,
+          far: camera.far,
+          position: [camera.position.x, camera.position.y, camera.position.z],
+          rotation: camera.rotation.z,
+        },
       };
     },
     dispose() {
@@ -140,6 +258,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer | undefined 
       }
       disposed = true;
       observer.disconnect();
+      themeObserver.disconnect();
+      scheme.removeEventListener('change', invalidate);
       ratioQuery?.removeEventListener('change', onRatio);
       if (frame !== undefined) {
         view.cancelAnimationFrame(frame);

@@ -3,7 +3,7 @@ import type { Engine, Summary } from '@karmania/engine';
 import { createRenderer } from '@karmania/render';
 import type { Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore } from '@karmania/scene';
-import type { SceneDocument } from '@karmania/scene';
+import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { carriesFiles } from './drag.js';
@@ -110,6 +110,11 @@ export class KarmaniaViewer extends LitElement {
     return this.store.getState();
   }
 
+  /** Changes the scene by a command (the same that the controls of the viewer use), and gives the document that comes of it. */
+  dispatch(command: Command): SceneDocument {
+    return this.store.dispatch(command);
+  }
+
   /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the viewer is. */
   private readonly rows: RowSource = (id, start, count) => {
     const engine = this.engine;
@@ -131,6 +136,11 @@ export class KarmaniaViewer extends LitElement {
 
   /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
   private renderer: Renderer | undefined;
+
+  /** A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer. */
+  renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined {
+    return this.renderer?.readPixels(x, y, width, height);
+  }
 
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
   renderStats(): RenderStats | undefined {
@@ -161,13 +171,23 @@ export class KarmaniaViewer extends LitElement {
     const canvas = area.canvas;
     if (canvas !== undefined && this.isConnected) {
       this.renderer = createRenderer(canvas);
+      this.lookThroughCamera();
     }
   }
 
-  /** Called when the scene changes: the first layer is what the renderer is for. */
-  private readonly onScene = (): void => {
-    if (Object.keys(this.store.getState().layers).length > 0) {
+  /** Gives the renderer the camera and the origin of the scene. */
+  private lookThroughCamera(): void {
+    const { camera2d, frame } = this.store.getState();
+    this.renderer?.setCamera2d(camera2d, frame?.origin ?? [0, 0, 0]);
+  }
+
+  /** Called when the scene changes: the first layer is what the renderer is for, and the camera is what it looks through. */
+  private readonly onScene = (state: SceneDocument, previous: SceneDocument): void => {
+    if (Object.keys(state.layers).length > 0) {
       void this.attachRenderer();
+    }
+    if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
+      this.lookThroughCamera();
     }
   };
 
