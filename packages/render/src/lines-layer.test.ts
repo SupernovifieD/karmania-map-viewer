@@ -2,6 +2,7 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth } from 'three';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
+import { MAX_CLASSES } from './look.js';
 import type { FrameInfo, LayerLook } from './look.js';
 import { SEGMENTS_PER_PART, createLinesLayer, gatherSegments } from './lines-layer.js';
 
@@ -152,5 +153,107 @@ describe('createLinesLayer', () => {
     layer.dispose();
     expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
     expect(parts(layer)).toHaveLength(0);
+  });
+
+  describe('coloured by classes', () => {
+    /** `count` segments of lines of 2 segments each (segments 0 and 1 are line 0, 2 and 3 are line 1, ...). */
+    const twoEach = (count: number): Extract<RenderBuffers, { kind: 'lines' }> => ({
+      ...lines(count),
+      segmentLine: Uint32Array.from({ length: count }, (_, i) => Math.floor(i / 2)),
+    });
+    const colours = (n: number) =>
+      Array.from({ length: n }, (_, i) => `#${(i * 16).toString(16).padStart(2, '0')}0000`);
+    const classOf = (mesh: Mesh | undefined) =>
+      (mesh?.geometry as InstancedBufferGeometry | undefined)?.getAttribute('aClass');
+
+    it('is in the colour of the layer until it is given classes, and when they are taken away', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(classOf(parts(layer)[0])).toBeUndefined();
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2) });
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+      layer.setClasses?.(undefined);
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(uniforms(layer)['uCount']?.value).toBe(0);
+      expect(classOf(parts(layer)[0])).toBeUndefined();
+    });
+
+    it('gives each segment the class of its line, and the colours of the classes go in the palette', () => {
+      const layer = createLinesLayer(twoEach(5), LOOK);
+      layer.setClasses?.({
+        indices: Uint8Array.of(3, 255, 1),
+        colours: ['#ff0000', '#00ff00', '#0000ff', '#ffffff'],
+      });
+      // Segments 0 and 1 are line 0, 2 and 3 line 1 (no value), 4 line 2.
+      expect([...(classOf(parts(layer)[0])?.array ?? [])]).toEqual([3, 3, 255, 255, 1]);
+      expect(classOf(parts(layer)[0])?.itemSize).toBe(1);
+      expect(uniforms(layer)['uCount']?.value).toBe(4);
+      const palette = uniforms(layer)['uPalette']?.value as { x: number; y: number; z: number }[];
+      expect(palette).toHaveLength(MAX_CLASSES);
+      expect(palette[2]).toMatchObject({ x: 0, y: 0, z: 1 });
+    });
+
+    it('holds no more colours than it has room for', () => {
+      const layer = createLinesLayer(twoEach(2), LOOK);
+      layer.setClasses?.({ indices: new Uint8Array(1), colours: colours(MAX_CLASSES + 4) });
+      expect(uniforms(layer)['uCount']?.value).toBe(MAX_CLASSES);
+    });
+
+    it('gives each part the classes of its own segments, and a part put on later its share', () => {
+      const layer = createLinesLayer(twoEach(SEGMENTS_PER_PART + 3), LOOK);
+      const lineCount = Math.ceil((SEGMENTS_PER_PART + 3) / 2);
+      layer.setClasses?.({
+        indices: Uint8Array.from({ length: lineCount }, (_, i) => i % 197),
+        colours: colours(8),
+      });
+      layer.step?.();
+      const [first, second] = parts(layer).map((mesh) => classOf(mesh)?.array);
+      expect(first).toHaveLength(SEGMENTS_PER_PART);
+      expect(second).toHaveLength(3);
+      // The last segment of the first part is segment 99,999, of line 49,999; the first of the second is segment 100,000, of line 50,000.
+      expect(first?.[0]).toBe(0);
+      expect(first?.[SEGMENTS_PER_PART - 1]).toBe(Math.floor((SEGMENTS_PER_PART - 1) / 2) % 197);
+      expect(second?.[0]).toBe((SEGMENTS_PER_PART / 2) % 197);
+      expect(second?.[2]).toBe((SEGMENTS_PER_PART / 2 + 1) % 197);
+    });
+
+    it('is in the colour of the layer for classes that stop short of a line that has segments, and covers lines that have none', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2) });
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+      layer.setClasses?.({ indices: Uint8Array.of(0), colours: colours(2) });
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(classOf(parts(layer)[0])).toBeUndefined();
+      // More classes than lines is as it should be: a line with no segment has a class and nothing to draw it in.
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1, 2, 3), colours: colours(4) });
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+    });
+
+    it('keeps the attributes when it is given the same classes with other colours: only the palette changes', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      const indices = Uint8Array.of(0, 1);
+      layer.setClasses?.({ indices, colours: colours(2) });
+      const attribute = classOf(parts(layer)[0]);
+      layer.setClasses?.({ indices, colours: ['#ff0000'] });
+      expect(classOf(parts(layer)[0])).toBe(attribute);
+      expect(uniforms(layer)['uCount']?.value).toBe(1);
+      layer.setClasses?.({ indices: Uint8Array.from(indices), colours: colours(2) });
+      expect(classOf(parts(layer)[0])).not.toBe(attribute);
+    });
+
+    it('keeps the width, the opacity and the draw order of one colour', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2) });
+      layer.prepareFrame(INFO);
+      layer.setLook({ ...LOOK, colour: '#112233', opacity: 0.25, lineWidth: 5 });
+      expect(uniforms(layer)['uOpacity']?.value).toBe(0.25);
+      expect(uniforms(layer)['uWidth']?.value).toBe(10);
+      expect(uniforms(layer)['uColour']?.value).toMatchObject({
+        x: 17 / 255,
+        y: 34 / 255,
+        z: 51 / 255,
+      });
+      expect(uniforms(layer)['uDepthScale']?.value).toBe(0);
+    });
   });
 });
