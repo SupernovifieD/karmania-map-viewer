@@ -740,6 +740,31 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
   });
 
+  it('asks for the classes of a block model as for a grid, and gives them with the layer', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'blocks',
+          centres: Float32Array.of(0, 0, 0, 10, 0, 0),
+          spacing: [10, 10, 10],
+          rotation: 0,
+        },
+        findings: [],
+      });
+    t.scene.dispatch({
+      type: 'addLayers',
+      datasets: [{ ...gridDataset(0), name: 'Blocks', kind: 'blocks' }],
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([[0, 'Au', 'equal', 7]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    expect(t.sink.setLayerClasses.mock.calls[0]?.[1]?.indices).toEqual(Uint8Array.of(0, 1));
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+  });
+
   it('does not ask for classes for a layer of a kind that is not coloured by them, whatever its style says', async () => {
     const t = setup();
     t.drawable([0, true]);

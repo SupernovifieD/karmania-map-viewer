@@ -432,12 +432,12 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.11c The warped grid: the mesh of each tile with its texture.
   - [x] 16.11d The pipeline brings the classes of a layer coloured by classes (classify, class index, colours) to the renderer;
     end-to-end tests of the grid. (Restyling by recomputing only the classes, and the other kinds, are 16.13.)
-- [ ] 16.12 Block layer (instanced, top faces in 2D).
-  Split (blocks are turned as grids are, so that moves first; the layer; then the pipeline gives blocks their classes, and the browser tests):
+- [x] 16.12 Block layer (instanced, top faces in 2D).
+  Split (blocks are turned as grids are, so that moves first; the layer; a mend found by the browser; then the pipeline gives blocks their classes, and the browser tests):
   - [x] 16.12a The exact sine and cosine of a rotation, shared by the grid and the blocks.
   - [x] 16.12b The block layer: instanced boxes in parts, the class of each block, the top faces in 2D.
   - [x] 16.12c A layer of blocks that is less than opaque: a depth pass, so that a top with another under it is blended once.
-  - [ ] 16.12d The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
+  - [x] 16.12d The pipeline gives blocks their classes; end-to-end tests with `blocks.csv`.
 - [ ] 16.13 Class colours: palette uniforms from class indices; restyling
   recomputes only class indices.
 - [ ] 16.14 Draw order with depth cleared between layers; pixel tests.
