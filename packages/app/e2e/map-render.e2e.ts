@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { dispatch, pause, pixels, stats, withData } from './support/render.js';
+import { camera, dispatch, pause, pixels, sceneFrame, stats, withData } from './support/render.js';
 
 const area = (page: Page) => page.locator('karmania-map-area');
 
@@ -92,9 +92,10 @@ test.describe('the renderer core', () => {
     const first = await withData(page);
     const frame = (origin: readonly number[]) => ({
       type: 'setFrame',
-      frame: { mapCrs: { kind: 'epsg', code: 32640 }, origin, source: 'user' },
+      frame: { mapCrs: { kind: 'epsg', code: 32640 }, origin, source: 'auto' },
     });
-    // The frame comes first: a new map CRS puts the cameras back, as the scene does.
+    // The map's system is the file's (32640), so a new origin leaves the camera where it is; the frame is the engine's kind (auto), which the
+    // pipeline leaves alone, where one a person chose is a choice that it follows.
     await dispatch(page, frame([0, 0, 0]));
     await dispatch(page, {
       type: 'setCamera',
@@ -120,18 +121,16 @@ test.describe('the renderer core', () => {
     expect((await stats(page))?.frame.position.slice(0, 2)).toEqual([300, 300]);
   });
 
-  test('is given the camera that the scene had before there was a renderer', async ({ page }) => {
+  test('looks through the camera that the first view of the data made', async ({ page }) => {
     await page.goto('/');
-    await dispatch(page, {
-      type: 'setCamera',
-      patch: { camera2d: { centre: [300, 400], unitsPerPixel: 0.5, heading: 90 } },
-    });
-    expect(await stats(page)).toBeUndefined();
-    await withData(page);
-    const now = await stats(page);
-    expect(now?.frame.position.slice(0, 2)).toEqual([300, 400]);
-    expect(now?.frame.right).toBeCloseTo((now?.cssWidth ?? 0) * 0.25, 6);
-    expect(now?.frame.rotation).toBeCloseTo(-Math.PI / 2, 12);
+    const now = await withData(page);
+    const view = await camera(page);
+    const frame = await sceneFrame(page);
+    expect(view.unitsPerPixel).not.toBe(1);
+    // The renderer was made before the fit, so it was given the camera that the fit made when the scene said so.
+    expect(now.frame.position[0]).toBeCloseTo(view.centre[0] - (frame?.origin[0] ?? 0), 4);
+    expect(now.frame.position[1]).toBeCloseTo(view.centre[1] - (frame?.origin[1] ?? 0), 4);
+    expect(now.frame.right).toBeCloseTo((now.cssWidth * view.unitsPerPixel) / 2, 4);
   });
 
   test('draws one frame for any number of changes made together, and none for a change that changes nothing', async ({

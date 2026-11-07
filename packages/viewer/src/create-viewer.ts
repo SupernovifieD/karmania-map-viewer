@@ -9,6 +9,8 @@ import './viewer.js';
 export interface Viewer {
   /** The scene as it is now: a layer for each loaded dataset, the camera, the legend. */
   scene(): SceneDocument;
+  /** Shows the data: the camera goes where all the visible layers that are prepared fit in the map area. */
+  fit(): void;
   /** Changes the scene by a command, and gives the document that comes of it (the same one if nothing changed). */
   dispatch(command: Command): SceneDocument;
   /** Opens the import wizard on `files`, or the browser's file picker when there are none to give (no list, or an empty one). */
@@ -23,7 +25,7 @@ export interface Viewer {
 /**
  * Puts a viewer in `container`, which has to have a size: the viewer is as tall and as wide as it is.
  *
- * @throws Error from `openImport`, `scene` and `dispatch` if the viewer has been disposed, which is a mistake of the caller.
+ * @throws Error from `openImport`, `scene`, `dispatch` and `fit` if the viewer has been disposed, which is a mistake of the caller.
  */
 export function createViewer(container: HTMLElement): Viewer {
   const element = document.createElement('karmania-viewer');
@@ -38,6 +40,10 @@ export function createViewer(container: HTMLElement): Viewer {
     scene() {
       alive();
       return element.scene();
+    },
+    fit() {
+      alive();
+      element.fit();
     },
     dispatch(command) {
       alive();

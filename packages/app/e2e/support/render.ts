@@ -34,9 +34,17 @@ export interface Camera {
   readonly heading: number;
 }
 
+/** The frame of the scene: the map's coordinate system, the origin the card's positions are relative to, and who chose it. */
+export interface SceneFrame {
+  readonly mapCrs: { readonly kind: string; readonly code?: number; readonly units?: string };
+  readonly origin: readonly [number, number, number];
+  readonly source: string;
+}
+
 /** The viewer of the page, in what the tests use of it. */
 interface ViewerElement {
-  scene(): { camera2d: Camera };
+  scene(): { camera2d: Camera; frame: SceneFrame | null };
+  layerStates(): [string, { status: string; fraction?: number; message?: string }][];
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
   dispatch(command: unknown): unknown;
@@ -62,9 +70,20 @@ export async function drawn(page: Page): Promise<Stats> {
   return now;
 }
 
-/** Loads a file, which gives the scene its first layer, and so the viewer its renderer; waits for the first frame. */
+/**
+ * Loads a file, which gives the scene its first layer, and so the viewer its renderer and its pipeline; waits for the first frame, for
+ * the layer to be prepared, and for the camera to be fitted to it (the pipeline's first view), so that nothing changes after.
+ */
 export async function withData(page: Page): Promise<Stats> {
   await importAndLoad(page, 'points.csv', 'points.prj');
+  await drawn(page);
+  await expect
+    .poll(async () => {
+      const states = await layerStatuses(page);
+      return states.length > 0 && states.every(([, status]) => status !== 'preparing');
+    })
+    .toBe(true);
+  await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
   return drawn(page);
 }
 
@@ -109,5 +128,32 @@ export function camera(page: Page): Promise<Camera> {
       ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
     const { centre, unitsPerPixel, heading } = viewer.scene().camera2d;
     return { centre: [centre[0], centre[1]] as const, unitsPerPixel, heading };
+  });
+}
+
+/** The frame of the scene as it is now: `null` until the engine has chosen one. */
+export function sceneFrame(page: Page): Promise<SceneFrame | null> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    const frame = viewer.scene().frame;
+    return frame === null
+      ? null
+      : {
+          mapCrs: { ...frame.mapCrs },
+          origin: [...frame.origin] as [number, number, number],
+          source: frame.source,
+        };
+  });
+}
+
+/** Where each layer is, as the pipeline says: `[layer id, status]` in the order of the layers. */
+export function layerStatuses(page: Page): Promise<[string, string][]> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    return viewer.layerStates().map(([id, state]): [string, string] => [id, state.status]);
   });
 }
