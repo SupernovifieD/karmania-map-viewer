@@ -14,10 +14,13 @@ export interface DroppedFiles {
   readonly files: readonly File[];
 }
 
+/** The name of the event the map area sends when a person asks to see the Legend, which says why a layer is not drawn. */
+export const SHOW_LEGEND = 'karmania-show-legend';
+
 /**
- * The map area. Nothing is drawn in phase 1: it says so, with an empty state in the middle. With
- * no data it invites people to drop files or import them; once datasets are loaded (`datasets`)
- * it says that the map itself comes in phase 2, and how many datasets there are.
+ * The map area: the canvas the map is drawn on, and what is laid over it. With no data it invites people to drop files or import them. With
+ * data it shows the map and says nothing, but while layers are being prepared it has a chip at the top (how many, and how far along they are),
+ * and if none of the layers can be drawn it says that nothing can be, with the reason and a button to the Legend.
  *
  * Files can be dropped on it. While some are being dragged over it, an outline and a label
  * (`Drop to import`) are shown inside its edges. They are laid over the area without being part of
@@ -29,6 +32,9 @@ export class KarmaniaMapArea extends LitElement {
   static override properties = {
     datasets: { type: Number },
     redrawing: { type: Boolean },
+    preparing: { type: Number },
+    progress: { type: Number },
+    reasons: { attribute: false },
     interactive: { type: Boolean },
     dragging: { state: true },
   };
@@ -128,6 +134,27 @@ export class KarmaniaMapArea extends LitElement {
         white-space: nowrap;
       }
 
+      /* The chip while layers are being prepared: the notice with a thin bar along its foot that fills as they get ready. */
+      .chip {
+        overflow: hidden;
+      }
+
+      .chip .bar {
+        background: var(--k-border);
+        block-size: calc(var(--k-border-width) * 2);
+        inset-block-end: 0;
+        inset-inline: 0;
+        position: absolute;
+      }
+
+      .chip .bar::after {
+        background: var(--k-accent);
+        block-size: 100%;
+        content: '';
+        display: block;
+        inline-size: var(--k-progress);
+      }
+
       .drop-label {
         font-size: var(--k-font-size-section-title);
         font-weight: var(--k-weight-medium);
@@ -140,6 +167,12 @@ export class KarmaniaMapArea extends LitElement {
   declare datasets: number;
   /** Whether the map is being drawn again after the graphics card took it away: it says so, in a notice over the map. */
   declare redrawing: boolean;
+  /** How many layers are being prepared (0 for none): the chip at the top says so. */
+  declare preparing: number;
+  /** How far along the layers are, from 0 to 1, for the bar of the chip. */
+  declare progress: number;
+  /** Why each layer that cannot be drawn is not, when there is data and none of it can be drawn: then the map area says that nothing can be. */
+  declare reasons: readonly string[];
   /**
    * Whether the map can be moved (a drag, the wheel, the keys): the area is then a stop of the keyboard. Before that it is not,
    * since a stop that does nothing is in a person's way, and the empty state's own button is the first thing after the toolbar.
@@ -158,6 +191,9 @@ export class KarmaniaMapArea extends LitElement {
     super();
     this.datasets = 0;
     this.redrawing = false;
+    this.preparing = 0;
+    this.progress = 0;
+    this.reasons = [];
     this.interactive = false;
     this.dragging = false;
   }
@@ -183,8 +219,14 @@ export class KarmaniaMapArea extends LitElement {
         @drop=${this.onDrop}
       >
         <canvas aria-hidden="true"></canvas>
-        ${this.datasets > 0 ? this.loaded() : this.empty()}
-        ${this.redrawing ? html`<div class="notice" role="status">Redrawing the map…</div>` : nothing}
+        ${this.datasets === 0 ? this.empty() : this.reasons.length > 0 ? this.blocked() : nothing}
+        ${
+          this.redrawing
+            ? html`<div class="notice" role="status">Redrawing the map…</div>`
+            : this.preparing > 0
+              ? this.chip()
+              : nothing
+        }
         <div class="drop-zone" ?data-active=${this.dragging} aria-hidden="true">
           <span class="drop-label">Drop to import</span>
         </div>
@@ -252,13 +294,33 @@ export class KarmaniaMapArea extends LitElement {
     `;
   }
 
-  private loaded() {
-    const count = this.datasets === 1 ? '1 dataset' : `${formatCount(this.datasets)} datasets`;
+  private readonly onShowLegend = (): void => {
+    this.dispatchEvent(new CustomEvent(SHOW_LEGEND, { bubbles: true, composed: true }));
+  };
+
+  /** Data, and none of it can be drawn: why, and where the Legend says it. */
+  private blocked() {
+    const [first = ''] = this.reasons;
+    const count = this.reasons.length;
+    const text = count === 1 ? first : `${formatCount(count)} layers cannot be drawn. ${first}`;
     return html`
-      <k-empty-state icon="map" heading="Map rendering arrives in phase 2">
-        ${count} loaded
+      <k-empty-state icon="map" heading="Nothing can be drawn yet">
+        ${text}
+        <span slot="action"
+          >${kButton({ icon: 'layers', children: 'Show the Legend', onClick: this.onShowLegend })}</span
+        >
       </k-empty-state>
     `;
+  }
+
+  /** The chip at the top while layers are being prepared. */
+  private chip() {
+    const percent = Math.round(Math.min(1, Math.max(0, this.progress)) * 100);
+    const layers = this.preparing === 1 ? '1 layer' : `${formatCount(this.preparing)} layers`;
+    return html`<div class="notice chip" role="status" style=${`--k-progress: ${String(percent)}%`}>
+      Preparing ${layers}…
+      <span class="bar" aria-hidden="true"></span>
+    </div>`;
   }
 }
 
@@ -271,6 +333,7 @@ declare global {
 
   interface HTMLElementEventMap {
     [IMPORT_REQUEST]: CustomEvent;
+    [SHOW_LEGEND]: CustomEvent;
     [FILES_DROPPED]: CustomEvent<DroppedFiles>;
   }
 }

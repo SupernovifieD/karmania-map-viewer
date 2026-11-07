@@ -456,6 +456,9 @@ or releasing, and whenever the brief says to stop.
   phase 1 placeholder text removed. Shell screenshots updated, each change
   explained.
   The five data-tab states that the canvas of 16.2 changed (text anti-aliasing, see decisions) are updated here too.
+  Split (the states and their tests; then the pictures that they and the canvas changed):
+  - [x] 16.17a The map area's states: the preparing chip, "Nothing can be drawn yet" with the reason and a button to the Legend, the phase 1 placeholder gone.
+  - [ ] 16.17b The screenshots that changed, each looked at and explained.
 - [ ] 16.G Gate (with `pnpm perf` for 2D).
 
 ## M17: Map furniture and overlays
