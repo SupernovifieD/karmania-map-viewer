@@ -389,7 +389,10 @@ export class LayerPipeline {
     if (!verdict.drawn) {
       entry.state = { status: 'not_drawn', findings: verdict.findings };
       this.forget(entry);
+      // What it was prepared for is of no use: it is prepared again when the frame is one it can be drawn in, even this one.
+      delete entry.preparedWith;
       this.options.sink()?.removeLayer(id);
+      this.depth();
       this.changed();
       return;
     }
@@ -426,7 +429,10 @@ export class LayerPipeline {
       if (result.status === 'not_drawn') {
         entry.state = { status: 'not_drawn', findings: result.findings };
         this.forget(entry);
+        // The answer is for this frame, and is not asked for again until the frame is another.
+        entry.preparedWith = frame;
         this.options.sink()?.removeLayer(id);
+        this.depth();
       } else {
         entry.preparedWith = frame;
         entry.kind = result.buffers.kind;
@@ -519,8 +525,13 @@ export class LayerPipeline {
     this.changed();
   }
 
-  /** Forgets that the layer is on the card, of what kind it is and its classes: it is not drawn, or is to be made again. */
+  /**
+   * Forgets that the layer is on the card, of what kind it is, its classes, the buffers that wait for the renderer and the extent of what
+   * was prepared (the fit and the heights are of what is drawn): it is not drawn, or is to be made again.
+   */
   private forget(entry: Entry): void {
+    delete entry.waiting;
+    delete entry.extent;
     delete entry.onCard;
     delete entry.kind;
     delete entry.classKey;
