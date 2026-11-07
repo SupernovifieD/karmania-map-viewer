@@ -172,7 +172,7 @@ test.describe('the points layer coloured by classes', () => {
     expect([after.layers, after.geometries]).toEqual([before?.layers, before?.geometries]);
   });
 
-  test('is the colour of the layer again in one colour, and takes the opacity either way', async ({
+  test('is a colour chosen for the layer again in one colour, draws the point that had no value, and takes the opacity', async ({
     page,
   }) => {
     await page.goto('/?theme=light');
@@ -194,5 +194,12 @@ test.describe('the points layer coloured by classes', () => {
       .toBeLessThanOrEqual(2);
     // The point that had no value is drawn again.
     expect(await inkAround(page, 4)).toBeGreaterThan(0);
+    // Half opaque: the colour over the map, as for a layer that never had classes.
+    const map = await mapColour(page);
+    await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    const blended = [0xe6, 0x9f, 0x00].map((c, i) => c * 0.5 + (map[i] ?? 0) * 0.5);
+    await expect
+      .poll(async () => distance(await colourOfPoint(page, 0), blended))
+      .toBeLessThanOrEqual(3);
   });
 });

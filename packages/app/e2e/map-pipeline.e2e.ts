@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { camera, dispatch, layerStatuses, sceneFrame, stats, withData } from './support/render.js';
+import {
+  camera,
+  dispatch,
+  expectLayersDrawn,
+  layerStatuses,
+  sceneFrame,
+  stats,
+  withData,
+} from './support/render.js';
 import { fixture, projectionFor } from './support/fixtures.js';
 import { goTo, importAndLoad, kept, startWizard, wizard } from './support/wizard.js';
 
@@ -118,17 +126,12 @@ test.describe('from the loaded file to the map', () => {
   }) => {
     await page.goto('/');
     await importAndLoad(page, 'mixed.geojson');
-    await expect.poll(async () => (await layerStatuses(page)).length).toBe(3);
+    await expectLayersDrawn(page, 3);
     await expect.poll(async () => (await sceneFrame(page))?.mapCrs.code).toBeGreaterThan(32600);
     const frame = await sceneFrame(page);
     expect(frame?.mapCrs.kind).toBe('epsg');
     expect(frame?.mapCrs.code).toBeLessThanOrEqual(32760);
     expect(frame?.source).toBe('auto');
-    expect((await layerStatuses(page)).map(([, status]) => status)).toEqual([
-      'drawn',
-      'drawn',
-      'drawn',
-    ]);
     // The map is in UTM metres now: a camera that was at 0, 0 is somewhere in the zone, at a scale of metres to a pixel.
     await expect.poll(async () => (await camera(page)).centre[0]).toBeGreaterThan(100_000);
     const view = await camera(page);

@@ -165,6 +165,13 @@ export function layerStatuses(page: Page): Promise<[string, string][]> {
   });
 }
 
+/** Waits until the map has `count` layers and every one is drawn, as the pipeline says (the map is told, not only the placeholder gone). */
+export async function expectLayersDrawn(page: Page, count: number): Promise<void> {
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(Array.from({ length: count }, () => 'drawn'));
+}
+
 /** The colour of the first layer of the scene, `#rrggbb`: the one its points are drawn in. */
 export function layerColour(page: Page, id = 'layer-1'): Promise<string> {
   return page.evaluate((layerId) => {

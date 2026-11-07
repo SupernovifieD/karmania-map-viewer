@@ -91,7 +91,17 @@ async function expectLine(
   const [ux, uy] = [direction[0] / length, direction[1] / length];
   const blend = colour.slice(0, 3).map((c, i) => c * alpha + (map[i] ?? 0) * (1 - alpha));
   let exact = 0;
+  // How much of the line each pixel has, from the map (0) to the line's colour (1), added up: that is the area of the line in the block, which is
+  // the width times the length of the line in it. It says the width where the two bounds below leave the pixels between them unsaid.
+  const towards = blend.map((c, i) => c - (map[i] ?? 0));
+  const reach = towards.reduce((sum, c) => sum + c * c, 0);
+  let area = 0;
   for (const [dx, dy, pixel] of block.all()) {
+    const off = pixel.slice(0, 3).map((c, i) => c - (map[i] ?? 0));
+    area += Math.min(
+      1,
+      Math.max(0, off.reduce((sum, c, i) => sum + c * (towards[i] ?? 0), 0) / reach),
+    );
     // The middle of this pixel from the point where the line goes through (the middle of the buffer, which is a pixel corner or centre).
     const [px, py] = [cx + dx + 0.5 - view.width / 2, cy + dy + 0.5 - view.height / 2];
     const away = Math.abs(px * uy - py * ux);
@@ -109,6 +119,9 @@ async function expectLine(
     }
   }
   expect(exact).toBeGreaterThan(2);
+  // The line goes through the middle of a square block of `2 * half + 1` pixels: its length in it is the side over the larger part of the direction.
+  const inBlock = (2 * half + 1) / Math.max(Math.abs(ux), Math.abs(uy));
+  expect(area / inBlock, 'the width of the line, in pixels').toBeCloseTo(2 * halfWidth, 0);
 }
 
 test.describe('the lines layer', () => {

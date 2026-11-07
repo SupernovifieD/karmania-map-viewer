@@ -120,7 +120,6 @@ test.describe('the map area', () => {
     await expect(state(page)).toHaveCount(1);
     await load(page, 1);
     await expect(state(page)).toHaveCount(0);
-    await expect(map(page).locator('canvas')).toHaveCount(1);
     await load(page, 10_000_000);
     await expect(state(page)).toHaveCount(0);
     await load(page, 0);

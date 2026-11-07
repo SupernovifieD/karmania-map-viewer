@@ -152,54 +152,59 @@ test.describe('the block layer', () => {
     expect(distance(c00, FIRST)).toBeGreaterThan(40);
   });
 
-  test('shows the top of a stack of two blocks whichever is first in the file, drawn once at the opacity of the layer', async ({
-    page,
-  }) => {
-    // The block at 105 is first and the one at 95, a higher density, after it: if the one drawn last were on top it would be the last colour.
-    // A block beside them, at 95, has a density in the middle.
-    await loadBlocks(
+  for (const [order, pair] of [
+    ['the upper block first in the file', ['500005,2765005,105,10,a', '500005,2765005,95,100,b']],
+    ['the lower block first in the file', ['500005,2765005,95,100,b', '500005,2765005,105,10,a']],
+  ] as const) {
+    test(`shows the top of a stack of two blocks with ${order}, drawn once at the opacity of the layer`, async ({
       page,
-      [
-        'XC,YC,ZC,Density,Domain',
-        '500005,2765005,105,10,a',
-        '500005,2765005,95,100,b',
-        '500015,2765005,95,55,c',
-        '500025,2765005,105,,n',
-        '500025,2765005,95,55,m',
-        '',
-      ].join('\n'),
-    );
-    const centre = [CORNER[0] + 1.5 * BLOCK, CORNER[1] + BLOCK / 2] as const;
-    await dispatch(page, {
-      type: 'setCamera',
-      patch: { camera2d: { centre, unitsPerPixel: 1, heading: 0 } },
+    }) => {
+      // The block at 105 is on top and the one at 95, a higher density, under it, in either order in the file: if the one drawn last were on top
+      // it would be the last colour in one of them.
+      // A block beside them, at 95, has a density in the middle.
+      await loadBlocks(
+        page,
+        [
+          'XC,YC,ZC,Density,Domain',
+          ...pair,
+          '500015,2765005,95,55,c',
+          '500025,2765005,105,,n',
+          '500025,2765005,95,55,m',
+          '',
+        ].join('\n'),
+      );
+      const centre = [CORNER[0] + 1.5 * BLOCK, CORNER[1] + BLOCK / 2] as const;
+      await dispatch(page, {
+        type: 'setCamera',
+        patch: { camera2d: { centre, unitsPerPixel: 1, heading: 0 } },
+      });
+      const now = await drawn(page);
+      const view: View = { width: now.width, height: now.height, ratio: now.pixelRatio, centre };
+      const map = await mapColour(page);
+      const stack = middleOf(0, 0);
+      const beside = middleOf(1, 0);
+      const empty = middleOf(2, 0);
+      await expect
+        .poll(async () => distance(await colourAt(page, view, ...stack), FIRST))
+        .toBeLessThanOrEqual(2);
+      expect(distance(await colourAt(page, view, ...beside), FIRST)).toBeGreaterThan(40);
+      expect(distance(await colourAt(page, view, ...beside), LAST)).toBeGreaterThan(40);
+      // The block with no value, which is over one that has, is not drawn and hides nothing: what is seen is the one under it, the colour of
+      // the block beside, which has the same density.
+      expect(
+        distance(await colourAt(page, view, ...empty), await colourAt(page, view, ...beside)),
+      ).toBeLessThanOrEqual(1);
+      // Half opaque: the top block over the map and nothing of the one under it.
+      await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+      const blended = FIRST.map((c, i) => c * 0.5 + (map[i] ?? 0) * 0.5);
+      await expect
+        .poll(async () => distance(await colourAt(page, view, ...stack), blended))
+        .toBeLessThanOrEqual(3);
+      // And the one with no value over the other is still not in the way: the lower block is seen, blended once, as the one beside it is.
+      const lower = await colourAt(page, view, ...beside);
+      expect(distance(await colourAt(page, view, ...empty), lower)).toBeLessThanOrEqual(1);
     });
-    const now = await drawn(page);
-    const view: View = { width: now.width, height: now.height, ratio: now.pixelRatio, centre };
-    const map = await mapColour(page);
-    const stack = middleOf(0, 0);
-    const beside = middleOf(1, 0);
-    const empty = middleOf(2, 0);
-    await expect
-      .poll(async () => distance(await colourAt(page, view, ...stack), FIRST))
-      .toBeLessThanOrEqual(2);
-    expect(distance(await colourAt(page, view, ...beside), FIRST)).toBeGreaterThan(40);
-    expect(distance(await colourAt(page, view, ...beside), LAST)).toBeGreaterThan(40);
-    // The block with no value, which is over one that has, is not drawn and hides nothing: what is seen is the one under it, the colour of
-    // the block beside, which has the same density.
-    expect(
-      distance(await colourAt(page, view, ...empty), await colourAt(page, view, ...beside)),
-    ).toBeLessThanOrEqual(1);
-    // Half opaque: the top block over the map and nothing of the one under it.
-    await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
-    const blended = FIRST.map((c, i) => c * 0.5 + (map[i] ?? 0) * 0.5);
-    await expect
-      .poll(async () => distance(await colourAt(page, view, ...stack), blended))
-      .toBeLessThanOrEqual(3);
-    // And the one with no value over the other is still not in the way: the lower block is seen, blended once, as the one beside it is.
-    const lower = await colourAt(page, view, ...beside);
-    expect(distance(await colourAt(page, view, ...empty), lower)).toBeLessThanOrEqual(1);
-  });
+  }
 
   test('draws the blocks that have a value in the one colour of the style, and a block with no value hides nothing', async ({
     page,
