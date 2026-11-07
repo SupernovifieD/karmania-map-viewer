@@ -5,10 +5,12 @@
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { LayerMaker } from './layer-set.js';
+import { createPointsLayer } from './points-layer.js';
 
 /** The makers of the layers, by the kind of buffers they are made from. */
 const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } = {
-  points: undefined,
+  points: (buffers, look) =>
+    buffers.kind === 'points' ? createPointsLayer(buffers, look) : undefined,
   lines: undefined,
   polygons: undefined,
   mesh: undefined,
@@ -18,4 +20,4 @@ const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } 
 };
 
 /** The layer for some buffers, or `undefined` if buffers of that kind are not drawn (yet). */
-export const makeLayer: LayerMaker = (buffers) => MAKERS[buffers.kind]?.(buffers);
+export const makeLayer: LayerMaker = (buffers, look) => MAKERS[buffers.kind]?.(buffers, look);

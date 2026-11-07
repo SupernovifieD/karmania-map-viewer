@@ -28,3 +28,6 @@ export {
 export type { CameraChange, KeyAction, KeyInput, ScaleLimits } from './controls-2d.js';
 export { LayerSet } from './layer-set.js';
 export type { Container, LayerMaker, LayerObject, LayerOutcome } from './layer-set.js';
+export { OUTLINE_WIDTH, POINTS_PER_PART } from './points-layer.js';
+export { colourOf } from './look.js';
+export type { FrameInfo, LayerLook, Rgb } from './look.js';

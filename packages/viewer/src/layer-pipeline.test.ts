@@ -97,6 +97,7 @@ function setup(sinkOverride?: LayerSink | null) {
   const sink = {
     setLayer: vi.fn((): 'drawn' | 'unsupported' => 'drawn'),
     removeLayer: vi.fn(() => true),
+    setDepthRange: vi.fn(),
     maxTextureSize: 8192,
   };
   let current: LayerSink | undefined = sinkOverride === null ? undefined : (sinkOverride ?? sink);
@@ -376,6 +377,30 @@ describe('LayerPipeline: from the scene to the card', () => {
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: true });
     await t.pipeline.idle();
     expect(t.chooseCalls).toHaveLength(1);
+  });
+
+  it('tells the renderer the heights that are drawn, relative to the origin, before the layer is put on the card, and none when there is none', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.choice = () => ({
+      frame: frame([1000, 2000, 100]),
+      drawable: [{ id: 0, status: 'drawn', reprojected: false, findings: [] }],
+      findings: [],
+    });
+    // Two points at 3 and 9 above the origin of the frame.
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: { kind: 'points', positions: Float32Array.of(0, 0, 3, 1, 1, 9) },
+        findings: [],
+      });
+    await t.add(0);
+    expect(t.sink.setDepthRange).toHaveBeenCalledWith(3, 9);
+    expect(t.sink.setDepthRange.mock.invocationCallOrder[0]).toBeLessThan(
+      t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
+    );
+    t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
+    expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(0, 0);
   });
 
   it('keeps what was prepared until the renderer is there, and gives it then', async () => {

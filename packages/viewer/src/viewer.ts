@@ -27,6 +27,7 @@ import {
 } from './panel-state.js';
 import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
+import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { syncDatasets } from './scene-datasets.js';
@@ -242,8 +243,17 @@ export class KarmaniaViewer extends LitElement {
     return renderer === undefined
       ? undefined
       : {
-          setLayer: (id, buffers) => renderer.setLayer(id, buffers),
+          setLayer: (id, buffers) => {
+            const layer = this.store.getState().layers[id];
+            // (A layer that is gone is not given buffers; the look is the scene's own for the one that is there.)
+            return layer === undefined
+              ? 'unsupported'
+              : renderer.setLayer(id, buffers, layerLook(layer));
+          },
           removeLayer: (id) => renderer.removeLayer(id),
+          setDepthRange: (min, max) => {
+            renderer.setDepthRange(min, max);
+          },
           get maxTextureSize() {
             return renderer.stats().maxTextureSize;
           },
@@ -270,6 +280,12 @@ export class KarmaniaViewer extends LitElement {
     }
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
+    }
+    // A layer whose style or visibility changed looks different, and is not built again for it.
+    for (const [id, layer] of Object.entries(state.layers)) {
+      if (layer !== previous.layers[id]) {
+        this.renderer?.setLayerLook(id, layerLook(layer));
+      }
     }
   };
 

@@ -13,6 +13,7 @@ import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import type { LayerOutcome } from './layer-set.js';
+import type { LayerLook } from './look.js';
 
 /** What the renderer says of itself, for tests and diagnostics. */
 export interface RenderStats {
@@ -59,10 +60,17 @@ export interface Renderer {
    */
   setCamera2d(camera: Camera2d, origin: readonly [number, number, number]): void;
   /**
-   * Puts the layer of some buffers on the card, in place of the one of the same id; a big layer is built a part at a time over the
+   * The heights that are drawn, relative to the origin: the camera is put above the highest and sees down to the lowest, so what is
+   * outside them is not drawn. A frame is asked for if they changed.
+   */
+  setDepthRange(min: number, max: number): void;
+  /**
+   * Puts the layer of some buffers on the card, looking as `look` says, in place of the one of the same id; a big layer is built a part at a time over the
    * next frames. `unsupported` if buffers of that kind are not drawn: there is no layer then, and the old one is gone.
    */
-  setLayer(id: string, buffers: RenderBuffers): LayerOutcome;
+  setLayer(id: string, buffers: RenderBuffers, look: LayerLook): LayerOutcome;
+  /** Changes how a layer looks (colour, size, opacity, whether it is shown) without building it again. `false` if there is no such layer. */
+  setLayerLook(id: string, look: LayerLook): boolean;
   /** Takes a layer off the card and frees what it held. `false` if there was none. */
   removeLayer(id: string): boolean;
   /**
@@ -147,10 +155,16 @@ export function createRenderer(
     camera.updateProjectionMatrix();
   }
 
+  /** The colour of outlines: the colour of the text where the canvas is, which contrasts with the map in the theme that it is in. */
+  let outline: readonly [number, number, number] = [0, 0, 0];
+
   /** What the map is cleared to is the background of the canvas, which the page gives (the token `--k-surface-map`). */
   let background = '';
   function readBackground(): void {
-    const colour = parseCssColour(view.getComputedStyle(canvas).backgroundColor);
+    const style = view.getComputedStyle(canvas);
+    const ink = parseCssColour(style.color);
+    outline = ink === undefined ? [0, 0, 0] : [ink.r / 255, ink.g / 255, ink.b / 255];
+    const colour = parseCssColour(style.backgroundColor);
     const opaque = colour !== undefined && colour.a > 0 ? colour : undefined;
     const text =
       opaque === undefined
@@ -178,6 +192,7 @@ export function createRenderer(
     readBackground();
     // The next part of what is still being built goes on the card before the frame, and another frame is asked for if there is more.
     const more = layers.step();
+    layers.prepareFrame({ pixelRatio: size.pixelRatio, outline });
     gl.render(scene, camera);
     frames += 1;
     if (more) {
@@ -270,15 +285,29 @@ export function createRenderer(
       placeCamera();
       invalidate();
     },
-    setLayer(id, buffers) {
-      const outcome = layers.set(id, buffers);
+    setLayer(id, buffers, look) {
+      const outcome = layers.set(id, buffers, look);
       invalidate();
       return outcome;
+    },
+    setLayerLook(id, look) {
+      const known = layers.setLook(id, look);
+      invalidate();
+      return known;
     },
     removeLayer(id) {
       const removed = layers.remove(id);
       invalidate();
       return removed;
+    },
+    setDepthRange(min, max) {
+      if (disposed || (depth.min === min && depth.max === max)) {
+        return;
+      }
+      depth.min = min;
+      depth.max = max;
+      placeCamera();
+      invalidate();
     },
     readPixels(x, y, width, height) {
       const whole = [x, y, width, height].every(Number.isInteger);
