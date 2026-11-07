@@ -2,7 +2,8 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { LessDepth } from 'three';
 import type { Points, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import type { FrameInfo, LayerLook } from './look.js';
+import { MAX_CLASSES } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 import { OUTLINE_WIDTH, POINTS_PER_PART, createPointsLayer } from './points-layer.js';
 
 const LOOK: LayerLook = {
@@ -133,5 +134,104 @@ describe('createPointsLayer', () => {
     layer.dispose();
     expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
     expect(parts(layer)).toHaveLength(0);
+  });
+
+  describe('coloured by classes', () => {
+    /** A class for each point, which is its own number, and colours for the first 8 classes. */
+    const numbered = (count: number): ClassColouring => ({
+      indices: Uint8Array.from({ length: count }, (_, i) => i % 200),
+      colours: Array.from(
+        { length: 8 },
+        (_, i) => `#${(i * 16).toString(16).padStart(2, '0')}0000`,
+      ),
+    });
+    const classAttribute = (part: Points | undefined) => part?.geometry.getAttribute('aClass');
+
+    it('is in the colour of the layer until it is given classes, and when they are taken away', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(classAttribute(parts(layer)[0])).toBeUndefined();
+      layer.setClasses?.(numbered(3));
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+      layer.setClasses?.(undefined);
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(uniforms(layer)['uCount']?.value).toBe(0);
+      expect(classAttribute(parts(layer)[0])).toBeUndefined();
+    });
+
+    it('has the class of each point as an attribute of its vertex, and the colours of the classes in the palette', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      layer.setClasses?.({
+        indices: Uint8Array.of(2, 0, 255),
+        colours: ['#ff0000', '#00ff00', '#0000ff'],
+      });
+      expect([...(classAttribute(parts(layer)[0])?.array ?? [])]).toEqual([2, 0, 255]);
+      expect(classAttribute(parts(layer)[0])?.itemSize).toBe(1);
+      expect(uniforms(layer)['uCount']?.value).toBe(3);
+      const palette = uniforms(layer)['uPalette']?.value as { x: number; y: number; z: number }[];
+      expect(palette).toHaveLength(MAX_CLASSES);
+      expect(palette[0]).toMatchObject({ x: 1, y: 0, z: 0 });
+      expect(palette[2]).toMatchObject({ x: 0, y: 0, z: 1 });
+    });
+
+    it('holds no more colours than it has room for', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      layer.setClasses?.({
+        indices: new Uint8Array(3),
+        colours: Array.from({ length: MAX_CLASSES + 5 }, () => '#0000ff'),
+      });
+      expect(uniforms(layer)['uCount']?.value).toBe(MAX_CLASSES);
+    });
+
+    it('cuts the classes into the parts as views, and gives a part that is put on later its share', () => {
+      const colouring = numbered(POINTS_PER_PART + 3);
+      const layer = createPointsLayer(points(POINTS_PER_PART + 3), LOOK);
+      layer.setClasses?.(colouring);
+      layer.step?.();
+      const [first, second] = parts(layer).map((part) => classAttribute(part)?.array);
+      expect(first?.length).toBe(POINTS_PER_PART);
+      expect(second?.length).toBe(3);
+      expect(second?.buffer).toBe(colouring.indices.buffer);
+      expect(second?.byteOffset).toBe(POINTS_PER_PART);
+    });
+
+    it('is in the colour of the layer for classes that are not one byte for each point', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      layer.setClasses?.(numbered(3));
+      layer.setClasses?.(numbered(2));
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+      expect(classAttribute(parts(layer)[0])).toBeUndefined();
+      layer.setClasses?.(numbered(4));
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+    });
+
+    it('keeps the attribute when it is given the same classes with other colours: only the palette changes', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      const colouring = numbered(3);
+      layer.setClasses?.(colouring);
+      const attribute = classAttribute(parts(layer)[0]);
+      layer.setClasses?.({ indices: colouring.indices, colours: ['#ff0000', '#00ff00'] });
+      expect(classAttribute(parts(layer)[0])).toBe(attribute);
+      expect(uniforms(layer)['uCount']?.value).toBe(2);
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+      layer.setClasses?.({
+        indices: Uint8Array.from(colouring.indices),
+        colours: colouring.colours,
+      });
+      expect(classAttribute(parts(layer)[0])).not.toBe(attribute);
+    });
+
+    it('does not change what it looks like in one colour: the layer colour, size and opacity are as they were', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      layer.setClasses?.(numbered(3));
+      layer.setLook({ ...LOOK, colour: '#112233', opacity: 0.5, pointSize: 10 });
+      expect(uniforms(layer)['uFill']?.value).toMatchObject({
+        x: 17 / 255,
+        y: 34 / 255,
+        z: 51 / 255,
+      });
+      expect(uniforms(layer)['uOpacity']?.value).toBe(0.5);
+      expect(uniforms(layer)['uClassed']?.value).toBe(1);
+    });
   });
 });
