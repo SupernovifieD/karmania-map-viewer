@@ -148,12 +148,14 @@ function setup(sinkOverride?: LayerSink | null) {
   let current: LayerSink | undefined = sinkOverride === null ? undefined : (sinkOverride ?? sink);
   /** The first column of numbers of a dataset, which the viewer knows and the tests say. */
   let firstColumn: (datasetId: number) => string | undefined = () => undefined;
+  /** The size of the map area, which the tests may take away (a page that has not laid it out yet has none). */
+  let viewport = { width: 1000, height: 500 };
   const changes = vi.fn();
   const pipeline = new LayerPipeline({
     engine: fake.engine,
     scene,
     sink: () => current,
-    viewport: () => ({ width: 1000, height: 500 }),
+    viewport: () => viewport,
     firstColumn: (datasetId) => firstColumn(datasetId),
     onChange: changes,
   });
@@ -189,6 +191,9 @@ function setup(sinkOverride?: LayerSink | null) {
     },
     setFirstColumn: (next: (datasetId: number) => string | undefined) => {
       firstColumn = next;
+    },
+    setViewport: (next: { width: number; height: number }) => {
+      viewport = next;
     },
     ...fake,
   };
@@ -503,6 +508,49 @@ describe('LayerPipeline: from the scene to the card', () => {
     expect(t.sink.setLayer).toHaveBeenCalledTimes(1);
   });
 
+  it('does not prepare the layers that are left for a frame that the person has changed since the pass began', async () => {
+    const t = setup();
+    t.drawable([0, true], [1, true]);
+    const held = deferred<PrepareResult>();
+    let first = true;
+    t.state.prepare = (call) => {
+      if (first) {
+        first = false;
+        call.options?.signal?.addEventListener('abort', () => {
+          held.reject(call.options?.signal?.reason);
+        });
+        return held.promise;
+      }
+      return Promise.resolve({ status: 'drawn', buffers: buffers(), findings: [] });
+    };
+    t.scene.dispatch({ type: 'addLayers', datasets: [dataset(0), dataset(1)] });
+    await vi.waitFor(() => {
+      expect(t.prepareCalls).toHaveLength(1);
+    });
+    const chosen: Frame = {
+      mapCrs: { kind: 'epsg', code: 32641 },
+      origin: [0, 0, 0],
+      source: 'user',
+    };
+    t.state.choice = () => ({
+      frame: chosen,
+      drawable: [0, 1].map((id) => ({
+        id,
+        status: 'drawn' as const,
+        reprojected: true,
+        findings: [],
+      })),
+      findings: [],
+    });
+    t.scene.dispatch({ type: 'setFrame', frame: chosen });
+    await t.pipeline.idle();
+    // The second dataset was prepared once, and for the frame that the person chose: never for the one that was.
+    expect(t.prepareCalls.filter((call) => call.id === 1).map((call) => call.params.frame)).toEqual(
+      [chosen],
+    );
+    expect(t.sink.setLayer).toHaveBeenCalledTimes(2);
+  });
+
   it('gives the engine the coordinate system that the person chose, and not one that it chose itself', async () => {
     const t = setup();
     t.drawable([0, true]);
@@ -692,6 +740,33 @@ describe('LayerPipeline: the view of the data', () => {
     });
     expect(expected).toBeDefined();
     expect(t.scene.getState().camera2d).toEqual(expected);
+    expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
+  });
+
+  it('fits at the next look at the scene when the map area had no size at the first view', async () => {
+    const t = setup();
+    t.setViewport({ width: 0, height: 0 });
+    t.drawable([0, true]);
+    const before = t.scene.getState().camera2d;
+    await t.add(0);
+    expect(t.scene.getState().camera2d).toEqual(before);
+    // The area has its size, and the scene changes: the data is shown, for the first time.
+    t.setViewport({ width: 1000, height: 500 });
+    t.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await t.pipeline.idle();
+    expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
+  });
+
+  it('fits at the next look at the scene when the layers that were prepared were all hidden at the first view', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.scene.dispatch({ type: 'addLayers', datasets: [dataset(0)] });
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    const before = t.scene.getState().camera2d;
+    expect(t.scene.getState().camera2d).toEqual(before);
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: true });
+    await t.pipeline.idle();
     expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
   });
 
@@ -1306,6 +1381,53 @@ describe('LayerPipeline: the classes of a layer', () => {
     });
     await t.pipeline.idle();
     expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('says that a layer is drawn again when its style goes from classes that were refused to one colour, which is not refused', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.classify = () =>
+      Promise.resolve({ status: 'not_classified', findings: [finding('classes.column.missing')] });
+    await t.add(0);
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'Au',
+          method: 'quantile',
+          classes: 4,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')?.status).toBe('not_drawn');
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+  });
+
+  it('tells nobody that a layer has changed when the camera moves, for a layer that has classes or one that is not drawn', async () => {
+    const t = gridSetup();
+    t.drawable([0, true], [1, false]);
+    t.scene.dispatch({ type: 'addLayers', datasets: [gridDataset(0), gridDataset(1)] });
+    await t.pipeline.idle();
+    expect(t.pipeline.states().get('layer-1')).toEqual({ status: 'drawn' });
+    expect(t.pipeline.states().get('layer-2')?.status).toBe('not_drawn');
+    t.changes.mockClear();
+    t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [5, 5] } } });
+    await t.pipeline.idle();
+    t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [6, 6] } } });
+    await t.pipeline.idle();
+    expect(t.changes).not.toHaveBeenCalled();
+    expect(t.sink.removeLayer).toHaveBeenCalledTimes(1);
   });
 
   it('takes the classes away, and does not draw the cells, when the layer is given one colour and the dataset has no column of numbers to say which cells have a value', async () => {
