@@ -411,7 +411,7 @@ or releasing, and whenever the brief says to stop.
   the GPU memory test.
   Split (the pieces are libraries with unit tests, and then they are wired to the real engine and browser):
   - [x] 16.6a The layers on the card: a registry that builds, replaces, steps (in chunks) and frees them.
-  - [ ] 16.6b The extent of render buffers, in map units.
+  - [x] 16.6b The extent of render buffers, in map units.
   - [ ] 16.6c The layer pipeline (frame, prepare, cancel, deliver, fit, limits), with a fake engine and renderer.
   - [ ] 16.6d The pipeline in the viewer, and Home fits; end-to-end tests. (The GPU memory test comes with the first kind
     of layer, 16.7: with no kind drawn there is nothing on the card to count.)
