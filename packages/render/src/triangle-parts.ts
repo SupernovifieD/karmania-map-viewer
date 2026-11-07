@@ -1,13 +1,13 @@
 /**
  * The triangles of a layer on the card (the fill of polygons, a mesh): the positions go to the card once and the triangles in parts
- * of 250,000, the first at once, each part a view of the indices and a mesh of its own, all with the one material the layer gives. The size of a
+ * of 100,000, the first at once, each part a view of the indices and a mesh of its own, all with the one material the layer gives. The size of a
  * part is a number of triangles and never a time, so that the same data is built the same way on every machine.
  */
 import { BufferAttribute, BufferGeometry, Group, Mesh } from 'three';
 import type { Material } from 'three';
 
-/** The triangles are put on the card this many at a time (3 MB of indices), the first part at once. */
-export const TRIANGLES_PER_PART = 250_000;
+/** The triangles are put on the card this many at a time (1.2 MB of indices), the first part at once (the size of a part of points, for the same reason). */
+export const TRIANGLES_PER_PART = 100_000;
 
 /** The triangles of a layer: the positions, and the triangles as indices into them. */
 export interface TriangleBuffers {

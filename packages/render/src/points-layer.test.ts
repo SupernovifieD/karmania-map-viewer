@@ -46,8 +46,8 @@ describe('createPointsLayer', () => {
     expect('step' in whole).toBe(false);
   });
 
-  it('puts the first part at once and the rest a part at a time, each of 250,000 points, until all are on', () => {
-    expect(POINTS_PER_PART).toBe(250_000);
+  it('puts the first part at once and the rest a part at a time, each of 100,000 points, until all are on', () => {
+    expect(POINTS_PER_PART).toBe(100_000);
     const layer = createPointsLayer(points(2 * POINTS_PER_PART + 5), LOOK);
     expect(parts(layer)).toHaveLength(1);
     expect(layer.step?.()).toBe(true);

@@ -20,7 +20,7 @@ import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import type { ClassColouring, ScaleLimits } from '@karmania/render';
 import { OTHER_COLOUR, classColours, fitCamera2d } from '@karmania/scene';
 import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
-import { extentOf } from './extent.js';
+import { extentOfInParts, nextTask } from './extent.js';
 
 /** Where a layer is. */
 export type LayerState =
@@ -62,6 +62,11 @@ export interface PipelineOptions {
   firstColumn?(datasetId: number): string | undefined;
   /** Called whenever the state of a layer changes. */
   onChange?(): void;
+  /**
+   * Gives the page a turn between the slices of the extent of a big layer (the positions are looked at 200,000 at a time, so that no task is
+   * long): the next task, unless a test says otherwise.
+   */
+  turn?(): Promise<void>;
 }
 
 /** Pixels left free all round the data by a fit, for the overlays that are over the map. */
@@ -69,8 +74,12 @@ export const FIT_PADDING = 24;
 /** The scale may go this many times closer than the fit and this many times farther. */
 export const ZOOM_IN_LIMIT = 100_000;
 export const ZOOM_OUT_LIMIT = 100;
-/** What `prepare` is told the card's texture limit is while there is no card yet (the engine's own default). */
-const DEFAULT_TEXTURE_SIZE = 4096;
+/**
+ * The tiles of a grid are at most this many cells a side, whatever the card takes (a texture of 4096 by 4096 cells is 16 MB), and the card's
+ * own limit if that is less. It is what `prepare` is told while there is no card yet: the renderer is made when the first buffers are ready, so
+ * as not to compete with the worker for the machine, and a grid that was prepared for more than the card takes is prepared again.
+ */
+export const MAX_TILE_SIZE = 4096;
 
 /**
  * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a triangle of a mesh, a grid's cell and a model's block are coloured by it. (The surface of a grid with
@@ -121,6 +130,8 @@ interface Entry {
   extent?: BBox;
   /** Buffers that are ready and waiting for the renderer. */
   waiting?: RenderBuffers;
+  /** The largest texture, in cells on a side, that the buffers were prepared for. */
+  textureSize?: number;
 }
 
 function sameFrame(a: Frame | null, b: Frame | null): boolean {
@@ -165,6 +176,11 @@ export class LayerPipeline {
     return this.scale === undefined
       ? DEFAULT_SCALE_LIMITS
       : { min: this.scale / ZOOM_IN_LIMIT, max: this.scale * ZOOM_OUT_LIMIT };
+  }
+
+  /** Whether a layer has been prepared and waits for the renderer. */
+  hasWaiting(): boolean {
+    return [...this.entries.values()].some((entry) => entry.waiting !== undefined);
   }
 
   /** Looks at the scene again: call it whenever the scene changes. Nothing is done for a change that needs nothing. */
@@ -420,6 +436,10 @@ export class LayerPipeline {
     }
     const abort = new AbortController();
     entry.abort = abort;
+    const textureSize = Math.min(
+      this.options.sink()?.maxTextureSize ?? MAX_TILE_SIZE,
+      MAX_TILE_SIZE,
+    );
     // The request is no longer wanted: aborted, the pipeline is stopped, or the layer is gone or is another. (A function, so that it is
     // looked at again after each wait.)
     const unwanted = (): boolean =>
@@ -427,7 +447,7 @@ export class LayerPipeline {
     try {
       const result = await this.options.engine.prepare(
         entry.datasetId,
-        { frame, maxTextureSize: this.options.sink()?.maxTextureSize ?? DEFAULT_TEXTURE_SIZE },
+        { frame, maxTextureSize: textureSize },
         {
           signal: abort.signal,
           onProgress: (progress) => {
@@ -450,9 +470,19 @@ export class LayerPipeline {
         this.options.sink()?.removeLayer(id);
         this.depth();
       } else {
+        // The extent first, a slice at a time with a turn for the page between (a layer of millions of positions is 10 to 40 ms in one go); and
+        // what came back is of no use if it was asked for something else meanwhile.
+        const extent = await extentOfInParts(
+          result.buffers,
+          frame.origin,
+          () => this.options.turn?.() ?? nextTask(),
+        );
+        if (unwanted()) {
+          return;
+        }
         entry.preparedWith = frame;
         entry.kind = result.buffers.kind;
-        const extent = extentOf(result.buffers, frame.origin);
+        entry.textureSize = textureSize;
         if (extent === undefined) {
           delete entry.extent;
         } else {
@@ -491,6 +521,21 @@ export class LayerPipeline {
   private deliver(id: LayerId, entry: Entry): void {
     const sink = this.options.sink();
     if (entry.waiting === undefined || sink === undefined) {
+      return;
+    }
+    if (
+      entry.kind === 'grid' &&
+      entry.textureSize !== undefined &&
+      entry.textureSize > sink.maxTextureSize
+    ) {
+      // Tiles for more than the card takes (it was not there when they were made, and takes less than the most that a tile is): they are
+      // made again for it, and these are let go.
+      delete entry.waiting;
+      delete entry.extent;
+      delete entry.preparedWith;
+      delete entry.textureSize;
+      entry.state = { status: 'preparing', fraction: 0 };
+      this.update();
       return;
     }
     const buffers = entry.waiting;
@@ -557,6 +602,7 @@ export class LayerPipeline {
   private forget(entry: Entry): void {
     delete entry.waiting;
     delete entry.extent;
+    delete entry.textureSize;
     delete entry.onCard;
     delete entry.kind;
     delete entry.classKey;

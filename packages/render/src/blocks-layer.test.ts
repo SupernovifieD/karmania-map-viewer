@@ -112,8 +112,8 @@ describe('createBlocksLayer', () => {
     expect(slant.y).toBeCloseTo(Math.sqrt(3) / 2, 12);
   });
 
-  it('puts the blocks in parts of 250,000, the first at once, as views of the centres and not copies', () => {
-    expect(BLOCKS_PER_PART).toBe(250_000);
+  it('puts the blocks in parts of 100,000, the first at once, as views of the centres and not copies', () => {
+    expect(BLOCKS_PER_PART).toBe(100_000);
     const buffers = blocks(BLOCKS_PER_PART + 3);
     const layer = createBlocksLayer(buffers, LOOK);
     expect(parts(layer)).toHaveLength(1);

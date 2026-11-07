@@ -103,23 +103,66 @@ export interface Renderer {
 const DEFAULT_MAX_BUFFER = 4096;
 
 /**
+ * Waits, a turn of the page at a time, until the card has made the context. The browser gives the page its context at once and the graphics
+ * process finishes making it meanwhile, and the first thing that asks the context a question (three asks dozens) waits for that, which was
+ * 15 to 60 ms of the page's thread. A fence that the card signals when it has run the commands up to it says when that is, and asking whether it
+ * has been signalled does not wait. At most a second is waited, after which three is let to wait as it would.
+ */
+async function untilSettled(gl: WebGL2RenderingContext, view: Window): Promise<void> {
+  const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (fence === null) {
+    return;
+  }
+  gl.flush();
+  const until = view.performance.now() + 1000;
+  while (gl.clientWaitSync(fence, 0, 0) === gl.TIMEOUT_EXPIRED && view.performance.now() < until) {
+    await new Promise<void>((resolve) => {
+      view.setTimeout(resolve, 2);
+    });
+  }
+  gl.deleteSync(fence);
+}
+
+/** What the context of the card is asked for: what three would ask for with the options it is given below. */
+const CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
+  alpha: true,
+  depth: true,
+  stencil: false,
+  antialias: false,
+  premultipliedAlpha: true,
+  preserveDrawingBuffer: false,
+  powerPreference: 'high-performance',
+  failIfMajorPerformanceCaveat: false,
+};
+
+/**
  * Makes a renderer that draws on `canvas`, which the page sizes (the drawing buffer follows its box). `undefined` if
  * WebGL2 cannot be had, which is a fact of the browser and not a mistake: the viewer says so to the person.
+ *
+ * It is made in pieces with the page given a turn between them: the browser makes the context (14 to 34 ms), the page waits for the card to
+ * finish it (`untilSettled`: a turn at a time, and not by being held), and three then makes its own state from it (10 to 20 ms). All of it in
+ * one task held the page for over 45 ms, which with the work that came with it was over the 50 ms that a task may take (section 9.6).
  */
-export function createRenderer(
+export async function createRenderer(
   canvas: HTMLCanvasElement,
   options: RendererOptions = {},
-): Renderer | undefined {
+): Promise<Renderer | undefined> {
   const owner = canvas.ownerDocument.defaultView;
   if (owner === null) {
     return undefined;
   }
   // The same window, with the type it has once it is known not to be null, which a function declaration would lose.
   const view: Window = owner;
+  const made = canvas.getContext('webgl2', CONTEXT_ATTRIBUTES);
+  if (made === null) {
+    return undefined;
+  }
+  await untilSettled(made, view);
   let gl: WebGLRenderer;
   try {
     gl = new WebGLRenderer({
       canvas,
+      context: made,
       alpha: true,
       antialias: false,
       depth: true,

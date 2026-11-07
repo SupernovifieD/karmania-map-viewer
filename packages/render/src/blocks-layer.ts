@@ -1,7 +1,7 @@
 /**
  * The layer of a block model (section 9.3 of the brief): one box for each block, of the model's spacing and turned by its rotation about
  * its own centre, each in the colour of its class. The boxes are instanced: one box on the card, and for each block only its centre (and its
- * class), in parts of 250,000, the first at once and the others between frames. In the view from above only the tops show, so only the
+ * class), in parts of 100,000, the first at once and the others between frames. In the view from above only the tops show, so only the
  * tops are drawn (a sixth of the triangles); the nearest top wins, so where blocks are over each other the highest shows: also when the layer
  * is less than opaque, when a first pass writes only depth and the colour is then drawn once, where the nearest top is, and not once for each
  * block that is under another.
@@ -29,8 +29,8 @@ import { MAX_CLASSES, colourOf } from './look.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 import { sinCos } from './rotation.js';
 
-/** The blocks are put on the card this many at a time (3 MB of centres, 250 KB of classes), the first part at once. */
-export const BLOCKS_PER_PART = 250_000;
+/** The blocks are put on the card this many at a time (1.2 MB of centres, 100 KB of classes), the first part at once (the size of a part of points, for the same reason). */
+export const BLOCKS_PER_PART = 100_000;
 
 /** The index of the top face (+z) among the six that `BoxGeometry` makes, in the order +x, -x, +y, -y, +z, -z. */
 const TOP_FACE = 4;

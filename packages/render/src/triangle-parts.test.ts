@@ -26,8 +26,8 @@ describe('createTriangleParts', () => {
     expect(parts.step).toBeUndefined();
   });
 
-  it('takes the triangles in parts of 250,000, the first at once, and the last part is what is left', () => {
-    expect(TRIANGLES_PER_PART).toBe(250_000);
+  it('takes the triangles in parts of 100,000, the first at once, and the last part is what is left', () => {
+    expect(TRIANGLES_PER_PART).toBe(100_000);
     const parts = createTriangleParts(strip(2 * TRIANGLES_PER_PART + 4), new MeshBasicMaterial());
     expect(meshes(parts)).toHaveLength(1);
     expect(parts.step?.()).toBe(true);
@@ -42,7 +42,7 @@ describe('createTriangleParts', () => {
     expect(meshes(parts)).toHaveLength(3);
   });
 
-  it('is exactly one part, with nothing to step, for exactly 250,000 triangles', () => {
+  it('is exactly one part, with nothing to step, for exactly 100,000 triangles', () => {
     const parts = createTriangleParts(strip(TRIANGLES_PER_PART), new MeshBasicMaterial());
     expect(meshes(parts)).toHaveLength(1);
     expect(parts.step).toBeUndefined();

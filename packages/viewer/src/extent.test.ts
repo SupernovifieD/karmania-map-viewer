@@ -1,6 +1,6 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { describe, expect, it } from 'vitest';
-import { extentOf } from './extent.js';
+import { extentOf, extentOfInParts } from './extent.js';
 
 const ORIGIN = [500_000, 4_000_000, 100] as const;
 
@@ -109,5 +109,89 @@ describe('extentOf', () => {
     );
     expect(near?.min[0]).toBe(512_346.678);
     expect(near?.min[1]).toBe(4_012_346.5);
+  });
+});
+
+describe('extentOfInParts', () => {
+  /** Positions that are not simple: spread out, a few that are not numbers, and the extreme ones far into the array. */
+  function many(count: number): Float32Array {
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      positions[i * 3] = ((i * 7919) % 2001) - 1000;
+      positions[i * 3 + 1] = ((i * 104_729) % 4001) - 2000;
+      positions[i * 3 + 2] = (i % 13) - 6;
+    }
+    positions[3 * (count - 2)] = NaN;
+    positions[3 * (count - 3) + 1] = Infinity;
+    // The least and the greatest of all are in the last slice.
+    positions[3 * (count - 1)] = -5000;
+    positions[3 * (count - 1) + 1] = 9000;
+    positions[3 * (count - 1) + 2] = 77;
+    return positions;
+  }
+
+  it('is the extent that `extentOf` gives, for every kind that has positions, whatever the size of the slices', async () => {
+    const positions = many(1000);
+    const empty = new Uint32Array(0);
+    const all: RenderBuffers[] = [
+      { kind: 'points', positions },
+      { kind: 'lines', positions, segments: empty, segmentLine: empty },
+      { kind: 'mesh', positions, triangles: empty },
+      { kind: 'blocks', centres: positions, spacing: [6, 8, 4], rotation: 30 },
+      {
+        kind: 'grid',
+        size: [2, 2],
+        tiles: [{ i0: 0, j0: 0, nx: 2, ny: 2 }],
+        warp: { positions, uvs: new Float32Array(8), triangles: empty, tileTriangles: empty },
+      },
+    ];
+    for (const buffers of all) {
+      for (const perTurn of [1, 7, 333, 1000, 5000]) {
+        expect(
+          await extentOfInParts(buffers, ORIGIN, () => Promise.resolve(), perTurn),
+          `${buffers.kind} by ${String(perTurn)}`,
+        ).toEqual(extentOf(buffers, ORIGIN));
+      }
+    }
+  });
+
+  it('gives the page a turn between the slices and not after the last, and none for buffers of one slice', async () => {
+    let turns = 0;
+    const turn = () => {
+      turns += 1;
+      return Promise.resolve();
+    };
+    await extentOfInParts({ kind: 'points', positions: many(1000) }, ORIGIN, turn, 300);
+    // 1,000 positions by 300: four slices, three turns.
+    expect(turns).toBe(3);
+    turns = 0;
+    await extentOfInParts({ kind: 'points', positions: many(1000) }, ORIGIN, turn, 1000);
+    expect(turns).toBe(0);
+    await extentOfInParts({ kind: 'points', positions: many(10) }, ORIGIN, turn);
+    expect(turns).toBe(0);
+  });
+
+  it('has no extent for nothing, or for positions none of which is a number, and does not wait for a grid that is placed', async () => {
+    const never = () => Promise.reject(new Error('no turn is wanted'));
+    expect(
+      await extentOfInParts({ kind: 'points', positions: new Float32Array(0) }, ORIGIN, never),
+    ).toBeUndefined();
+    expect(
+      await extentOfInParts(
+        { kind: 'points', positions: Float32Array.of(NaN, 1, 2) },
+        ORIGIN,
+        never,
+        1,
+      ),
+    ).toBeUndefined();
+    const placed: RenderBuffers = {
+      kind: 'grid',
+      size: [4, 2],
+      tiles: [{ i0: 0, j0: 0, nx: 4, ny: 2 }],
+      placement: { origin: [100, 200, 7], spacing: [10, 5], rotation: 0 },
+    };
+    expect(await extentOfInParts(placed, [1000, 2000, 0], never)).toEqual(
+      extentOf(placed, [1000, 2000, 0]),
+    );
   });
 });
