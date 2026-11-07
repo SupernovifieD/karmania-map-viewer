@@ -401,14 +401,18 @@ context that is made and used before the first measurement):
 | | 1,000,000 points | 4,000,000 cells | 1,000,000 blocks | Target |
 | --- | ---: | ---: | ---: | --- |
 | Loading to the first frame, ms | 262, 263, 288 | 447, 473, 474 | 359, 361, 419 | 1,500; 1,500; 3,000 |
-| Median frame time of the pan, zoom and rotation, ms | 16.6, 16.7, 16.7 | | | under 16.7 |
+| Median frame time of the pan, zoom and rotation, ms | 16.6, 16.7, 16.7 | | | under 16.7 (met by the 16.6 only) |
 | 95th percentile of the same, ms | 17.6, 18.0, 18.2 | | | under 33 |
 | New classes to the picture, ms | | 177, 188, 194 | | 300 |
 | Longest task of the main thread, ms | none over 50 | none over 50 | none over 50 | 50 |
 
 The median is the period of the display: 60 Hz is 16.67 ms and the browser's clock reads 0.1 ms, so the best a frame can be is the 16.6 or
-16.7 that it reads, which is a frame at every beat with none dropped (the 95th percentile, 18 ms, says how far the others are). The test reads "under
-16.7" as at or under that; the figure is not better than the display can show. **Every target is met on this machine.**
+16.7 that it reads, which is a frame at every beat with none dropped (the 95th percentile, 18 ms, says how far the others are). **The target says
+"under 16.7 ms", and by that it is met in one of the three runs (16.6) and not in two (16.7).** The test asserts it as the brief has it (`< 16.7`), so
+it passes or fails on the reading of the clock and not on the speed of the renderer. An earlier version of this section read "under" as "at or under" and
+said every target was met; that was a relaxation of a target, which the brief forbids ("Do not relax a target on your own"), and it is undone. Whether
+the target means "keeps up with the display" or is to be measured another way (the renderer's own time for a frame, from a timer query of the card,
+which does not depend on the display's period) is the owner's to say. **Every other target is met on this machine.**
 
 How it got there. The first measurement on the card, before any change, met the times and missed the last target in all three: a first frame of 630 to 862 ms
 and a median of 16.6 ms (p95 18.5), but a longest task of 186 ms for the points, 292 for the grid and 210 for the blocks, and, in later runs, of 51 to 58

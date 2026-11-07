@@ -470,6 +470,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 16.F7 The map area says that the map cannot be drawn when the browser has no WebGL 2 (review round).
   - [x] 16.F8 Small corrections of code, tests and comments from the review; the sort by class measured (review round).
   - [x] 16.F9 Tests that could not fail, or said more than they check, made to (review round).
+  - [x] 16.F10 The median frame target is recorded as met by one run of three, not as met (a relaxation of the target is undone; for the owner to decide).
 
 ## M17: Map furniture and overlays
 
