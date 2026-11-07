@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:axe": "KARMANIA_AXE=1 playwright test --project accessibility",
-    "test:perf": "KARMANIA_PERF=1 playwright test --project performance --workers=1"
+    "test:perf": "KARMANIA_PERF=1 playwright test --project performance --project render-performance --workers=1"
   },
   "dependencies": {
     "@karmania/ui": "workspace:*",
