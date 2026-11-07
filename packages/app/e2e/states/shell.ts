@@ -79,6 +79,24 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    name: 'shell-no-webgl',
+    show: async (page) => {
+      await startWith(page);
+      // Data, and a browser that cannot draw it.
+      await page.locator('karmania-map-area').evaluate(async (element) => {
+        const area = element as unknown as {
+          datasets: number;
+          unavailable: boolean;
+          updateComplete: Promise<boolean>;
+        };
+        area.datasets = 3;
+        area.unavailable = true;
+        await area.updateComplete;
+      });
+      return wholeApp(page);
+    },
+  },
+  {
     name: 'shell-drop',
     show: async (page) => {
       await startWith(page);

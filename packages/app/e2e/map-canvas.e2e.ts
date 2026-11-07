@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { inEveryLayout } from './support/layouts.js';
-import { camera, drawn, pause, stats, withData } from './support/render.js';
+import { camera, dispatch, drawn, pause, stats, withData } from './support/render.js';
+import { importAndLoad } from './support/wizard.js';
 
 const area = (page: Page) => page.locator('karmania-map-area');
 const canvas = (page: Page) => area(page).locator('canvas');
@@ -21,6 +22,45 @@ test.describe('the map canvas', () => {
     ).toEqual([300, 150]);
     await withData(page);
     expect(await stats(page)).toBeDefined();
+  });
+
+  test('says that the map cannot be drawn when the browser gives no WebGL 2, and says nothing of layers being prepared', async ({
+    page,
+  }) => {
+    // A browser that has no WebGL 2: the page asks for it and is told there is none, and the asks are counted.
+    await page.addInitScript(() => {
+      const original = Reflect.get(HTMLCanvasElement.prototype, 'getContext') as (
+        this: HTMLCanvasElement,
+        ...args: unknown[]
+      ) => unknown;
+      const holder = window as unknown as { asks: number };
+      holder.asks = 0;
+      Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+        configurable: true,
+        value(this: HTMLCanvasElement, kind: string, ...rest: unknown[]): unknown {
+          if (kind === 'webgl2') {
+            holder.asks += 1;
+            return null;
+          }
+          return original.call(this, kind, ...rest);
+        },
+      });
+    });
+    await page.goto('/');
+    await importAndLoad(page, 'points.csv', 'points.prj');
+    await expect(area(page).getByText('The map cannot be drawn')).toBeVisible();
+    await expect(area(page).getByText('WebGL 2')).toBeVisible();
+    expect(await stats(page)).toBeUndefined();
+    // The layers are prepared and waiting, and the chip that says they are being prepared is not there for ever.
+    await expect(area(page).locator('.chip')).toHaveCount(0);
+    // And it is not asked again for every change of the scene.
+    const asks = () => page.evaluate(() => (window as unknown as { asks: number }).asks);
+    const before = await asks();
+    expect(before).toBeGreaterThan(0);
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: true });
+    await pause(page, 200);
+    expect(await asks()).toBe(before);
   });
 
   test('fills the map area exactly, at every window size in both themes', async ({ page }) => {
