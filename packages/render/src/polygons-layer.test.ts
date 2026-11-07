@@ -1,7 +1,7 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { TRIANGLES_PER_PART } from './fill-layer.js';
+import { TRIANGLES_PER_PART } from './triangle-parts.js';
 import type { FrameInfo, LayerLook } from './look.js';
 import { POLYGON_OUTLINE_WIDTH, createPolygonsLayer } from './polygons-layer.js';
 

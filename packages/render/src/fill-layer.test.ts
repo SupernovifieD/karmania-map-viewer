@@ -2,8 +2,9 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth } from 'three';
 import type { Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { TRIANGLES_PER_PART, createFillLayer } from './fill-layer.js';
+import { createFillLayer } from './fill-layer.js';
 import type { LayerLook } from './look.js';
+import { TRIANGLES_PER_PART } from './triangle-parts.js';
 
 const LOOK: LayerLook = {
   visible: true,
