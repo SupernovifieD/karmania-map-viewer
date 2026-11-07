@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
+import { warmTheGraphicsProcess } from './support/warm.js';
 import { goTo, wizard } from './support/wizard.js';
 
 const GENERATED = (name: string): string =>
@@ -27,6 +28,23 @@ const WATCH = `(() => {
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) long.push({ start: entry.startTime, duration: entry.duration });
   }).observe({ type: 'longtask', buffered: true });
+  /** The frames that took over 50 ms (where the Long Animation Frames API starts to report), with the scripts that ran in them: what a long task was made of. */
+  const slow = [];
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        
+        slow.push({
+          start: Math.round(entry.startTime), duration: Math.round(entry.duration), blocking: Math.round(entry.blockingDuration),
+          renderStart: Math.round(entry.renderStart - entry.startTime), layoutStart: Math.round(entry.styleAndLayoutStart - entry.startTime),
+          scripts: entry.scripts.map((s) => ({
+            type: s.invokerType, invoker: s.invoker, url: s.sourceURL.split('/').pop(), fn: s.sourceFunctionName, at: s.sourceCharPosition,
+            ms: Math.round(s.duration), forced: Math.round(s.forcedStyleAndLayoutDuration), pause: Math.round(s.pauseDuration),
+          })),
+        });
+      }
+    }).observe({ type: 'long-animation-frame', buffered: true });
+  } catch (error) { /* a browser without the API: the long tasks are still counted */ }
   /** The first element that matches, looking through every tree of every element that has one. */
   function deepFirst(scope, selector) {
     const roots = [scope];
@@ -66,7 +84,7 @@ const WATCH = `(() => {
       tick();
     });
   }
-  window.perf = { long, find, until };
+  window.perf = { long, slow, find, until };
 })()`;
 
 /** A window of the run: what the long tasks in it came to. */
@@ -207,6 +225,11 @@ async function measure(page: Page, data: string, sidecar: string): Promise<Measu
   const scrolledAt = scrolled.at;
 
   const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
+  // The frames over 50 ms and the scripts in them, for what a long task was made of (printed, not asserted).
+  const slow = await inPage<unknown[]>(page, 'return perf.slow;');
+  if (slow.length > 0) {
+    console.info(`SLOW ${data} ${JSON.stringify(slow)}`);
+  }
   const megabytes = readFileSync(GENERATED(data)).length / 1_048_576;
   return {
     file: data,
@@ -229,6 +252,11 @@ async function measure(page: Page, data: string, sidecar: string): Promise<Measu
 const RESULTS: Measured[] = [];
 
 test.describe('the large files', () => {
+  // The map is drawn as soon as the data is loaded, so the first page of a browser would pay for the start of its graphics process.
+  test.beforeAll(async ({ browser }) => {
+    await warmTheGraphicsProcess(browser);
+  });
+
   test.beforeAll(() => {
     for (const name of ['points-1m.csv', 'points-1m.prj', 'grid-4m.asc', 'grid-4m.prj']) {
       if (!existsSync(GENERATED(name))) {

@@ -192,16 +192,21 @@ for (const size of SIZES) {
       await assertNoOverflow(app(page));
     });
 
-    test('the map area says 10 million datasets are loaded, on one or more lines, inside itself', async ({
+    test('the map area says 10 million layers are being prepared, in its chip, inside itself', async ({
       page,
     }) => {
       await page.locator('karmania-map-area').evaluate(async (element) => {
-        const area = element as unknown as { datasets: number; updateComplete: Promise<boolean> };
+        const area = element as unknown as {
+          datasets: number;
+          preparing: number;
+          updateComplete: Promise<boolean>;
+        };
         area.datasets = 10_000_000;
+        area.preparing = 10_000_000;
         await area.updateComplete;
       });
-      await expect(page.locator('karmania-map-area k-empty-state')).toContainText(
-        `${COUNT_TEXT} datasets loaded`,
+      await expect(page.locator('karmania-map-area .chip')).toHaveText(
+        `Preparing ${COUNT_TEXT} layers…`,
       );
       await assertNoOverflow(app(page));
     });

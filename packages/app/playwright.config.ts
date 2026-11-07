@@ -46,10 +46,18 @@ export default defineConfig({
     { name: 'chromium', testIgnore: '**/*.visual.ts', use: { ...devices['Desktop Chrome'] } },
     ...(withPerf
       ? [
+          // The timings are taken in the full Chromium, which uses the graphics card of the machine; the browser that the other tests run in
+          // (a headless shell) has only the software driver, with which drawing a million points holds the page for seconds, and the
+          // brief's figures are for the real GPU. A machine with no card gets the software driver in this one too, and the numbers say so.
           {
             name: 'performance',
-            testMatch: '**/*.perf.ts',
-            use: { ...devices['Desktop Chrome'] },
+            testMatch: '**/performance.perf.ts',
+            use: { ...devices['Desktop Chrome'], channel: 'chromium' },
+          },
+          {
+            name: 'render-performance',
+            testMatch: '**/render.perf.ts',
+            use: { ...devices['Desktop Chrome'], channel: 'chromium' },
           },
         ]
       : []),

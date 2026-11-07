@@ -6,10 +6,12 @@
  * (`axe-states.axe.ts`).
  */
 import { readFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { fixturePath } from '../support/picker.js';
 import type { Pick } from '../support/picker.js';
 import type { Shot } from '../support/screenshots.js';
+import { layerStatuses } from '../support/render.js';
 import { importAndLoad } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
@@ -56,7 +58,10 @@ async function rest(page: Page): Promise<Locator[]> {
   return [app(page)];
 }
 
-/** Loads files, and waits for the table to have its first rows and the summary to have the name of the coordinate system. */
+/**
+ * Loads files, and waits for the table to have its first rows, the summary to have the name of the coordinate system, and the layers to be
+ * done (not being prepared, which is a chip over the map in the picture).
+ */
 async function load(page: Page, ...picks: Pick[]): Promise<void> {
   await importAndLoad(page, ...picks);
   await table(page).locator('.rows [role="row"]').first().waitFor();
@@ -65,6 +70,9 @@ async function load(page: Page, ...picks: Pick[]): Promise<void> {
     .locator('karmania-dataset-summary dt:text-is("Coordinates") + dd')
     .filter({ hasNotText: /^\s*EPSG \d+\s*$/ })
     .waitFor();
+  await expect
+    .poll(async () => (await layerStatuses(page)).every(([, status]) => status !== 'preparing'))
+    .toBe(true);
 }
 
 /** Points with a point twice: loaded, with a warning. */

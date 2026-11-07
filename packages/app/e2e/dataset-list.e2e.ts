@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
+import { expectLayersDrawn, layerStatuses } from './support/render.js';
 import { importAndLoad } from './support/wizard.js';
 
 function parts(page: Page) {
@@ -328,7 +329,8 @@ test.describe('loading and removing datasets', () => {
     await q.keep.click();
     await expect(q.dialog).toBeHidden();
     await expect(q.rows).toHaveCount(1);
-    await expect(q.map).toContainText('1 dataset loaded');
+    await expect(q.map).toHaveCount(0);
+    await expectLayersDrawn(page, 1);
   });
 
   test('keeps the dataset when the dialog is closed with Esc', async ({ page }) => {
@@ -341,12 +343,10 @@ test.describe('loading and removing datasets', () => {
     await expect(q.rows).toHaveCount(1);
   });
 
-  test('removes it when that is confirmed, from the engine and from the list, and the map area says so', async ({
-    page,
-  }) => {
+  test('removes it when that is confirmed, from the engine and from the list', async ({ page }) => {
     const q = parts(page);
     await importAndLoad(page, 'mixed.geojson');
-    await expect(q.map).toContainText('3 datasets loaded');
+    await expectLayersDrawn(page, 3);
     const before = await page
       .locator('karmania-viewer')
       .evaluate((app) =>
@@ -356,7 +356,7 @@ test.describe('loading and removing datasets', () => {
     await q.rows.nth(1).locator('.remove k-button button').click();
     await q.confirm.click();
     await expect(q.rows).toHaveCount(2);
-    await expect(q.map).toContainText('2 datasets loaded');
+    await expectLayersDrawn(page, 2);
     const state = await page.locator('karmania-viewer').evaluate((app) => {
       const held = app as unknown as {
         datasets: { id: number }[];
@@ -408,6 +408,7 @@ test.describe('loading and removing datasets', () => {
       'No data loaded',
     );
     await expect(q.map).toContainText('No data yet');
+    expect(await layerStatuses(page)).toEqual([]);
     await expect(q.emptyImport).toBeFocused();
   });
 });

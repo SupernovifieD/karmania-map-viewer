@@ -21,13 +21,27 @@ function line(page: Page): Promise<string> {
   );
 }
 
-/** Puts a number of datasets in the map area, and waits for it to be drawn. */
-async function load(page: Page, datasets: number): Promise<void> {
-  await map(page).evaluate(async (element, count) => {
-    (element as unknown as { datasets: number }).datasets = count;
-    await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
-  }, datasets);
+/** What the map area is told, as the viewer tells it. */
+interface Told {
+  datasets?: number;
+  preparing?: number;
+  progress?: number;
+  reasons?: string[];
 }
+
+/** Tells the map area how things are, and waits for it to be drawn. */
+async function tell(page: Page, told: Told): Promise<void> {
+  await map(page).evaluate(async (element, properties) => {
+    Object.assign(element, properties);
+    await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
+  }, told);
+}
+
+/** Puts a number of datasets in the map area, and waits for it to be drawn. */
+const load = (page: Page, datasets: number): Promise<void> => tell(page, { datasets });
+
+/** The chip at the top while layers are being prepared. */
+const chip = (page: Page) => map(page).locator('.chip');
 
 /** A few computed style values of an element. */
 function styleOf(locator: Locator, ...properties: string[]): Promise<string[]> {
@@ -99,41 +113,161 @@ test.describe('the map area', () => {
     });
   });
 
-  test('says that the map comes in phase 2 once there is data, and how many datasets there are', async ({
+  test('has no empty state once there is data, which is the map, and has it again with none', async ({
     page,
   }) => {
     await page.goto('/');
+    await expect(state(page)).toHaveCount(1);
     await load(page, 1);
-    await expect(part(page, '.heading')).toHaveText('Map rendering arrives in phase 2');
-    await expect.poll(() => line(page)).toBe('1 dataset loaded');
-    await expect(part(page, 'k-button')).toHaveCount(0);
-    await load(page, 3);
-    await expect.poll(() => line(page)).toBe('3 datasets loaded');
-    // The thousands are grouped, as every count in the app is.
-    await load(page, 1234);
-    await expect.poll(() => line(page)).toBe('1,234 datasets loaded');
-    // A long count wraps; it does not overflow.
+    await expect(state(page)).toHaveCount(0);
     await load(page, 10_000_000);
-    await expect.poll(() => line(page)).toBe('10,000,000 datasets loaded');
-    await assertNoOverflow(map(page));
+    await expect(state(page)).toHaveCount(0);
     await load(page, 0);
     await expect(part(page, '.heading')).toHaveText('No data yet');
     await expect(part(page, 'k-button')).toHaveCount(1);
   });
 
-  test('keeps the same icon, and stays in the middle, once there is data', async ({ page }) => {
-    await inEveryLayout(page, '/', async () => {
+  test.describe('while layers are being prepared', () => {
+    test('says how many, in a chip at the top in the middle, 16 from the edge, over the map, and moves nothing', async ({
+      page,
+    }) => {
+      await page.goto('/');
       await load(page, 2);
-      await expect(part(page, 'k-icon.icon')).toHaveAttribute('name', 'map');
-      const group = await boxOf(part(page, '.group'), 'the group');
+      await expect(chip(page)).toHaveCount(0);
+      const canvas = await boxOf(map(page).locator('canvas'), 'the canvas');
+      await tell(page, { preparing: 2, progress: 0.4 });
+      await expect(chip(page)).toHaveText('Preparing 2 layers…');
+      await expect(chip(page)).toHaveAttribute('role', 'status');
       const area = await boxOf(map(page), 'the map area');
-      expect(Math.abs(group.x + group.width / 2 - (area.x + area.width / 2))).toBeLessThanOrEqual(
-        0.5,
-      );
-      expect(Math.abs(group.y + group.height / 2 - (area.y + area.height / 2))).toBeLessThanOrEqual(
-        0.5,
-      );
+      const box = await boxOf(chip(page), 'the chip');
+      expect(box.y - area.y).toBeCloseTo(16, 1);
+      expect(Math.abs(box.x + box.width / 2 - (area.x + area.width / 2))).toBeLessThanOrEqual(0.5);
+      expect(box.height).toBeCloseTo(24, 1);
+      // Over the map and moving nothing.
+      expect(await boxOf(map(page).locator('canvas'), 'the canvas')).toEqual(canvas);
+      expect(await styleOf(chip(page), 'position', 'background-color')).toEqual([
+        'absolute',
+        expect.stringMatching(/^rgb/) as unknown as string,
+      ]);
+      await tell(page, { preparing: 1 });
+      await expect(chip(page)).toHaveText('Preparing 1 layer…');
+      await tell(page, { preparing: 1234 });
+      await expect(chip(page)).toHaveText('Preparing 1,234 layers…');
       await assertNoOverflow(map(page));
+      await tell(page, { preparing: 0 });
+      await expect(chip(page)).toHaveCount(0);
+    });
+
+    test('has a thin bar along its foot that is as full as the layers are ready', async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await tell(page, { datasets: 1, preparing: 1, progress: 0.25 });
+      const filled = () =>
+        chip(page).evaluate((element) => {
+          const bar = element.querySelector('.bar');
+          if (bar === null) {
+            return [];
+          }
+          const after = getComputedStyle(bar, '::after');
+          return [
+            Number.parseFloat(after.width),
+            Number.parseFloat(getComputedStyle(bar).width),
+            Number.parseFloat(getComputedStyle(bar).height),
+          ];
+        });
+      const [full = 0, track = 0, height = 0] = await filled();
+      expect(track).toBeGreaterThan(100);
+      expect(full).toBeCloseTo(track * 0.25, 0);
+      expect(height).toBe(2);
+      await tell(page, { progress: 1 });
+      await expect.poll(async () => (await filled())[0] ?? -1).toBeCloseTo(track, 0);
+      // Out of range is held to it.
+      await tell(page, { progress: 7 });
+      await expect.poll(async () => (await filled())[0] ?? -1).toBeCloseTo(track, 0);
+      await tell(page, { progress: -3 });
+      await expect.poll(async () => (await filled())[0] ?? -1).toBe(0);
+    });
+
+    test('gives way to the notice that the map is being drawn again, which is in the same place', async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await tell(page, { datasets: 1, preparing: 2, progress: 0.5 });
+      await expect(chip(page)).toHaveCount(1);
+      await map(page).evaluate(async (element) => {
+        (element as unknown as { redrawing: boolean }).redrawing = true;
+        await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
+      });
+      await expect(chip(page)).toHaveCount(0);
+      await expect(map(page).locator('.notice')).toHaveText('Redrawing the map…');
+    });
+  });
+
+  test.describe('when there is data and none of it can be drawn', () => {
+    test('says so, with the reason, and a button to the Legend', async ({ page }) => {
+      await page.goto('/');
+      await tell(page, {
+        datasets: 1,
+        reasons: ['The code EPSG:99999 is not known. Change the map’s coordinate system.'],
+      });
+      await expect(part(page, '.heading')).toHaveText('Nothing can be drawn yet');
+      await expect
+        .poll(() => line(page))
+        .toBe('The code EPSG:99999 is not known. Change the map’s coordinate system.');
+      await expect(part(page, 'k-icon.icon')).toHaveAttribute('name', 'map');
+      const button = part(page, 'k-button');
+      await expect(button).toHaveText('Show the Legend');
+      await expect(button).toHaveAttribute('variant', 'secondary');
+      await expect(button.locator('k-icon')).toHaveAttribute('name', 'layers');
+      // Several layers: how many, and the first reason.
+      await tell(page, {
+        datasets: 3,
+        reasons: ['First reason.', 'Second reason.', 'Third reason.'],
+      });
+      await expect.poll(() => line(page)).toBe('3 layers cannot be drawn. First reason.');
+    });
+
+    test('opens the Legend tab when the button is pressed, whichever tab was open', async ({
+      page,
+    }) => {
+      await page.goto('/');
+      const tab = (name: string) =>
+        page.locator('karmania-panel k-tabs').getByRole('tab', { name });
+      await tab('Data').click();
+      await expect(tab('Data')).toHaveAttribute('aria-selected', 'true');
+      await tell(page, { datasets: 1, reasons: ['Not drawn.'] });
+      await part(page, 'k-button').getByRole('button', { name: 'Show the Legend' }).click();
+      await expect(tab('Legend')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    test('stays in the middle of the map area, and does not overflow, at every window size', async ({
+      page,
+    }) => {
+      await inEveryLayout(page, '/', async () => {
+        await tell(page, { datasets: 2, reasons: ['A reason. '.repeat(40)] });
+        const group = await boxOf(part(page, '.group'), 'the group');
+        const area = await boxOf(map(page), 'the map area');
+        expect(Math.abs(group.x + group.width / 2 - (area.x + area.width / 2))).toBeLessThanOrEqual(
+          0.5,
+        );
+        expect(
+          Math.abs(group.y + group.height / 2 - (area.y + area.height / 2)),
+        ).toBeLessThanOrEqual(0.5);
+        await assertNoOverflow(map(page));
+      });
+    });
+
+    test('is not said while a layer is being prepared, which is said instead, or once nothing is the matter', async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await tell(page, { datasets: 1, preparing: 1, progress: 0.1, reasons: [] });
+      await expect(state(page)).toHaveCount(0);
+      await expect(chip(page)).toHaveCount(1);
+      await tell(page, { preparing: 0 });
+      await expect(chip(page)).toHaveCount(0);
+      await expect(state(page)).toHaveCount(0);
     });
   });
 
@@ -147,13 +281,19 @@ test.describe('the map area', () => {
     await expect(part(page, 'k-button').getByRole('button', { name: 'Import' })).toBeFocused();
   });
 
+  const STATES: readonly { name: string; told: Told }[] = [
+    { name: 'no data', told: { datasets: 0 } },
+    { name: 'data', told: { datasets: 2 } },
+    { name: 'layers being prepared', told: { datasets: 2, preparing: 2, progress: 0.4 } },
+    { name: 'nothing that can be drawn', told: { datasets: 2, reasons: ['Not drawn.'] } },
+  ];
   for (const theme of ['light', 'dark'] as const) {
-    for (const datasets of [0, 2]) {
-      test(`has no serious accessibility violations in the ${theme} theme with ${String(datasets)} datasets`, async ({
+    for (const item of STATES) {
+      test(`has no serious accessibility violations in the ${theme} theme with ${item.name}`, async ({
         page,
       }) => {
         await page.goto(`/?theme=${theme}`);
-        await load(page, datasets);
+        await tell(page, item.told);
         await expectNoSeriousViolations(page);
       });
     }
