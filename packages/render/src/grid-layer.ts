@@ -28,6 +28,7 @@ import {
 import type { LayerObject } from './layer-set.js';
 import { MAX_CLASSES, colourOf } from './look.js';
 import type { ClassColouring, LayerLook } from './look.js';
+import { sinCos } from './rotation.js';
 
 const VERTEX = /* glsl */ `
 varying vec2 vUv;
@@ -60,25 +61,6 @@ void main() {
 
 type GridBuffers = Extract<RenderBuffers, { kind: 'grid' }>;
 type Tile = GridBuffers['tiles'][number];
-
-/** Sine and cosine of an angle in degrees, exact for the multiples of 90 so that a grid turned a quarter is exactly where it should be. */
-function sinCos(degrees: number): [number, number] {
-  const turn = ((degrees % 360) + 360) % 360;
-  switch (turn) {
-    case 0:
-      return [0, 1];
-    case 90:
-      return [1, 0];
-    case 180:
-      return [0, -1];
-    case 270:
-      return [-1, 0];
-    default: {
-      const radians = (turn * Math.PI) / 180;
-      return [Math.sin(radians), Math.cos(radians)];
-    }
-  }
-}
 
 /**
  * The four corners of a tile (from the first cell's lower corner, anticlockwise), `x y z` each: the cells' own axes from the origin,
