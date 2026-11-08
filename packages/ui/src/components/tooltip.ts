@@ -51,6 +51,9 @@ export class KTooltip extends LitElement {
         pointer-events: auto;
         position: fixed;
         transition: opacity var(--k-motion-duration) var(--k-motion-easing);
+        /* It wraps, whatever the box that the control is in does: white-space is inherited, and a tooltip in a box that does not wrap would
+           run out of its own box, as light text on whatever is under it. */
+        white-space: normal;
         width: max-content;
       }
 
@@ -214,7 +217,12 @@ export class KTooltip extends LitElement {
       trigger.textContent
     ).trim();
     const text = this.text ?? '';
-    if (text !== '' && text !== name) {
+    // A name that begins with what the tooltip says (`Reset to north. Map turned 30° from north` and `Reset to north`) already says it: a
+    // description of the same words would be read out twice.
+    if (
+      text !== '' &&
+      !(name.startsWith(text) && /^[\s.,:;]*$/.test(name.slice(text.length, text.length + 1)))
+    ) {
       trigger.setAttribute('aria-description', text);
     } else {
       trigger.removeAttribute('aria-description');
