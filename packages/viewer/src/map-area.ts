@@ -7,6 +7,7 @@ import './north-arrow.js';
 import './scale-bar.js';
 import './status-chip.js';
 import type { MapCrsText } from './map-crs-text.js';
+import { KEYS_2D } from './map-label.js';
 import type { Readout } from './pointer-readout.js';
 import type { ScaleBarModel } from '@karmania/scene';
 
@@ -54,6 +55,7 @@ export class KarmaniaMapArea extends LitElement {
     heading: { type: Number },
     scale: { attribute: false },
     crs: { attribute: false },
+    label: { type: String },
     readout: { attribute: false },
     readoutChars: { type: Number },
     preparing: { type: Number },
@@ -227,6 +229,8 @@ export class KarmaniaMapArea extends LitElement {
   declare scale: ScaleBarModel | undefined;
   /** What the status chip's button says of the map's coordinate system. */
   declare crs: MapCrsText | undefined;
+  /** What the map is called for those who cannot see it: `Map, 2D view, 3 layers, turned 30° from north`. */
+  declare label: string;
   /** Where the pointer is on the map, written, for the status chip; `undefined` when it is off the map or the view is 3D. */
   declare readout: Readout | undefined;
   /** How many characters wide the longest coordinate of the readout can be at this camera: what the chip keeps room for. */
@@ -259,6 +263,7 @@ export class KarmaniaMapArea extends LitElement {
     this.heading = 0;
     this.scale = undefined;
     this.crs = undefined;
+    this.label = 'Map';
     this.readout = undefined;
     this.readoutChars = 0;
     this.preparing = 0;
@@ -295,6 +300,7 @@ export class KarmaniaMapArea extends LitElement {
     return html`
       <main
         aria-label="Map"
+        aria-describedby=${this.interactive ? 'keys' : nothing}
         tabindex=${this.interactive ? '0' : nothing}
         @pointermove=${this.onPointerMove}
         @pointerleave=${this.onPointerLeave}
@@ -303,7 +309,8 @@ export class KarmaniaMapArea extends LitElement {
         @dragleave=${this.onDragLeave}
         @drop=${this.onDrop}
       >
-        <canvas aria-hidden="true"></canvas>
+        <canvas role="img" aria-label=${this.label}></canvas>
+        ${this.interactive ? html`<p id="keys" class="visually-hidden">${KEYS_2D}</p>` : nothing}
         ${
           this.datasets === 0
             ? this.empty()

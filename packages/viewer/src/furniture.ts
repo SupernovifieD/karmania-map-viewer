@@ -7,6 +7,7 @@ import type { CrsInfo } from '@karmania/engine';
 import { scaleBar } from '@karmania/scene';
 import type { SceneDocument, ScaleBarModel } from '@karmania/scene';
 import { mapCrsText } from './map-crs-text.js';
+import { mapLabel } from './map-label.js';
 import type { MapCrsText } from './map-crs-text.js';
 import { unitsOf } from './map-units.js';
 
@@ -18,6 +19,8 @@ export interface Furniture {
   readonly scale: ScaleBarModel;
   /** What the status chip's button says of the map's coordinate system. */
   readonly crs: MapCrsText;
+  /** What the map is called for those who cannot see it: the canvas's accessible name. */
+  readonly label: string;
 }
 
 /**
@@ -33,6 +36,7 @@ export function furnitureOf(state: SceneDocument, info: CrsInfo | null | undefin
       unitsPerPixel: state.camera2d.unitsPerPixel,
     }),
     crs: mapCrsText(state.frame, info),
+    label: mapLabel(state),
   };
 }
 
@@ -50,6 +54,7 @@ export function sameFurniture(a: Furniture, b: Furniture): boolean {
     a.heading === b.heading &&
     sameScale(a.scale, b.scale) &&
     a.crs.label === b.crs.label &&
-    a.crs.title === b.crs.title
+    a.crs.title === b.crs.title &&
+    a.label === b.label
   );
 }

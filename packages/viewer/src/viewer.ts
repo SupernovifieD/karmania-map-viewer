@@ -663,6 +663,7 @@ export class KarmaniaViewer extends LitElement {
           .heading=${this.furniture.heading}
           .scale=${this.furniture.scale}
           .crs=${this.furniture.crs}
+          .label=${this.furniture.label}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}

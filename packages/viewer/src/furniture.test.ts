@@ -49,6 +49,11 @@ describe('the furniture of the scene', () => {
     expect(furnitureOf(scene({ frame: null }), undefined).crs.label).toBe('No map CRS');
   });
 
+  it('has the name of the map, which says the heading', () => {
+    expect(furnitureOf(scene(), UTM).label).toBe('Map, 2D view, no layers, turned 30° from north');
+    expect(furnitureOf(scene({ viewMode: '3d' }), UTM).label).toContain('3D view');
+  });
+
   it('measures a local grid in its own units, whatever the definitions say', () => {
     const frame: Frame = {
       mapCrs: { kind: 'local', units: 'ft' },
@@ -85,6 +90,25 @@ describe('whether two furnitures show the same', () => {
     expect(same(at(2), at(2.04))).toBe(false);
     // 100 m and 1 km are the same width, and not the same bar.
     expect(same(at(1), at(10))).toBe(false);
+  });
+
+  it('is false when the name of the map changes, for the layers there are and for the view', () => {
+    const layer = {
+      id: 'layer-1',
+      datasetId: 1,
+      name: 'a',
+      visible: true,
+      style: { colour: { mode: 'single', value: '#000000' }, opacity: 1 },
+    } as unknown as SceneDocument['layers'][string];
+    expect(
+      sameFurniture(
+        furnitureOf(scene(), UTM),
+        furnitureOf(scene({ layers: { 'layer-1': layer } }), UTM),
+      ),
+    ).toBe(false);
+    expect(
+      sameFurniture(furnitureOf(scene(), UTM), furnitureOf(scene({ viewMode: '3d' }), UTM)),
+    ).toBe(false);
   });
 
   it('is false when what the chip says of the coordinate system changes: the name that arrives, and another system', () => {
