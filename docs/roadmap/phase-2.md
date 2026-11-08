@@ -490,11 +490,11 @@ or releasing, and whenever the brief says to stop.
 - [x] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
   - [x] 17.3a The icons (plus, minus, maximize, rotate-ccw).
   - [x] 17.3b The group on the map, and what its four buttons do to the camera.
-- [ ] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
+- [x] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
   the map CRS button.
   - [x] 17.4a What the pointer is over, in the map CRS, and the decimals that make the last digit about a pixel.
   - [x] 17.4b The chip with the coordinates.
-  - [ ] 17.4c The map CRS button of the chip, with the system's name in its tooltip.
+  - [x] 17.4c The map CRS button of the chip, with the system's name in its tooltip.
 - [ ] 17.5 Map CRS dialog (10.5): current CRS, search, local option, "What
   changes", apply re-prepares every layer.
   - [ ] 17.5a `engine.previewFrame(preferred)`: what `chooseFrame` would say for a system, without changing the frame (the engine keeps the frame `chooseFrame` gives, so asking it about a system the person has not chosen yet would change the map).

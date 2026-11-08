@@ -41,6 +41,14 @@ describe('the furniture of the scene', () => {
     });
   });
 
+  it('has what the status chip says of the map’s coordinate system', () => {
+    expect(furnitureOf(scene(), UTM).crs).toEqual({
+      label: 'EPSG:32640',
+      title: 'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+    });
+    expect(furnitureOf(scene({ frame: null }), undefined).crs.label).toBe('No map CRS');
+  });
+
   it('measures a local grid in its own units, whatever the definitions say', () => {
     const frame: Frame = {
       mapCrs: { kind: 'local', units: 'ft' },
@@ -77,6 +85,27 @@ describe('whether two furnitures show the same', () => {
     expect(same(at(2), at(2.04))).toBe(false);
     // 100 m and 1 km are the same width, and not the same bar.
     expect(same(at(1), at(10))).toBe(false);
+  });
+
+  it('is false when what the chip says of the coordinate system changes: the name that arrives, and another system', () => {
+    // The same system, whose name has come: the tooltip is different.
+    expect(sameFurniture(furnitureOf(scene(), UTM), furnitureOf(scene(), undefined))).toBe(false);
+    expect(sameFurniture(furnitureOf(scene(), UTM), furnitureOf(scene(), UTM))).toBe(true);
+    // Another name for the same units: only the tooltip differs.
+    expect(
+      sameFurniture(
+        furnitureOf(scene(), UTM),
+        furnitureOf(scene(), { ...UTM, name: 'Another name' }),
+      ),
+    ).toBe(false);
+    const other: Frame = {
+      mapCrs: { kind: 'epsg', code: 32641 },
+      origin: [0, 0, 0],
+      source: 'user',
+    };
+    expect(
+      sameFurniture(furnitureOf(scene(), UTM), furnitureOf(scene({ frame: other }), UTM)),
+    ).toBe(false);
   });
 
   it('is false for a bar and no bar, and for two reasons for none', () => {
