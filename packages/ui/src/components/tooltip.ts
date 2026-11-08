@@ -205,7 +205,11 @@ export class KTooltip extends LitElement {
     tip.dataset['placement'] = spot.placement;
   }
 
-  /** Tells the control what the tooltip says, if that is something its own name does not. */
+  /**
+   * Tells the control what the tooltip says, if that is something its own name does not. It is worked out when the tooltip is drawn and when
+   * what is in its slot changes, and not when the control's own name changes later: none of the app's does so in a way that matters (the
+   * north arrow's name always begins with the same words).
+   */
   private describeTrigger(): void {
     const trigger = this.trigger;
     if (trigger === undefined) {
@@ -218,11 +222,10 @@ export class KTooltip extends LitElement {
     ).trim();
     const text = this.text ?? '';
     // A name that begins with what the tooltip says (`Reset to north. Map turned 30° from north` and `Reset to north`) already says it: a
-    // description of the same words would be read out twice.
-    if (
-      text !== '' &&
-      !(name.startsWith(text) && /^[\s.,:;]*$/.test(name.slice(text.length, text.length + 1)))
-    ) {
+    // description of the same words would be read out twice. The words end where the name ends or at a character that is not a letter or a
+    // digit (so `Zoom` is not the beginning of `Zoomed in` or `Zoom2`).
+    const saysIt = name.startsWith(text) && /^(?![\p{L}\p{N}])/u.test(name.slice(text.length));
+    if (text !== '' && !saysIt) {
       trigger.setAttribute('aria-description', text);
     } else {
       trigger.removeAttribute('aria-description');
