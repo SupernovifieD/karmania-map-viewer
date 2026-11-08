@@ -75,12 +75,13 @@ test.describe('the tooltip', () => {
     await page.evaluate(async () => {
       const holder = document.createElement('div');
       holder.style.cssText = 'position: fixed; left: 300px; top: 300px;';
-      holder.innerHTML = [
+      const cases: [id: string, text: string, label: string][] = [
         ['same', 'Reset to north', 'Reset to north. Map turned 30° from north'],
         ['exact', 'Close', 'Close'],
         ['longer', 'Zoom in (+)', 'Zoom in'],
         ['word', 'Zoom', 'Zoomed in'],
-      ]
+      ];
+      holder.innerHTML = cases
         .map(
           ([id, text, label]) =>
             `<k-tooltip id="d-${id}" text="${text}"><k-button icon="x" label="${label}"></k-button></k-tooltip>`,
