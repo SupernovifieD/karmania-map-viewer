@@ -461,7 +461,11 @@ export class KarmaniaViewer extends LitElement {
   }
 
   protected override firstUpdated(): void {
-    this.watchSize();
+    // A viewer that was put in a page and taken out before it first rendered has nothing to watch for: Lit makes the update whether or not the
+    // element is still connected, and nothing would disconnect an observer made now.
+    if (this.isConnected) {
+      this.watchSize();
+    }
   }
 
   override connectedCallback(): void {
@@ -536,10 +540,13 @@ export class KarmaniaViewer extends LitElement {
     this.importFiles(event.detail.files);
   };
 
-  /** Opens the import wizard on `files`, if there are any. */
+  /**
+   * Opens the import wizard on `files`, if there are any and the viewer is in a page. The engine belongs to the time it is in one (see `load`), and
+   * the wizard of a viewer that was taken out is still in its shadow root, so one made here would never be let go.
+   */
   private importFiles(files: readonly File[]): void {
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
-    if (files.length > 0 && wizard) {
+    if (this.isConnected && files.length > 0 && wizard) {
       this.engine ??= createEngine();
       wizard.engine = this.engine;
       wizard.show(files);

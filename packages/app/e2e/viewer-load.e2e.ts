@@ -141,4 +141,39 @@ test.describe('the viewer’s load', () => {
     );
     expect(outcome.engine).toBe('undefined');
   });
+
+  test('makes no engine when files are handed to a viewer that is out of a page either', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const engine = await page.evaluate(() => {
+      const element = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as HTMLElement & {
+        engine?: unknown;
+        openImport(files: File[]): void;
+      };
+      element.remove();
+      element.openImport([new File(['x,y\n1,2\n'], 'points.csv', { type: 'text/csv' })]);
+      return typeof element.engine;
+    });
+    expect(engine).toBe('undefined');
+  });
+
+  test('watches no size when it is taken out of a page before it has rendered', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const watching = await page.evaluate(async () => {
+      const element = document.createElement('karmania-viewer') as unknown as HTMLElement & {
+        sizeWatch?: unknown;
+        updateComplete: Promise<boolean>;
+      };
+      document.body.append(element);
+      element.remove();
+      await element.updateComplete;
+      return typeof element.sizeWatch;
+    });
+    expect(watching).toBe('undefined');
+  });
 });
