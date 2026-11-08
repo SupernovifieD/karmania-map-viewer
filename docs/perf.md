@@ -437,7 +437,34 @@ need the card). **Six runs of `pnpm perf` after it** (the same machine and card;
 The tests of Phase 1 in the same runs (a CSV of 1,000,000 points and a grid of 4,000,000 cells, through the preview, the import, the load and the scroll of the table) had no task over 50 ms in any
 of their 36 measurements, where before they had them in some (a load of 51 to 60 ms, scrolls of 84 and 107): the same causes. For comparison, with the two heads run in turn before the fix, tasks over 50 ms
 were in 8 of 27 measurements on each. **What is not changed**: the first frame that draws a layer is still the card's own work in a task of its own (20 ms was measured with parts of 50,000 and 33 to 45 with 250,000; with the 100,000 now it was not timed apart, and no task over 50 ms was seen), and the frames over 50 ms that `SLOW` shows outside the windows that the targets name (the start-up of the page, 45 to 90 ms to evaluate its script, and in the import wizard the frame after a click on Next with the
-1,000,000-row file, 110 to 226 ms of layout) are the Phase 1 interface's and are not held by any target; they are for the owner to say whether to look at.
+1,000,000-row file, 110 to 226 ms) are not held by any target: **the owner asked what they are, and the next section says (step 17.10)**.
+
+### The frames over 50 ms outside the targets' windows (step 17.10)
+
+The owner asked, after M16, what the two kinds of long frame that `SLOW` still shows are, and how they could be fixed. **Nothing was changed for this: it is a finding.** Found with the Long Animation Frames API,
+a trace of the browser (`devtools.timeline`, `v8`, `blink`), a CPU profile of the page (the `Profiler` of the protocol, at 100 to 200 microseconds), and, for the native side, macOS's `sample` on the renderer's process at 1 ms (the probes are
+throwaway scripts; the method is in this section). The machine is the one of the rest of this file (a laptop with a 1.1 GHz CPU, the full Chromium).
+
+**1. The frame after the first click, 110 to 226 ms (in the probes 111 to 139 ms): it is the operating system's, not the page's.** It is the frame after the first press of Next in the wizard, with any file, and it is the first mouse event
+that a page gets. The page's own part is small: the click's script is 15 to 29 ms (`K-BUTTON.onclick`, with a forced layout of 1 ms), the layout of the new step 13 to 19 ms (2,700 boxes), the rest of the JavaScript a few milliseconds
+and the garbage collector 4. **The rest is the browser's main thread waiting inside macOS**: the trace has a `BeginMainFrame` of 72 to 86 ms in which nothing at all runs on any thread of the process until its last millisecond (and it is a long task),
+and the `sample` of the renderer shows why: the first thing a renderer does with a mouse event on macOS is to ask for the state of the keyboard's modifier keys (`GetCurrentKeyModifiers`), which makes the system start its connection to the window server for
+the process, once: **a check of the process's permission over XPC to the `tccd` daemon (30 ms in the sample) and the setting up of the display (26 ms)**, 56 ms of the 138 that the thread was busy in the sample, with the page's own code in a small part of the rest.
+**Proof that it is that and not the step**: with a mouse move over the page before the wizard is used (`page.mouse.move`), the click's frame is 52 to 57 ms and the long frame, 92 to 136 ms, is the one of the move; the other steps of the wizard
+(Next to the third, fourth and fifth step) never have one; and **it does not depend on the file** (the same frame is 99 to 126 ms for a file of two rows, 110 and 111 ms for the grid of 4,000,000 cells, the script of the click being 13 to 22 ms or under the 5 ms that the API lists, and 111 to 139 ms for the 1,000,000 points). **It cannot be fixed in the page**: it is the browser's, in the process's first mouse event, and a person on a Mac pays it
+once for each tab's process (not measured in a window with a person at it: the probes drive the page with the protocol's mouse events, which take the same path in the renderer). **If the harness's lines are to be clean**, a mouse move after `goto` in `measure()`
+(`performance.perf.ts`) and in `render.perf.ts` moves the cost out of the windows that are timed; nothing asserts the frames over 50 ms, so it is not needed for the tests, and it was not done.
+
+**2. The start-up of the page, 53 to 69 ms (45 to 90 over the runs): it is the page's own first render, and not the size of the bundle.** One task: the parser runs the module script, which is 18 ms of evaluating the modules (`v8.evaluateModule`: three.js's top level
+is 5 ms of it, the colour ramps 1.5, the components' classes the rest) and then **42 ms of microtasks, which are Lit rendering the shell**: 212 elements in 40 shadow roots (14 kinds of component), run cold (the JavaScript engine has not yet compiled
+any of it), and 8 ms of the page's first style and layout after it. **A prototype that split three.js and the renderer out of the first script into a chunk that is loaded when the first layer is ready (the main chunk went from 704 kB to 148 kB, with 558 kB loaded later)
+did not change it: 54 to 64 ms against 48 to 64**, so the size of the script is not what the time is. (The first frame of all, 35 to 134 ms with no script and no long task, is the browser's own first render; and a task of 150 ms at 290 to 380 ms in the `SLOW` lines is
+the harness's own, which blocks the page on purpose to see that its watch works.)
+
+**How the start-up could be brought under 50 ms, if the owner wants no task over 50 ms anywhere (none of this is done):** (a) **do not render what is not seen at the start**: the import dialog with its steps, the tooltips and the panel's tabs that are hidden are about a third of the 40 roots, and
+Lit can render them when they are first opened (a change of the viewer, with the tests of the dialog and the panel to follow it; the saving is not measured); (b) **give the page a turn between the parts of the first render** (the map area and the panel in one task, the dialog and what is
+hidden in the next), which splits one task of 60 into two of 30 at no cost to what is on screen and is the smallest change; (c) leave it: the targets of 9.6 name loading data, the frames of a camera and the like, and not the start of the page, and 53 to 69 ms on a 1.1 GHz laptop is
+expected to be about a third of that on a desktop (not measured). **My recommendation is (b) if it is to be done, and (c) otherwise**; (a) is more work for a saving that is not known.
 
 How it got there. The first measurement on the card, before any change, met the times and missed the last target in all three: a first frame of 630 to 862 ms
 and a median of 16.6 ms (p95 18.5), but a longest task of 186 ms for the points, 292 for the grid and 210 for the blocks, and, in later runs, of 51 to 58
