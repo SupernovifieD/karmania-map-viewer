@@ -158,6 +158,14 @@ describe('no scale bar, and why', () => {
     });
   });
 
+  it('is none while the units are being looked up, and says so and not that there is no map', () => {
+    expect(none({ viewMode: '2d', units: 'pending', unitsPerPixel: 1 })).toEqual({
+      kind: 'none',
+      reason: 'units_pending',
+      message: 'The units of this coordinate system are being looked up.',
+    });
+  });
+
   it('is none when the map has no scale: not above 0, not a number, or too small to write', () => {
     for (const unitsPerPixel of [0, -1, NaN, Infinity, 1e-9]) {
       expect(none({ viewMode: '2d', units: 'm', unitsPerPixel })).toEqual({
@@ -177,6 +185,12 @@ describe('no scale bar, and why', () => {
     });
     expect(none({ viewMode: '2d', units: undefined, unitsPerPixel: NaN })).toMatchObject({
       reason: 'no_map',
+    });
+    expect(none({ viewMode: '3d', units: 'pending', unitsPerPixel: NaN })).toMatchObject({
+      reason: 'three_d',
+    });
+    expect(none({ viewMode: '2d', units: 'pending', unitsPerPixel: NaN })).toMatchObject({
+      reason: 'units_pending',
     });
   });
 });

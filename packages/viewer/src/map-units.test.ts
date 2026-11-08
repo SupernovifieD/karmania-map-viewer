@@ -32,8 +32,8 @@ describe('the units of the map', () => {
     expect(unitsOf(local('us_ft'), info('m'))).toBe('us_ft');
   });
 
-  it('are not known for an EPSG code until the definitions have been asked', () => {
-    expect(unitsOf(epsg(32640), undefined)).toBeUndefined();
+  it('are pending for an EPSG code until the definitions have answered', () => {
+    expect(unitsOf(epsg(32640), undefined)).toBe('pending');
   });
 
   it('are the definitions’ for an EPSG code', () => {

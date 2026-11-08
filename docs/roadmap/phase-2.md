@@ -515,7 +515,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
   - [x] 17.F3 `viewer.load` on a viewer that is not in a page made an engine that nothing disposes.
   - [x] 17.F4 The map CRS dialog asked the engine what would change while it was closed, and not again for another engine.
-  - [ ] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
+  - [x] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
   - [ ] 17.F6 Tests that could not fail, and titles that said more than the test: the scale bar at its widest, the Home key, fit with a heading, the limits of the zoom, the dialog's height, what looking at a choice changes, Apply after a preview that failed, and the keyboard after Apply.
   - [ ] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
 - [ ] 17.G Gate.

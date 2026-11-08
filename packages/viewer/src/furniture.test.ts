@@ -25,8 +25,11 @@ describe('the furniture of the scene', () => {
     expect(furniture.scale).toMatchObject({ kind: 'bar', label: '100 m', unit: 'm' });
   });
 
-  it('has no scale bar until the units are known, with no map, in degrees and in 3D', () => {
-    expect(furnitureOf(scene(), undefined).scale).toMatchObject({ kind: 'none', reason: 'no_map' });
+  it('has no scale bar until the units are known (and says they are being looked up), with no map, in degrees and in 3D', () => {
+    expect(furnitureOf(scene(), undefined).scale).toMatchObject({
+      kind: 'none',
+      reason: 'units_pending',
+    });
     expect(furnitureOf(scene({ frame: null }), UTM).scale).toMatchObject({
       kind: 'none',
       reason: 'no_map',
