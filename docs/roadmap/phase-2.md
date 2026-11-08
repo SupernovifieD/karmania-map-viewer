@@ -493,7 +493,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
   the map CRS button.
   - [x] 17.4a What the pointer is over, in the map CRS, and the decimals that make the last digit about a pixel.
-  - [ ] 17.4b The chip with the coordinates.
+  - [x] 17.4b The chip with the coordinates.
   - [ ] 17.4c The map CRS button of the chip, with the system's name in its tooltip.
 - [ ] 17.5 Map CRS dialog (10.5): current CRS, search, local option, "What
   changes", apply re-prepares every layer.
