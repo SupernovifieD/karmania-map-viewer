@@ -109,4 +109,36 @@ test.describe('the viewer’s load', () => {
     );
     expect(engineAfter).toBe('object');
   });
+
+  test('rejects when the viewer is out of a page, and does not make an engine that nothing would let go', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const outcome = await page.evaluate(async () => {
+      const element = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as HTMLElement & {
+        engine?: unknown;
+        load(input: unknown): Promise<unknown>;
+      };
+      element.remove();
+      let message = '';
+      try {
+        await element.load({
+          kind: 'points',
+          name: 'Collars',
+          crs: { kind: 'epsg', code: 32640 },
+          x: new Float64Array([500_000]),
+          y: new Float64Array([2_765_000]),
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      return { message, engine: typeof element.engine };
+    });
+    expect(outcome.message).toBe(
+      'The viewer is not in a page: put it in one before loading a dataset.',
+    );
+    expect(outcome.engine).toBe('undefined');
+  });
 });
