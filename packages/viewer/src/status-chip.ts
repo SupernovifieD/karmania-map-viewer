@@ -10,7 +10,7 @@ export const MAP_CRS_REQUEST = 'karmania-map-crs-request';
  * The status chip of the map (section 10.2 of the brief), 24 high: where the pointer is in the map's coordinate system (`X 512,345.12  Y
  * 4,012,345.67`, in the caption size with tabular numbers, and a dash when the pointer is off the map or the view is 3D), a separator, and the
  * map's coordinate system as a button (`EPSG:32640`, `Local grid, m`) that asks to change it (`karmania-map-crs-request`), with the whole
- * name in its tooltip. Each coordinate has the room of its longest text (`chars` of them), right-aligned, so that nothing in the chip moves as
+ * name in its tooltip. Each coordinate has the room of its longest text (`chars` of them), so that nothing in the chip moves as
  * the pointer does. Nothing in it is for the pointer but the button.
  */
 export class KarmaniaStatusChip extends LitElement {
@@ -44,7 +44,7 @@ export class KarmaniaStatusChip extends LitElement {
         white-space: nowrap;
       }
 
-      /* The two coordinates, each with the room of its longest text: a label, and the number to its right, aligned on the right. */
+      /* The two coordinates, each with the room of its longest text: a label, and the number just after it, aligned on the left. */
       .coordinates {
         column-gap: var(--k-space-4);
         display: grid;
@@ -61,7 +61,7 @@ export class KarmaniaStatusChip extends LitElement {
       }
 
       .value {
-        text-align: right;
+        text-align: left;
       }
 
       /* With the pointer off the map the same cells are there, hidden, so that the chip is as wide as it is with numbers in them, and the dash is on

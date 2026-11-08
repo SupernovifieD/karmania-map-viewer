@@ -54,6 +54,15 @@ describe('what would change', () => {
     ]);
   });
 
+  it('leaves off the engine’s own "Not drawn: " from the reason, which "would stop being drawn" says', () => {
+    const [change] = whatChanges(
+      choice(entry(1, true)),
+      choice(entry(1, false, { findings: [finding('Not drawn: Wells is a local grid.')] })),
+      datasets,
+    );
+    expect(change?.reason).toBe('Wells is a local grid.');
+  });
+
   it('is a dataset that starts being drawn, in the system or converted to it', () => {
     const before = choice(entry(1, false), entry(2, false), entry(3, false));
     const after = choice(

@@ -3,6 +3,7 @@ import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './datasets.js';
 import type { CrsLookup } from './datasets.js';
+import { withoutNotDrawn } from './finding-text.js';
 import './findings.js';
 import { groupFindings } from './import-run.js';
 import { describeSize, formatCount, KIND_NAMES } from './import-files.js';
@@ -238,7 +239,7 @@ export class KarmaniaDatasetSummary extends LitElement {
           <div>
             <strong>Not drawn on the map</strong>
             <!-- The engine's words begin with "Not drawn: ", which the line above has said. -->
-            <p>${this.notice.replace(/^Not drawn:\s*/, '')}</p>
+            <p>${withoutNotDrawn(this.notice)}</p>
           </div>
         </div>`;
   }

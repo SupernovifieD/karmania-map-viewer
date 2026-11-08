@@ -9,3 +9,11 @@ export function said(finding: Finding | undefined, otherwise: string): string {
   const hint = finding.hint ?? '';
   return hint === '' ? finding.message : `${finding.message} ${hint}`;
 }
+
+/**
+ * A reason without the engine's own opening `Not drawn: `, for the places that have said already that something is not drawn (the summary's
+ * heading, "would stop being drawn").
+ */
+export function withoutNotDrawn(reason: string): string {
+  return reason.replace(/^Not drawn:\s*/, '');
+}
