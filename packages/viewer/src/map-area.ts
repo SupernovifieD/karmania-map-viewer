@@ -2,6 +2,7 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
+import './nav-group.js';
 import './north-arrow.js';
 import './scale-bar.js';
 import type { ScaleBarModel } from '@karmania/scene';
@@ -126,6 +127,12 @@ export class KarmaniaMapArea extends LitElement {
 
       .north {
         inset-block-start: var(--k-space-16);
+        inset-inline-end: var(--k-space-16);
+      }
+
+      /* The navigation group at the bottom on the right. */
+      .nav {
+        inset-block-end: var(--k-space-16);
         inset-inline-end: var(--k-space-16);
       }
 
@@ -279,6 +286,11 @@ export class KarmaniaMapArea extends LitElement {
                 class="furniture north"
                 .heading=${this.heading}
               ></karmania-north-arrow>`
+            : nothing
+        }
+        ${
+          this.furnished
+            ? html`<karmania-nav-group class="furniture nav"></karmania-nav-group>`
             : nothing
         }
         ${
