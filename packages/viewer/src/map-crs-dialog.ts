@@ -206,9 +206,17 @@ export class KarmaniaMapCrsDialog extends LitElement {
     if (this.open) {
       this.finder.search(this.engine, this.query);
     }
-    // What would change is asked again when what is chosen, what the map is in or what is loaded is different. A system that is the one
-    // the map is in changes nothing, and is not asked about.
-    if (changed.has('choice') || changed.has('frame') || changed.has('datasets')) {
+    // What would change is asked again when what is chosen, what the map is in, what is loaded, the engine or the dialog's being open is
+    // different, and only while it is open: a closed dialog keeps the choice it was closed with, and the engine has nobody to answer to.
+    // A system that is the one the map is in changes nothing, and is not asked about.
+    if (
+      this.open &&
+      (changed.has('choice') ||
+        changed.has('frame') ||
+        changed.has('datasets') ||
+        changed.has('engine') ||
+        changed.has('open'))
+    ) {
       const current = this.frame?.mapCrs;
       this.preview.ask(
         this.engine,
