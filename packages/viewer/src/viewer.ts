@@ -1,5 +1,5 @@
 import { createEngine } from '@karmania/engine';
-import type { Engine, Summary } from '@karmania/engine';
+import type { CrsInfo, Engine, Summary } from '@karmania/engine';
 import {
   DEFAULT_SCALE_LIMITS,
   KEY_ZOOM_FACTOR,
@@ -21,6 +21,7 @@ import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
+import './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
 import './panel.js';
@@ -198,6 +199,12 @@ export class KarmaniaViewer extends LitElement {
     this.pointer = event.detail === null ? undefined : { x: event.detail.x, y: event.detail.y };
     this.updateReadout();
   };
+
+  /** What the definitions say of the code of the map's coordinate system, if it is an EPSG one that has been asked about. */
+  private mapCrsInfo(): CrsInfo | null | undefined {
+    const crs = this.store.getState().frame?.mapCrs;
+    return crs?.kind === 'epsg' ? this.names.get(crs.code) : undefined;
+  }
 
   /** Makes the furniture again for the scene as it is, and keeps the new one if it shows something different. */
   private refreshFurniture(): void {
@@ -558,6 +565,11 @@ export class KarmaniaViewer extends LitElement {
     }
   }
 
+  /** The status chip's button was pressed: the dialog for the map's coordinate system opens, with nothing chosen. */
+  private readonly onMapCrsRequest = (): void => {
+    this.renderRoot.querySelector('karmania-map-crs-dialog')?.show();
+  };
+
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
     this.selected = event.detail.id;
   };
@@ -634,6 +646,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-show-legend=${this.onShowLegend}
           @karmania-north-reset=${this.onNorthReset}
           @karmania-navigate=${this.onNavigate}
+          @karmania-map-crs-request=${this.onMapCrsRequest}
           @karmania-pointer-on-map=${this.onPointer}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
@@ -667,6 +680,12 @@ export class KarmaniaViewer extends LitElement {
       <karmania-import-dialog
         @karmania-import-loaded=${this.onImportLoaded}
       ></karmania-import-dialog>
+      <karmania-map-crs-dialog
+        .engine=${this.engine}
+        .frame=${this.store.getState().frame}
+        .info=${this.mapCrsInfo()}
+        .datasets=${this.datasets}
+      ></karmania-map-crs-dialog>
     `;
   }
 }

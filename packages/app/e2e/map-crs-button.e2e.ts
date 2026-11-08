@@ -122,9 +122,13 @@ test.describe('the status chip: the map’s coordinate system', () => {
     const requests = await listenForRequests(page);
     await button(page).click();
     expect(await requests()).toBe(1);
-    await button(page).focus();
+    // The request opens the dialog (step 17.5c), which has the keyboard: Esc closes it, and the keyboard is on the button again.
+    await page.keyboard.press('Escape');
+    await expect(button(page)).toBeFocused();
     await page.keyboard.press('Enter');
     expect(await requests()).toBe(2);
+    await page.keyboard.press('Escape');
+    await expect(button(page)).toBeFocused();
     await page.keyboard.press('Space');
     expect(await requests()).toBe(3);
   });
