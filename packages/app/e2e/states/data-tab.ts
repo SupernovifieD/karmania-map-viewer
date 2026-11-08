@@ -1,7 +1,7 @@
 /**
  * The app with the Data tab open, in each of the states that look different (nothing loaded, one
- * dataset, so many that the list scrolls, names too long for their rows, a dataset with warnings, the
- * keyboard in the table), each with what to do to the page to put it in that state. The screenshot
+ * dataset, so many that the list scrolls, names too long for their rows, a dataset with warnings, a
+ * dataset that is not drawn on the map, the keyboard in the table), each with what to do to the page to put it in that state. The screenshot
  * tests photograph them (`data-tab.visual.ts`) and the accessibility pass checks them
  * (`axe-states.axe.ts`).
  */
@@ -12,7 +12,7 @@ import { fixturePath } from '../support/picker.js';
 import type { Pick } from '../support/picker.js';
 import type { Shot } from '../support/screenshots.js';
 import { layerStatuses } from '../support/render.js';
-import { importAndLoad } from '../support/wizard.js';
+import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
 
@@ -136,6 +136,21 @@ export const SHOTS: Shot[] = [
         .filter({ hasText: /warning/ })
         .click();
       await page.locator('karmania-dataset-summary details[open]').first().waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // A dataset that is not drawn on the map says so, with the reason and what to do: the points are drawn (the map is in their
+    // system), and `faults`, a local grid, is not, and is the dataset that is selected.
+    name: 'data-tab-not-drawn',
+    show: async (page) => {
+      await load(page, 'points.csv', 'points.prj');
+      await importAsLocalGrid(page, 'ft', csv('faults.csv', 'x,y\n1,2\n3,4\n'));
+      await page.locator('karmania-dataset-summary .notice').waitFor();
+      await table(page).locator('.rows [role="row"]').first().waitFor();
+      await expect
+        .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+        .toEqual(['drawn', 'not_drawn']);
       return rest(page);
     },
   },
