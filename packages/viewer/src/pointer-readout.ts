@@ -47,7 +47,9 @@ export function readoutAt(camera: Camera2d, size: Size, x: number, y: number): R
 
 /**
  * How many characters wide a coordinate can be anywhere in the map area at this camera: the longest of the four corners (a coordinate is
- * greatest or least there) and one more as a plain margin. The chip reserves this much for each, so that it does not change as the pointer moves.
+ * greatest or least there, and so is its text the longest). The chip reserves this much for each, in `ch`, so that it does not change as
+ * the pointer moves; no character of a coordinate is wider than a digit, so no text is wider than its room. There is no margin on it: the
+ * chip is as wide as the most it can be, and the layout tests hold that at the narrowest map.
  */
 export function readoutWidth(camera: Camera2d, size: Size): number {
   let longest = 0;
@@ -62,5 +64,5 @@ export function readoutWidth(camera: Camera2d, size: Size): number {
       longest = Math.max(longest, corner.x.length, corner.y.length);
     }
   }
-  return longest + 1;
+  return longest;
 }
