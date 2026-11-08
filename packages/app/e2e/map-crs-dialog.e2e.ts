@@ -277,7 +277,8 @@ test.describe('the map coordinate system dialog', () => {
     await expect(p.dialog).toBeHidden();
     expect(await applied()).toEqual([]);
     expect(await sceneFrame(page)).toEqual(before);
-    // The layers were not prepared again either, and the chip still names the system the map is in.
+    // The layers' statuses are as they were (that nothing is prepared again by looking is the apply test's), and the chip still names the
+    // system the map is in.
     expect(await layerStatuses(page)).toEqual(statusesBefore);
     await expect(p.chip).toHaveText('EPSG:32640');
   });
@@ -517,7 +518,8 @@ test.describe('the map coordinate system dialog', () => {
     test('asks again of an engine that is a different one, while it is open', async ({ page }) => {
       const p = await open(page);
       await choose(page, p);
-      // A second engine (the first one's, counted) is given to the dialog, as a viewer that is put back in a page gives it the one it makes.
+      // Another engine is given to the dialog, as a viewer that is put back in a page gives it the one it makes. This one cannot answer, so that
+      // what the dialog says afterwards can only be from it: the first engine's answer was that no dataset would start or stop.
       const asked = await page.evaluate(async () => {
         const viewer = document
           .querySelector('karmania-app')
@@ -535,17 +537,19 @@ test.describe('the map coordinate system dialog', () => {
         let calls = 0;
         dialog.engine = {
           searchCrs: viewer.engine.searchCrs.bind(viewer.engine),
-          previewFrame: (...args: unknown[]) => {
+          previewFrame: () => {
             calls += 1;
-            return viewer.engine.previewFrame(...args);
+            return Promise.reject(new Error('The other engine did not answer.'));
           },
         };
         await dialog.updateComplete;
         return calls;
       });
       expect(asked).toBeGreaterThan(0);
-      // And what it says comes from the new one's answer.
-      await expect(p.host.locator('.changes')).toContainText('No dataset would');
+      // And what it says is the new engine's, which is that it could not be worked out.
+      await expect(p.host.locator('.changes')).toContainText(
+        'What would change could not be worked out.',
+      );
     });
   });
 
