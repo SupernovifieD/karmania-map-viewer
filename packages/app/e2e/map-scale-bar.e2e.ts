@@ -30,7 +30,7 @@ test.describe('the scale bar', () => {
     await expect(page.locator('karmania-scale-bar')).toHaveCount(0);
   });
 
-  test('is 24 high, on the left, 16 inside the edge, above the status chip', async ({ page }) => {
+  test('is 24 high, 16 from the left of the map, and 8 above the status chip', async ({ page }) => {
     await page.goto('/');
     await withData(page);
     const [map, box] = [await boxOf(area(page), 'the map'), await boxOf(scale(page), 'the bar')];

@@ -143,14 +143,15 @@ test.describe('the furniture of the map', () => {
     await page.setViewportSize({ width: 1024, height: 640 });
     await page.goto('/');
     await mapWith(page, { width: 9999 });
-    // A scale at which the nice length is the one that is nearly the whole 160 pixels: the bar and its label at their widest.
+    // A scale at which the nice length is exactly the whole 160 pixels (2 m at 0.0125 m a pixel): the bar at its widest, with the label it
+    // has when it is widest.
     await dispatch(page, {
       type: 'setCamera',
-      patch: { camera2d: { unitsPerPixel: 0.01, heading: 123 } },
+      patch: { camera2d: { unitsPerPixel: 0.0125, heading: 123 } },
     });
-    await expect(page.locator('karmania-scale-bar .scale')).toContainText('1 m');
+    await expect(page.locator('karmania-scale-bar .scale')).toContainText('2 m');
     const bar = await boxOf(page.locator('karmania-scale-bar .bar'), 'the bar');
-    expect(bar.width).toBeLessThanOrEqual(160);
+    expect(bar.width).toBe(160);
     await expectLaidOut(page, 'a turned map and a wide scale bar');
   });
 
@@ -161,7 +162,8 @@ test.describe('the furniture of the map', () => {
     await page.setViewportSize({ width: 1024, height: 640 });
     await page.goto('/');
     await mapWith(page, { width: 9999 });
-    // What the map area says while layers are being prepared, with a count that is as long as the area allows.
+    // What the map area says while layers are being prepared, with a count that is as long as the area allows. A count like it cannot be made
+    // by loading data, so it is set on the map area itself: the viewer sets it again only when its own count is different.
     await area(page).evaluate((element) => {
       const host = element.getRootNode() as ShadowRoot;
       const mapArea = host.host as unknown as { preparing: number; progress: number };

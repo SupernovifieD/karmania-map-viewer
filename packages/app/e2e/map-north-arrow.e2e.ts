@@ -140,7 +140,7 @@ test.describe('the north arrow', () => {
     }
   });
 
-  test('is a stop of the keyboard with a ring that is not cut off, and a tooltip', async ({
+  test('is a stop of the keyboard after the map, with a ring of 2 pixels and a tooltip', async ({
     page,
   }) => {
     await page.goto('/');
