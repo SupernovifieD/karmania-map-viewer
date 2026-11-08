@@ -481,7 +481,7 @@ or releasing, and whenever the brief says to stop.
 
 ## M17: Map furniture and overlays
 
-- [ ] 17.1 North arrow (10.2): turns with the heading, resets on click, keyboard,
+- [x] 17.1 North arrow (10.2): turns with the heading, resets on click, keyboard,
   accessible name with the angle.
 - [ ] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
   and for geographic map CRSs.
