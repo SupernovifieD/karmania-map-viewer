@@ -483,10 +483,10 @@ or releasing, and whenever the brief says to stop.
 
 - [x] 17.1 North arrow (10.2): turns with the heading, resets on click, keyboard,
   accessible name with the angle.
-- [ ] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
+- [x] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
   and for geographic map CRSs.
   - [x] 17.2a The units of the map: from the frame (a local grid has its own; an EPSG code is asked of the engine, once).
-  - [ ] 17.2b The scale bar on the map.
+  - [x] 17.2b The scale bar on the map.
 - [ ] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
   - [ ] 17.3a The icons (plus, minus, maximize, rotate-ccw).
   - [ ] 17.3b The group on the map, and what its four buttons do to the camera.

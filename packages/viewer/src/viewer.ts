@@ -6,6 +6,7 @@ import { createSceneStore, firstNumericColumn } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
+import { CrsNames } from './crs-names.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -31,6 +32,8 @@ import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { drawOrder } from './draw-order.js';
+import { furnitureOf, sameFurniture } from './furniture.js';
+import type { Furniture } from './furniture.js';
 import { summariseLayers } from './layer-summary.js';
 import { syncDatasets } from './scene-datasets.js';
 
@@ -55,7 +58,7 @@ export class KarmaniaViewer extends LitElement {
     layerChanges: { state: true },
     cannotDraw: { state: true },
     selected: { state: true },
-    heading: { state: true },
+    furniture: { state: true },
   };
 
   static override styles = [
@@ -99,8 +102,11 @@ export class KarmaniaViewer extends LitElement {
   declare private cannotDraw: boolean;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
-  /** The camera's heading, which the north arrow shows: kept here so that the viewer is drawn again when it turns, and not when the map is only moved. */
-  declare private heading: number;
+  /**
+   * What the furniture over the map shows (the north arrow's heading, the scale bar). Kept here, and made again only when what it shows is
+   * different, so that the viewer is drawn again when the map is turned or zoomed and not when it is only moved.
+   */
+  declare private furniture: Furniture;
 
   constructor() {
     super();
@@ -110,7 +116,7 @@ export class KarmaniaViewer extends LitElement {
     this.layerChanges = 0;
     this.cannotDraw = false;
     this.selected = undefined;
-    this.heading = 0;
+    this.furniture = furnitureOf(this.store.getState(), undefined);
   }
 
   /** The engine, which is started when the first files arrive, not before. */
@@ -150,6 +156,21 @@ export class KarmaniaViewer extends LitElement {
       ? Promise.reject(new Error('There is no engine to ask what a code means.'))
       : engine.crsInfo(code);
   };
+
+  /** What the definitions say of the codes of the map's coordinate systems, for the units of the scale bar; an answer that arrives draws the furniture again. */
+  private readonly names = new CrsNames(this.crsInfo, () => {
+    this.refreshFurniture();
+  });
+
+  /** Makes the furniture again for the scene as it is, and keeps the new one if it shows something different. */
+  private refreshFurniture(): void {
+    const state = this.store.getState();
+    const crs = state.frame?.mapCrs;
+    const next = furnitureOf(state, crs?.kind === 'epsg' ? this.names.get(crs.code) : undefined);
+    if (!sameFurniture(this.furniture, next)) {
+      this.furniture = next;
+    }
+  }
 
   /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
   private renderer: Renderer | undefined;
@@ -342,7 +363,12 @@ export class KarmaniaViewer extends LitElement {
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
     }
-    this.heading = state.camera2d.heading;
+    // The scale bar is in the units of the map's coordinate system, which the definitions say for an EPSG code: asked once.
+    const crs = state.frame?.mapCrs;
+    if (crs?.kind === 'epsg') {
+      this.names.ask(crs.code);
+    }
+    this.refreshFurniture();
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
@@ -390,6 +416,7 @@ export class KarmaniaViewer extends LitElement {
     // that is put back in a page starts again, and does not list datasets that no engine can give rows of.
     this.datasets = [];
     this.selected = undefined;
+    this.names.clear();
     syncDatasets(this.store, this.datasets);
   }
 
@@ -515,7 +542,8 @@ export class KarmaniaViewer extends LitElement {
         <karmania-map-area
           .datasets=${this.datasets.length}
           .unavailable=${this.cannotDraw}
-          .heading=${this.heading}
+          .heading=${this.furniture.heading}
+          .scale=${this.furniture.scale}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}
