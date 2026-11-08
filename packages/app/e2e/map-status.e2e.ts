@@ -125,7 +125,7 @@ test.describe('the status chip: where the pointer is', () => {
     expect([...widths]).toHaveLength(1);
   });
 
-  test('is in the caption size with tabular numbers, with the numbers on the right', async ({
+  test('is in the caption size with tabular numbers, with each number just after its label', async ({
     page,
   }) => {
     const box = await start(page);
@@ -135,7 +135,7 @@ test.describe('the status chip: where the pointer is', () => {
       const value = getComputedStyle(element.querySelector('.value') as Element);
       return { size: style.fontSize, numbers: style.fontVariantNumeric, align: value.textAlign };
     });
-    expect(look).toEqual({ size: '12px', numbers: 'tabular-nums', align: 'right' });
+    expect(look).toEqual({ size: '12px', numbers: 'tabular-nums', align: 'left' });
   });
 
   test('goes back to the dash when the pointer leaves the map for the panel', async ({ page }) => {

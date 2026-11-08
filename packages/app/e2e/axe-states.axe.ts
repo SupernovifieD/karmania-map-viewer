@@ -17,6 +17,7 @@ import type { Locator, Page } from '@playwright/test';
 import { PATH as DATA_TAB_PATH, SHOTS as DATA_TAB } from './states/data-tab.js';
 import { PATH as GALLERY_PATH, SHOTS as GALLERY } from './states/gallery.js';
 import { PATH as LONG_PATH, SHOTS as LONG } from './states/long-content.js';
+import { PATH as FURNITURE_PATH, SHOTS as FURNITURE } from './states/map-furniture.js';
 import { PATH as SHELL_PATH, SHOTS as SHELL } from './states/shell.js';
 import { PATH as WIZARD_PATH, SHOTS as WIZARD } from './states/wizard.js';
 import { THEMES, VIEWPORTS } from './support/layouts.js';
@@ -113,6 +114,7 @@ const APP: readonly (readonly [string, string, readonly Shot[]])[] = [
   ['wizard', WIZARD_PATH, WIZARD],
   ['data tab', DATA_TAB_PATH, DATA_TAB],
   ['long content', LONG_PATH, LONG],
+  ['map furniture', FURNITURE_PATH, FURNITURE],
 ];
 
 for (const [group, path, shots] of APP) {

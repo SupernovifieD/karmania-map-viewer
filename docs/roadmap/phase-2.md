@@ -506,7 +506,7 @@ or releasing, and whenever the brief says to stop.
   summary.
 - [x] 17.7 Canvas accessibility: live label, keyboard description, inset focus
   ring.
-- [ ] 17.8 Overlay layout tests: no overlap for every pair at every window size,
+- [x] 17.8 Overlay layout tests: no overlap for every pair at every window size,
   panel narrowest, widest and collapsed; screenshots; axe.
 - [ ] 17.9 Rotation of grids and blocks seen in a browser (the owner's question after M16: no file or wizard step gives a rotation, so these were tested in Node only): `viewer.load(input)`, the first part of the viewer API of 11.8, which hands a dataset made with a builder to the viewer; a pixel test and a render golden image for a turned grid and a turned block model.
 - [ ] 17.10 The frames over 50 ms that `pnpm perf` shows outside the windows of the targets, found (the owner's question after M16): what they are and what could be done, recorded in `docs/perf.md`.

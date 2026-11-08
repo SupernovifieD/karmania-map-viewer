@@ -6,7 +6,7 @@
 import type { Engine, Summary } from '@karmania/engine';
 import type { DrawableEntry, FrameChoice } from '@karmania/engine/display';
 import type { CrsRef } from '@karmania/engine/types';
-import { said } from './finding-text.js';
+import { said, withoutNotDrawn } from './finding-text.js';
 
 /** What would happen to a dataset. */
 export type ChangeKind = 'starts' | 'stops';
@@ -54,7 +54,7 @@ export function whatChanges(
       kind: drawnNow ? 'starts' : 'stops',
       reason: drawnNow
         ? startReason(entry)
-        : said(entry.findings[0], 'It cannot be drawn in that coordinate system.'),
+        : withoutNotDrawn(said(entry.findings[0], 'It cannot be drawn in that coordinate system.')),
     });
   }
   return changes;
