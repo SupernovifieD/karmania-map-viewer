@@ -22,7 +22,7 @@ import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
 import type { Navigate } from './nav-group.js';
-import type { DroppedFiles, KarmaniaMapArea } from './map-area.js';
+import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -42,6 +42,7 @@ import { drawOrder } from './draw-order.js';
 import { furnitureOf, sameFurniture } from './furniture.js';
 import type { Furniture } from './furniture.js';
 import { summariseLayers } from './layer-summary.js';
+import { readoutAt, readoutWidth } from './pointer-readout.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -168,6 +169,35 @@ export class KarmaniaViewer extends LitElement {
   private readonly names = new CrsNames(this.crsInfo, () => {
     this.refreshFurniture();
   });
+
+  /** Where the pointer last was on the map, which the readout of the status chip follows; `undefined` while it is off it. */
+  private pointer: { readonly x: number; readonly y: number } | undefined;
+
+  /**
+   * Writes where the pointer is for the status chip: the point of the map under it at the camera the scene has now (the map moves under a
+   * pointer that is still, with a key or a button), or a dash if it is off the map or the view is 3D. It is set on the map area at once and not
+   * kept as state of the viewer, so that a move of the pointer draws the chip and not the viewer.
+   */
+  private updateReadout(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    const box = area?.canvas?.getBoundingClientRect();
+    if (area === null || box === undefined) {
+      return;
+    }
+    const state = this.store.getState();
+    const size = { width: box.width, height: box.height };
+    const here = this.pointer;
+    area.readout =
+      here === undefined || state.viewMode === '3d' || state.frame === null
+        ? undefined
+        : readoutAt(state.camera2d, size, here.x, here.y);
+    area.readoutChars = readoutWidth(state.camera2d, size);
+  }
+
+  private readonly onPointer = (event: CustomEvent<PointerOnMap>): void => {
+    this.pointer = event.detail === null ? undefined : { x: event.detail.x, y: event.detail.y };
+    this.updateReadout();
+  };
 
   /** Makes the furniture again for the scene as it is, and keeps the new one if it shows something different. */
   private refreshFurniture(): void {
@@ -376,6 +406,13 @@ export class KarmaniaViewer extends LitElement {
       this.names.ask(crs.code);
     }
     this.refreshFurniture();
+    if (
+      state.camera2d !== previous.camera2d ||
+      state.frame !== previous.frame ||
+      state.viewMode !== previous.viewMode
+    ) {
+      this.updateReadout();
+    }
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
@@ -596,6 +633,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-show-legend=${this.onShowLegend}
           @karmania-north-reset=${this.onNorthReset}
           @karmania-navigate=${this.onNavigate}
+          @karmania-pointer-on-map=${this.onPointer}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>

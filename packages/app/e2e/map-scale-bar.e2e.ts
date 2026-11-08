@@ -30,13 +30,15 @@ test.describe('the scale bar', () => {
     await expect(page.locator('karmania-scale-bar')).toHaveCount(0);
   });
 
-  test('is 24 high, at the bottom on the left, 16 inside the edge', async ({ page }) => {
+  test('is 24 high, on the left, 16 inside the edge, above the status chip', async ({ page }) => {
     await page.goto('/');
     await withData(page);
     const [map, box] = [await boxOf(area(page), 'the map'), await boxOf(scale(page), 'the bar')];
     expect(box.height).toBe(24);
     expect(box.x - map.x).toBe(16);
-    expect(map.y + map.height - (box.y + box.height)).toBe(16);
+    // The status chip is under it, 8 below (map-status.e2e.ts has the chip's own place).
+    const under = await boxOf(page.locator('karmania-status-chip .status'), 'the chip');
+    expect(under.y - (box.y + box.height)).toBe(8);
   });
 
   test('is a nice length in metres and kilometres, as wide as the map says it is', async ({
