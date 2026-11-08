@@ -43,7 +43,7 @@ import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { drawOrder } from './draw-order.js';
 import { furnitureOf, sameFurniture } from './furniture.js';
 import type { Furniture } from './furniture.js';
-import { summariseLayers } from './layer-summary.js';
+import { datasetNotices, sameNotices, summariseLayers } from './layer-summary.js';
 import { readoutAt, readoutWidth } from './pointer-readout.js';
 import { syncDatasets } from './scene-datasets.js';
 
@@ -395,6 +395,9 @@ export class KarmaniaViewer extends LitElement {
     this.pipeline?.fit();
   }
 
+  /** Why each dataset that is not drawn is not, as the Data tab was last given it. */
+  private notices: ReadonlyMap<number, string> = new Map();
+
   /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
   layerStates(): [string, LayerState][] {
     return [...(this.pipeline?.states() ?? [])];
@@ -640,7 +643,14 @@ export class KarmaniaViewer extends LitElement {
     // The width that was asked for, or what the window allows of it.
     const width = clampPanelWidth(this.panel.width, this.viewportWidth);
     const limits = panelWidthLimits(this.viewportWidth);
-    const layers = summariseLayers(this.pipeline?.states().values() ?? []);
+    const states = this.pipeline?.states() ?? new Map();
+    const layers = summariseLayers(states.values());
+    const found = datasetNotices(states, this.store.getState().layers);
+    // The same object while the reasons are the same: a turn of the map draws the viewer again, and the panel need not be.
+    if (!sameNotices(this.notices, found)) {
+      this.notices = found;
+    }
+    const notices = this.notices;
     return html`
       <div
         class="workspace"
@@ -675,6 +685,7 @@ export class KarmaniaViewer extends LitElement {
           .selected=${this.selected}
           .rows=${this.rows}
           .crsInfo=${this.crsInfo}
+          .notices=${notices}
           @karmania-import-request=${this.chooseFiles}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}

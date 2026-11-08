@@ -502,7 +502,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.5c The dialog: the current system, the search, a local grid.
   - [x] 17.5d "What changes": the datasets that would start or stop being drawn, with the reasons.
   - [x] 17.5e Apply: the frame the person chose, every layer prepared again.
-- [ ] 17.6 Datasets that are not drawn: the reason and hint in the dataset
+- [x] 17.6 Datasets that are not drawn: the reason and hint in the dataset
   summary.
 - [ ] 17.7 Canvas accessibility: live label, keyboard description, inset focus
   ring.
