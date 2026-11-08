@@ -517,7 +517,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F4 The map CRS dialog asked the engine what would change while it was closed, and not again for another engine.
   - [x] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
   - [x] 17.F6 Tests that could not fail, and titles that said more than the test: the scale bar at its widest, the Home key, fit with a heading, the limits of the zoom, the dialog's height, what looking at a choice changes, Apply after a preview that failed, and the keyboard after Apply.
-  - [ ] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
+  - [x] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
 - [ ] 17.G Gate.
 
 ## M18: 3D view

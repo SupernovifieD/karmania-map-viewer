@@ -236,7 +236,9 @@ describe('previewFrame', () => {
     });
   });
 
-  it('changes nothing the kernel keeps: not the frame, and not the origin that waits for a dataset', () => {
+  // That a preview does not make the origin that waits for a dataset is held by the preparer's test in Rust (`a_preview_does_not_make_an_origin_that_is_waiting`):
+  // here a later `chooseFrame` would give the same origin whether or not the preview had kept it.
+  it('leaves the frame as it was, and says the origin that a choice would make', () => {
     const kernel = createKernel();
     points(kernel, METRES, [[1, 1]]);
     kernel.chooseFrame();

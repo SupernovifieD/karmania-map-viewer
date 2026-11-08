@@ -10,7 +10,10 @@ function layersIn(count: number): string {
   return count === 0 ? 'no layers' : `${String(count)} ${count === 1 ? 'layer' : 'layers'}`;
 }
 
-/** The name of the map for the scene as it is: the view, how many layers there are, and how the map is turned from north. */
+/**
+ * The name of the map for the scene as it is: the view, how many layers there are, and how the map is turned from north. The view is the scene's
+ * `viewMode`, and the renderer draws 2D until M18, so a scene in 3D is named so while 2D is what is drawn.
+ */
 export function mapLabel(
   scene: Pick<SceneDocument, 'viewMode' | 'layers'> & {
     camera2d: Pick<SceneDocument['camera2d'], 'heading'>;
@@ -25,6 +28,9 @@ export function mapLabel(
   ].join(', ');
 }
 
-/** What the keys do on the map in the 2D view, for a screen reader to be told when the map has the keyboard (section 10.2 of the brief). */
+/**
+ * What the keys do on the map in the 2D view, for a screen reader to be told when the map has the keyboard (section 10.2 of the brief). It is the
+ * description in the 3D view too until its own keys are made (step 18.2).
+ */
 export const KEYS_2D =
   'The arrow keys move the map. Plus and minus zoom in and out. Shift with the left or right arrow turns the map by 15 degrees. 0 puts north up. Home fits the map to the data.';

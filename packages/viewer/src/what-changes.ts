@@ -65,7 +65,7 @@ export type PreviewStatus = 'idle' | 'working' | 'ready' | 'failed';
 
 /**
  * Works out what would change for the system that is thought of, asking the engine as the thought changes: the latest asking wins, so an
- * answer that comes after a newer question is dropped. `changed` is called when the status or the changes are different.
+ * answer that comes after a newer question is dropped. `changed` is called each time the status and the changes are set (a question, an answer, a reset), whether or not they are different from what they were.
  */
 export class ChangesPreview {
   status: PreviewStatus = 'idle';
