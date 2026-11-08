@@ -14,6 +14,8 @@ export interface KernelApi {
   readonly remove: (datasetId: number) => boolean;
   /** Chooses the map's coordinate system and says which datasets are drawn in it. */
   readonly chooseFrame: (preferred: unknown) => unknown;
+  /** What `chooseFrame` would say for `preferred`, without changing the frame the kernel keeps. */
+  readonly previewFrame: (preferred: unknown) => unknown;
   /** Starts preparing a dataset for drawing; returns the job's id. */
   readonly startPrepare: (datasetId: number, frame: unknown, maxTextureSize: number) => number;
   /** Does the next part of a prepare. */
