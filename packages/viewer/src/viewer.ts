@@ -22,6 +22,7 @@ import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
 import './map-crs-dialog.js';
+import type { MapCrsApply } from './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
 import './panel.js';
@@ -570,6 +571,18 @@ export class KarmaniaViewer extends LitElement {
     this.renderRoot.querySelector('karmania-map-crs-dialog')?.show();
   };
 
+  /**
+   * A person applied a coordinate system in the map CRS dialog: the scene takes it as the person's choice (`source: user`), and the pipeline
+   * asks the engine for the frame in it (which gives the origin), prepares every layer again for it, and fits the camera to the data in the
+   * new units, which it does whenever the map's system changes.
+   */
+  private readonly onMapCrsApply = (event: CustomEvent<MapCrsApply>): void => {
+    this.store.dispatch({
+      type: 'setFrame',
+      frame: { mapCrs: event.detail.crs, origin: [0, 0, 0], source: 'user' },
+    });
+  };
+
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
     this.selected = event.detail.id;
   };
@@ -681,6 +694,7 @@ export class KarmaniaViewer extends LitElement {
         @karmania-import-loaded=${this.onImportLoaded}
       ></karmania-import-dialog>
       <karmania-map-crs-dialog
+        @karmania-map-crs-apply=${this.onMapCrsApply}
         .engine=${this.engine}
         .frame=${this.store.getState().frame}
         .info=${this.mapCrsInfo()}
