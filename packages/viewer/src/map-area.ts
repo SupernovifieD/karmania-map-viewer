@@ -3,6 +3,8 @@ import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
 import './north-arrow.js';
+import './scale-bar.js';
+import type { ScaleBarModel } from '@karmania/scene';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';
@@ -35,6 +37,7 @@ export class KarmaniaMapArea extends LitElement {
     redrawing: { type: Boolean },
     unavailable: { type: Boolean },
     heading: { type: Number },
+    scale: { attribute: false },
     preparing: { type: Number },
     progress: { type: Number },
     reasons: { attribute: false },
@@ -126,6 +129,18 @@ export class KarmaniaMapArea extends LitElement {
         inset-inline-end: var(--k-space-16);
       }
 
+      /* At the bottom on the left, 16 in, what is there stacked with 8 between, and the left edges level: the scale bar, and under it
+         the status chip. The stack takes the pointer for nothing itself: what is in it that is for the pointer says so. */
+      .stack {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-space-8);
+        inset-block-end: var(--k-space-16);
+        inset-inline-start: var(--k-space-16);
+        pointer-events: none;
+      }
+
       /* A notice over the map, at the top in the middle, 16 from the edge: it is laid over the area and moves nothing. */
       .notice {
         align-items: center;
@@ -184,6 +199,8 @@ export class KarmaniaMapArea extends LitElement {
   declare unavailable: boolean;
   /** The camera's heading, in degrees clockwise from grid north: the north arrow's needle turns with it. */
   declare heading: number;
+  /** The scale bar, or why there is none; `undefined` while there is no map. */
+  declare scale: ScaleBarModel | undefined;
   /** How many layers are being prepared (0 for none): the chip at the top says so. */
   declare preparing: number;
   /** How far along the layers are, from 0 to 1, for the bar of the chip. */
@@ -210,6 +227,7 @@ export class KarmaniaMapArea extends LitElement {
     this.redrawing = false;
     this.unavailable = false;
     this.heading = 0;
+    this.scale = undefined;
     this.preparing = 0;
     this.progress = 0;
     this.reasons = [];
@@ -261,6 +279,13 @@ export class KarmaniaMapArea extends LitElement {
                 class="furniture north"
                 .heading=${this.heading}
               ></karmania-north-arrow>`
+            : nothing
+        }
+        ${
+          this.furnished && this.scale?.kind === 'bar'
+            ? html`<div class="furniture stack">
+                <karmania-scale-bar .model=${this.scale}></karmania-scale-bar>
+              </div>`
             : nothing
         }
         ${
