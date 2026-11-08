@@ -5,6 +5,7 @@ import {
   dispatch,
   expectLayersDrawn,
   layerStatuses,
+  loadLattice,
   sceneFrame,
   withData,
 } from './support/render.js';
@@ -434,6 +435,88 @@ test.describe('the map coordinate system dialog', () => {
       await p.localRadios.first().check();
       await expect(section(page).locator('li')).toHaveCount(2);
       expect(await boxOf(p.dialog, 'the dialog')).toEqual(before);
+    });
+  });
+
+  test.describe('asking the engine what would change', () => {
+    /** Picks the first match for UTM zone 41, which is not the system the map is in, so that there is something to ask about. */
+    async function choose(page: Page, p: ReturnType<typeof parts>): Promise<void> {
+      await p.search.fill('32641');
+      await expect(p.rows.first()).toContainText('EPSG 32641');
+      await p.rows.first().click();
+      await expect(p.host.locator('.changes')).toContainText('No dataset would');
+    }
+
+    test('does not ask while it is closed, when what is loaded changes under the choice it was closed with', async ({
+      page,
+    }) => {
+      const p = await open(page);
+      await choose(page, p);
+      await p.cancel.click();
+      await expect(p.dialog).toBeHidden();
+      // The calls to the engine's `previewFrame` from now on.
+      await page.evaluate(() => {
+        const viewer = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+          engine: { previewFrame: (...args: unknown[]) => unknown };
+        };
+        const holder = window as unknown as { previews: number };
+        holder.previews = 0;
+        const real = viewer.engine.previewFrame.bind(viewer.engine);
+        viewer.engine.previewFrame = (...args: unknown[]) => {
+          holder.previews += 1;
+          return real(...args);
+        };
+      });
+      await loadLattice(page, 'grid', {
+        name: 'Surface',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [500_000, 2_765_000, 0],
+        spacing: [10, 10, 1],
+        dims: [2, 2, 1],
+        values: [1, 2, 3, 4],
+      });
+      await expect
+        .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+        .toEqual(['drawn', 'drawn']);
+      expect(await page.evaluate(() => (window as unknown as { previews: number }).previews)).toBe(
+        0,
+      );
+    });
+
+    test('asks again of an engine that is a different one, while it is open', async ({ page }) => {
+      const p = await open(page);
+      await choose(page, p);
+      // A second engine (the first one's, counted) is given to the dialog, as a viewer that is put back in a page gives it the one it makes.
+      const asked = await page.evaluate(async () => {
+        const viewer = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+          engine: {
+            searchCrs: (...args: unknown[]) => unknown;
+            previewFrame: (...args: unknown[]) => unknown;
+          };
+          shadowRoot: ShadowRoot;
+        };
+        const dialog = viewer.shadowRoot.querySelector('karmania-map-crs-dialog') as unknown as {
+          engine: unknown;
+          updateComplete: Promise<boolean>;
+        };
+        let calls = 0;
+        dialog.engine = {
+          searchCrs: viewer.engine.searchCrs.bind(viewer.engine),
+          previewFrame: (...args: unknown[]) => {
+            calls += 1;
+            return viewer.engine.previewFrame(...args);
+          },
+        };
+        await dialog.updateComplete;
+        return calls;
+      });
+      expect(asked).toBeGreaterThan(0);
+      // And what it says comes from the new one's answer.
+      await expect(p.host.locator('.changes')).toContainText('No dataset would');
     });
   });
 
