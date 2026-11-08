@@ -1,6 +1,12 @@
 import { createEngine } from '@karmania/engine';
 import type { Engine, Summary } from '@karmania/engine';
-import { DEFAULT_SCALE_LIMITS, attachController2d, createRenderer } from '@karmania/render';
+import {
+  DEFAULT_SCALE_LIMITS,
+  KEY_ZOOM_FACTOR,
+  attachController2d,
+  createRenderer,
+  zoomAt,
+} from '@karmania/render';
 import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore, firstNumericColumn } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
@@ -15,6 +21,7 @@ import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
+import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
@@ -475,6 +482,45 @@ export class KarmaniaViewer extends LitElement {
     this.store.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 0 } } });
   };
 
+  /** A button of the navigation group was pressed: the same as the key that does it, or, for the last, north up and the data in view. */
+  private readonly onNavigate = (event: CustomEvent<Navigate>): void => {
+    switch (event.detail.action) {
+      case 'zoom-in':
+        this.zoomBy(1 / KEY_ZOOM_FACTOR);
+        break;
+      case 'zoom-out':
+        this.zoomBy(KEY_ZOOM_FACTOR);
+        break;
+      case 'fit':
+        this.fit();
+        break;
+      case 'reset':
+        this.onNorthReset();
+        this.fit();
+        break;
+    }
+  };
+
+  /** Changes the scale by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the limits. */
+  private zoomBy(factor: number): void {
+    const box = this.renderRoot.querySelector('karmania-map-area')?.canvas?.getBoundingClientRect();
+    if (box === undefined) {
+      return;
+    }
+    const size = { width: box.width, height: box.height };
+    const change = zoomAt(
+      this.store.getState().camera2d,
+      size,
+      factor,
+      size.width / 2,
+      size.height / 2,
+      this.pipeline?.limits() ?? DEFAULT_SCALE_LIMITS,
+    );
+    if (change !== undefined) {
+      this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
+    }
+  }
+
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
     this.selected = event.detail.id;
   };
@@ -549,6 +595,7 @@ export class KarmaniaViewer extends LitElement {
           .reasons=${layers.reasons}
           @karmania-show-legend=${this.onShowLegend}
           @karmania-north-reset=${this.onNorthReset}
+          @karmania-navigate=${this.onNavigate}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
