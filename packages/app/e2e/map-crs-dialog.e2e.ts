@@ -261,6 +261,7 @@ test.describe('the map coordinate system dialog', () => {
     const p = await open(page);
     const applied = await listenForApplies(page);
     const before = await sceneFrame(page);
+    const statusesBefore = await layerStatuses(page);
     await p.search.fill('32641');
     await p.rows.first().click();
     await p.cancel.click();
@@ -276,6 +277,9 @@ test.describe('the map coordinate system dialog', () => {
     await expect(p.dialog).toBeHidden();
     expect(await applied()).toEqual([]);
     expect(await sceneFrame(page)).toEqual(before);
+    // The layers were not prepared again either, and the chip still names the system the map is in.
+    expect(await layerStatuses(page)).toEqual(statusesBefore);
+    await expect(p.chip).toHaveText('EPSG:32640');
   });
 
   test('gives the keyboard back to the button that opened it', async ({ page }) => {
@@ -316,6 +320,8 @@ test.describe('the map coordinate system dialog', () => {
     await page.keyboard.press('Enter');
     await expect(p.dialog).toBeHidden();
     expect(await applied()).toEqual([{ crs: { kind: 'epsg', code: 32641 } }]);
+    // The keyboard is back on the button that opened the dialog, so that a person who applied from it does not start again from the top.
+    await expect(p.chip).toBeFocused();
   });
 
   test.describe('what changes', () => {
@@ -349,6 +355,29 @@ test.describe('the map coordinate system dialog', () => {
         'Choose a coordinate system to see which datasets would start or stop being drawn.',
       );
       await expect(p.apply.locator('button')).toBeDisabled();
+    });
+
+    test('can still be applied when what would change could not be worked out: it is a help, and not a gate', async ({
+      page,
+    }) => {
+      const p = await open(page);
+      const applied = await listenForApplies(page);
+      // The engine fails to answer, as a worker that has gone away would.
+      await page.evaluate(() => {
+        const viewer = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+          engine: { previewFrame: () => Promise<never> };
+        };
+        viewer.engine.previewFrame = () => Promise.reject(new Error('The engine did not answer.'));
+      });
+      await p.search.fill('32641');
+      await p.rows.first().click();
+      await expect(section(page)).toContainText('What would change could not be worked out.');
+      await expect(p.apply.locator('button')).toBeEnabled();
+      await p.apply.locator('button').click();
+      await expect(p.dialog).toBeHidden();
+      expect(await applied()).toEqual([{ crs: { kind: 'epsg', code: 32641 } }]);
     });
 
     test('says that nothing would start or stop when the datasets can be drawn in both', async ({

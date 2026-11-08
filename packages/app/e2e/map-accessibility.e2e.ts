@@ -77,6 +77,7 @@ test.describe('the map for those who cannot see it', () => {
   test('does what the description says', async ({ page }) => {
     await page.goto('/');
     await withData(page);
+    const fitted = await camera(page);
     await dispatch(page, {
       type: 'setCamera',
       patch: { camera2d: { centre: [1000, 2000], unitsPerPixel: 2, heading: 0 } },
@@ -91,7 +92,13 @@ test.describe('the map for those who cannot see it', () => {
     await page.keyboard.press('0');
     await expect.poll(async () => (await camera(page)).heading).toBe(0);
     await page.keyboard.press('Home');
-    await expect.poll(async () => (await camera(page)).centre[0]).not.toBe(1000);
+    // The map was moved and zoomed above, so that it is the fit that Home gives back that is read, and not a map that never left it.
+    await expect
+      .poll(async () => (await camera(page)).unitsPerPixel)
+      .toBeCloseTo(fitted.unitsPerPixel, 9);
+    const now = await camera(page);
+    expect(now.centre[0]).toBeCloseTo(fitted.centre[0], 6);
+    expect(now.centre[1]).toBeCloseTo(fitted.centre[1], 6);
   });
 
   test('has a ring inside its edges when it has the keyboard, so that nothing cuts it off', async ({

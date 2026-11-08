@@ -17,6 +17,19 @@ async function boxOf(locator: Locator, what: string) {
 
 const NAMES = ['Zoom in', 'Zoom out', 'Fit to data', 'Reset view'] as const;
 
+/** Waits for two frames, so that what a press sent to the scene has had its turn (for a press that is expected to change nothing). */
+const settle = (page: Page): Promise<void> =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve();
+          });
+        });
+      }),
+  );
+
 /** A map with a camera that is easy to read, and the one the pipeline fitted, to compare Fit with. */
 async function start(page: Page) {
   await page.goto('/');
@@ -108,7 +121,7 @@ test.describe('the navigation group', () => {
     expect(await camera(page)).toEqual(byButton);
   });
 
-  test('keeps the heading when it zooms, and turns about the middle', async ({ page }) => {
+  test('keeps the heading and the centre when it zooms a map that is turned', async ({ page }) => {
     await start(page);
     await dispatch(page, {
       type: 'setCamera',
@@ -126,17 +139,31 @@ test.describe('the navigation group', () => {
 
   test('does not go past the limits of the scale, and does nothing there', async ({ page }) => {
     const fitted = await start(page);
+    // A control: in the middle of the range the same two buttons do move the scale, so that what follows is the limit and not buttons that
+    // do nothing.
+    await button(page, 'Zoom in').click();
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).toBeLessThan(2);
+    await button(page, 'Zoom out').click();
+    await button(page, 'Zoom out').click();
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).toBeGreaterThan(2);
     // The nearest is a hundred thousandth of the fit's scale, the farthest a hundred times it.
     const nearest = fitted.unitsPerPixel / 100_000;
     const farthest = fitted.unitsPerPixel * 100;
-    await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: nearest } } });
-    await button(page, 'Zoom in').click();
     await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: farthest } } });
     await button(page, 'Zoom out').click();
+    await settle(page);
     expect((await camera(page)).unitsPerPixel).toBe(farthest);
     await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: nearest } } });
     await button(page, 'Zoom in').click();
+    await settle(page);
     expect((await camera(page)).unitsPerPixel).toBe(nearest);
+    // Nearly there, a press goes as far as the limit and no further.
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera2d: { unitsPerPixel: nearest * 1.2 } },
+    });
+    await button(page, 'Zoom in').click();
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).toBe(nearest);
   });
 
   test('fits the data, with the heading the map has', async ({ page }) => {
@@ -149,11 +176,16 @@ test.describe('the navigation group', () => {
     expect(now.centre[0]).toBeCloseTo(fitted.centre[0], 6);
     expect(now.centre[1]).toBeCloseTo(fitted.centre[1], 6);
     expect(now.heading).toBe(0);
-    // Turned, it fits the data as it is turned: the heading is the person's.
-    await dispatch(page, { type: 'setCamera', patch: { camera2d: { heading: 40 } } });
+    // Turned, it fits the data as it is turned: the heading is the person's, and the centre is the data's again from where the map was moved to.
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera2d: { centre: [1000, 2000], heading: 40 } },
+    });
     await button(page, 'Fit to data').click();
-    await expect.poll(async () => (await camera(page)).centre[0]).not.toBe(1000);
-    expect((await camera(page)).heading).toBe(40);
+    await expect.poll(async () => (await camera(page)).centre[0]).toBeCloseTo(fitted.centre[0], 6);
+    const turned = await camera(page);
+    expect(turned.centre[1]).toBeCloseTo(fitted.centre[1], 6);
+    expect(turned.heading).toBe(40);
   });
 
   test('resets the view: north up, and the data fitted as at the start', async ({ page }) => {
@@ -216,7 +248,9 @@ test.describe('the navigation group', () => {
     }
   });
 
-  test('has a ring on the focused button that is not cut off', async ({ page }) => {
+  test('has a ring of 2 pixels on the focused button, which the baselines show is not cut off', async ({
+    page,
+  }) => {
     await start(page);
     await button(page, 'Fit to data').focus();
     await page.keyboard.press('Shift+Tab');

@@ -160,8 +160,9 @@ for (const kind of ['grid', 'blocks'] as const) {
     }) => {
       const view = await show(page, kind, TURN);
       const map = await mapColour(page);
-      // Half a unit inside each corner of the 30 by 20 lattice, along its own axes. A box that is moved to where a turned cell is and is not
-      // turned itself (which the blocks' shader does for each box) stops about two units short of such a corner.
+      // Half a unit inside each corner of the 30 by 20 lattice, along its own axes: 4.5 from the middle of its cell in each of the cell's axes,
+      // which turned 30 degrees is 6.15 and 1.65 along the map's. A box of 10 that is moved to where a turned cell is and is not turned itself
+      // (which the blocks' shader does for each box) reaches 5 from its middle, so it stops about 1.15 units short of such a corner.
       for (const [x, y] of [
         [0.5, 0.5],
         [29.5, 0.5],
@@ -225,7 +226,7 @@ for (const kind of ['grid', 'blocks'] as const) {
       }
     });
 
-    test('turns by a quarter exactly: the first row is on the left of the map', async ({
+    test('turns by a quarter exactly: the lattice’s x runs north and its y runs west', async ({
       page,
     }) => {
       const view = await show(page, kind, 90);

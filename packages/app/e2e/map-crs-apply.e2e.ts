@@ -125,7 +125,7 @@ test.describe('applying a map coordinate system', () => {
     await expect(page.locator('karmania-scale-bar .scale')).toHaveCount(0);
   });
 
-  test('says that nothing can be drawn when the system is one that the data cannot be drawn in, and back again', async ({
+  test('draws the datasets that are in the system that was chosen and not the others, and the other way when it is changed back', async ({
     page,
   }) => {
     await page.goto('/');

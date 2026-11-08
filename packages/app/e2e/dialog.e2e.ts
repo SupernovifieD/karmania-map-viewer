@@ -83,23 +83,27 @@ test.describe('the dialog', () => {
   test('is narrower when --k-dialog-width says so, with the height limit it had', async ({
     page,
   }) => {
-    const p = parts(page, 'dialog-short');
+    // The long demo is taller than any limit here, so that its height is the limit and can be read.
+    await page.setViewportSize({ width: 1024, height: 800 });
+    const p = parts(page, 'dialog-long');
     await p.host.evaluate((element) => {
       element.style.setProperty('--k-dialog-width', '400px');
     });
     await p.trigger.click();
     const dialog = await rect(p.dialog);
     expect(dialog.width).toBe(400);
+    expect(dialog.height).toBe(720);
     // A width that is more than the window leaves is the window less 24 on each side, as it is without the property.
     await page.setViewportSize({ width: 420, height: 800 });
     expect((await rect(p.dialog)).width).toBe(372);
-    // The height is the limit that `--k-dialog-max-size` gives: the property is for the width alone.
+    // The height is the limit that `--k-dialog-max-size` gives: the property is for the width alone, so that the limit changes the height
+    // and not the width.
     await p.host.evaluate((element) => {
       element.style.setProperty('--k-dialog-max-size', '500px');
     });
-    expect((await rect(p.dialog)).width).toBe(372);
+    expect(await rect(p.dialog)).toMatchObject({ width: 372, height: 500 });
     await page.setViewportSize({ width: 1024, height: 800 });
-    expect((await rect(p.dialog)).width).toBe(400);
+    expect(await rect(p.dialog)).toMatchObject({ width: 400, height: 500 });
   });
 
   test('is 720 wide, centred in the window, with the header and footer bands of the specification', async ({

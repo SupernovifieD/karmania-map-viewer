@@ -61,9 +61,7 @@ test.describe('a dataset that is not drawn, in the Data tab', () => {
     await expect(notice(page)).toBeVisible();
   });
 
-  test('is not said of a dataset while it is being prepared, or when nothing is the matter', async ({
-    page,
-  }) => {
+  test('is not said when the only dataset is drawn and nothing is the matter', async ({ page }) => {
     await page.goto('/');
     await withData(page);
     await expect(notice(page)).toHaveCount(0);
