@@ -80,6 +80,8 @@ test.describe('the tooltip', () => {
         ['exact', 'Close', 'Close'],
         ['longer', 'Zoom in (+)', 'Zoom in'],
         ['word', 'Zoom', 'Zoomed in'],
+        ['digit', 'Zoom', 'Zoom2'],
+        ['mark', 'Zoom in', 'Zoom in? (+)'],
       ];
       holder.innerHTML = cases
         .map(
@@ -100,6 +102,9 @@ test.describe('the tooltip', () => {
     expect(await description('exact')).toBeNull();
     expect(await description('longer')).toBe('Zoom in (+)');
     expect(await description('word')).toBe('Zoom');
+    expect(await description('digit')).toBe('Zoom');
+    // The words end at a mark that is not a full stop or a colon too.
+    expect(await description('mark')).toBeNull();
   });
 
   test('is above the control, centred on it, a gap of 4 away, when the control is in the middle of the window', async ({
