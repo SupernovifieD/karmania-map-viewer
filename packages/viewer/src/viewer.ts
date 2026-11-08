@@ -627,6 +627,7 @@ export class KarmaniaViewer extends LitElement {
           .unavailable=${this.cannotDraw}
           .heading=${this.furniture.heading}
           .scale=${this.furniture.scale}
+          .crs=${this.furniture.crs}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}

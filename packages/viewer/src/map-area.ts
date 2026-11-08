@@ -6,6 +6,7 @@ import './nav-group.js';
 import './north-arrow.js';
 import './scale-bar.js';
 import './status-chip.js';
+import type { MapCrsText } from './map-crs-text.js';
 import type { Readout } from './pointer-readout.js';
 import type { ScaleBarModel } from '@karmania/scene';
 
@@ -52,6 +53,7 @@ export class KarmaniaMapArea extends LitElement {
     unavailable: { type: Boolean },
     heading: { type: Number },
     scale: { attribute: false },
+    crs: { attribute: false },
     readout: { attribute: false },
     readoutChars: { type: Number },
     preparing: { type: Number },
@@ -223,6 +225,8 @@ export class KarmaniaMapArea extends LitElement {
   declare heading: number;
   /** The scale bar, or why there is none; `undefined` while there is no map. */
   declare scale: ScaleBarModel | undefined;
+  /** What the status chip's button says of the map's coordinate system. */
+  declare crs: MapCrsText | undefined;
   /** Where the pointer is on the map, written, for the status chip; `undefined` when it is off the map or the view is 3D. */
   declare readout: Readout | undefined;
   /** How many characters wide the longest coordinate of the readout can be at this camera: what the chip keeps room for. */
@@ -254,6 +258,7 @@ export class KarmaniaMapArea extends LitElement {
     this.unavailable = false;
     this.heading = 0;
     this.scale = undefined;
+    this.crs = undefined;
     this.readout = undefined;
     this.readoutChars = 0;
     this.preparing = 0;
@@ -332,6 +337,7 @@ export class KarmaniaMapArea extends LitElement {
                 <karmania-status-chip
                   .readout=${this.readout}
                   .chars=${this.readoutChars}
+                  .crs=${this.crs}
                 ></karmania-status-chip>
               </div>`
             : nothing

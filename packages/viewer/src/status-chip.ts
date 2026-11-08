@@ -1,17 +1,23 @@
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
+import type { MapCrsText } from './map-crs-text.js';
 import type { Readout } from './pointer-readout.js';
+
+/** The name of the event the chip sends when a person asks to change the map's coordinate system. */
+export const MAP_CRS_REQUEST = 'karmania-map-crs-request';
 
 /**
  * The status chip of the map (section 10.2 of the brief), 24 high: where the pointer is in the map's coordinate system (`X 512,345.12  Y
- * 4,012,345.67`, in the caption size with tabular numbers, and a dash when the pointer is off the map or the view is 3D). Each coordinate has
- * the room of its longest text (`chars` of them), right-aligned, so that nothing in the chip moves as the pointer does. It is not for the
- * pointer itself.
+ * 4,012,345.67`, in the caption size with tabular numbers, and a dash when the pointer is off the map or the view is 3D), a separator, and the
+ * map's coordinate system as a button (`EPSG:32640`, `Local grid, m`) that asks to change it (`karmania-map-crs-request`), with the whole
+ * name in its tooltip. Each coordinate has the room of its longest text (`chars` of them), right-aligned, so that nothing in the chip moves as
+ * the pointer does. Nothing in it is for the pointer but the button.
  */
 export class KarmaniaStatusChip extends LitElement {
   static override properties = {
     readout: { attribute: false },
     chars: { type: Number },
+    crs: { attribute: false },
   };
 
   static override styles = [
@@ -64,6 +70,44 @@ export class KarmaniaStatusChip extends LitElement {
         visibility: hidden;
       }
 
+      .separator {
+        background: var(--k-border-strong);
+        block-size: var(--k-space-12);
+        flex: none;
+        inline-size: var(--k-border-width);
+      }
+
+      /* The button is the only part that is for the pointer (the chip itself is over the map and takes none). Its ring is drawn inside it, since
+         the chip is as high as the button and a ring outside would be on the chip's border. */
+      k-tooltip {
+        pointer-events: auto;
+      }
+
+      .crs {
+        background: transparent;
+        border: 0;
+        border-radius: var(--k-radius-sm);
+        color: var(--k-text);
+        cursor: pointer;
+        font: inherit;
+        font-variant-numeric: inherit;
+        height: calc(var(--k-space-16) + var(--k-space-4));
+        padding: 0 var(--k-space-4);
+      }
+
+      .crs:hover {
+        background: var(--k-surface);
+      }
+
+      .crs:active {
+        background: var(--k-border);
+      }
+
+      .crs:focus-visible {
+        outline: var(--k-focus-width) solid var(--k-accent);
+        outline-offset: calc(var(--k-focus-width) * -1);
+      }
+
       .off {
         inset-block-start: 0;
         inset-inline-start: 0;
@@ -76,12 +120,19 @@ export class KarmaniaStatusChip extends LitElement {
   declare readout: Readout | undefined;
   /** How many characters wide the longest coordinate can be at this camera: the room each is given. */
   declare chars: number;
+  /** What the button says of the map's coordinate system, and what its tooltip does. */
+  declare crs: MapCrsText | undefined;
 
   constructor() {
     super();
     this.readout = undefined;
     this.chars = 0;
+    this.crs = undefined;
   }
+
+  private readonly onRequest = (): void => {
+    this.dispatchEvent(new CustomEvent(MAP_CRS_REQUEST, { bubbles: true, composed: true }));
+  };
 
   override render() {
     const readout = this.readout;
@@ -96,6 +147,22 @@ export class KarmaniaStatusChip extends LitElement {
           ><span class="axis">Y</span><span class="value">${readout?.y ?? ''}</span>
           ${readout === undefined ? html`<span class="off">—</span>` : nothing}
         </div>
+        ${
+          this.crs === undefined
+            ? nothing
+            : html`<span class="separator" aria-hidden="true"></span>
+                <k-tooltip text=${this.crs.title}>
+                  <button
+                    type="button"
+                    class="crs"
+                    aria-haspopup="dialog"
+                    aria-label=${`Map coordinate system: ${this.crs.label}`}
+                    @click=${this.onRequest}
+                  >
+                    ${this.crs.label}
+                  </button>
+                </k-tooltip>`
+        }
       </div>
     `;
   }
@@ -106,5 +173,9 @@ customElements.define('karmania-status-chip', KarmaniaStatusChip);
 declare global {
   interface HTMLElementTagNameMap {
     'karmania-status-chip': KarmaniaStatusChip;
+  }
+
+  interface HTMLElementEventMap {
+    [MAP_CRS_REQUEST]: CustomEvent;
   }
 }

@@ -6,6 +6,8 @@
 import type { CrsInfo } from '@karmania/engine';
 import { scaleBar } from '@karmania/scene';
 import type { SceneDocument, ScaleBarModel } from '@karmania/scene';
+import { mapCrsText } from './map-crs-text.js';
+import type { MapCrsText } from './map-crs-text.js';
 import { unitsOf } from './map-units.js';
 
 /** What the furniture shows. */
@@ -14,6 +16,8 @@ export interface Furniture {
   readonly heading: number;
   /** The scale bar, or why there is none. */
   readonly scale: ScaleBarModel;
+  /** What the status chip's button says of the map's coordinate system. */
+  readonly crs: MapCrsText;
 }
 
 /**
@@ -28,6 +32,7 @@ export function furnitureOf(state: SceneDocument, info: CrsInfo | null | undefin
       units: unitsOf(state.frame, info),
       unitsPerPixel: state.camera2d.unitsPerPixel,
     }),
+    crs: mapCrsText(state.frame, info),
   };
 }
 
@@ -41,5 +46,10 @@ function sameScale(a: ScaleBarModel, b: ScaleBarModel): boolean {
 
 /** Whether what two furnitures show is the same. */
 export function sameFurniture(a: Furniture, b: Furniture): boolean {
-  return a.heading === b.heading && sameScale(a.scale, b.scale);
+  return (
+    a.heading === b.heading &&
+    sameScale(a.scale, b.scale) &&
+    a.crs.label === b.crs.label &&
+    a.crs.title === b.crs.title
+  );
 }
