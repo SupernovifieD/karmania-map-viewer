@@ -2,6 +2,14 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
+import './nav-group.js';
+import './north-arrow.js';
+import './scale-bar.js';
+import './status-chip.js';
+import type { MapCrsText } from './map-crs-text.js';
+import { KEYS_2D } from './map-label.js';
+import type { Readout } from './pointer-readout.js';
+import type { ScaleBarModel } from '@karmania/scene';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';
@@ -16,6 +24,17 @@ export interface DroppedFiles {
 
 /** The name of the event the map area sends when a person asks to see the Legend, which says why a layer is not drawn. */
 export const SHOW_LEGEND = 'karmania-show-legend';
+
+/** The name of the event the map area sends when the pointer moves over it, or leaves it. */
+export const POINTER_ON_MAP = 'karmania-pointer-on-map';
+
+/** Where the pointer is on the map, in CSS pixels from its top left, and how big the map is; `null` when it is off the map. */
+export type PointerOnMap = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} | null;
 
 /**
  * The map area: the canvas the map is drawn on, and what is laid over it. With no data it invites people to drop files or import them. With
@@ -33,6 +52,12 @@ export class KarmaniaMapArea extends LitElement {
     datasets: { type: Number },
     redrawing: { type: Boolean },
     unavailable: { type: Boolean },
+    heading: { type: Number },
+    scale: { attribute: false },
+    crs: { attribute: false },
+    label: { type: String },
+    readout: { attribute: false },
+    readoutChars: { type: Number },
     preparing: { type: Number },
     progress: { type: Number },
     reasons: { attribute: false },
@@ -114,6 +139,35 @@ export class KarmaniaMapArea extends LitElement {
         visibility: visible;
       }
 
+      /* The furniture of the map is laid over it, 16 inside its edges, and moves nothing: the north arrow at the top on the right, the navigation
+         group at the bottom on the right and the stack of the scale bar and the status chip at the bottom on the left. */
+      .furniture {
+        position: absolute;
+      }
+
+      .north {
+        inset-block-start: var(--k-space-16);
+        inset-inline-end: var(--k-space-16);
+      }
+
+      /* The navigation group at the bottom on the right. */
+      .nav {
+        inset-block-end: var(--k-space-16);
+        inset-inline-end: var(--k-space-16);
+      }
+
+      /* At the bottom on the left, 16 in, what is there stacked with 8 between, and the left edges level: the scale bar, and under it
+         the status chip. The stack takes the pointer for nothing itself: what is in it that is for the pointer says so. */
+      .stack {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-space-8);
+        inset-block-end: var(--k-space-16);
+        inset-inline-start: var(--k-space-16);
+        pointer-events: none;
+      }
+
       /* A notice over the map, at the top in the middle, 16 from the edge: it is laid over the area and moves nothing. */
       .notice {
         align-items: center;
@@ -170,6 +224,18 @@ export class KarmaniaMapArea extends LitElement {
   declare redrawing: boolean;
   /** Whether the browser cannot draw the map at all (it has no WebGL 2): with data, it says so, and says nothing of layers. */
   declare unavailable: boolean;
+  /** The camera's heading, in degrees clockwise from grid north: the north arrow's needle turns with it. */
+  declare heading: number;
+  /** The scale bar, or why there is none; `undefined` while there is no map. */
+  declare scale: ScaleBarModel | undefined;
+  /** What the status chip's button says of the map's coordinate system. */
+  declare crs: MapCrsText | undefined;
+  /** What the map is called for those who cannot see it: `Map, 2D view, 3 layers, turned 30° from north`. */
+  declare label: string;
+  /** Where the pointer is on the map, written, for the status chip; `undefined` when it is off the map or the view is 3D. */
+  declare readout: Readout | undefined;
+  /** How many characters wide the longest coordinate of the readout can be at this camera: what the chip keeps room for. */
+  declare readoutChars: number;
   /** How many layers are being prepared (0 for none): the chip at the top says so. */
   declare preparing: number;
   /** How far along the layers are, from 0 to 1, for the bar of the chip. */
@@ -195,6 +261,12 @@ export class KarmaniaMapArea extends LitElement {
     this.datasets = 0;
     this.redrawing = false;
     this.unavailable = false;
+    this.heading = 0;
+    this.scale = undefined;
+    this.crs = undefined;
+    this.label = 'Map';
+    this.readout = undefined;
+    this.readoutChars = 0;
     this.preparing = 0;
     this.progress = 0;
     this.reasons = [];
@@ -212,17 +284,34 @@ export class KarmaniaMapArea extends LitElement {
     return this.renderRoot.querySelector('canvas') ?? undefined;
   }
 
+  /**
+   * Whether the furniture is shown: there is data, the browser can draw it, and it is not the case that nothing can be (then the map is
+   * not there to be moved or measured, and the empty state says why).
+   */
+  private get furnished(): boolean {
+    return this.datasets > 0 && !this.unavailable && this.reasons.length === 0;
+  }
+
+  /** Whether the status chip is shown: there is data and the browser can draw it, whether or not anything can be (the chip is where the map's coordinate system is changed). */
+  private get chipped(): boolean {
+    return this.datasets > 0 && !this.unavailable;
+  }
+
   override render() {
     return html`
       <main
         aria-label="Map"
+        aria-describedby=${this.interactive ? 'keys' : nothing}
         tabindex=${this.interactive ? '0' : nothing}
+        @pointermove=${this.onPointerMove}
+        @pointerleave=${this.onPointerLeave}
         @dragenter=${this.onDragEnter}
         @dragover=${this.onDragOver}
         @dragleave=${this.onDragLeave}
         @drop=${this.onDrop}
       >
-        <canvas aria-hidden="true"></canvas>
+        <canvas role="img" aria-label=${this.label}></canvas>
+        ${this.interactive ? html`<p id="keys" class="visually-hidden">${KEYS_2D}</p>` : nothing}
         ${
           this.datasets === 0
             ? this.empty()
@@ -231,6 +320,35 @@ export class KarmaniaMapArea extends LitElement {
               : this.reasons.length > 0
                 ? this.blocked()
                 : nothing
+        }
+        ${
+          this.furnished
+            ? html`<karmania-north-arrow
+                class="furniture north"
+                .heading=${this.heading}
+              ></karmania-north-arrow>`
+            : nothing
+        }
+        ${
+          this.furnished
+            ? html`<karmania-nav-group class="furniture nav"></karmania-nav-group>`
+            : nothing
+        }
+        ${
+          this.chipped
+            ? html`<div class="furniture stack">
+                ${
+                  this.furnished && this.scale?.kind === 'bar'
+                    ? html`<karmania-scale-bar .model=${this.scale}></karmania-scale-bar>`
+                    : nothing
+                }
+                <karmania-status-chip
+                  .readout=${this.readout}
+                  .chars=${this.readoutChars}
+                  .crs=${this.crs}
+                ></karmania-status-chip>
+              </div>`
+            : nothing
         }
         ${
           this.redrawing
@@ -244,6 +362,31 @@ export class KarmaniaMapArea extends LitElement {
         </div>
       </main>
     `;
+  }
+
+  /** Says where the pointer is on the map (anywhere in the area is on the map: what is laid over it is not in its way), or that it is not. */
+  private readonly onPointerMove = (event: PointerEvent): void => {
+    const box = this.canvas?.getBoundingClientRect();
+    if (box === undefined) {
+      return;
+    }
+    const [x, y] = [event.clientX - box.left, event.clientY - box.top];
+    const on = x >= 0 && y >= 0 && x <= box.width && y <= box.height;
+    this.tell(on ? { x, y, width: box.width, height: box.height } : null);
+  };
+
+  private readonly onPointerLeave = (): void => {
+    this.tell(null);
+  };
+
+  private tell(where: PointerOnMap): void {
+    this.dispatchEvent(
+      new CustomEvent<PointerOnMap>(POINTER_ON_MAP, {
+        detail: where,
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private readonly onDragEnter = (event: DragEvent): void => {
@@ -356,6 +499,7 @@ declare global {
   interface HTMLElementEventMap {
     [IMPORT_REQUEST]: CustomEvent;
     [SHOW_LEGEND]: CustomEvent;
+    [POINTER_ON_MAP]: CustomEvent<PointerOnMap>;
     [FILES_DROPPED]: CustomEvent<DroppedFiles>;
   }
 }

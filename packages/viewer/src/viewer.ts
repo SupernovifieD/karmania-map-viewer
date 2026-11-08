@@ -1,11 +1,25 @@
 import { createEngine } from '@karmania/engine';
-import type { Engine, Summary } from '@karmania/engine';
-import { DEFAULT_SCALE_LIMITS, attachController2d, createRenderer } from '@karmania/render';
+import type {
+  CrsInfo,
+  DatasetInput,
+  Engine,
+  LoadOptions,
+  LoadResult,
+  Summary,
+} from '@karmania/engine';
+import {
+  DEFAULT_SCALE_LIMITS,
+  KEY_ZOOM_FACTOR,
+  attachController2d,
+  createRenderer,
+  zoomAt,
+} from '@karmania/render';
 import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore, firstNumericColumn } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
+import { CrsNames } from './crs-names.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -14,7 +28,10 @@ import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
 import './map-area.js';
-import type { DroppedFiles, KarmaniaMapArea } from './map-area.js';
+import './map-crs-dialog.js';
+import type { MapCrsApply } from './map-crs-dialog.js';
+import type { Navigate } from './nav-group.js';
+import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -31,7 +48,10 @@ import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { drawOrder } from './draw-order.js';
-import { summariseLayers } from './layer-summary.js';
+import { furnitureOf, sameFurniture } from './furniture.js';
+import type { Furniture } from './furniture.js';
+import { datasetNotices, sameNotices, summariseLayers } from './layer-summary.js';
+import { readoutAt, readoutWidth } from './pointer-readout.js';
 import { syncDatasets } from './scene-datasets.js';
 
 /**
@@ -55,6 +75,7 @@ export class KarmaniaViewer extends LitElement {
     layerChanges: { state: true },
     cannotDraw: { state: true },
     selected: { state: true },
+    furniture: { state: true },
   };
 
   static override styles = [
@@ -98,6 +119,11 @@ export class KarmaniaViewer extends LitElement {
   declare private cannotDraw: boolean;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
+  /**
+   * What the furniture over the map shows (the north arrow's heading, the scale bar). Kept here, and made again only when what it shows is
+   * different, so that the viewer is drawn again when the map is turned or zoomed and not when it is only moved.
+   */
+  declare private furniture: Furniture;
 
   constructor() {
     super();
@@ -107,6 +133,7 @@ export class KarmaniaViewer extends LitElement {
     this.layerChanges = 0;
     this.cannotDraw = false;
     this.selected = undefined;
+    this.furniture = furnitureOf(this.store.getState(), undefined);
   }
 
   /** The engine, which is started when the first files arrive, not before. */
@@ -146,6 +173,56 @@ export class KarmaniaViewer extends LitElement {
       ? Promise.reject(new Error('There is no engine to ask what a code means.'))
       : engine.crsInfo(code);
   };
+
+  /** What the definitions say of the codes of the map's coordinate systems, for the units of the scale bar; an answer that arrives draws the furniture again. */
+  private readonly names = new CrsNames(this.crsInfo, () => {
+    this.refreshFurniture();
+  });
+
+  /** Where the pointer last was on the map, which the readout of the status chip follows; `undefined` while it is off it. */
+  private pointer: { readonly x: number; readonly y: number } | undefined;
+
+  /**
+   * Writes where the pointer is for the status chip: the point of the map under it at the camera the scene has now (the map moves under a
+   * pointer that is still, with a key or a button), or a dash if it is off the map or the view is 3D. It is set on the map area at once and not
+   * kept as state of the viewer, so that a move of the pointer draws the chip and not the viewer.
+   */
+  private updateReadout(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    const box = area?.canvas?.getBoundingClientRect();
+    if (area === null || box === undefined) {
+      return;
+    }
+    const state = this.store.getState();
+    const size = { width: box.width, height: box.height };
+    const here = this.pointer;
+    area.readout =
+      here === undefined || state.viewMode === '3d' || state.frame === null
+        ? undefined
+        : readoutAt(state.camera2d, size, here.x, here.y);
+    area.readoutChars = readoutWidth(state.camera2d, size);
+  }
+
+  private readonly onPointer = (event: CustomEvent<PointerOnMap>): void => {
+    this.pointer = event.detail === null ? undefined : { x: event.detail.x, y: event.detail.y };
+    this.updateReadout();
+  };
+
+  /** What the definitions say of the code of the map's coordinate system, if it is an EPSG one that has been asked about. */
+  private mapCrsInfo(): CrsInfo | null | undefined {
+    const crs = this.store.getState().frame?.mapCrs;
+    return crs?.kind === 'epsg' ? this.names.get(crs.code) : undefined;
+  }
+
+  /** Makes the furniture again for the scene as it is, and keeps the new one if it shows something different. */
+  private refreshFurniture(): void {
+    const state = this.store.getState();
+    const crs = state.frame?.mapCrs;
+    const next = furnitureOf(state, crs?.kind === 'epsg' ? this.names.get(crs.code) : undefined);
+    if (!sameFurniture(this.furniture, next)) {
+      this.furniture = next;
+    }
+  }
 
   /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
   private renderer: Renderer | undefined;
@@ -325,6 +402,9 @@ export class KarmaniaViewer extends LitElement {
     this.pipeline?.fit();
   }
 
+  /** Why each dataset that is not drawn is not, as the Data tab was last given it. */
+  private notices: ReadonlyMap<number, string> = new Map();
+
   /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
   layerStates(): [string, LayerState][] {
     return [...(this.pipeline?.states() ?? [])];
@@ -337,6 +417,19 @@ export class KarmaniaViewer extends LitElement {
     }
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
+    }
+    // The scale bar is in the units of the map's coordinate system, which the definitions say for an EPSG code: asked once.
+    const crs = state.frame?.mapCrs;
+    if (crs?.kind === 'epsg') {
+      this.names.ask(crs.code);
+    }
+    this.refreshFurniture();
+    if (
+      state.camera2d !== previous.camera2d ||
+      state.frame !== previous.frame ||
+      state.viewMode !== previous.viewMode
+    ) {
+      this.updateReadout();
     }
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
@@ -353,8 +446,34 @@ export class KarmaniaViewer extends LitElement {
   /** Stops listening to the scene; set while the viewer is in a page. */
   private unlistenScene: (() => void) | undefined;
 
+  /** Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away). */
+  private sizeWatch: ResizeObserver | undefined;
+
+  private watchSize(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null || this.sizeWatch !== undefined) {
+      return;
+    }
+    this.sizeWatch = new ResizeObserver(() => {
+      this.updateReadout();
+    });
+    this.sizeWatch.observe(area);
+  }
+
+  protected override firstUpdated(): void {
+    // A viewer that was put in a page and taken out before it first rendered has nothing to watch for: Lit makes the update whether or not the
+    // element is still connected, and nothing would disconnect an observer made now.
+    if (this.isConnected) {
+      this.watchSize();
+    }
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
+    // Put back in a page, the viewer's first render has been made already.
+    if (this.hasUpdated) {
+      this.watchSize();
+    }
     window.addEventListener('dragover', this.refuseStrayFiles);
     window.addEventListener('drop', this.refuseStrayFiles);
     window.addEventListener('resize', this.onWindowResize);
@@ -368,6 +487,8 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('resize', this.onWindowResize);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
+    this.sizeWatch?.disconnect();
+    this.sizeWatch = undefined;
     this.pipeline?.dispose();
     this.pipeline = undefined;
     this.controller?.dispose();
@@ -385,6 +506,7 @@ export class KarmaniaViewer extends LitElement {
     // that is put back in a page starts again, and does not list datasets that no engine can give rows of.
     this.datasets = [];
     this.selected = undefined;
+    this.names.clear();
     syncDatasets(this.store, this.datasets);
   }
 
@@ -418,10 +540,13 @@ export class KarmaniaViewer extends LitElement {
     this.importFiles(event.detail.files);
   };
 
-  /** Opens the import wizard on `files`, if there are any. */
+  /**
+   * Opens the import wizard on `files`, if there are any and the viewer is in a page. The engine belongs to the time it is in one (see `load`), and
+   * the wizard of a viewer that was taken out is still in its shadow root, so one made here would never be let go.
+   */
   private importFiles(files: readonly File[]): void {
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
-    if (files.length > 0 && wizard) {
+    if (this.isConnected && files.length > 0 && wizard) {
       this.engine ??= createEngine();
       wizard.engine = this.engine;
       wizard.show(files);
@@ -436,6 +561,67 @@ export class KarmaniaViewer extends LitElement {
   /** The map area says nothing can be drawn and sends people to the Legend, which says why for each layer. */
   private readonly onShowLegend = (): void => {
     this.changePanel({ tab: 'legend', collapsed: false });
+  };
+
+  /** The north arrow was pressed: north is up, with the centre and the scale as they are. */
+  private readonly onNorthReset = (): void => {
+    this.store.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 0 } } });
+  };
+
+  /** A button of the navigation group was pressed: the same as the key that does it, or, for the last, north up and the data in view. */
+  private readonly onNavigate = (event: CustomEvent<Navigate>): void => {
+    switch (event.detail.action) {
+      case 'zoom-in':
+        this.zoomBy(1 / KEY_ZOOM_FACTOR);
+        break;
+      case 'zoom-out':
+        this.zoomBy(KEY_ZOOM_FACTOR);
+        break;
+      case 'fit':
+        this.fit();
+        break;
+      case 'reset':
+        this.onNorthReset();
+        this.fit();
+        break;
+    }
+  };
+
+  /** Changes the scale by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the limits. */
+  private zoomBy(factor: number): void {
+    const box = this.renderRoot.querySelector('karmania-map-area')?.canvas?.getBoundingClientRect();
+    if (box === undefined) {
+      return;
+    }
+    const size = { width: box.width, height: box.height };
+    const change = zoomAt(
+      this.store.getState().camera2d,
+      size,
+      factor,
+      size.width / 2,
+      size.height / 2,
+      this.pipeline?.limits() ?? DEFAULT_SCALE_LIMITS,
+    );
+    if (change !== undefined) {
+      this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
+    }
+  }
+
+  /** The status chip's button was pressed: the dialog for the map's coordinate system opens, with nothing chosen. */
+  private readonly onMapCrsRequest = (): void => {
+    this.renderRoot.querySelector('karmania-map-crs-dialog')?.show();
+  };
+
+  /**
+   * A person applied a coordinate system in the map CRS dialog: the scene takes it as the person's choice (`source: user`), and the pipeline
+   * asks the engine for the frame in it (which gives the origin), prepares every layer again for it, and fits the camera to the data in the
+   * new units, which it does whenever the map's system changes.
+   */
+  private readonly onMapCrsApply = (event: CustomEvent<MapCrsApply>): void => {
+    this.store.dispatch({
+      type: 'setFrame',
+      frame: { mapCrs: event.detail.crs, origin: [0, 0, 0], source: 'user' },
+    });
   };
 
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
@@ -465,12 +651,35 @@ export class KarmaniaViewer extends LitElement {
    * Something has been loaded: the datasets are those the engine holds, the new one is selected, and
    * the panel shows the Data tab, open, whatever it was showing.
    */
-  private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
+  private adopt(summaries: readonly Summary[]): void {
     this.datasets = this.engine?.datasets() ?? [];
     syncDatasets(this.store, this.datasets);
-    this.selected = event.detail.summaries[0]?.id;
+    this.selected = summaries[0]?.id;
     this.changePanel({ tab: 'data', collapsed: false });
+  }
+
+  private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
+    this.adopt(event.detail.summaries);
   };
+
+  /**
+   * Loads a dataset made with a builder (`points`, `grid`, `blocks`, ...), as a file that is imported is: it is listed in the Data tab, selected,
+   * and drawn. The engine takes the input's arrays, which are empty afterwards, so an input is loaded once. Resolves with what the engine says:
+   * `loaded` with the summaries, or `blocked` with the findings, and then nothing is added. Rejects when the viewer is not in a page: the engine
+   * belongs to the time it is in one (it is made here, and let go when the viewer is taken out), so one made for a viewer that is out of a page
+   * would never be let go. (The first part of the viewer's API; the rest of it comes with the embedding.)
+   */
+  async load(input: DatasetInput, options?: LoadOptions): Promise<LoadResult> {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before loading a dataset.');
+    }
+    this.engine ??= createEngine();
+    const result = await this.engine.load(input, options);
+    if (result.status === 'loaded') {
+      this.adopt(result.summaries);
+    }
+    return result;
+  }
 
   /** Gives the panel the width that was asked for, as far as the window allows. */
   private readonly onResize = (event: CustomEvent<ResizeRequest>): void => {
@@ -495,7 +704,14 @@ export class KarmaniaViewer extends LitElement {
     // The width that was asked for, or what the window allows of it.
     const width = clampPanelWidth(this.panel.width, this.viewportWidth);
     const limits = panelWidthLimits(this.viewportWidth);
-    const layers = summariseLayers(this.pipeline?.states().values() ?? []);
+    const states = this.pipeline?.states() ?? new Map();
+    const layers = summariseLayers(states.values());
+    const found = datasetNotices(states, this.store.getState().layers);
+    // The same object while the reasons are the same: a turn of the map draws the viewer again, and the panel need not be.
+    if (!sameNotices(this.notices, found)) {
+      this.notices = found;
+    }
+    const notices = this.notices;
     return html`
       <div
         class="workspace"
@@ -505,10 +721,18 @@ export class KarmaniaViewer extends LitElement {
         <karmania-map-area
           .datasets=${this.datasets.length}
           .unavailable=${this.cannotDraw}
+          .heading=${this.furniture.heading}
+          .scale=${this.furniture.scale}
+          .crs=${this.furniture.crs}
+          .label=${this.furniture.label}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}
           @karmania-show-legend=${this.onShowLegend}
+          @karmania-north-reset=${this.onNorthReset}
+          @karmania-navigate=${this.onNavigate}
+          @karmania-map-crs-request=${this.onMapCrsRequest}
+          @karmania-pointer-on-map=${this.onPointer}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
@@ -523,6 +747,7 @@ export class KarmaniaViewer extends LitElement {
           .selected=${this.selected}
           .rows=${this.rows}
           .crsInfo=${this.crsInfo}
+          .notices=${notices}
           @karmania-import-request=${this.chooseFiles}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
@@ -541,6 +766,13 @@ export class KarmaniaViewer extends LitElement {
       <karmania-import-dialog
         @karmania-import-loaded=${this.onImportLoaded}
       ></karmania-import-dialog>
+      <karmania-map-crs-dialog
+        @karmania-map-crs-apply=${this.onMapCrsApply}
+        .engine=${this.engine}
+        .frame=${this.store.getState().frame}
+        .info=${this.mapCrsInfo()}
+        .datasets=${this.datasets}
+      ></karmania-map-crs-dialog>
     `;
   }
 }

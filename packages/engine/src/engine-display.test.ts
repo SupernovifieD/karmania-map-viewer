@@ -96,6 +96,32 @@ describe('chooseFrame', () => {
   });
 });
 
+describe('previewFrame', () => {
+  it('says what choosing a system would say, as often as it is asked, and chooses nothing', async () => {
+    const engine = start();
+    expect((await engine.previewFrame(UTM40)).frame).toBeNull();
+    const id = await loadPoints(engine, 10);
+    const kept = await engine.chooseFrame();
+    const local = await engine.previewFrame({ kind: 'local', units: 'm' });
+    expect(local.frame).toMatchObject({ mapCrs: { kind: 'local', units: 'm' }, source: 'user' });
+    expect(local.drawable.map((entry) => [entry.id, entry.status])).toStrictEqual([
+      [id, 'not_drawn'],
+    ]);
+    expect(local.drawable[0]?.findings.length).toBeGreaterThan(0);
+    const other = await engine.previewFrame({ kind: 'epsg', code: 32641 });
+    expect(other.drawable[0]).toMatchObject({ id, status: 'drawn', reprojected: true });
+    // Neither changed the frame the engine keeps, and a choice says what its preview did.
+    expect((await engine.chooseFrame()).frame).toStrictEqual(kept.frame);
+    expect(await engine.chooseFrame({ kind: 'epsg', code: 32641 })).toStrictEqual(other);
+  });
+
+  it('is refused after the engine is disposed of', async () => {
+    const engine = start();
+    engine.dispose();
+    await expect(engine.previewFrame(UTM40)).rejects.toBeInstanceOf(EngineDisposedError);
+  });
+});
+
 describe('prepare', () => {
   it('gives the buffers, with progress, and the worker’s copies are empty once they have been handed over', async () => {
     const made: Made = { steps: [], indexes: [], cancelled: [] };

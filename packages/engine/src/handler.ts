@@ -375,6 +375,14 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
           transfer: [],
         };
       }
+      case 'previewFrame': {
+        const { kernel } = await ready();
+        const choice = checkedFrameChoice(kernel.previewFrame(message.params.preferred));
+        return {
+          reply: { type: 'result', id, request: 'previewFrame', result: choice },
+          transfer: [],
+        };
+      }
       case 'prepare': {
         const result = await runPrepare(id, message.params);
         return {

@@ -3,6 +3,7 @@ import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './datasets.js';
 import type { CrsLookup } from './datasets.js';
+import { withoutNotDrawn } from './finding-text.js';
 import './findings.js';
 import { groupFindings } from './import-run.js';
 import { describeSize, formatCount, KIND_NAMES } from './import-files.js';
@@ -19,6 +20,7 @@ export class KarmaniaDatasetSummary extends LitElement {
   static override properties = {
     summary: { attribute: false },
     crsInfo: { attribute: false },
+    notice: { attribute: false },
     names: { state: true },
   };
 
@@ -28,6 +30,35 @@ export class KarmaniaDatasetSummary extends LitElement {
       :host {
         display: block;
         min-width: 0;
+      }
+
+      /* A dataset that is not drawn says so at the top, with the reason and what to do about it. */
+      .notice {
+        align-items: flex-start;
+        border-bottom: var(--k-border-width) solid var(--k-border);
+        display: grid;
+        gap: var(--k-space-8);
+        grid-template-columns: var(--k-icon-size-sm) minmax(0, 1fr);
+        padding: var(--k-space-8) var(--k-space-16);
+      }
+
+      .notice k-icon {
+        color: var(--k-warning);
+        margin-top: var(--k-space-2);
+      }
+
+      .notice strong {
+        font-size: var(--k-font-size-secondary);
+        font-weight: var(--k-weight-medium);
+        line-height: var(--k-line-height-secondary);
+      }
+
+      .notice p {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-secondary);
+        line-height: var(--k-line-height-secondary);
+        margin: 0;
+        overflow-wrap: anywhere;
       }
 
       dl {
@@ -162,6 +193,8 @@ export class KarmaniaDatasetSummary extends LitElement {
   declare summary: Summary | undefined;
   /** What says what an EPSG code means; without it the code is shown as it is. */
   declare crsInfo: CrsLookup | undefined;
+  /** Why the dataset is not drawn on the map, with what to do about it; `undefined` while it is, or is being prepared. */
+  declare notice: string | undefined;
   /** What it said of the codes it was asked about: the system, or `null` for a code that is not in the definitions. */
   declare names: ReadonlyMap<number, CrsInfo | null>;
   /** The codes it has been asked about, so that none is asked twice. */
@@ -171,6 +204,7 @@ export class KarmaniaDatasetSummary extends LitElement {
     super();
     this.summary = undefined;
     this.crsInfo = undefined;
+    this.notice = undefined;
     this.names = new Map();
   }
 
@@ -194,6 +228,20 @@ export class KarmaniaDatasetSummary extends LitElement {
       // summary is next made. Nothing else of the summary is lost for it.
       this.asked.delete(code);
     }
+  }
+
+  /** Says that the dataset is not drawn, and why. */
+  private notices() {
+    return this.notice === undefined
+      ? nothing
+      : html`<div class="notice" role="note">
+          <k-icon name="triangle-alert" size="16"></k-icon>
+          <div>
+            <strong>Not drawn on the map</strong>
+            <!-- The engine's words begin with "Not drawn: ", which the line above has said. -->
+            <p>${withoutNotDrawn(this.notice)}</p>
+          </div>
+        </div>`;
   }
 
   private facts(dataset: Summary) {
@@ -295,7 +343,7 @@ export class KarmaniaDatasetSummary extends LitElement {
     if (dataset === undefined) {
       return nothing;
     }
-    return html`${this.facts(dataset)}${this.columns(dataset)}${this.findings(dataset)}`;
+    return html`${this.notices()}${this.facts(dataset)}${this.columns(dataset)}${this.findings(dataset)}`;
   }
 }
 

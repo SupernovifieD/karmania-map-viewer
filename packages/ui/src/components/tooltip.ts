@@ -51,6 +51,9 @@ export class KTooltip extends LitElement {
         pointer-events: auto;
         position: fixed;
         transition: opacity var(--k-motion-duration) var(--k-motion-easing);
+        /* It wraps, whatever the box that the control is in does: white-space is inherited, and a tooltip in a box that does not wrap would
+           run out of its own box, as light text on whatever is under it. */
+        white-space: normal;
         width: max-content;
       }
 
@@ -202,7 +205,11 @@ export class KTooltip extends LitElement {
     tip.dataset['placement'] = spot.placement;
   }
 
-  /** Tells the control what the tooltip says, if that is something its own name does not. */
+  /**
+   * Tells the control what the tooltip says, if that is something its own name does not. It is worked out when the tooltip is drawn and when
+   * what is in its slot changes, and not when the control's own name changes later: none of the app's does so in a way that matters (the
+   * north arrow's name always begins with the same words).
+   */
   private describeTrigger(): void {
     const trigger = this.trigger;
     if (trigger === undefined) {
@@ -214,7 +221,12 @@ export class KTooltip extends LitElement {
       trigger.textContent
     ).trim();
     const text = this.text ?? '';
-    if (text !== '' && text !== name) {
+    // A name that begins with what the tooltip says (`Reset to north. Map turned 30° from north` and `Reset to north`) already says it: a
+    // description of the same words would be read out twice. The words end where the name ends or at a character that is not a letter, a
+    // digit or a combining mark (so `Zoom` is not the beginning of `Zoomed in` or `Zoom2`, nor `Cafe` of `Café` written with an accent that
+    // is a character of its own).
+    const saysIt = name.startsWith(text) && /^(?![\p{L}\p{N}\p{M}])/u.test(name.slice(text.length));
+    if (text !== '' && !saysIt) {
       trigger.setAttribute('aria-description', text);
     } else {
       trigger.removeAttribute('aria-description');

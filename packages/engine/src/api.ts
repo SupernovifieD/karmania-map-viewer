@@ -159,6 +159,14 @@ export interface Engine {
   chooseFrame(preferred?: CrsRef): Promise<FrameChoice>;
 
   /**
+   * What `chooseFrame(preferred)` would answer now, **without choosing it**: the frame that would be made (with its origin) and which of
+   * the loaded datasets would be drawn in it, each with its findings. The frame the engine keeps is not changed, nor is anything else, so
+   * it can be asked as often as a person thinks of another system (the map CRS dialog's "What changes"), which `chooseFrame` cannot, since
+   * it keeps what it answers. `frame` is `null` when nothing is loaded.
+   */
+  previewFrame(preferred: CrsRef): Promise<FrameChoice>;
+
+  /**
    * Prepares a dataset for drawing in a frame: converts its positions, triangulates, rebases to the
    * frame's origin and cuts a grid into textures, in steps in the worker so that the page stays
    * responsive. The buffers of the result are handed over, not copied, and are the caller's to keep.

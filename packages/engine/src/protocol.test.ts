@@ -27,6 +27,7 @@ describe('the types of messages', () => {
         case 'rows':
         case 'remove':
         case 'chooseFrame':
+        case 'previewFrame':
         case 'prepare':
         case 'classify':
         case 'classIndex':
@@ -65,6 +66,7 @@ describe('what the worker accepts', () => {
     rows: { dataset: 1, start: 0, count: 10 },
     remove: { dataset: 1 },
     chooseFrame: {},
+    previewFrame: { preferred: { kind: 'epsg', code: 32640 } },
     prepare: {
       dataset: 1,
       frame: { mapCrs: { kind: 'local', units: 'm' }, origin: [0, 0, 0], source: 'auto' },

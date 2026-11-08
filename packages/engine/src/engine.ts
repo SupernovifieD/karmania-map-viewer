@@ -170,6 +170,12 @@ export function createEngineOnPort(
       return client.request('chooseFrame', preferred === undefined ? {} : { preferred });
     },
 
+    previewFrame: async (preferred) => {
+      assertUsable();
+      await started;
+      return client.request('previewFrame', { preferred });
+    },
+
     prepare: async (id, params, prepareOptions: PrepareOptions = {}) => {
       assertUsable();
       await started;

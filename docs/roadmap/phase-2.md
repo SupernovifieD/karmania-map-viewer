@@ -481,22 +481,50 @@ or releasing, and whenever the brief says to stop.
 
 ## M17: Map furniture and overlays
 
-- [ ] 17.1 North arrow (10.2): turns with the heading, resets on click, keyboard,
+- [x] 17.1 North arrow (10.2): turns with the heading, resets on click, keyboard,
   accessible name with the angle.
-- [ ] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
+- [x] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
   and for geographic map CRSs.
-- [ ] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
-- [ ] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
+  - [x] 17.2a The units of the map: from the frame (a local grid has its own; an EPSG code is asked of the engine, once).
+  - [x] 17.2b The scale bar on the map.
+- [x] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
+  - [x] 17.3a The icons (plus, minus, maximize, rotate-ccw).
+  - [x] 17.3b The group on the map, and what its four buttons do to the camera.
+- [x] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
   the map CRS button.
-- [ ] 17.5 Map CRS dialog (10.5): current CRS, search, local option, "What
+  - [x] 17.4a What the pointer is over, in the map CRS, and the decimals that make the last digit about a pixel.
+  - [x] 17.4b The chip with the coordinates.
+  - [x] 17.4c The map CRS button of the chip, with the system's name in its tooltip.
+- [x] 17.5 Map CRS dialog (10.5): current CRS, search, local option, "What
   changes", apply re-prepares every layer.
-- [ ] 17.6 Datasets that are not drawn: the reason and hint in the dataset
+  - [x] 17.5a `engine.previewFrame(preferred)`: what `chooseFrame` would say for a system, without changing the frame (the engine keeps the frame `chooseFrame` gives, so asking it about a system the person has not chosen yet would change the map).
+  - [x] 17.5b The search of the wizard's CRS step, taken out to be shared (no visible change).
+  - [x] 17.5c The dialog: the current system, the search, a local grid.
+  - [x] 17.5d "What changes": the datasets that would start or stop being drawn, with the reasons.
+  - [x] 17.5e Apply: the frame the person chose, every layer prepared again.
+- [x] 17.6 Datasets that are not drawn: the reason and hint in the dataset
   summary.
-- [ ] 17.7 Canvas accessibility: live label, keyboard description, inset focus
+- [x] 17.7 Canvas accessibility: live label, keyboard description, inset focus
   ring.
-- [ ] 17.8 Overlay layout tests: no overlap for every pair at every window size,
+- [x] 17.8 Overlay layout tests: no overlap for every pair at every window size,
   panel narrowest, widest and collapsed; screenshots; axe.
-- [ ] 17.G Gate.
+- [x] 17.9 Rotation of grids and blocks seen in a browser (the owner's question after M16: no file or wizard step gives a rotation, so these were tested in Node only): `viewer.load(input)`, the first part of the viewer API of 11.8, which hands a dataset made with a builder to the viewer; a pixel test and a render golden image for a turned grid and a turned block model.
+- [x] 17.10 The frames over 50 ms that `pnpm perf` shows outside the windows of the targets, found (the owner's question after M16): what they are and what could be done, recorded in `docs/perf.md`.
+- [x] 17.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
+  - [x] 17.F1 The tooltip: its text ran out of its box when an ancestor does not wrap (found in the CRS button's picture), and a button whose name begins with the tooltip's text was told the same words twice.
+  - [x] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
+  - [x] 17.F3 `viewer.load` on a viewer that is not in a page made an engine that nothing disposes.
+  - [x] 17.F4 The map CRS dialog asked the engine what would change while it was closed, and not again for another engine.
+  - [x] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
+  - [x] 17.F6 Tests that could not fail, and titles that said more than the test: the scale bar at its widest, the Home key, fit with a heading, the limits of the zoom, the dialog's height, what looking at a choice changes, Apply after a preview that failed, and the keyboard after Apply.
+  - [x] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
+  - [x] 17.F8 The viewer out of a page (second review): `openImport` made an engine for a viewer that was taken out, and a viewer taken out before its first render still made a size observer.
+  - [x] 17.F9 The tooltip's words end at any character that is not a letter or a digit, and not only at a space or a stop, so that a name that begins with them is not described with them again.
+  - [x] 17.F10 Second review, tests and records: the test of the dialog's other engine can tell its answer from the first's, the kernel test's title, the perf.md headlines that said more than the probes, and the order of the scale bar's reasons.
+  - [x] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
+  - [x] 17.F12 Third review: the tooltip's words end before a combining mark too, the kernel test says what it asserts, the perf.md percentages follow the figures, and 17.F11 is ticked when the visual set has passed.
+  - [x] 17.F13 The status chip overlapped the navigation group on CI (4 px, with the Linux fonts): the room of each number has no spare character any more, a test samples the area to show that no text is longer, and the 21 states that show the chip were retaken.
+- [x] 17.G Gate.
 
 ## M18: 3D view
 

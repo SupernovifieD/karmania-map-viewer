@@ -68,9 +68,9 @@ export async function lookAt(
 
 /** The picture of the canvas, which has to be the golden image of `name` in `theme` to the pixel. */
 export async function expectGolden(page: Page, name: string, theme: Theme): Promise<void> {
-  // Only the map is photographed: what the area puts over it (its words when there is nothing to show, its notices) is not the render's.
+  // Only the map is photographed: what the area puts over it (its words when there is nothing to show, its notices, its furniture) is not the render's.
   await page
-    .locator('karmania-map-area :is(k-empty-state, .notice, .drop-zone)')
+    .locator('karmania-map-area :is(k-empty-state, .notice, .drop-zone, .furniture)')
     .evaluateAll((elements) => {
       for (const element of elements) {
         (element as HTMLElement).style.visibility = 'hidden';
