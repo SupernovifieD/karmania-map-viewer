@@ -55,6 +55,7 @@ export class KarmaniaViewer extends LitElement {
     layerChanges: { state: true },
     cannotDraw: { state: true },
     selected: { state: true },
+    heading: { state: true },
   };
 
   static override styles = [
@@ -98,6 +99,8 @@ export class KarmaniaViewer extends LitElement {
   declare private cannotDraw: boolean;
   /** The dataset that is selected: the one that was loaded last, until a person chooses another. */
   declare private selected: number | undefined;
+  /** The camera's heading, which the north arrow shows: kept here so that the viewer is drawn again when it turns, and not when the map is only moved. */
+  declare private heading: number;
 
   constructor() {
     super();
@@ -107,6 +110,7 @@ export class KarmaniaViewer extends LitElement {
     this.layerChanges = 0;
     this.cannotDraw = false;
     this.selected = undefined;
+    this.heading = 0;
   }
 
   /** The engine, which is started when the first files arrive, not before. */
@@ -338,6 +342,7 @@ export class KarmaniaViewer extends LitElement {
     if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
       this.lookThroughCamera();
     }
+    this.heading = state.camera2d.heading;
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
@@ -438,6 +443,11 @@ export class KarmaniaViewer extends LitElement {
     this.changePanel({ tab: 'legend', collapsed: false });
   };
 
+  /** The north arrow was pressed: north is up, with the centre and the scale as they are. */
+  private readonly onNorthReset = (): void => {
+    this.store.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 0 } } });
+  };
+
   private readonly onDatasetSelect = (event: CustomEvent<DatasetChoice>): void => {
     this.selected = event.detail.id;
   };
@@ -505,10 +515,12 @@ export class KarmaniaViewer extends LitElement {
         <karmania-map-area
           .datasets=${this.datasets.length}
           .unavailable=${this.cannotDraw}
+          .heading=${this.heading}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}
           @karmania-show-legend=${this.onShowLegend}
+          @karmania-north-reset=${this.onNorthReset}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>

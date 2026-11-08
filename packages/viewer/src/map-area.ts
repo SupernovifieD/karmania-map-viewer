@@ -2,6 +2,7 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
+import './north-arrow.js';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';
@@ -33,6 +34,7 @@ export class KarmaniaMapArea extends LitElement {
     datasets: { type: Number },
     redrawing: { type: Boolean },
     unavailable: { type: Boolean },
+    heading: { type: Number },
     preparing: { type: Number },
     progress: { type: Number },
     reasons: { attribute: false },
@@ -114,6 +116,16 @@ export class KarmaniaMapArea extends LitElement {
         visibility: visible;
       }
 
+      /* The furniture of the map is laid over it, 16 inside its edges, and moves nothing: the north arrow at the top on the right. */
+      .furniture {
+        position: absolute;
+      }
+
+      .north {
+        inset-block-start: var(--k-space-16);
+        inset-inline-end: var(--k-space-16);
+      }
+
       /* A notice over the map, at the top in the middle, 16 from the edge: it is laid over the area and moves nothing. */
       .notice {
         align-items: center;
@@ -170,6 +182,8 @@ export class KarmaniaMapArea extends LitElement {
   declare redrawing: boolean;
   /** Whether the browser cannot draw the map at all (it has no WebGL 2): with data, it says so, and says nothing of layers. */
   declare unavailable: boolean;
+  /** The camera's heading, in degrees clockwise from grid north: the north arrow's needle turns with it. */
+  declare heading: number;
   /** How many layers are being prepared (0 for none): the chip at the top says so. */
   declare preparing: number;
   /** How far along the layers are, from 0 to 1, for the bar of the chip. */
@@ -195,6 +209,7 @@ export class KarmaniaMapArea extends LitElement {
     this.datasets = 0;
     this.redrawing = false;
     this.unavailable = false;
+    this.heading = 0;
     this.preparing = 0;
     this.progress = 0;
     this.reasons = [];
@@ -210,6 +225,14 @@ export class KarmaniaMapArea extends LitElement {
   /** The canvas the map is drawn on: there from the first render, and `undefined` until then. */
   get canvas(): HTMLCanvasElement | undefined {
     return this.renderRoot.querySelector('canvas') ?? undefined;
+  }
+
+  /**
+   * Whether the furniture is shown: there is data, the browser can draw it, and it is not the case that nothing can be (then the map is
+   * not there to be moved or measured, and the empty state says why).
+   */
+  private get furnished(): boolean {
+    return this.datasets > 0 && !this.unavailable && this.reasons.length === 0;
   }
 
   override render() {
@@ -231,6 +254,14 @@ export class KarmaniaMapArea extends LitElement {
               : this.reasons.length > 0
                 ? this.blocked()
                 : nothing
+        }
+        ${
+          this.furnished
+            ? html`<karmania-north-arrow
+                class="furniture north"
+                .heading=${this.heading}
+              ></karmania-north-arrow>`
+            : nothing
         }
         ${
           this.redrawing
