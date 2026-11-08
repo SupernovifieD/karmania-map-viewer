@@ -485,7 +485,7 @@ or releasing, and whenever the brief says to stop.
   accessible name with the angle.
 - [ ] 17.2 Scale bar from the furniture model, units from CrsInfo; absent in 3D
   and for geographic map CRSs.
-  - [ ] 17.2a The units of the map: from the frame (a local grid has its own; an EPSG code is asked of the engine, once).
+  - [x] 17.2a The units of the map: from the frame (a local grid has its own; an EPSG code is asked of the engine, once).
   - [ ] 17.2b The scale bar on the map.
 - [ ] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
   - [ ] 17.3a The icons (plus, minus, maximize, rotate-ccw).
