@@ -488,7 +488,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.2a The units of the map: from the frame (a local grid has its own; an EPSG code is asked of the engine, once).
   - [x] 17.2b The scale bar on the map.
 - [ ] 17.3 Navigation group: zoom in, zoom out, fit, reset view.
-  - [ ] 17.3a The icons (plus, minus, maximize, rotate-ccw).
+  - [x] 17.3a The icons (plus, minus, maximize, rotate-ccw).
   - [ ] 17.3b The group on the map, and what its four buttons do to the camera.
 - [ ] 17.4 Status chip: pointer coordinates (fixed width, decimals by scale) and
   the map CRS button.

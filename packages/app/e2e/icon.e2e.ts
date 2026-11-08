@@ -19,6 +19,14 @@ test.describe('the icon', () => {
     }
   });
 
+  test('has the icons of the controls of the map: zoom in, zoom out, fit and reset', async ({
+    page,
+  }) => {
+    for (const name of ['plus', 'minus', 'maximize', 'rotate-ccw']) {
+      await expect(page.locator(`[data-icon="${name}"] k-icon`).first()).toBeVisible();
+    }
+  });
+
   test('draws something for every icon', async ({ page }) => {
     const empty = await page.evaluate(() =>
       [...document.querySelectorAll('karmania-gallery k-icon')]
