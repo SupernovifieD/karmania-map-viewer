@@ -139,7 +139,8 @@ export class KarmaniaMapArea extends LitElement {
         visibility: visible;
       }
 
-      /* The furniture of the map is laid over it, 16 inside its edges, and moves nothing: the north arrow at the top on the right. */
+      /* The furniture of the map is laid over it, 16 inside its edges, and moves nothing: the north arrow at the top on the right, the navigation
+         group at the bottom on the right and the stack of the scale bar and the status chip at the bottom on the left. */
       .furniture {
         position: absolute;
       }

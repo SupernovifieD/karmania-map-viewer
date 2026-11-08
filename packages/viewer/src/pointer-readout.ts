@@ -14,7 +14,8 @@ export const MOST_DECIMALS = 6;
 /**
  * The decimals for a map in which one pixel is `unitsPerPixel` map units: the fewest for which the last digit is not more than a pixel,
  * so that the last digit is between a tenth of a pixel and a pixel (a pixel of 0.25 units gives one decimal, a tenth, and one of 2.5
- * gives none). From 0 up to 6; a scale that is not a number above 0 gives none.
+ * gives none). From 0 up to 6: below a millionth of a unit a pixel the cap holds the last digit at a millionth, which is coarser than the pixel.
+ * A scale that is not a number above 0 gives none.
  */
 export function decimalsFor(unitsPerPixel: number): number {
   if (!(unitsPerPixel > 0) || !Number.isFinite(unitsPerPixel)) {
@@ -46,8 +47,7 @@ export function readoutAt(camera: Camera2d, size: Size, x: number, y: number): R
 
 /**
  * How many characters wide a coordinate can be anywhere in the map area at this camera: the longest of the four corners (a coordinate is
- * greatest or least there) and one more, for the digit that a coordinate crossing a power of ten gains. The chip reserves this much for
- * each, so that it does not change as the pointer moves.
+ * greatest or least there) and one more as a plain margin. The chip reserves this much for each, so that it does not change as the pointer moves.
  */
 export function readoutWidth(camera: Camera2d, size: Size): number {
   let longest = 0;
