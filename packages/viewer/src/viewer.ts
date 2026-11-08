@@ -658,10 +658,14 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Loads a dataset made with a builder (`points`, `grid`, `blocks`, ...), as a file that is imported is: it is listed in the Data tab, selected,
    * and drawn. The engine takes the input's arrays, which are empty afterwards, so an input is loaded once. Resolves with what the engine says:
-   * `loaded` with the summaries, or `blocked` with the findings, and then nothing is added. (The first part of the viewer's API; the rest of it
-   * comes with the embedding.)
+   * `loaded` with the summaries, or `blocked` with the findings, and then nothing is added. Rejects when the viewer is not in a page: the engine
+   * belongs to the time it is in one (it is made here, and let go when the viewer is taken out), so one made for a viewer that is out of a page
+   * would never be let go. (The first part of the viewer's API; the rest of it comes with the embedding.)
    */
   async load(input: DatasetInput, options?: LoadOptions): Promise<LoadResult> {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before loading a dataset.');
+    }
     this.engine ??= createEngine();
     const result = await this.engine.load(input, options);
     if (result.status === 'loaded') {
