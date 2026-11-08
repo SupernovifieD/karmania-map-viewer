@@ -82,6 +82,7 @@ test.describe('the tooltip', () => {
         ['word', 'Zoom', 'Zoomed in'],
         ['digit', 'Zoom', 'Zoom2'],
         ['mark', 'Zoom in', 'Zoom in? (+)'],
+        ['accent', 'Cafe', 'Cafe\u0301 au lait'],
       ];
       holder.innerHTML = cases
         .map(
@@ -105,6 +106,8 @@ test.describe('the tooltip', () => {
     expect(await description('digit')).toBe('Zoom');
     // The words end at a mark that is not a full stop or a colon too.
     expect(await description('mark')).toBeNull();
+    // An accent that is a character of its own belongs to the word before it.
+    expect(await description('accent')).toBe('Cafe');
   });
 
   test('is above the control, centred on it, a gap of 4 away, when the control is in the middle of the window', async ({

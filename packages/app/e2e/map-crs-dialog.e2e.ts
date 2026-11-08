@@ -277,7 +277,7 @@ test.describe('the map coordinate system dialog', () => {
     await expect(p.dialog).toBeHidden();
     expect(await applied()).toEqual([]);
     expect(await sceneFrame(page)).toEqual(before);
-    // The layers' statuses are as they were (that nothing is prepared again by looking is the apply test's), and the chip still names the
+    // The layers' statuses are as they were (that nothing is prepared again by looking is the test of `map-crs-apply.e2e.ts` that counts the calls of `prepare`), and the chip still names the
     // system the map is in.
     expect(await layerStatuses(page)).toEqual(statusesBefore);
     await expect(p.chip).toHaveText('EPSG:32640');

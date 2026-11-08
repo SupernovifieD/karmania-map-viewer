@@ -237,18 +237,18 @@ describe('previewFrame', () => {
   });
 
   // That a preview does not make the origin that waits for a dataset is held by the preparer's test in Rust (`a_preview_does_not_make_an_origin_that_is_waiting`):
-  // here a later `chooseFrame` would give the same origin whether or not the preview had kept it.
-  it('says the origin that a choice would make, after a preview of another system in between', () => {
+  // here a later `chooseFrame` would give the same frame whether or not the preview had kept the origin.
+  it('says the frame that a choice would make, and a choice after a preview of another system makes the same', () => {
     const kernel = createKernel();
     points(kernel, METRES, [[1, 1]]);
     kernel.chooseFrame();
     // The map is put in a system nothing is drawn in, so its origin is 0 and waits for a dataset that is.
     expect(asObject(asObject(kernel.chooseFrame(UTM40)).frame).origin).toStrictEqual([0, 0, 0]);
     points(kernel, UTM40, [[512_000.01, 4_012_345.01]]);
-    // A preview of the map's own system has the origin that a choice would make, and does not make it.
+    // A preview of the map's own system has the origin that a choice would make.
     const preview = asObject(asObject(kernel.previewFrame(UTM40)).frame);
     expect(preview.origin).toStrictEqual([512_000, 4_012_000, 0]);
-    // A preview of another system in between does not disturb it either.
+    // A choice after a preview of another system in between is that frame.
     kernel.previewFrame(WGS84);
     expect(asObject(kernel.chooseFrame()).frame).toStrictEqual(preview);
   });

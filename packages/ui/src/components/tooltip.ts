@@ -222,9 +222,10 @@ export class KTooltip extends LitElement {
     ).trim();
     const text = this.text ?? '';
     // A name that begins with what the tooltip says (`Reset to north. Map turned 30° from north` and `Reset to north`) already says it: a
-    // description of the same words would be read out twice. The words end where the name ends or at a character that is not a letter or a
-    // digit (so `Zoom` is not the beginning of `Zoomed in` or `Zoom2`).
-    const saysIt = name.startsWith(text) && /^(?![\p{L}\p{N}])/u.test(name.slice(text.length));
+    // description of the same words would be read out twice. The words end where the name ends or at a character that is not a letter, a
+    // digit or a combining mark (so `Zoom` is not the beginning of `Zoomed in` or `Zoom2`, nor `Cafe` of `Café` written with an accent that
+    // is a character of its own).
+    const saysIt = name.startsWith(text) && /^(?![\p{L}\p{N}\p{M}])/u.test(name.slice(text.length));
     if (text !== '' && !saysIt) {
       trigger.setAttribute('aria-description', text);
     } else {
