@@ -156,6 +156,8 @@ test.describe('the north arrow', () => {
     expect(outline).toEqual({ width: '2px', style: 'solid' });
     await expect(page.locator('karmania-north-arrow k-tooltip .tip')).toBeVisible();
     await expect(page.locator('karmania-north-arrow k-tooltip .tip')).toHaveText('Reset to north');
+    // The name begins with the tooltip's words, so a description of them would be read out twice.
+    await expect(button(page)).not.toHaveAttribute('aria-description', /.*/);
   });
 
   test('is not the map: pressing it does not start a drag of the map', async ({ page }) => {

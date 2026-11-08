@@ -510,6 +510,14 @@ or releasing, and whenever the brief says to stop.
   panel narrowest, widest and collapsed; screenshots; axe.
 - [x] 17.9 Rotation of grids and blocks seen in a browser (the owner's question after M16: no file or wizard step gives a rotation, so these were tested in Node only): `viewer.load(input)`, the first part of the viewer API of 11.8, which hands a dataset made with a builder to the viewer; a pixel test and a render golden image for a turned grid and a turned block model.
 - [x] 17.10 The frames over 50 ms that `pnpm perf` shows outside the windows of the targets, found (the owner's question after M16): what they are and what could be done, recorded in `docs/perf.md`.
+- [ ] 17.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
+  - [x] 17.F1 The tooltip: its text ran out of its box when an ancestor does not wrap (found in the CRS button's picture), and a button whose name begins with the tooltip's text was told the same words twice.
+  - [ ] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
+  - [ ] 17.F3 `viewer.load` on a viewer that is not in a page made an engine that nothing disposes.
+  - [ ] 17.F4 The map CRS dialog asked the engine what would change while it was closed, and not again for another engine.
+  - [ ] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
+  - [ ] 17.F6 Tests that could not fail, and titles that said more than the test: the scale bar at its widest, the Home key, fit with a heading, the limits of the zoom, the dialog's height, what looking at a choice changes, Apply after a preview that failed, and the keyboard after Apply.
+  - [ ] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
 - [ ] 17.G Gate.
 
 ## M18: 3D view

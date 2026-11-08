@@ -62,6 +62,11 @@ test.describe('the status chip: the map’s coordinate system', () => {
     await expect(page.locator('karmania-status-chip k-tooltip .tip')).toHaveText(
       'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
+    // The whole of the name is inside the tooltip's box (the chip does not wrap, and the tooltip is inside it).
+    const runsOut = await page
+      .locator('karmania-status-chip k-tooltip .tip')
+      .evaluate((element) => element.scrollWidth > element.clientWidth);
+    expect(runsOut).toBe(false);
   });
 
   test('says a local grid with its units, in feet and in US survey feet too', async ({ page }) => {
