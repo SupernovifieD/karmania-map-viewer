@@ -1,5 +1,12 @@
 import { createEngine } from '@karmania/engine';
-import type { CrsInfo, Engine, Summary } from '@karmania/engine';
+import type {
+  CrsInfo,
+  DatasetInput,
+  Engine,
+  LoadOptions,
+  LoadResult,
+  Summary,
+} from '@karmania/engine';
 import {
   DEFAULT_SCALE_LIMITS,
   KEY_ZOOM_FACTOR,
@@ -613,12 +620,31 @@ export class KarmaniaViewer extends LitElement {
    * Something has been loaded: the datasets are those the engine holds, the new one is selected, and
    * the panel shows the Data tab, open, whatever it was showing.
    */
-  private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
+  private adopt(summaries: readonly Summary[]): void {
     this.datasets = this.engine?.datasets() ?? [];
     syncDatasets(this.store, this.datasets);
-    this.selected = event.detail.summaries[0]?.id;
+    this.selected = summaries[0]?.id;
     this.changePanel({ tab: 'data', collapsed: false });
+  }
+
+  private readonly onImportLoaded = (event: CustomEvent<ImportLoaded>): void => {
+    this.adopt(event.detail.summaries);
   };
+
+  /**
+   * Loads a dataset made with a builder (`points`, `grid`, `blocks`, ...), as a file that is imported is: it is listed in the Data tab, selected,
+   * and drawn. The engine takes the input's arrays, which are empty afterwards, so an input is loaded once. Resolves with what the engine says:
+   * `loaded` with the summaries, or `blocked` with the findings, and then nothing is added. (The first part of the viewer's API; the rest of it
+   * comes with the embedding.)
+   */
+  async load(input: DatasetInput, options?: LoadOptions): Promise<LoadResult> {
+    this.engine ??= createEngine();
+    const result = await this.engine.load(input, options);
+    if (result.status === 'loaded') {
+      this.adopt(result.summaries);
+    }
+    return result;
+  }
 
   /** Gives the panel the width that was asked for, as far as the window allows. */
   private readonly onResize = (event: CustomEvent<ResizeRequest>): void => {
