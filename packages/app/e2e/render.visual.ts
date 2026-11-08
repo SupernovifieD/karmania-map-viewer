@@ -8,7 +8,7 @@ import { test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { expectGolden, lookAt, settled, sizeMap, THEMES } from './support/golden.js';
 import { fixture, projectionFor } from './support/fixtures.js';
-import { dispatch } from './support/render.js';
+import { dispatch, loadLattice } from './support/render.js';
 import { goTo, importAndLoad, startWizard, wizard } from './support/wizard.js';
 import type { Theme } from './support/golden.js';
 
@@ -125,6 +125,23 @@ async function importBlocks(page: Page): Promise<void> {
   await w.next.click();
 }
 
+/** A lattice of 5 by 4 cells of 10 metres, turned 30 degrees anticlockwise about its corner, with the values 1 to 20 (X fastest). */
+const turned = (name: string) => ({
+  name,
+  crs: { kind: 'epsg', code: 32640 } as const,
+  origin: [EAST, NORTH, 0] as const,
+  spacing: [10, 10, 5] as const,
+  dims: [5, 4, 1] as const,
+  rotation: 30,
+  values: Array.from({ length: 20 }, (_, index) => index + 1),
+});
+
+/** The middle of that lattice on the map: its own (25, 20) turned 30 degrees about the corner. */
+const turnedMiddle = [
+  EAST + 25 * Math.cos(Math.PI / 6) - 20 * Math.sin(Math.PI / 6),
+  NORTH + 25 * Math.sin(Math.PI / 6) + 20 * Math.cos(Math.PI / 6),
+] as const;
+
 const BY = (column: string, method: string, classes: number) => ({
   mode: 'classes',
   column,
@@ -226,6 +243,24 @@ const CASES: readonly Case[] = [
     load: (page) =>
       importAndLoad(page, geojson('lease.geojson', [polygon(EAST, NORTH, 100, null, 40)])),
     view: (page) => lookAt(page, [EAST + 50, NORTH + 50], 0.25, 30),
+  },
+  {
+    // A grid turned 30 degrees (a lattice's rotation comes from no file: the viewer's `load` is the way in), 5 by 4 cells of 10 m with the values 1 to 20.
+    name: 'grid-turned',
+    layers: 1,
+    load: async (page) => {
+      await loadLattice(page, 'grid', turned('grid'));
+    },
+    view: (page) => lookAt(page, turnedMiddle, 0.2),
+  },
+  {
+    // The same as blocks: the boxes are turned about their own centres, so that the model is one turned rectangle of squares.
+    name: 'blocks-turned',
+    layers: 1,
+    load: async (page) => {
+      await loadLattice(page, 'blocks', turned('blocks'));
+    },
+    view: (page) => lookAt(page, turnedMiddle, 0.2),
   },
   {
     name: 'order',
