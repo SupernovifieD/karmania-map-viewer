@@ -21,6 +21,20 @@ fn core_kernel() -> CoreKernel {
     CoreKernel::with_kinds(Box::new(Definitions))
 }
 
+/// The coordinate system a caller prefers, from what it passed: none for `undefined` and `null`.
+fn preferred_crs(preferred: JsValue) -> Result<Option<CrsRef>, JsError> {
+    if preferred.is_undefined() || preferred.is_null() {
+        return Ok(None);
+    }
+    serde_wasm_bindgen::from_value(preferred)
+        .map(Some)
+        .map_err(|error| {
+            JsError::new(&format!(
+                "the preferred coordinate system is not valid: {error}"
+            ))
+        })
+}
+
 /// The kernel: the loaded datasets and the imports in progress.
 ///
 /// Create one with `new Kernel()` in the worker, and call `free()` to release its
@@ -148,17 +162,24 @@ impl Kernel {
     /// Throws if `preferred` is not a `CrsRef`.
     #[wasm_bindgen(js_name = chooseFrame)]
     pub fn choose_frame(&mut self, preferred: JsValue) -> Result<JsValue, JsError> {
-        let preferred: Option<CrsRef> = if preferred.is_undefined() || preferred.is_null() {
-            None
-        } else {
-            Some(serde_wasm_bindgen::from_value(preferred).map_err(|error| {
-                JsError::new(&format!(
-                    "the preferred coordinate system is not valid: {error}"
-                ))
-            })?)
-        };
+        let preferred = preferred_crs(preferred)?;
         let datasets = self.inner.registry().datasets();
         to_js_with_nulls(&self.prep.choose_frame(preferred, &datasets))
+    }
+
+    /// What `chooseFrame(preferred)` would answer now, in the same form, **without changing anything**: the
+    /// frame the kernel keeps, and its origin, stay as they are. It is for asking what a coordinate system
+    /// that a person is thinking of would do to the map (which datasets would start or stop being drawn,
+    /// and why) before it is chosen, which `chooseFrame` cannot say since it keeps what it answers.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `preferred` is not a `CrsRef`.
+    #[wasm_bindgen(js_name = previewFrame)]
+    pub fn preview_frame(&self, preferred: JsValue) -> Result<JsValue, JsError> {
+        let preferred = preferred_crs(preferred)?;
+        let datasets = self.inner.registry().datasets();
+        to_js_with_nulls(&self.prep.preview_frame(preferred, &datasets))
     }
 
     /// Starts preparing a dataset for drawing and returns the job's id. `frame` is the `{ mapCrs,

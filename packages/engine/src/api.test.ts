@@ -52,6 +52,7 @@ function inertEngine(): Engine {
     rows: unavailable,
     remove: unavailable,
     chooseFrame: unavailable,
+    previewFrame: unavailable,
     prepare: unavailable,
     classify: unavailable,
     classIndex: unavailable,
@@ -84,6 +85,9 @@ describe('the engine interface', () => {
     expectTypeOf<Engine['chooseFrame']>().toEqualTypeOf<
       (preferred?: CrsRef) => Promise<FrameChoice>
     >();
+    expectTypeOf<Engine['previewFrame']>().toEqualTypeOf<
+      (preferred: CrsRef) => Promise<FrameChoice>
+    >();
     expectTypeOf<Engine['prepare']>().toEqualTypeOf<
       (id: number, params: PrepareParams, options?: PrepareOptions) => Promise<PrepareResult>
     >();
@@ -100,6 +104,7 @@ describe('the engine interface', () => {
       'on',
       'prepare',
       'preview',
+      'previewFrame',
       'remove',
       'rows',
       'searchCrs',

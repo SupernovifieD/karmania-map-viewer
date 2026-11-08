@@ -94,6 +94,38 @@ describe('chooseFrame', () => {
   });
 });
 
+describe('previewFrame', () => {
+  it('says which datasets a system would draw, without choosing it', async () => {
+    const harness = await ready();
+    const dataset = await loadPoints(harness, 10);
+    const kept = await chosenFrame(harness);
+    const preview = resultOf(
+      await harness.settle({
+        type: 'previewFrame',
+        id: id(),
+        params: { preferred: { kind: 'local', units: 'm' } },
+      }),
+      'previewFrame',
+    );
+    expect(preview.frame).toMatchObject({ mapCrs: { kind: 'local', units: 'm' }, source: 'user' });
+    expect(preview.drawable.map((entry) => [entry.id, entry.status])).toStrictEqual([
+      [dataset, 'not_drawn'],
+    ]);
+    // What the worker keeps is what it was.
+    expect(await chosenFrame(harness)).toStrictEqual(kept);
+  });
+
+  it('refuses a system that is not one', async () => {
+    const harness = await ready();
+    const reply = await harness.settle({
+      type: 'previewFrame',
+      id: id(),
+      params: { preferred: { kind: 'nonsense' } as unknown as CrsRef },
+    });
+    expect(errorMessage(reply)).toMatch(/not valid/);
+  });
+});
+
 describe('prepare', () => {
   it('does a large dataset in steps, reports how far it is, and hands the buffers over', async () => {
     const harness = await ready();

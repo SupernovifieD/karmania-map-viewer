@@ -194,6 +194,72 @@ describe('chooseFrame', () => {
   });
 });
 
+describe('previewFrame', () => {
+  it('says what chooseFrame would say for a system, and keeps nothing', () => {
+    const kernel = createKernel();
+    const id = points(kernel, UTM40, [
+      [512_000, 4_012_000],
+      [513_000, 4_013_000],
+    ]);
+    const kept = asObject(kernel.chooseFrame());
+    // The data are in UTM 40, which a local grid is not a system for: they would not be drawn in it.
+    const preview = asObject(kernel.previewFrame(METRES));
+    expect(asObject(preview.frame)).toMatchObject({ mapCrs: METRES, source: 'user' });
+    const entry = asObject(asArray(preview.drawable)[0]);
+    expect(entry).toMatchObject({ id, status: 'not_drawn' });
+    expect(asArray(entry.findings).length).toBeGreaterThan(0);
+    // The kernel's frame is what it was, and choosing the system says the same as the preview did.
+    expect(asObject(kernel.chooseFrame()).frame).toStrictEqual(kept.frame);
+    expect(asObject(kernel.chooseFrame(METRES))).toStrictEqual(preview);
+  });
+
+  it('says that a dataset would be drawn, and reprojected, in another system that it can be converted to', () => {
+    const kernel = createKernel();
+    const id = points(kernel, UTM40, [[512_000, 4_012_000]]);
+    kernel.chooseFrame();
+    const preview = asObject(kernel.previewFrame(WGS84));
+    expect(asObject(asArray(preview.drawable)[0])).toMatchObject({
+      id,
+      status: 'drawn',
+      reprojected: true,
+    });
+    // The frame of a map in degrees has an origin of whole degrees, not UTM metres.
+    expect(asObject(preview.frame).mapCrs).toStrictEqual(WGS84);
+    expect(asObject(kernel.chooseFrame()).frame).toMatchObject({ mapCrs: UTM40, source: 'auto' });
+  });
+
+  it('has no frame and no datasets when nothing is loaded', () => {
+    expect(createKernel().previewFrame(UTM40)).toStrictEqual({
+      frame: null,
+      drawable: [],
+      findings: [],
+    });
+  });
+
+  it('changes nothing the kernel keeps: not the frame, and not the origin that waits for a dataset', () => {
+    const kernel = createKernel();
+    points(kernel, METRES, [[1, 1]]);
+    kernel.chooseFrame();
+    // The map is put in a system nothing is drawn in, so its origin is 0 and waits for a dataset that is.
+    expect(asObject(asObject(kernel.chooseFrame(UTM40)).frame).origin).toStrictEqual([0, 0, 0]);
+    points(kernel, UTM40, [[512_000.01, 4_012_345.01]]);
+    // A preview of the map's own system has the origin that a choice would make, and does not make it.
+    const preview = asObject(asObject(kernel.previewFrame(UTM40)).frame);
+    expect(preview.origin).toStrictEqual([512_000, 4_012_000, 0]);
+    // A preview of another system in between does not disturb it either.
+    kernel.previewFrame(WGS84);
+    expect(asObject(kernel.chooseFrame()).frame).toStrictEqual(preview);
+  });
+
+  it('refuses a system that is not one, and takes no preference as the one the map is in', () => {
+    const kernel = createKernel();
+    points(kernel, UTM40, [[512_000, 4_012_000]]);
+    const kept = asObject(kernel.chooseFrame());
+    expect(() => kernel.previewFrame({ kind: 'nonsense' })).toThrow(/not valid/);
+    expect(asObject(kernel.previewFrame(undefined)).frame).toStrictEqual(kept.frame);
+  });
+});
+
 describe('prepare', () => {
   it('gives the positions of points as a Float32Array, relative to the origin, with its own buffer', () => {
     const kernel = createKernel();
