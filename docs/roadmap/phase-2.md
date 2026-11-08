@@ -510,7 +510,7 @@ or releasing, and whenever the brief says to stop.
   panel narrowest, widest and collapsed; screenshots; axe.
 - [x] 17.9 Rotation of grids and blocks seen in a browser (the owner's question after M16: no file or wizard step gives a rotation, so these were tested in Node only): `viewer.load(input)`, the first part of the viewer API of 11.8, which hands a dataset made with a builder to the viewer; a pixel test and a render golden image for a turned grid and a turned block model.
 - [x] 17.10 The frames over 50 ms that `pnpm perf` shows outside the windows of the targets, found (the owner's question after M16): what they are and what could be done, recorded in `docs/perf.md`.
-- [ ] 17.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
+- [x] 17.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
   - [x] 17.F1 The tooltip: its text ran out of its box when an ancestor does not wrap (found in the CRS button's picture), and a button whose name begins with the tooltip's text was told the same words twice.
   - [x] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
   - [x] 17.F3 `viewer.load` on a viewer that is not in a page made an engine that nothing disposes.
@@ -521,10 +521,10 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F8 The viewer out of a page (second review): `openImport` made an engine for a viewer that was taken out, and a viewer taken out before its first render still made a size observer.
   - [x] 17.F9 The tooltip's words end at any character that is not a letter or a digit, and not only at a space or a stop, so that a name that begins with them is not described with them again.
   - [x] 17.F10 Second review, tests and records: the test of the dialog's other engine can tell its answer from the first's, the kernel test's title, the perf.md headlines that said more than the probes, and the order of the scale bar's reasons.
-  - [ ] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
+  - [x] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
   - [x] 17.F12 Third review: the tooltip's words end before a combining mark too, the kernel test says what it asserts, the perf.md percentages follow the figures, and 17.F11 is ticked when the visual set has passed.
   - [x] 17.F13 The status chip overlapped the navigation group on CI (4 px, with the Linux fonts): the room of each number has no spare character any more, a test samples the area to show that no text is longer, and the 21 states that show the chip were retaken.
-- [ ] 17.G Gate.
+- [x] 17.G Gate.
 
 ## M18: 3D view
 
