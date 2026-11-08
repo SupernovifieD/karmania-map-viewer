@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { dispatch, expectLayersDrawn, sceneFrame, withData } from './support/render.js';
+import {
+  dispatch,
+  expectLayersDrawn,
+  layerStatuses,
+  sceneFrame,
+  withData,
+} from './support/render.js';
 import { importAsLocalGrid } from './support/wizard.js';
 
 /** The parts of the map coordinate system dialog, and of the chip's button that opens it. */
@@ -102,6 +108,18 @@ test.describe('the map coordinate system dialog', () => {
     expect((await boxOf(p.dialog, 'the dialog')).width).toBe(552);
   });
 
+  test('is as tall as the wizard’s (720, or the window less 48), so that its buttons stay where they are whatever it says', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const p = await open(page);
+    expect((await boxOf(p.dialog, 'the dialog')).height).toBe(720);
+    await page.setViewportSize({ width: 1024, height: 640 });
+    expect((await boxOf(p.dialog, 'the dialog')).height).toBe(592);
+    await page.setViewportSize({ width: 1024, height: 500 });
+    expect((await boxOf(p.dialog, 'the dialog')).height).toBe(452);
+  });
+
   test('stays inside a window of 1024 by 640', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 640 });
     const p = await open(page);
@@ -116,7 +134,7 @@ test.describe('the map coordinate system dialog', () => {
     page,
   }) => {
     const p = await open(page);
-    await expect(p.now).toContainText('EPSG 32640, WGS 84 / UTM zone 40N');
+    await expect(p.now).toContainText('Now: EPSG 32640, WGS 84 / UTM zone 40N');
     await expect(p.now).toContainText('Projected, in metres · Taken from the datasets');
   });
 
@@ -193,7 +211,7 @@ test.describe('the map coordinate system dialog', () => {
     await importAsLocalGrid(page, 'm', 'points.csv');
     const p = parts(page);
     await p.chip.click();
-    await expect(p.local.locator('h3')).toHaveText('Local grid');
+    await expect(p.local.getByRole('radiogroup', { name: 'Local grid' })).toBeVisible();
     await expect(p.localRadios).toHaveCount(2);
     await expect(p.local.locator('label')).toHaveText([
       'A local grid, in feet',
@@ -297,6 +315,126 @@ test.describe('the map coordinate system dialog', () => {
     await page.keyboard.press('Enter');
     await expect(p.dialog).toBeHidden();
     expect(await applied()).toEqual([{ crs: { kind: 'epsg', code: 32641 } }]);
+  });
+
+  test.describe('what changes', () => {
+    const section = (page: Page): Locator => parts(page).host.locator('.changes');
+
+    /** The map in UTM 40 with `points` drawn, and a local grid in feet named `faults` that is not. */
+    async function withALocalGrid(page: Page): Promise<ReturnType<typeof parts>> {
+      await page.goto('/');
+      await withData(page);
+      await importAsLocalGrid(page, 'ft', {
+        name: 'faults.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('x,y\n1,2\n3,4\n'),
+      });
+      // Both layers are settled: the points are drawn, and the grid, which is not in the map's system, is not.
+      await expect
+        .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+        .toEqual(['drawn', 'not_drawn']);
+      const p = parts(page);
+      await p.chip.click();
+      await expect(p.dialog).toBeVisible();
+      return p;
+    }
+
+    test('says what to do before a system is chosen, under a heading that is always there', async ({
+      page,
+    }) => {
+      const p = await open(page);
+      await expect(section(page).locator('h3')).toHaveText('What changes');
+      await expect(section(page)).toContainText(
+        'Choose a coordinate system to see which datasets would start or stop being drawn.',
+      );
+      await expect(p.apply.locator('button')).toBeDisabled();
+    });
+
+    test('says that nothing would start or stop when the datasets can be drawn in both', async ({
+      page,
+    }) => {
+      const p = await open(page);
+      await p.search.fill('32641');
+      await p.rows.first().click();
+      await expect(section(page)).toContainText('No dataset would start or stop being drawn.');
+    });
+
+    test('names the datasets that would stop and start, with the reasons', async ({ page }) => {
+      const p = await withALocalGrid(page);
+      await p.localRadios.first().check();
+      const items = section(page).locator('li');
+      await expect(items).toHaveCount(2);
+      // In the order they were loaded: points, which is in UTM 40 and cannot be drawn in a local grid, and then faults, which is in one.
+      await expect(items.nth(0)).toContainText('points would stop being drawn.');
+      await expect(items.nth(0)).toHaveAttribute('data-kind', 'stops');
+      await expect(items.nth(1)).toContainText('faults would start being drawn.');
+      await expect(items.nth(1)).toHaveAttribute('data-kind', 'starts');
+      await expect(items.nth(1)).toContainText('It is in that system.');
+    });
+
+    test('fits in a window of 1024 by 640 without scrolling, with a local grid offered and two datasets that change', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1024, height: 640 });
+      const p = await withALocalGrid(page);
+      await p.localRadios.first().check();
+      await expect(section(page).locator('li')).toHaveCount(2);
+      const [scrollHeight, clientHeight] = await p.body.evaluate((element) => [
+        element.scrollHeight,
+        element.clientHeight,
+      ]);
+      expect(scrollHeight).toBeLessThanOrEqual(clientHeight);
+    });
+
+    test('says the other way round for a system that the points are drawn in and the grid is not', async ({
+      page,
+    }) => {
+      const p = await withALocalGrid(page);
+      // Now the map is in UTM 40 (from the points), and the local grid is not drawn: a local grid is not in it. Choosing UTM 41 changes
+      // nothing for the points (they are converted) and nothing for the grid (still not drawn).
+      await p.search.fill('32641');
+      await p.rows.first().click();
+      await expect(section(page)).toContainText('No dataset would start or stop being drawn.');
+    });
+
+    test('follows the choice: what would change is worked out again for each', async ({ page }) => {
+      const p = await withALocalGrid(page);
+      await p.search.fill('32641');
+      await p.rows.first().click();
+      await expect(section(page)).toContainText('No dataset would start or stop being drawn.');
+      await p.localRadios.first().check();
+      await expect(section(page).locator('li')).toHaveCount(2);
+      await p.search.fill('32640');
+      await p.rows.first().click();
+      // The system the map is in: nothing is asked, and the section is as it was before a choice.
+      await expect(section(page)).toContainText('Choose a coordinate system to see');
+    });
+
+    test('changes nothing of the map: the frame and the layers are as they were while it is looked at', async ({
+      page,
+    }) => {
+      const p = await withALocalGrid(page);
+      const before = await sceneFrame(page);
+      await p.localRadios.first().check();
+      await expect(section(page).locator('li')).toHaveCount(2);
+      expect(await sceneFrame(page)).toEqual(before);
+      await p.cancel.click();
+      expect(await sceneFrame(page)).toEqual(before);
+      await expect
+        .poll(async () => (await sceneFrame(page))?.mapCrs)
+        .toEqual({ kind: 'epsg', code: 32640 });
+    });
+
+    test('is a status that is read out when it changes, and the dialog does not change size', async ({
+      page,
+    }) => {
+      const p = await withALocalGrid(page);
+      await expect(section(page).getByRole('status')).toBeVisible();
+      const before = await boxOf(p.dialog, 'the dialog');
+      await p.localRadios.first().check();
+      await expect(section(page).locator('li')).toHaveCount(2);
+      expect(await boxOf(p.dialog, 'the dialog')).toEqual(before);
+    });
   });
 
   test('has no serious accessibility violations, in either theme', async ({ page }) => {

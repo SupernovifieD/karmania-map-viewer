@@ -2,7 +2,7 @@
  * What the map area says of the layers as a whole (section 10.2 of the brief): how many are being prepared and how far along, and, once
  * none is being prepared and none can be drawn, why each cannot. The pipeline knows where each layer is; this is what a person is told.
  */
-import type { Finding } from '@karmania/engine/types';
+import { said } from './finding-text.js';
 import type { LayerState } from './layer-pipeline.js';
 
 export interface LayerSummary {
@@ -12,15 +12,6 @@ export interface LayerSummary {
   readonly progress: number;
   /** One sentence for each layer that cannot be drawn, when there is at least one layer, none is being prepared, and none is drawn; else none. */
   readonly reasons: readonly string[];
-}
-
-/** What a finding says, and what to do about it. */
-function said(finding: Finding | undefined, otherwise: string): string {
-  if (finding === undefined) {
-    return otherwise;
-  }
-  const hint = finding.hint ?? '';
-  return hint === '' ? finding.message : `${finding.message} ${hint}`;
 }
 
 /** Why a layer that is not drawn is not. */
