@@ -512,7 +512,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 17.10 The frames over 50 ms that `pnpm perf` shows outside the windows of the targets, found (the owner's question after M16): what they are and what could be done, recorded in `docs/perf.md`.
 - [ ] 17.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
   - [x] 17.F1 The tooltip: its text ran out of its box when an ancestor does not wrap (found in the CRS button's picture), and a button whose name begins with the tooltip's text was told the same words twice.
-  - [ ] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
+  - [x] 17.F2 The status chip: the 8 between a number and the next label never applied, and the readout was not made again when the map's size changed under a still pointer.
   - [ ] 17.F3 `viewer.load` on a viewer that is not in a page made an engine that nothing disposes.
   - [ ] 17.F4 The map CRS dialog asked the engine what would change while it was closed, and not again for another engine.
   - [ ] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.

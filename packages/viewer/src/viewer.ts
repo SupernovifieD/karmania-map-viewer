@@ -446,8 +446,30 @@ export class KarmaniaViewer extends LitElement {
   /** Stops listening to the scene; set while the viewer is in a page. */
   private unlistenScene: (() => void) | undefined;
 
+  /** Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away). */
+  private sizeWatch: ResizeObserver | undefined;
+
+  private watchSize(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null || this.sizeWatch !== undefined) {
+      return;
+    }
+    this.sizeWatch = new ResizeObserver(() => {
+      this.updateReadout();
+    });
+    this.sizeWatch.observe(area);
+  }
+
+  protected override firstUpdated(): void {
+    this.watchSize();
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
+    // Put back in a page, the viewer's first render has been made already.
+    if (this.hasUpdated) {
+      this.watchSize();
+    }
     window.addEventListener('dragover', this.refuseStrayFiles);
     window.addEventListener('drop', this.refuseStrayFiles);
     window.addEventListener('resize', this.onWindowResize);
@@ -461,6 +483,8 @@ export class KarmaniaViewer extends LitElement {
     window.removeEventListener('resize', this.onWindowResize);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
+    this.sizeWatch?.disconnect();
+    this.sizeWatch = undefined;
     this.pipeline?.dispose();
     this.pipeline = undefined;
     this.controller?.dispose();

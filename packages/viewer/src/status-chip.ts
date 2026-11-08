@@ -56,7 +56,9 @@ export class KarmaniaStatusChip extends LitElement {
         color: var(--k-text-muted);
       }
 
-      .axis:nth-of-type(2) {
+      /* 8 more between the first number and the second label: the label is the third of the four cells, and the rule is written for
+         what comes after a number. */
+      .value + .axis {
         margin-inline-start: var(--k-space-8);
       }
 

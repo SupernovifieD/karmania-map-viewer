@@ -164,6 +164,52 @@ test.describe('the status chip: where the pointer is', () => {
     await expect.poll(() => said(page)).toEqual(['X', '1,100', 'Y', '2,300']);
   });
 
+  test('has 12 between the first number and the second label: the 4 of the grid and 8 more', async ({
+    page,
+  }) => {
+    const box = await start(page);
+    await pointAt(page, box.width / 2, box.height / 2);
+    await expect.poll(() => said(page)).toEqual(['X', '1,000', 'Y', '2,000']);
+    const [value, label] = [
+      await boxOf(chip(page).locator('.value').first(), 'the first number'),
+      await boxOf(chip(page).locator('.axis').nth(1), 'the second label'),
+    ];
+    expect(label.x - (value.x + value.width)).toBe(12);
+    // And the first label is 4 from its number, with no more.
+    const first = await boxOf(chip(page).locator('.axis').first(), 'the first label');
+    expect(value.x - (first.x + first.width)).toBe(4);
+  });
+
+  test('is made again when the map area changes size under a pointer that is still', async ({
+    page,
+  }) => {
+    const box = await start(page);
+    // The pointer is 200 pixels in from the left and 100 down, and stays there.
+    await pointAt(page, 200, 100);
+    await expect
+      .poll(() => said(page))
+      .toEqual([
+        'X',
+        (1000 + (200 - box.width / 2) * 2).toLocaleString('en-US'),
+        'Y',
+        (2000 + (box.height / 2 - 100) * 2).toLocaleString('en-US'),
+      ]);
+    await page.setViewportSize({ width: 1000, height: 700 });
+    // The map is a different size, so its middle, which is 1000 and 2000, is somewhere else, and the point under the pointer is another.
+    const after = await boxOf(canvas(page), 'the map');
+    const x = Math.round(1000 + (200 - after.width / 2) * 2);
+    const y = Math.round(2000 + (after.height / 2 - 100) * 2);
+    expect(after.width).not.toBe(box.width);
+    await expect
+      .poll(() => said(page))
+      .toEqual([
+        'X',
+        x.toLocaleString('en-US').replace('-', '−'),
+        'Y',
+        y.toLocaleString('en-US').replace('-', '−'),
+      ]);
+  });
+
   test('keeps the point under the pointer while the map is dragged', async ({ page }) => {
     const box = await start(page);
     await pointAt(page, box.width / 2, box.height / 2);
