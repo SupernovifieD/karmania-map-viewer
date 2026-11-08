@@ -55,6 +55,7 @@ interface ViewerElement {
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
   dispatch(command: unknown): unknown;
+  load(input: unknown): Promise<{ status: string }>;
 }
 
 /** The renderer's account of itself, reached through the viewer; `undefined` while there is no renderer. */
@@ -239,4 +240,48 @@ export function marked(block: Block, background: readonly number[], tolerance = 
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
   };
+}
+
+/** A lattice (a grid or a block model) to load: where it is, how big its cells are, how many, how it is turned, and the values of its cells. */
+export interface LatticeSpec {
+  readonly name: string;
+  readonly crs:
+    | { readonly kind: 'epsg'; readonly code: number }
+    | { readonly kind: 'local'; readonly units: 'm' | 'ft' | 'us_ft' };
+  readonly origin: readonly [number, number, number];
+  readonly spacing: readonly [number, number, number];
+  readonly dims: readonly [number, number, number];
+  /** Degrees anticlockwise about the origin. No file or step of the wizard gives one: the viewer's `load` is the way. */
+  readonly rotation?: number;
+  /** One value for each cell, X fastest, then Y, then Z. */
+  readonly values: readonly number[];
+}
+
+/**
+ * Loads a grid or a block model that is made in the page, with the viewer's `load` (the first part of its API), as a script that embeds the
+ * viewer would. The arrays are made in the page, since a typed array does not cross from the test as one. Resolves with what the engine says.
+ */
+export function loadLattice(
+  page: Page,
+  kind: 'grid' | 'blocks',
+  spec: LatticeSpec,
+): Promise<{ status: string }> {
+  return page.evaluate(
+    ([which, lattice]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+      return viewer.load({
+        kind: which,
+        name: lattice.name,
+        crs: lattice.crs,
+        origin: lattice.origin,
+        spacing: lattice.spacing,
+        dims: lattice.dims,
+        ...(lattice.rotation === undefined ? {} : { rotation: lattice.rotation }),
+        columns: [{ name: 'value', type: 'float', values: new Float64Array(lattice.values) }],
+      });
+    },
+    [kind, spec] as const,
+  );
 }

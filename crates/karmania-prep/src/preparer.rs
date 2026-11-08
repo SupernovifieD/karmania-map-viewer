@@ -58,6 +58,21 @@ impl Preparer {
         choice
     }
 
+    /// What [`Preparer::choose_frame`] would answer for `preferred` and `datasets`, without keeping anything: the
+    /// frame and the origin the preparer holds stay as they are, and so do the jobs. For asking what a map
+    /// coordinate system a person is thinking of would do (which datasets would start or stop being drawn)
+    /// before it is chosen, which `choose_frame` itself cannot, since it keeps what it answers.
+    #[must_use]
+    pub fn preview_frame(&self, preferred: Option<CrsRef>, datasets: &[&Dataset]) -> FrameChoice {
+        choose_frame_tracking(
+            self.frame.as_ref(),
+            preferred,
+            datasets,
+            self.origin_waiting,
+        )
+        .0
+    }
+
     /// Starts preparing `dataset` for drawing in `frame` and returns the job's identifier. Nothing is done
     /// until [`Preparer::step`].
     pub fn start(&mut self, dataset: &Dataset, frame: Frame, max_texture_size: u32) -> u32 {
@@ -130,8 +145,10 @@ impl Preparer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::drawable::DrawStatus;
     use crate::origin::FrameSource;
     use crate::testutil::points;
+    use karmania_core::Units;
 
     const UTM40: CrsRef = CrsRef::Epsg { code: 32640 };
 
@@ -168,6 +185,96 @@ mod tests {
         assert_eq!(
             p.choose_frame(None, &[&b]).frame.map(|f| f.map_crs),
             Some(UTM40)
+        );
+    }
+
+    #[test]
+    fn a_preview_says_what_choosing_would_and_keeps_nothing() {
+        let a = at(1, &[(512_000.0, 4_012_000.0)]);
+        let b = at(2, &[(300_000.0, 4_000_000.0)]);
+        let mut p = Preparer::new();
+        // The map is in a system the person chose, which is not the one that the datasets would give it by themselves.
+        let utm41 = CrsRef::Epsg { code: 32641 };
+        let kept = p.choose_frame(Some(utm41), &[&a, &b]);
+        assert!(
+            kept.drawable
+                .iter()
+                .all(|entry| entry.status == DrawStatus::Drawn)
+        );
+        let before = p.frame().copied();
+        // A local grid is a system that neither dataset can be drawn in: that is what the preview says...
+        let local = CrsRef::Local {
+            units: Units::Metre,
+        };
+        let preview = p.preview_frame(Some(local), &[&a, &b]);
+        assert_eq!(
+            preview.frame.map(|f| (f.map_crs, f.source)),
+            Some((local, FrameSource::User))
+        );
+        assert!(
+            preview
+                .drawable
+                .iter()
+                .all(|entry| entry.status == DrawStatus::NotDrawn)
+        );
+        // ...the same as choosing it would, which is tried on a preparer of its own...
+        assert_eq!(
+            preview,
+            Preparer::new().choose_frame(Some(local), &[&a, &b])
+        );
+        // ...and the preparer is as it was: the frame it holds, and what it says without a preference.
+        assert_eq!(p.frame().copied(), before);
+        let again = p.choose_frame(None, &[&a, &b]);
+        assert_eq!((again.frame, again.drawable), (kept.frame, kept.drawable));
+        // Without a preference a preview is what is kept (the person's choice, and not what the datasets would give), and with nothing
+        // loaded there is nothing to show.
+        assert_eq!(p.preview_frame(None, &[&a, &b]).frame, before);
+        assert_eq!(
+            before.map(|f| (f.map_crs, f.source)),
+            Some((utm41, FrameSource::User))
+        );
+        assert_eq!(p.preview_frame(Some(local), &[]).frame, None);
+    }
+
+    #[test]
+    fn a_preview_does_not_make_an_origin_that_is_waiting() {
+        // The map is in a system in which nothing is drawn, so its origin is 0 and waits for a dataset that can be.
+        let a = at(1, &[(512_000.0, 4_012_000.0)]);
+        let local = CrsRef::Local {
+            units: Units::Metre,
+        };
+        let mut p = Preparer::new();
+        let waiting = p.choose_frame(Some(local), &[&a]);
+        assert_eq!(waiting.frame.map(|f| f.origin), Some([0.0, 0.0, 0.0]));
+        // The preview of a system the dataset is drawn in has an origin made from it...
+        let preview = p.preview_frame(Some(UTM40), &[&a]);
+        assert_ne!(preview.frame.map(|f| f.origin), Some([0.0, 0.0, 0.0]));
+        // ...and the preparer still has the frame that waits, until a choice is made.
+        assert_eq!(p.frame().copied(), waiting.frame);
+        let made = p.choose_frame(Some(UTM40), &[&a]);
+        assert_eq!(made.frame, preview.frame);
+    }
+
+    #[test]
+    fn a_preview_of_the_map_system_whose_origin_waits_has_the_origin_a_choice_would_make() {
+        let local = CrsRef::Local {
+            units: Units::Metre,
+        };
+        let mut a = points(Some(local), &[(1.0, 1.0)]);
+        a.id = DatasetId(1);
+        let mut p = Preparer::new();
+        p.choose_frame(None, &[&a]);
+        // The person chooses a system in which nothing is drawn: the origin is 0 and waits for a dataset that is.
+        let chosen = p.choose_frame(Some(UTM40), &[&a]).frame.unwrap();
+        assert_eq!(chosen.origin, [0.0; 3]);
+        let b = at(2, &[(512_000.01, 4_012_345.01), (512_000.02, 4_012_345.02)]);
+        let preview = p.preview_frame(Some(UTM40), &[&a, &b]).frame.unwrap();
+        assert_eq!(preview.origin, [512_000.0, 4_012_000.0, 0.0]);
+        // It is a preview: the origin that waits is still the one that is kept, until a choice is made.
+        assert_eq!(p.frame().map(|f| f.origin), Some([0.0; 3]));
+        assert_eq!(
+            p.choose_frame(None, &[&a, &b]).frame.map(|f| f.origin),
+            Some(preview.origin)
         );
     }
 

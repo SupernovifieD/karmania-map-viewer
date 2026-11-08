@@ -45,6 +45,71 @@ test.describe('the tooltip', () => {
     await expect(tip(page, 'tip-icon')).toHaveText('Collapse panel');
   });
 
+  test('wraps its text inside its own box, in a box that does not wrap', async ({ page }) => {
+    // The map's status chip is such a box (white-space is inherited, and the tooltip is inside it): the text of the tooltip ran out of its
+    // box as light text on what was under it.
+    await page.evaluate(async () => {
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position: fixed; left: 300px; top: 300px; white-space: nowrap;';
+      holder.innerHTML =
+        '<k-tooltip id="nowrap" text="EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), the whole of a name that is a good deal longer than a tooltip is wide"><k-button icon="x" label="Close"></k-button></k-tooltip>';
+      document.body.append(holder);
+      await document.querySelector<HTMLElementTagNameMap['k-tooltip']>('#nowrap')?.updateComplete;
+    });
+    await tooltip(page, 'nowrap').hover();
+    const look = await tip(page, 'nowrap').evaluate((element) => ({
+      overflows: element.scrollWidth > element.clientWidth,
+      lines: Math.round(element.getBoundingClientRect().height / 16),
+      whiteSpace: getComputedStyle(element).whiteSpace,
+      width: element.getBoundingClientRect().width,
+    }));
+    expect(look.whiteSpace).toBe('normal');
+    expect(look.overflows).toBe(false);
+    expect(look.lines).toBeGreaterThan(2);
+    expect(look.width).toBeLessThanOrEqual(240);
+  });
+
+  test('does not describe a control with the words that its name begins with, and does with any others', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position: fixed; left: 300px; top: 300px;';
+      const cases: [id: string, text: string, label: string][] = [
+        ['same', 'Reset to north', 'Reset to north. Map turned 30° from north'],
+        ['exact', 'Close', 'Close'],
+        ['longer', 'Zoom in (+)', 'Zoom in'],
+        ['word', 'Zoom', 'Zoomed in'],
+        ['digit', 'Zoom', 'Zoom2'],
+        ['mark', 'Zoom in', 'Zoom in? (+)'],
+        ['accent', 'Cafe', 'Cafe\u0301 au lait'],
+      ];
+      holder.innerHTML = cases
+        .map(
+          ([id, text, label]) =>
+            `<k-tooltip id="d-${id}" text="${text}"><k-button icon="x" label="${label}"></k-button></k-tooltip>`,
+        )
+        .join('');
+      document.body.append(holder);
+      await Promise.all(
+        [...holder.querySelectorAll<HTMLElementTagNameMap['k-tooltip']>('k-tooltip')].map(
+          (element) => element.updateComplete,
+        ),
+      );
+    });
+    const description = (id: string) =>
+      tooltip(page, `d-${id}`).locator('k-button').getAttribute('aria-description');
+    expect(await description('same')).toBeNull();
+    expect(await description('exact')).toBeNull();
+    expect(await description('longer')).toBe('Zoom in (+)');
+    expect(await description('word')).toBe('Zoom');
+    expect(await description('digit')).toBe('Zoom');
+    // The words end at a mark that is not a full stop or a colon too.
+    expect(await description('mark')).toBeNull();
+    // An accent that is a character of its own belongs to the word before it.
+    expect(await description('accent')).toBe('Cafe');
+  });
+
   test('is above the control, centred on it, a gap of 4 away, when the control is in the middle of the window', async ({
     page,
   }) => {

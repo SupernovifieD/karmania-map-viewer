@@ -171,3 +171,26 @@ export async function importAndLoad(page: Page, ...picks: Pick[]): Promise<void>
   await w.next.click();
   await expect(w.dialog).toBeHidden();
 }
+
+/**
+ * Imports files as a person does, and says at the coordinate system step that the coordinates are a local grid in `units` (a mine grid,
+ * not tied to a place on the Earth), whatever the files say, and loads them.
+ */
+export async function importAsLocalGrid(
+  page: Page,
+  units: 'm' | 'ft' | 'us_ft',
+  ...picks: Pick[]
+): Promise<void> {
+  const w = wizard(page);
+  await startWizard(page, ...picks);
+  for (const step of ['mapping', 'nodata', 'crs']) {
+    await goTo(page, step);
+  }
+  const step = w.host.locator('karmania-crs-step');
+  await step.locator('.choice k-select').first().locator('select').selectOption('local');
+  await step.locator('.choice k-select').nth(1).locator('select').selectOption(units);
+  await goTo(page, 'review');
+  await expect(w.host.locator('karmania-review-step .verdict')).toHaveText('Ready to load');
+  await w.next.click();
+  await expect(w.dialog).toBeHidden();
+}

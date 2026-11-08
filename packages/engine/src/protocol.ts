@@ -80,6 +80,14 @@ export interface Requests {
     readonly result: FrameChoice;
   };
   /**
+   * What `chooseFrame` would say for a coordinate system, without choosing it: the frame that would be made and which datasets would be
+   * drawn in it. Nothing the worker keeps is changed.
+   */
+  readonly previewFrame: {
+    readonly params: { readonly preferred: CrsRef };
+    readonly result: FrameChoice;
+  };
+  /**
    * Prepares a dataset for drawing in a frame, with `prepareProgress` replies on the way. The buffers of
    * the result are handed over, not copied.
    */
@@ -123,6 +131,7 @@ export const REQUEST_TYPES = [
   'rows',
   'remove',
   'chooseFrame',
+  'previewFrame',
   'prepare',
   'classify',
   'classIndex',

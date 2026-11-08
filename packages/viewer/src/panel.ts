@@ -40,6 +40,7 @@ export class KarmaniaPanel extends LitElement {
     selected: { attribute: false },
     rows: { attribute: false },
     crsInfo: { attribute: false },
+    notices: { attribute: false },
     width: { type: Number },
     min: { type: Number },
     max: { type: Number },
@@ -139,6 +140,8 @@ export class KarmaniaPanel extends LitElement {
   declare rows: RowSource | undefined;
   /** Says what an EPSG code means, for the Data tab. */
   declare crsInfo: CrsLookup | undefined;
+  /** Why each dataset that is not drawn is not, by the dataset's number, for the Data tab. */
+  declare notices: ReadonlyMap<number, string>;
   /** How wide the panel is, and the least and most it can be, and the width it goes back to. */
   declare width: number;
   declare min: number;
@@ -155,6 +158,7 @@ export class KarmaniaPanel extends LitElement {
     this.selected = undefined;
     this.rows = undefined;
     this.crsInfo = undefined;
+    this.notices = new Map();
     this.width = 0;
     this.min = 0;
     this.max = 0;
@@ -248,6 +252,7 @@ export class KarmaniaPanel extends LitElement {
                 .selected=${this.selected}
                 .rows=${this.rows}
                 .crsInfo=${this.crsInfo}
+                .notices=${this.notices}
               ></karmania-data-tab>
             </div>
           </k-tabs>

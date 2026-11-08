@@ -19,6 +19,7 @@ export class KarmaniaDataTab extends LitElement {
     selected: { attribute: false },
     rows: { attribute: false },
     crsInfo: { attribute: false },
+    notices: { attribute: false },
   };
 
   static override styles = [
@@ -57,6 +58,8 @@ export class KarmaniaDataTab extends LitElement {
   declare rows: RowSource | undefined;
   /** Says what an EPSG code means, for the coordinate system of the summary. */
   declare crsInfo: CrsLookup | undefined;
+  /** Why each dataset that is not drawn is not, by the dataset's number: its summary says so. */
+  declare notices: ReadonlyMap<number, string>;
 
   /**
    * What each dataset's table asks for rows with. The table starts again when it is given another,
@@ -70,6 +73,7 @@ export class KarmaniaDataTab extends LitElement {
     this.selected = undefined;
     this.rows = undefined;
     this.crsInfo = undefined;
+    this.notices = new Map();
   }
 
   /** The function the table of dataset `id` gets its rows with. */
@@ -127,6 +131,7 @@ export class KarmaniaDataTab extends LitElement {
         <karmania-dataset-summary
           .summary=${selected}
           .crsInfo=${this.crsInfo}
+          .notice=${selected === undefined ? undefined : this.notices.get(selected.id)}
         ></karmania-dataset-summary>
         ${
           selected === undefined

@@ -28,7 +28,8 @@ export interface ScaleBar {
 }
 
 /** Why there is no scale bar. */
-export type ScaleBarReason = 'three_d' | 'geographic' | 'unknown_units' | 'no_map' | 'no_scale';
+export type ScaleBarReason =
+  'three_d' | 'geographic' | 'unknown_units' | 'units_pending' | 'no_map' | 'no_scale';
 
 /** No scale bar, and why, in a sentence for a tooltip or a screen reader. */
 export interface NoScaleBar {
@@ -44,8 +45,11 @@ export type ScaleBarModel = ScaleBar | NoScaleBar;
 export interface ScaleBarInput {
   /** There is a scale bar in 2D only. */
   readonly viewMode: ViewMode;
-  /** The units of the map's coordinate system (`CrsInfo.units`; for a local grid its unit), or `undefined` if there is no map. */
-  readonly units: CrsUnits | undefined;
+  /**
+   * The units of the map's coordinate system (`CrsInfo.units`; for a local grid its unit); `'pending'` while they are being looked up (an
+   * EPSG code's are in the definitions, which have to be asked); or `undefined` if there is no map.
+   */
+  readonly units: CrsUnits | 'pending' | undefined;
   /** Map units to a pixel on the screen (`camera2d.unitsPerPixel`). */
   readonly unitsPerPixel: number;
   /** The most the bar can be wide, in pixels; 160 by default. */
@@ -56,6 +60,7 @@ const MESSAGES: Record<ScaleBarReason, string> = {
   three_d: 'The scale bar is only shown in the 2D view.',
   geographic: 'A map in degrees has no scale bar.',
   unknown_units: 'The units of this coordinate system are not known, so there is no scale bar.',
+  units_pending: 'The units of this coordinate system are being looked up.',
   no_map: 'There is no map to measure yet.',
   no_scale: 'The map has no scale yet.',
 };
@@ -84,8 +89,8 @@ function niceAtMost(x: number): { value: number; decimals: number } {
  * The scale bar for a map. Metres become kilometres from 1,000, and feet (international or US survey) become
  * miles from 5,280, so that a bar never reads `1,000 m` or `5,280 ft`; a mile of survey feet is 5,280 of them, as
  * a mile of feet is, so the sum is the same. Nothing is given for the 3D view, for a map in degrees, for units that
- * are not known, when there is no map, and when the map has no scale (a scale that is not above 0 or not a
- * number, or one so small that a bar is under a millionth of a unit).
+ * are not known, for units that are still being looked up, when there is no map, and when the map has no scale (a
+ * scale that is not above 0 or not a number, or one so small that a bar is under a millionth of a unit).
  *
  * @throws RangeError if `maxPixels` is given and is not above 0, which is a mistake of the caller.
  */
@@ -102,6 +107,9 @@ export function scaleBar(input: ScaleBarInput): ScaleBarModel {
   const { units } = input;
   if (units === undefined) {
     return none('no_map');
+  }
+  if (units === 'pending') {
+    return none('units_pending');
   }
   if (units === 'degree') {
     return none('geographic');
