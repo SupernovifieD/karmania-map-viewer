@@ -518,6 +518,10 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F5 The scale bar gave "no map" as the reason while the units of an EPSG code were being asked for.
   - [x] 17.F6 Tests that could not fail, and titles that said more than the test: the scale bar at its widest, the Home key, fit with a heading, the limits of the zoom, the dialog's height, what looking at a choice changes, Apply after a preview that failed, and the keyboard after Apply.
   - [x] 17.F7 The records: counts and wording that were wrong, the width of the status chip, claims of the section of `docs/perf.md` that had no evidence recorded, and comments.
+  - [x] 17.F8 The viewer out of a page (second review): `openImport` made an engine for a viewer that was taken out, and a viewer taken out before its first render still made a size observer.
+  - [ ] 17.F9 The tooltip's words end at any character that is not a letter or a digit, and not only at a space or a stop, so that a name that begins with them is not described with them again.
+  - [ ] 17.F10 Second review, tests and records: the test of the dialog's other engine can tell its answer from the first's, the kernel test's title, the perf.md headlines that said more than the probes, and the order of the scale bar's reasons.
+  - [ ] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
 - [ ] 17.G Gate.
 
 ## M18: 3D view
