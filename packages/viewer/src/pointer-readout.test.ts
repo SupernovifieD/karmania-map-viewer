@@ -83,22 +83,49 @@ describe('what the pointer is over', () => {
 });
 
 describe('how wide the pointer readout can be', () => {
-  it('is the longest of the corners and one more', () => {
+  it('is the longest of the corners', () => {
     // At a pixel a unit the corners are 499,600 to 500,400 and 2,764,700 to 2,765,300: nine characters.
-    expect(readoutWidth(camera(1), SIZE)).toBe(10);
+    expect(readoutWidth(camera(1), SIZE)).toBe(9);
     // With two decimals the same numbers have three characters more.
-    expect(readoutWidth(camera(0.01), SIZE)).toBe(13);
+    expect(readoutWidth(camera(0.01), SIZE)).toBe(12);
   });
 
   it('is made from every corner of the map area, and the area decides how far they reach', () => {
     // Only the corner at the right has four digits and a comma (1,000): the one at the top left has three.
-    expect(readoutWidth(camera(1, [600, 0]), SIZE)).toBe('1,000'.length + 1);
+    expect(readoutWidth(camera(1, [600, 0]), SIZE)).toBe('1,000'.length);
     // A bigger area reaches farther, and the corners with it.
-    expect(readoutWidth(camera(1, [5, 5]), { width: 2000, height: 1200 })).toBe(6);
-    expect(readoutWidth(camera(1, [5, 5]), { width: 20, height: 20 })).toBe(3);
+    expect(readoutWidth(camera(1, [5, 5]), { width: 2000, height: 1200 })).toBe(5);
+    expect(readoutWidth(camera(1, [5, 5]), { width: 20, height: 20 })).toBe(2);
   });
 
   it('counts the minus sign of a corner that is negative', () => {
-    expect(readoutWidth(camera(1, [0, 0]), SIZE)).toBe('−400'.length + 1);
+    expect(readoutWidth(camera(1, [0, 0]), SIZE)).toBe('−400'.length);
+  });
+
+  it('is never less than the text anywhere in the area, with no margin on it', () => {
+    // Cameras that cross zero, a power of ten and a rounding (999.96 at one decimal is 1,000.0), turned and not, and the most the map can reach.
+    const cameras = [
+      camera(1, [0, 0]),
+      camera(1, [600, 600]),
+      camera(0.1, [999.5, -999.5]),
+      camera(0.1, [999.9, 99.9]),
+      camera(0.01, [0.2, -0.2]),
+      camera(2.5, [-1_000, 1_000], 37),
+      camera(0.25, [499_800, 2_764_900], 123),
+      camera(1e-7, [9_999_999.123456, 19_999_999.123456]),
+      camera(1e-7, [-9_999_999.123456, -19_999_999.123456], 211),
+    ];
+    for (const each of cameras) {
+      const width = readoutWidth(each, SIZE);
+      for (let i = 0; i <= 40; i += 1) {
+        for (let j = 0; j <= 30; j += 1) {
+          const readout = readoutAt(each, SIZE, (SIZE.width * i) / 40, (SIZE.height * j) / 30);
+          expect(
+            Math.max(readout?.x.length ?? 0, readout?.y.length ?? 0),
+            `${JSON.stringify(each)} at ${String(i)}, ${String(j)}`,
+          ).toBeLessThanOrEqual(width);
+        }
+      }
+    }
   });
 });

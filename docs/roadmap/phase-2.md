@@ -523,6 +523,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F10 Second review, tests and records: the test of the dialog's other engine can tell its answer from the first's, the kernel test's title, the perf.md headlines that said more than the probes, and the order of the scale bar's reasons.
   - [ ] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
   - [x] 17.F12 Third review: the tooltip's words end before a combining mark too, the kernel test says what it asserts, the perf.md percentages follow the figures, and 17.F11 is ticked when the visual set has passed.
+  - [x] 17.F13 The status chip overlapped the navigation group on CI (4 px, with the Linux fonts): the room of each number has no spare character any more, a test samples the area to show that no text is longer, and the 21 states that show the chip were retaken.
 - [ ] 17.G Gate.
 
 ## M18: 3D view
