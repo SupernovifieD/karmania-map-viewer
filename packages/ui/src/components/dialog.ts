@@ -57,7 +57,8 @@ function holdsFocusable(element: Element): boolean {
  * closing it by setting `open` sends nothing. Clicking outside it does not close it: what a
  * dialog holds is often work that would be lost. A body that scrolls and has nothing in it that the
  * keyboard can be put on (text only) is a stop for the keyboard itself, with the dialog's name, so
- * that it can be scrolled without a pointer; one that has controls in it is left as it is. A dialog is as tall as what is in it, up to its
+ * that it can be scrolled without a pointer; one that has controls in it is left as it is. A dialog is as wide as `--k-dialog-max-size`, or the
+ * window less 24 each side if that is less; a narrower one sets `--k-dialog-width` (its height limit is still `--k-dialog-max-size`). A dialog is as tall as what is in it, up to its
  * limit; with `fill` it is as tall as it can be whatever is in it, which suits one whose content
  * changes (a wizard), since its buttons then stay where they are.
  */
@@ -91,7 +92,10 @@ export class KDialog extends LitElement {
         max-width: none;
         overflow: hidden;
         padding: 0;
-        width: min(var(--k-dialog-max-size), calc(100vw - var(--k-space-48)));
+        width: min(
+          var(--k-dialog-width, var(--k-dialog-max-size)),
+          calc(100vw - var(--k-space-48))
+        );
       }
 
       dialog[open] {

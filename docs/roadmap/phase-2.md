@@ -500,7 +500,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.5a `engine.previewFrame(preferred)`: what `chooseFrame` would say for a system, without changing the frame (the engine keeps the frame `chooseFrame` gives, so asking it about a system the person has not chosen yet would change the map).
   - [x] 17.5b The search of the wizard's CRS step, taken out to be shared (no visible change).
   - [x] 17.5c The dialog: the current system, the search, a local grid.
-  - [ ] 17.5d "What changes": the datasets that would start or stop being drawn, with the reasons.
+  - [x] 17.5d "What changes": the datasets that would start or stop being drawn, with the reasons.
   - [ ] 17.5e Apply: the frame the person chose, every layer prepared again.
 - [ ] 17.6 Datasets that are not drawn: the reason and hint in the dataset
   summary.

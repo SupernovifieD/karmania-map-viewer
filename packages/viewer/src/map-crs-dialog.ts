@@ -4,11 +4,13 @@ import type { CrsRef, Units } from '@karmania/engine/types';
 import { sharedStyles } from '@karmania/ui';
 import type { InputChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import './crs-matches.js';
 import type { CrsPick } from './crs-matches.js';
 import { CrsSearch } from './crs-search.js';
 import { localUnitsOf, sameCrs } from './crs-choice.js';
 import { describeKind } from './import-crs.js';
+import { ChangesPreview } from './what-changes.js';
 
 /** The name of the event the dialog sends when a person applies a coordinate system: what was chosen. */
 export const MAP_CRS_APPLY = 'karmania-map-crs-apply';
@@ -19,7 +21,7 @@ export interface MapCrsApply {
 }
 
 /** What the dialog needs of the engine. */
-export type MapCrsEngine = Pick<Engine, 'searchCrs'>;
+export type MapCrsEngine = Pick<Engine, 'searchCrs' | 'previewFrame'>;
 
 /** What each unit of a local grid is called in words. */
 const UNIT_WORDS: Readonly<Record<Units, string>> = {
@@ -54,15 +56,15 @@ export class KarmaniaMapCrsDialog extends LitElement {
         display: contents;
       }
 
-      /* A narrower dialog than the wizard's: 560 or the window less 24 each side (the dialog takes its width and its height limit from this). */
+      /* A narrower dialog than the wizard's: 560 wide, or the window less 24 each side. It is as tall as the wizard's. */
       k-dialog {
-        --k-dialog-max-size: calc(var(--k-space-48) * 11 + var(--k-space-32));
+        --k-dialog-width: calc(var(--k-space-48) * 11 + var(--k-space-32));
       }
 
       .content {
         display: flex;
         flex-direction: column;
-        gap: var(--k-space-16);
+        gap: var(--k-space-12);
         min-width: 0;
       }
 
@@ -92,13 +94,17 @@ export class KarmaniaMapCrsDialog extends LitElement {
         font-weight: var(--k-weight-medium);
       }
 
+      .current .name .muted {
+        font-weight: var(--k-weight-regular);
+      }
+
       /* The local grids that are loaded, a radio for each. */
       .local label {
         align-items: center;
         cursor: pointer;
         display: flex;
         gap: var(--k-space-8);
-        min-height: var(--k-control-height);
+        min-height: var(--k-control-height-compact);
       }
 
       .local input {
@@ -111,6 +117,36 @@ export class KarmaniaMapCrsDialog extends LitElement {
       .local input:focus-visible {
         outline: var(--k-focus-width) solid var(--k-accent);
         outline-offset: var(--k-focus-offset);
+      }
+
+      /* What would change: a line for each dataset that would start or stop being drawn, with an icon and the reason under its name. */
+      .changes ul {
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-space-8);
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .changes li {
+        align-items: flex-start;
+        display: grid;
+        gap: var(--k-space-8);
+        grid-template-columns: var(--k-icon-size-sm) minmax(0, 1fr);
+        overflow-wrap: anywhere;
+      }
+
+      .changes li k-icon {
+        margin-top: var(--k-space-2);
+      }
+
+      .changes li[data-kind='starts'] k-icon {
+        color: var(--k-info);
+      }
+
+      .changes li[data-kind='stops'] k-icon {
+        color: var(--k-warning);
       }
 
       span[slot='footer-note'] {
@@ -141,6 +177,11 @@ export class KarmaniaMapCrsDialog extends LitElement {
     this.requestUpdate();
   });
 
+  /** What would change if the system that is chosen were applied, worked out by the engine as the choice changes. */
+  private readonly preview = new ChangesPreview(() => {
+    this.requestUpdate();
+  });
+
   constructor() {
     super();
     this.open = false;
@@ -157,12 +198,24 @@ export class KarmaniaMapCrsDialog extends LitElement {
     this.query = '';
     this.choice = undefined;
     this.finder.reset();
+    this.preview.reset();
     this.open = true;
   }
 
-  protected override willUpdate(): void {
+  protected override willUpdate(changed: PropertyValues<this>): void {
     if (this.open) {
       this.finder.search(this.engine, this.query);
+    }
+    // What would change is asked again when what is chosen, what the map is in or what is loaded is different. A system that is the one
+    // the map is in changes nothing, and is not asked about.
+    if (changed.has('choice') || changed.has('frame') || changed.has('datasets')) {
+      const current = this.frame?.mapCrs;
+      this.preview.ask(
+        this.engine,
+        current,
+        sameCrs(this.choice, current) ? undefined : this.choice,
+        this.datasets,
+      );
     }
   }
 
@@ -194,7 +247,9 @@ export class KarmaniaMapCrsDialog extends LitElement {
   private current() {
     const frame = this.frame;
     if (frame === null) {
-      return html`<p class="name">The map has no coordinate system yet.</p>`;
+      return html`<p class="name">
+        <span class="muted">Now: </span>The map has no coordinate system yet.
+      </p>`;
     }
     const { mapCrs } = frame;
     const info = this.info;
@@ -213,7 +268,7 @@ export class KarmaniaMapCrsDialog extends LitElement {
       frame.source === 'user' ? 'Chosen by you' : 'Taken from the datasets',
     ].filter((part) => part !== undefined);
     const sentence = detail.join(' · ');
-    return html`<p class="name">${name}</p>
+    return html`<p class="name"><span class="muted">Now: </span>${name}</p>
       <p class="muted">${sentence.charAt(0).toUpperCase() + sentence.slice(1)}</p>`;
   }
 
@@ -225,8 +280,7 @@ export class KarmaniaMapCrsDialog extends LitElement {
     }
     const choice = this.choice;
     return html`<section class="local">
-      <h3 id="local-title">Local grid</h3>
-      <div role="radiogroup" aria-labelledby="local-title">
+      <div role="radiogroup" aria-label="Local grid">
         ${units.map(
           (unit) =>
             html`<label>
@@ -242,6 +296,44 @@ export class KarmaniaMapCrsDialog extends LitElement {
             </label>`,
         )}
       </div>
+    </section>`;
+  }
+
+  /** What would change, or what is being done to find out. */
+  private changes() {
+    const { status, changes } = this.preview;
+    let body;
+    if (status === 'idle') {
+      body = html`<p class="muted">
+        Choose a coordinate system to see which datasets would start or stop being drawn.
+      </p>`;
+    } else if (status === 'working') {
+      body = html`<p class="muted">Working out what would change…</p>`;
+    } else if (status === 'failed') {
+      body = html`<p class="muted">What would change could not be worked out.</p>`;
+    } else if (changes.length === 0) {
+      body = html`<p class="muted">No dataset would start or stop being drawn.</p>`;
+    } else {
+      body = html`<ul>
+        ${changes.map(
+          (change) =>
+            html`<li data-kind=${change.kind}>
+              <k-icon
+                name=${change.kind === 'starts' ? 'check' : 'triangle-alert'}
+                size="16"
+              ></k-icon>
+              <span
+                ><strong>${change.name}</strong>
+                ${change.kind === 'starts' ? 'would start' : 'would stop'} being drawn.
+                <span class="muted">${change.reason}</span></span
+              >
+            </li>`,
+        )}
+      </ul>`;
+    }
+    return html`<section class="changes">
+      <h3>What changes</h3>
+      <div role="status">${body}</div>
     </section>`;
   }
 
@@ -261,12 +353,12 @@ export class KarmaniaMapCrsDialog extends LitElement {
     return html`
       <k-dialog
         heading="Map coordinate system"
+        fill
         .open=${this.open}
         @k-dialog-close=${this.onDialogClose}
       >
         <div class="content">
-          <section class="current">
-            <h3>Now</h3>
+          <section class="current" aria-label="The map's coordinate system now">
             ${this.current()}
           </section>
           <section>
@@ -290,7 +382,7 @@ export class KarmaniaMapCrsDialog extends LitElement {
               }}
             ></karmania-crs-matches>
           </section>
-          ${this.local()}
+          ${this.local()} ${this.changes()}
         </div>
         <k-button slot="footer-start" variant="ghost" @click=${this.close}>Cancel</k-button>
         ${

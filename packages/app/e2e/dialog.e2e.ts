@@ -80,6 +80,28 @@ test.describe('the dialog', () => {
     await expect(p.dialog).toHaveAccessibleName('Import data');
   });
 
+  test('is narrower when --k-dialog-width says so, with the height limit it had', async ({
+    page,
+  }) => {
+    const p = parts(page, 'dialog-short');
+    await p.host.evaluate((element) => {
+      element.style.setProperty('--k-dialog-width', '400px');
+    });
+    await p.trigger.click();
+    const dialog = await rect(p.dialog);
+    expect(dialog.width).toBe(400);
+    // A width that is more than the window leaves is the window less 24 on each side, as it is without the property.
+    await page.setViewportSize({ width: 420, height: 800 });
+    expect((await rect(p.dialog)).width).toBe(372);
+    // The height is the limit that `--k-dialog-max-size` gives: the property is for the width alone.
+    await p.host.evaluate((element) => {
+      element.style.setProperty('--k-dialog-max-size', '500px');
+    });
+    expect((await rect(p.dialog)).width).toBe(372);
+    await page.setViewportSize({ width: 1024, height: 800 });
+    expect((await rect(p.dialog)).width).toBe(400);
+  });
+
   test('is 720 wide, centred in the window, with the header and footer bands of the specification', async ({
     page,
   }) => {
