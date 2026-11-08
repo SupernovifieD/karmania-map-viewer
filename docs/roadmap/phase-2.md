@@ -521,7 +521,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.F8 The viewer out of a page (second review): `openImport` made an engine for a viewer that was taken out, and a viewer taken out before its first render still made a size observer.
   - [x] 17.F9 The tooltip's words end at any character that is not a letter or a digit, and not only at a space or a stop, so that a name that begins with them is not described with them again.
   - [x] 17.F10 Second review, tests and records: the test of the dialog's other engine can tell its answer from the first's, the kernel test's title, the perf.md headlines that said more than the probes, and the order of the scale bar's reasons.
-  - [ ] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
+  - [x] 17.F11 The status chip is 8 wider in every state, which 17.F2 retook six pictures for: the baselines of every state that has it, found by the visual run, each checked and looked at.
 - [ ] 17.G Gate.
 
 ## M18: 3D view
