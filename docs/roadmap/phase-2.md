@@ -504,7 +504,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 17.5e Apply: the frame the person chose, every layer prepared again.
 - [x] 17.6 Datasets that are not drawn: the reason and hint in the dataset
   summary.
-- [ ] 17.7 Canvas accessibility: live label, keyboard description, inset focus
+- [x] 17.7 Canvas accessibility: live label, keyboard description, inset focus
   ring.
 - [ ] 17.8 Overlay layout tests: no overlap for every pair at every window size,
   panel narrowest, widest and collapsed; screenshots; axe.
