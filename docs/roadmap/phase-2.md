@@ -538,6 +538,9 @@ or releasing, and whenever the brief says to stop.
   - [x] 18.1d Browser proofs cover perspective pose and clipping and one depth
     test across layers.
 - [ ] 18.2 Orbit controller (9.5) and keyboard.
+  - [x] 18.2a Plain orbit and camera-plane pan arithmetic.
+  - [ ] 18.2b Pointer-anchored zoom and the 3D keyboard mapping.
+  - [ ] 18.2c Pointer, wheel and keyboard listeners in the viewer.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
