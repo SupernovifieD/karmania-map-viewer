@@ -4,11 +4,21 @@
  * this package; what the viewer sees is the small interface below.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
-import type { Camera2d } from '@karmania/scene';
-import { Color, OrthographicCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
+import type { BBox } from '@karmania/engine/types';
+import type { Camera2d, Camera3d, VerticalExaggeration, ViewMode } from '@karmania/scene';
+import {
+  Color,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Scene,
+  SRGBColorSpace,
+  WebGLRenderer,
+} from 'three';
 import { bufferSize } from './buffer-size.js';
 import { orthographicFrame } from './camera-2d.js';
 import type { OrthographicFrame } from './camera-2d.js';
+import { perspectiveFrame } from './camera-3d.js';
+import type { PerspectiveFrame } from './camera-3d.js';
 import { CompiledLayers } from './compiled-layers.js';
 import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
@@ -41,6 +51,18 @@ export interface RenderStats {
   readonly background: string;
   /** The box the orthographic camera of three shows now, where it is and how it is turned. */
   readonly frame: OrthographicFrame;
+  /** Which camera draws, and the perspective frame when it is the 3D one. */
+  readonly viewMode: ViewMode;
+  readonly perspective: PerspectiveFrame | null;
+}
+
+/** The parts of the scene that determine the renderer's camera. */
+export interface RendererView {
+  readonly viewMode: ViewMode;
+  readonly camera2d: Camera2d;
+  readonly camera3d: Camera3d;
+  readonly origin: readonly [number, number, number];
+  readonly verticalExaggeration: VerticalExaggeration;
 }
 
 /** What a renderer is told of how it is to behave. */
@@ -61,6 +83,10 @@ export interface Renderer {
    * A frame is asked for if either changed.
    */
   setCamera2d(camera: Camera2d, origin: readonly [number, number, number]): void;
+  /** Gives both scene cameras to the renderer and says which one draws. */
+  setView(view: RendererView): void;
+  /** The absolute extent of the prepared data, for the clipping planes of the perspective camera. */
+  setExtent(extent: BBox | null): void;
   /**
    * The heights that are drawn, relative to the origin: the camera is put above the highest and sees down to the lowest, so what is
    * outside them is not drawn. A frame is asked for if they changed.
@@ -79,9 +105,8 @@ export interface Renderer {
    */
   setLayerClasses(id: string, classes: ClassColouring | undefined): boolean;
   /**
-   * The order the layers are drawn in, from the first drawn (the bottom of the legend) to the last, which is on top: each is drawn over
-   * the ones before it with the depth cleared between them, so the order decides what is on top whatever the heights. A layer that is
-   * not named is drawn after those that are.
+   * The order the layers are drawn in, from the bottom of the legend to the top. In 2D, depth is cleared between them and the last is on
+   * top whatever the heights; in 3D, all share the frame's depth test. A layer that is not named is drawn after those that are.
    */
   setLayerOrder(ids: readonly string[]): void;
   /** Takes a layer off the card and frees what it held. `false` if there was none. */
@@ -218,7 +243,8 @@ export async function createRenderer(
   const maxBuffer =
     typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 ? limit : DEFAULT_MAX_BUFFER;
 
-  // A scene for each layer, so that a layer is drawn by itself over the ones under it, with the depth cleared between them (section 9.4).
+  // A scene for each layer. In 2D each is drawn by itself over the ones under it, with depth cleared between them (section 9.4); in 3D the
+  // scenes are still drawn in this order but share the depth buffer, so geometry decides what can be seen.
   const scenes = new Map<string, Scene>();
   /** The ids of the layers from the one that is drawn first (the bottom of the legend) to the one drawn last. */
   let order: readonly string[] = [];
@@ -232,13 +258,25 @@ export async function createRenderer(
   // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
   // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
   gl.sortObjects = false;
-  // Any box: `placeCamera` gives it its real one before the first frame, as the canvas gets its size.
-  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.25, 100);
+  // Any boxes: `placeCameras` gives them their real ones before the first frame, as the canvas gets its size.
+  const camera2d = new OrthographicCamera(-1, 1, 1, -1, 0.25, 100);
+  const camera3d = new PerspectiveCamera(45, 1, 0.25, 100);
 
   /** What the map is looking at, and the heights that are drawn (relative to the origin). */
   let look: Camera2d = { centre: [0, 0], unitsPerPixel: 1, heading: 0 };
+  let orbit: Camera3d = {
+    target: [0, 0, 0],
+    distance: 1000,
+    heading: 0,
+    elevation: 45,
+    fov: 45,
+  };
+  let viewMode: ViewMode = '2d';
+  let verticalExaggeration = 1;
   let origin: readonly [number, number, number] = [0, 0, 0];
+  let extent: BBox | null = null;
   const depth = { min: 0, max: 0 };
+  let perspective: PerspectiveFrame | null = null;
 
   const layers = new LayerSet(
     {
@@ -270,19 +308,37 @@ export async function createRenderer(
   let cssHeight = 0;
   let size = bufferSize(cssWidth, cssHeight, view.devicePixelRatio, maxBuffer);
 
-  /** Puts the orthographic camera where `look` says, for the box that the canvas has now. */
-  function placeCamera(): void {
+  /** Puts both cameras where the scene says, for the box that the canvas has now. */
+  function placeCameras(): void {
     const box = orthographicFrame(look, origin, { width: cssWidth, height: cssHeight }, depth);
-    camera.left = box.left;
-    camera.right = box.right;
-    camera.top = box.top;
-    camera.bottom = box.bottom;
-    camera.near = box.near;
-    camera.far = box.far;
-    camera.position.set(...box.position);
-    camera.rotation.z = box.rotation;
-    camera.updateProjectionMatrix();
+    camera2d.left = box.left;
+    camera2d.right = box.right;
+    camera2d.top = box.top;
+    camera2d.bottom = box.bottom;
+    camera2d.near = box.near;
+    camera2d.far = box.far;
+    camera2d.position.set(...box.position);
+    camera2d.rotation.z = box.rotation;
+    camera2d.updateProjectionMatrix();
+
+    perspective = perspectiveFrame(
+      orbit,
+      origin,
+      { width: cssWidth, height: cssHeight },
+      extent,
+      verticalExaggeration,
+    );
+    camera3d.fov = perspective.fov;
+    camera3d.aspect = perspective.aspect;
+    camera3d.near = perspective.near;
+    camera3d.far = perspective.far;
+    camera3d.position.set(...perspective.position);
+    camera3d.up.set(...perspective.up);
+    camera3d.lookAt(...perspective.target);
+    camera3d.updateProjectionMatrix();
   }
+
+  const activeCamera = () => (viewMode === '3d' ? camera3d : camera2d);
 
   /** The colour of outlines: the colour of the text where the canvas is, which contrasts with the map in the theme that it is in. */
   let outline: readonly [number, number, number] = [0, 0, 0];
@@ -324,7 +380,7 @@ export async function createRenderer(
         invalidate();
       }
     };
-    gl.compileAsync(own, camera).then(done, done);
+    gl.compileAsync(own, activeCamera()).then(done, done);
   }
 
   /** Draws a frame. `everything` draws every layer now, compiling what has to be compiled (a picture that is read back, which is of all of them). */
@@ -343,11 +399,10 @@ export async function createRenderer(
     layers.prepareFrame({
       pixelRatio: size.pixelRatio,
       viewport: [size.width, size.height],
-      // This renderer draws the 2D view (the 3D view of M18 is not flat).
-      flat: true,
+      flat: viewMode === '2d',
       outline,
     });
-    // The map's colour first, then each layer over what is there with its own depth: what is higher in the legend is on top, whatever the heights.
+    // The map's colour first. In 2D each layer then has its own depth; in 3D the clear above is the only one, so all layers share it.
     gl.clear();
     let drawn = 0;
     for (const id of drawOrder()) {
@@ -360,8 +415,10 @@ export async function createRenderer(
         continue;
       }
       programs.add(id);
-      gl.clearDepth();
-      gl.render(own, camera);
+      if (viewMode === '2d') {
+        gl.clearDepth();
+      }
+      gl.render(own, activeCamera());
       drawn += 1;
     }
     layersDrawn = drawn;
@@ -386,7 +443,7 @@ export async function createRenderer(
       gl.setSize(next.width, next.height, false);
     }
     size = next;
-    placeCamera();
+    placeCameras();
     invalidate();
   }
 
@@ -457,7 +514,37 @@ export async function createRenderer(
       }
       look = camera;
       origin = nextOrigin;
-      placeCamera();
+      placeCameras();
+      invalidate();
+    },
+    setView(next) {
+      if (disposed) {
+        return;
+      }
+      const changedMode = viewMode !== next.viewMode;
+      viewMode = next.viewMode;
+      look = next.camera2d;
+      orbit = next.camera3d;
+      origin = next.origin;
+      verticalExaggeration = next.verticalExaggeration;
+      placeCameras();
+      if (changedMode) {
+        programs.reset();
+      }
+      invalidate();
+    },
+    setExtent(next) {
+      const same =
+        extent === next ||
+        (extent !== null &&
+          next !== null &&
+          extent.min.every((value, axis) => value === next.min[axis]) &&
+          extent.max.every((value, axis) => value === next.max[axis]));
+      if (disposed || same) {
+        return;
+      }
+      extent = next;
+      placeCameras();
       invalidate();
     },
     setLayer(id, buffers, look) {
@@ -511,7 +598,7 @@ export async function createRenderer(
       }
       depth.min = min;
       depth.max = max;
-      placeCamera();
+      placeCameras();
       invalidate();
     },
     readPixels(x, y, width, height) {
@@ -559,15 +646,17 @@ export async function createRenderer(
         background,
         // What the camera of three has, which is what draws, and not what was worked out for it.
         frame: {
-          left: camera.left,
-          right: camera.right,
-          top: camera.top,
-          bottom: camera.bottom,
-          near: camera.near,
-          far: camera.far,
-          position: [camera.position.x, camera.position.y, camera.position.z],
-          rotation: camera.rotation.z,
+          left: camera2d.left,
+          right: camera2d.right,
+          top: camera2d.top,
+          bottom: camera2d.bottom,
+          near: camera2d.near,
+          far: camera2d.far,
+          position: [camera2d.position.x, camera2d.position.y, camera2d.position.z],
+          rotation: camera2d.rotation.z,
         },
+        viewMode,
+        perspective: viewMode === '3d' ? perspective : null,
       };
     },
     dispose() {

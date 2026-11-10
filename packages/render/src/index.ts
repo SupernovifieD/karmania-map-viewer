@@ -10,7 +10,7 @@ export { parseCssColour } from './css-colour.js';
 export type { Rgba } from './css-colour.js';
 export type { BufferSize } from './buffer-size.js';
 export { createRenderer } from './renderer.js';
-export type { RenderStats, Renderer, RendererOptions } from './renderer.js';
+export type { RenderStats, Renderer, RendererOptions, RendererView } from './renderer.js';
 export { attachController2d } from './controller-2d.js';
 export type { Controller2d, Controller2dOptions } from './controller-2d.js';
 export {
