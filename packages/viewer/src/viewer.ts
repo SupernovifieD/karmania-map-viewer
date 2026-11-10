@@ -326,10 +326,16 @@ export class KarmaniaViewer extends LitElement {
     });
   }
 
-  /** Gives the renderer the camera and the origin of the scene. */
+  /** Gives the renderer both cameras, the active view and the origin of the scene. */
   private lookThroughCamera(): void {
-    const { camera2d, frame } = this.store.getState();
-    this.renderer?.setCamera2d(camera2d, frame?.origin ?? [0, 0, 0]);
+    const { viewMode, camera2d, camera3d, frame, verticalExaggeration } = this.store.getState();
+    this.renderer?.setView({
+      viewMode,
+      camera2d,
+      camera3d,
+      origin: frame?.origin ?? [0, 0, 0],
+      verticalExaggeration,
+    });
   }
 
   /**
@@ -391,6 +397,9 @@ export class KarmaniaViewer extends LitElement {
           setDepthRange: (min, max) => {
             renderer.setDepthRange(min, max);
           },
+          setExtent: (extent) => {
+            renderer.setExtent(extent);
+          },
           get maxTextureSize() {
             return renderer.stats().maxTextureSize;
           },
@@ -415,7 +424,13 @@ export class KarmaniaViewer extends LitElement {
     if (this.engine !== undefined) {
       this.pipelineFor(this.engine).update();
     }
-    if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
+    if (
+      state.viewMode !== previous.viewMode ||
+      state.camera2d !== previous.camera2d ||
+      state.camera3d !== previous.camera3d ||
+      state.verticalExaggeration !== previous.verticalExaggeration ||
+      state.frame !== previous.frame
+    ) {
       this.lookThroughCamera();
     }
     // The scale bar is in the units of the map's coordinate system, which the definitions say for an EPSG code: asked once.
