@@ -29,6 +29,7 @@ describe('@karmania/render', () => {
       'orthographicFrame',
       'panBy',
       'parseCssColour',
+      'perspectiveFrame',
       'rotateAbout',
       'screenToMap',
       'turnBetween',

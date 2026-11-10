@@ -529,6 +529,10 @@ or releasing, and whenever the brief says to stop.
 ## M18: 3D view
 
 - [ ] 18.1 Perspective camera from camera3d; near and far from the extent.
+  - [x] 18.1a Perspective-camera arithmetic: rebasing, pose, aspect and clipping
+    planes from the extent.
+  - [ ] 18.1b The renderer and viewer use it in the 3D view; one depth test spans
+    the layers, and fitting uses the 3D camera.
 - [ ] 18.2 Orbit controller (9.5) and keyboard.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
