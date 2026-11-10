@@ -20,6 +20,7 @@ describe('@karmania/render', () => {
       'TRIANGLES_PER_PART',
       'angleAbout',
       'attachController2d',
+      'attachController3d',
       'bufferSize',
       'clampDistance',
       'clampScale',

@@ -13,6 +13,8 @@ export { createRenderer } from './renderer.js';
 export type { RenderStats, Renderer, RendererOptions, RendererView } from './renderer.js';
 export { attachController2d } from './controller-2d.js';
 export type { Controller2d, Controller2dOptions } from './controller-2d.js';
+export { attachController3d } from './controller-3d.js';
+export type { Controller3d, Controller3dOptions } from './controller-3d.js';
 export {
   DEFAULT_SCALE_LIMITS,
   KEY_PAN_PIXELS,
