@@ -9,7 +9,7 @@ import type {
 } from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
 import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import { OTHER_COLOUR, createSceneStore, fitCamera2d } from '@karmania/scene';
+import { OTHER_COLOUR, createSceneStore, fitCamera2d, fitCamera3d } from '@karmania/scene';
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
 import { POSITIONS_PER_TURN } from './extent.js';
@@ -144,6 +144,7 @@ function setup(sinkOverride?: LayerSink | null) {
     setLayerClasses: vi.fn<LayerSink['setLayerClasses']>(),
     removeLayer: vi.fn(() => true),
     setDepthRange: vi.fn(),
+    setExtent: vi.fn(),
     maxTextureSize: 8192,
   };
   let current: LayerSink | undefined = sinkOverride === null ? undefined : (sinkOverride ?? sink);
@@ -700,11 +701,20 @@ describe('LayerPipeline: from the scene to the card', () => {
       });
     await t.add(0);
     expect(t.sink.setDepthRange).toHaveBeenCalledWith(3, 9);
+    expect(t.sink.setExtent).toHaveBeenCalledWith({
+      min: [1000, 2000, 103],
+      max: [1001, 2001, 109],
+    });
     expect(t.sink.setDepthRange.mock.invocationCallOrder[0]).toBeLessThan(
+      t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
+    );
+    const extentCall = t.sink.setExtent.mock.calls.findIndex(([extent]) => extent !== null);
+    expect(t.sink.setExtent.mock.invocationCallOrder[extentCall]).toBeLessThan(
       t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
     );
     t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
     expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(0, 0);
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith(null);
   });
 
   it('asks for tiles of the size the card takes if that is less than the most a tile is, and the most if there is no card yet', async () => {
@@ -880,6 +890,37 @@ describe('LayerPipeline: the view of the data', () => {
     expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
   });
 
+  it('fits the 3D camera with its lens, heading, elevation and vertical exaggeration', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    const camera2d = t.scene.getState().camera2d;
+    t.scene.dispatch({ type: 'setViewMode', mode: '3d' });
+    t.scene.dispatch({ type: 'setVerticalExaggeration', factor: 5 });
+    t.scene.dispatch({
+      type: 'setCamera',
+      patch: { camera3d: { heading: 35, elevation: 25, fov: 60 } },
+    });
+    await t.pipeline.idle();
+    expect(t.scene.getState()).toMatchObject({
+      viewMode: '3d',
+      verticalExaggeration: 5,
+      camera3d: { heading: 35, elevation: 25, fov: 60 },
+    });
+    expect(t.pipeline.fit()).toBe(true);
+    const expected = fitCamera3d({
+      extent: { min: [1000, 2000, 0], max: [1010, 2010, 5] },
+      viewport: { width: 1000, height: 500 },
+      fov: 60,
+      heading: 35,
+      elevation: 25,
+      verticalExaggeration: 5,
+    });
+    expect(expected).toBeDefined();
+    expect(t.scene.getState().camera3d).toEqual(expected);
+    expect(t.scene.getState().camera2d).toBe(camera2d);
+  });
+
   it('fits at the next look at the scene when the map area had no size at the first view', async () => {
     const t = setup();
     t.setViewport({ width: 0, height: 0 });
@@ -950,9 +991,16 @@ describe('LayerPipeline: the view of the data', () => {
       });
     await t.add(0, 1);
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-2', visible: false });
+    await t.pipeline.idle();
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith({
+      min: [1000, 2000, 0],
+      max: [1010, 2010, 5],
+    });
     t.pipeline.fit();
     expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith(null);
     t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [7, 7] } } });
     t.pipeline.fit();
     expect(t.scene.getState().camera2d.centre).toEqual([7, 7]);

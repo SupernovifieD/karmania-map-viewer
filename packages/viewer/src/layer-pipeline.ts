@@ -18,7 +18,7 @@ import type { ClassBreaks, ClassMethod, Frame, RenderBuffers } from '@karmania/e
 import type { BBox, Finding } from '@karmania/engine/types';
 import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import type { ClassColouring, ScaleLimits } from '@karmania/render';
-import { OTHER_COLOUR, classColours, fitCamera2d } from '@karmania/scene';
+import { OTHER_COLOUR, classColours, fitCamera2d, fitCamera3d } from '@karmania/scene';
 import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
 
@@ -43,6 +43,8 @@ export interface LayerSink {
   removeLayer(id: string): boolean;
   /** The heights that are drawn, relative to the origin of the frame: what the card's camera has to see. */
   setDepthRange(min: number, max: number): void;
+  /** The absolute extent of the visible prepared layers, for the perspective camera and its clipping planes. */
+  setExtent(extent: BBox | null): void;
   /** The largest texture the card takes, in cells on a side. */
   readonly maxTextureSize: number;
 }
@@ -200,6 +202,8 @@ export class LayerPipeline {
         this.depth();
       }
     }
+    // Visibility changes do not prepare a layer again, but they do change the extent fitted and clipped in 3D.
+    this.depth();
     const chosen = doc.frame?.source === 'user' ? doc.frame : null;
     if (chosen !== null && this.frame !== null && !sameFrame(chosen, this.frame)) {
       for (const entry of this.entries.values()) {
@@ -234,25 +238,25 @@ export class LayerPipeline {
    */
   fit(): boolean {
     const doc = this.options.scene.getState();
-    const extents = [...this.entries]
-      .filter(([id]) => doc.layers[id]?.visible === true)
-      .flatMap(([, entry]) => (entry.extent === undefined ? [] : [entry.extent]));
-    const first = extents[0];
-    if (first === undefined) {
+    const extent = this.visibleExtent(doc);
+    if (extent === undefined) {
       return false;
     }
-    const extent: BBox = {
-      min: [
-        Math.min(...extents.map((box) => box.min[0])),
-        Math.min(...extents.map((box) => box.min[1])),
-        Math.min(...extents.map((box) => box.min[2])),
-      ],
-      max: [
-        Math.max(...extents.map((box) => box.max[0])),
-        Math.max(...extents.map((box) => box.max[1])),
-        Math.max(...extents.map((box) => box.max[2])),
-      ],
-    };
+    if (doc.viewMode === '3d') {
+      const camera = fitCamera3d({
+        extent,
+        viewport: this.options.viewport(),
+        fov: doc.camera3d.fov,
+        heading: doc.camera3d.heading,
+        elevation: doc.camera3d.elevation,
+        verticalExaggeration: doc.verticalExaggeration,
+      });
+      if (camera === undefined) {
+        return false;
+      }
+      this.options.scene.dispatch({ type: 'setCamera', patch: { camera3d: camera } });
+      return true;
+    }
     const camera = fitCamera2d({
       extent,
       viewport: this.options.viewport(),
@@ -749,7 +753,29 @@ export class LayerPipeline {
     this.changed();
   }
 
-  /** Tells the renderer the heights of what was prepared, relative to the origin: the least and the greatest, or 0 for none. */
+  /** The combined extent of the visible layers that have been prepared. */
+  private visibleExtent(doc = this.options.scene.getState()): BBox | undefined {
+    const extents = [...this.entries]
+      .filter(([id]) => doc.layers[id]?.visible === true)
+      .flatMap(([, entry]) => (entry.extent === undefined ? [] : [entry.extent]));
+    if (extents.length === 0) {
+      return undefined;
+    }
+    return {
+      min: [
+        Math.min(...extents.map((box) => box.min[0])),
+        Math.min(...extents.map((box) => box.min[1])),
+        Math.min(...extents.map((box) => box.min[2])),
+      ],
+      max: [
+        Math.max(...extents.map((box) => box.max[0])),
+        Math.max(...extents.map((box) => box.max[1])),
+        Math.max(...extents.map((box) => box.max[2])),
+      ],
+    };
+  }
+
+  /** Tells the renderer the heights and visible extent of what was prepared, or zero and no extent when there is none. */
   private depth(): void {
     const sink = this.options.sink();
     const origin = this.frame?.origin[2] ?? 0;
@@ -762,6 +788,7 @@ export class LayerPipeline {
       heights.length === 0 ? 0 : Math.min(...heights),
       heights.length === 0 ? 0 : Math.max(...heights),
     );
+    sink?.setExtent(this.visibleExtent() ?? null);
   }
 
   /** The first view of data that was just prepared, and again when the map's coordinate system changes. */

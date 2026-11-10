@@ -78,11 +78,6 @@ export interface RendererOptions {
 export interface Renderer {
   /** Asks for a frame: one is drawn soon, however many times this is called before it. After `dispose` it does nothing. */
   invalidate(): void;
-  /**
-   * Looks at the map through `camera`, with `origin` the point (in map units) that the positions on the card are relative to.
-   * A frame is asked for if either changed.
-   */
-  setCamera2d(camera: Camera2d, origin: readonly [number, number, number]): void;
   /** Gives both scene cameras to the renderer and says which one draws. */
   setView(view: RendererView): void;
   /** The absolute extent of the prepared data, for the clipping planes of the perspective camera. */
@@ -508,15 +503,6 @@ export async function createRenderer(
 
   return {
     invalidate,
-    setCamera2d(camera, nextOrigin) {
-      if (disposed) {
-        return;
-      }
-      look = camera;
-      origin = nextOrigin;
-      placeCameras();
-      invalidate();
-    },
     setView(next) {
       if (disposed) {
         return;
