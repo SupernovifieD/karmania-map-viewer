@@ -1,8 +1,11 @@
 import type { Camera3d } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
+import { KEY_PAN_PIXELS, KEY_ZOOM_FACTOR } from './controls-2d.js';
 import {
   DEFAULT_DISTANCE_LIMITS,
+  KEY_ORBIT_DEGREES,
   clampDistance,
+  keyAction3d,
   orbit3dBy,
   pan3dBy,
   zoom3dAt,
@@ -125,6 +128,36 @@ describe('zoom3dAt', () => {
     expect(zoom3dAt(camera(), SIZE, 0.5, NaN, 20, DEFAULT_DISTANCE_LIMITS)).toBeUndefined();
     expect(
       zoom3dAt(camera(), { width: 0, height: 400 }, 0.5, 10, 20, DEFAULT_DISTANCE_LIMITS),
+    ).toBeUndefined();
+  });
+});
+
+describe('keyAction3d', () => {
+  const key = (name: string, shiftKey = false) =>
+    keyAction3d({ key: name, shiftKey, ctrlKey: false, metaKey: false, altKey: false });
+
+  it('orbits with arrows and pans with Shift-arrows', () => {
+    expect(key('ArrowLeft')).toEqual({ type: 'orbit', heading: -KEY_ORBIT_DEGREES, elevation: 0 });
+    expect(key('ArrowRight')).toEqual({ type: 'orbit', heading: KEY_ORBIT_DEGREES, elevation: 0 });
+    expect(key('ArrowUp')).toEqual({ type: 'orbit', heading: 0, elevation: KEY_ORBIT_DEGREES });
+    expect(key('ArrowDown')).toEqual({ type: 'orbit', heading: 0, elevation: -KEY_ORBIT_DEGREES });
+    expect(key('ArrowLeft', true)).toEqual({ type: 'pan', dx: KEY_PAN_PIXELS, dy: 0 });
+    expect(key('ArrowDown', true)).toEqual({ type: 'pan', dx: 0, dy: -KEY_PAN_PIXELS });
+  });
+
+  it('zooms and fits, leaving browser and unrelated shortcuts alone', () => {
+    expect(key('+')).toEqual({ type: 'zoom', factor: 1 / KEY_ZOOM_FACTOR });
+    expect(key('-')).toEqual({ type: 'zoom', factor: KEY_ZOOM_FACTOR });
+    expect(key('Home')).toEqual({ type: 'fit' });
+    expect(key('0')).toBeUndefined();
+    expect(
+      keyAction3d({
+        key: 'ArrowLeft',
+        shiftKey: false,
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+      }),
     ).toBeUndefined();
   });
 });

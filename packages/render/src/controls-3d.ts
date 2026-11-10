@@ -1,6 +1,8 @@
 /** Plain camera arithmetic for the 3D orbit controller. */
 import type { Camera3d } from '@karmania/scene';
 import type { Size } from './camera-2d.js';
+import { KEY_PAN_PIXELS, KEY_ZOOM_FACTOR } from './controls-2d.js';
+import type { KeyInput } from './controls-2d.js';
 
 const normalHeading = (degrees: number): number => ((degrees % 360) + 360) % 360;
 const heldElevation = (degrees: number): number => Math.min(89, Math.max(-89, degrees));
@@ -21,6 +23,8 @@ export interface DistanceLimits {
 
 /** Broad limits for a camera whose data extent is not known yet. */
 export const DEFAULT_DISTANCE_LIMITS: DistanceLimits = { min: 1e-6, max: 1e15 };
+/** A key orbits by this many degrees. */
+export const KEY_ORBIT_DEGREES = 15;
 
 /** The camera's unit vectors along the right and top of the screen. */
 function axes(camera: Camera3d) {
@@ -123,4 +127,50 @@ export function zoom3dAt(
       (value, axis) => value + (right[axis] ?? 0) * offsetRight + (up[axis] ?? 0) * offsetUp,
     ) as [number, number, number],
   };
+}
+
+/** What a key does to a 3D orbit camera. */
+export type KeyAction3d =
+  | { readonly type: 'orbit'; readonly heading: number; readonly elevation: number }
+  | { readonly type: 'pan'; readonly dx: number; readonly dy: number }
+  | { readonly type: 'zoom'; readonly factor: number }
+  | { readonly type: 'fit' };
+
+/** Arrows orbit; Shift-arrows pan; `+` and `-` zoom; Home fits to the visible data. */
+export function keyAction3d(input: KeyInput): KeyAction3d | undefined {
+  if (input.ctrlKey || input.metaKey || input.altKey) {
+    return undefined;
+  }
+  if (input.shiftKey) {
+    switch (input.key) {
+      case 'ArrowLeft':
+        return { type: 'pan', dx: KEY_PAN_PIXELS, dy: 0 };
+      case 'ArrowRight':
+        return { type: 'pan', dx: -KEY_PAN_PIXELS, dy: 0 };
+      case 'ArrowUp':
+        return { type: 'pan', dx: 0, dy: KEY_PAN_PIXELS };
+      case 'ArrowDown':
+        return { type: 'pan', dx: 0, dy: -KEY_PAN_PIXELS };
+    }
+  }
+  switch (input.key) {
+    case 'ArrowLeft':
+      return { type: 'orbit', heading: -KEY_ORBIT_DEGREES, elevation: 0 };
+    case 'ArrowRight':
+      return { type: 'orbit', heading: KEY_ORBIT_DEGREES, elevation: 0 };
+    case 'ArrowUp':
+      return { type: 'orbit', heading: 0, elevation: KEY_ORBIT_DEGREES };
+    case 'ArrowDown':
+      return { type: 'orbit', heading: 0, elevation: -KEY_ORBIT_DEGREES };
+    case '+':
+    case '=':
+      return { type: 'zoom', factor: 1 / KEY_ZOOM_FACTOR };
+    case '-':
+    case '_':
+      return { type: 'zoom', factor: KEY_ZOOM_FACTOR };
+    case 'Home':
+      return { type: 'fit' };
+    default:
+      return undefined;
+  }
 }
