@@ -8,13 +8,15 @@ import type {
   Summary,
 } from '@karmania/engine';
 import {
+  DEFAULT_DISTANCE_LIMITS,
   DEFAULT_SCALE_LIMITS,
   KEY_ZOOM_FACTOR,
   attachController2d,
+  attachController3d,
   createRenderer,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
+import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
 import { createSceneStore, firstNumericColumn } from '@karmania/scene';
 import type { Command, SceneDocument } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
@@ -285,8 +287,7 @@ export class KarmaniaViewer extends LitElement {
     this.renderer = made;
     this.cannotDraw = made === undefined;
     this.lookThroughCamera();
-    this.controller = made === undefined ? undefined : this.listenToPerson(area, canvas);
-    area.interactive = this.controller !== undefined;
+    this.refreshController();
     this.pipeline?.rendererReady();
   }
 
@@ -301,15 +302,30 @@ export class KarmaniaViewer extends LitElement {
   }
 
   /** What moves the map when a person drags it, turns the wheel or presses a key: it asks the scene for a camera. */
-  private controller: Controller2d | undefined;
+  private controller: Controller2d | Controller3d | undefined;
 
   private listenToPerson(
     area: KarmaniaMapArea,
     canvas: HTMLCanvasElement,
-  ): Controller2d | undefined {
+  ): Controller2d | Controller3d | undefined {
     const focusTarget = area.focusTarget;
     if (focusTarget === undefined) {
       return undefined;
+    }
+    if (this.store.getState().viewMode === '3d') {
+      return attachController3d({
+        element: area,
+        canvas,
+        focusTarget,
+        getCamera: () => this.store.getState().camera3d,
+        getLimits: () => this.pipeline?.distanceLimits() ?? DEFAULT_DISTANCE_LIMITS,
+        onFit: () => {
+          this.fit();
+        },
+        onCamera: (change) => {
+          this.store.dispatch({ type: 'setCamera', patch: { camera3d: change } });
+        },
+      });
     }
     return attachController2d({
       element: area,
@@ -324,6 +340,20 @@ export class KarmaniaViewer extends LitElement {
         this.store.dispatch({ type: 'setCamera', patch: { camera2d: change } });
       },
     });
+  }
+
+  /** Replaces the listener when the renderer arrives or the active camera changes. */
+  private refreshController(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    const canvas = area?.canvas;
+    this.controller?.dispose();
+    this.controller =
+      this.renderer === undefined || area === null || canvas === undefined
+        ? undefined
+        : this.listenToPerson(area, canvas);
+    if (area !== null) {
+      area.interactive = this.controller !== undefined;
+    }
   }
 
   /** Gives the renderer both cameras, the active view and the origin of the scene. */
@@ -432,6 +462,9 @@ export class KarmaniaViewer extends LitElement {
       state.frame !== previous.frame
     ) {
       this.lookThroughCamera();
+    }
+    if (state.viewMode !== previous.viewMode) {
+      this.refreshController();
     }
     // The scale bar is in the units of the map's coordinate system, which the definitions say for an EPSG code: asked once.
     const crs = state.frame?.mapCrs;

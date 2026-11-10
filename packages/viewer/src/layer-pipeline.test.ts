@@ -8,7 +8,7 @@ import type {
   RenderBuffers,
 } from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
-import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
+import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import { OTHER_COLOUR, createSceneStore, fitCamera2d, fitCamera3d } from '@karmania/scene';
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
@@ -902,6 +902,7 @@ describe('LayerPipeline: the view of the data', () => {
       patch: { camera3d: { heading: 35, elevation: 25, fov: 60 } },
     });
     await t.pipeline.idle();
+    expect(t.pipeline.distanceLimits()).toEqual(DEFAULT_DISTANCE_LIMITS);
     expect(t.scene.getState()).toMatchObject({
       viewMode: '3d',
       verticalExaggeration: 5,
@@ -919,6 +920,11 @@ describe('LayerPipeline: the view of the data', () => {
     expect(expected).toBeDefined();
     expect(t.scene.getState().camera3d).toEqual(expected);
     expect(t.scene.getState().camera2d).toBe(camera2d);
+    const distance = t.scene.getState().camera3d.distance;
+    expect(t.pipeline.distanceLimits()).toEqual({
+      min: distance / ZOOM_IN_LIMIT,
+      max: distance * ZOOM_OUT_LIMIT,
+    });
   });
 
   it('fits at the next look at the scene when the map area had no size at the first view', async () => {
