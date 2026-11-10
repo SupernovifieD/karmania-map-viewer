@@ -28,8 +28,14 @@ export {
   zoomAt,
 } from './controls-2d.js';
 export type { CameraChange, KeyAction, KeyInput, ScaleLimits } from './controls-2d.js';
-export { orbit3dBy, pan3dBy } from './controls-3d.js';
-export type { Camera3dChange } from './controls-3d.js';
+export {
+  DEFAULT_DISTANCE_LIMITS,
+  clampDistance,
+  orbit3dBy,
+  pan3dBy,
+  zoom3dAt,
+} from './controls-3d.js';
+export type { Camera3dChange, DistanceLimits } from './controls-3d.js';
 export { LayerSet } from './layer-set.js';
 export type { Container, LayerMaker, LayerObject, LayerOutcome } from './layer-set.js';
 export { OUTLINE_WIDTH, POINTS_PER_PART } from './points-layer.js';

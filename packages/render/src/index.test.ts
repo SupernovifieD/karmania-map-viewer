@@ -4,6 +4,7 @@ import * as render from './index.js';
 describe('@karmania/render', () => {
   it('exposes the renderer and the arithmetic of its buffer and its camera', () => {
     expect(Object.keys(render).sort()).toEqual([
+      'DEFAULT_DISTANCE_LIMITS',
       'DEFAULT_SCALE_LIMITS',
       'KEY_PAN_PIXELS',
       'KEY_ROTATE_DEGREES',
@@ -19,6 +20,7 @@ describe('@karmania/render', () => {
       'angleAbout',
       'attachController2d',
       'bufferSize',
+      'clampDistance',
       'clampScale',
       'colourOf',
       'combineLayers',
@@ -36,6 +38,7 @@ describe('@karmania/render', () => {
       'screenToMap',
       'turnBetween',
       'wheelFactor',
+      'zoom3dAt',
       'zoomAt',
     ]);
   });
