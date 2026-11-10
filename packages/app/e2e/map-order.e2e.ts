@@ -97,6 +97,32 @@ test.describe('the order the layers are drawn in', () => {
     await expect.poll(async () => distance(await colourAt(page, 75, 75), b)).toBeLessThanOrEqual(2);
   });
 
+  test('shares one depth test between layers in 3D, so the higher square stays visible when the legend moves', async ({
+    page,
+  }) => {
+    await loadBoth(page);
+    const a = bytes(await layerColour(page, 'layer-1'));
+    await dispatch(
+      page,
+      {
+        type: 'setCamera',
+        patch: {
+          camera3d: {
+            target: [EAST + 75, NORTH + 75, 50],
+            distance: 500,
+            heading: 0,
+            elevation: 89,
+            fov: 45,
+          },
+        },
+      },
+      { type: 'setViewMode', mode: '3d' },
+    );
+    await expect.poll(async () => distance(await colourAt(page, 75, 75), a)).toBeLessThanOrEqual(2);
+    await dispatch(page, { type: 'moveNode', id: 'layer-2', to: { parent: null, index: 1 } });
+    await expect.poll(async () => distance(await colourAt(page, 75, 75), a)).toBeLessThanOrEqual(2);
+  });
+
   test('draws the layers that are in a group where the group is in the legend', async ({
     page,
   }) => {
