@@ -16,8 +16,8 @@
 import type { Engine } from '@karmania/engine';
 import type { ClassBreaks, ClassMethod, Frame, RenderBuffers } from '@karmania/engine/display';
 import type { BBox, Finding } from '@karmania/engine/types';
-import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import type { ClassColouring, ScaleLimits } from '@karmania/render';
+import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
+import type { ClassColouring, DistanceLimits, ScaleLimits } from '@karmania/render';
 import { OTHER_COLOUR, classColours, fitCamera2d, fitCamera3d } from '@karmania/scene';
 import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
@@ -165,6 +165,7 @@ export class LayerPipeline {
   /** The map CRS that the camera was last fitted for; the camera goes back to its start when that changes. */
   private fittedFor: Frame | null | undefined;
   private scale: number | undefined;
+  private distance: number | undefined;
 
   constructor(private readonly options: PipelineOptions) {}
 
@@ -178,6 +179,13 @@ export class LayerPipeline {
     return this.scale === undefined
       ? DEFAULT_SCALE_LIMITS
       : { min: this.scale / ZOOM_IN_LIMIT, max: this.scale * ZOOM_OUT_LIMIT };
+  }
+
+  /** How near and how far the orbit camera may go: from its fit, once there is one. */
+  distanceLimits(): DistanceLimits {
+    return this.distance === undefined
+      ? DEFAULT_DISTANCE_LIMITS
+      : { min: this.distance / ZOOM_IN_LIMIT, max: this.distance * ZOOM_OUT_LIMIT };
   }
 
   /** Whether a layer has been prepared and waits for the renderer. */
@@ -254,6 +262,7 @@ export class LayerPipeline {
       if (camera === undefined) {
         return false;
       }
+      this.distance = camera.distance;
       this.options.scene.dispatch({ type: 'setCamera', patch: { camera3d: camera } });
       return true;
     }
@@ -354,6 +363,7 @@ export class LayerPipeline {
     this.chosenFor = '';
     this.fittedFor = undefined;
     this.scale = undefined;
+    this.distance = undefined;
     this.drawable = new Map();
     if (this.options.scene.getState().frame !== null) {
       this.options.scene.dispatch({ type: 'setFrame', frame: null });
