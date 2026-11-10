@@ -528,14 +528,14 @@ or releasing, and whenever the brief says to stop.
 
 ## M18: 3D view
 
-- [ ] 18.1 Perspective camera from camera3d; near and far from the extent.
+- [x] 18.1 Perspective camera from camera3d; near and far from the extent.
   - [x] 18.1a Perspective-camera arithmetic: rebasing, pose, aspect and clipping
     planes from the extent.
   - [x] 18.1b The renderer owns an orthographic and a perspective camera; in 3D,
     one depth test spans all layers.
   - [x] 18.1c The viewer supplies the 3D camera and prepared extent, and fitting
     uses the 3D camera.
-  - [ ] 18.1d Browser proofs cover perspective pose and clipping and one depth
+  - [x] 18.1d Browser proofs cover perspective pose and clipping and one depth
     test across layers.
 - [ ] 18.2 Orbit controller (9.5) and keyboard.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.

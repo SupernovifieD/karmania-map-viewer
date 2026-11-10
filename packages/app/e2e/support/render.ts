@@ -18,6 +18,7 @@ export interface Stats {
   readonly layersDrawn: number;
   readonly maxTextureSize: number;
   readonly background: string;
+  readonly viewMode: '2d' | '3d';
   readonly frame: {
     readonly left: number;
     readonly right: number;
@@ -28,6 +29,15 @@ export interface Stats {
     readonly position: readonly [number, number, number];
     readonly rotation: number;
   };
+  readonly perspective: {
+    readonly fov: number;
+    readonly aspect: number;
+    readonly near: number;
+    readonly far: number;
+    readonly position: readonly [number, number, number];
+    readonly target: readonly [number, number, number];
+    readonly up: readonly [0, 0, 1];
+  } | null;
 }
 
 /** The 2D camera of the scene. */
