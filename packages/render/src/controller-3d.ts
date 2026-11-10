@@ -1,7 +1,7 @@
 /** DOM listeners for the 3D orbit camera; the arithmetic lives in `controls-3d.ts`. */
 import type { Camera3d } from '@karmania/scene';
 import { wheelFactor } from './controls-2d.js';
-import { orbit3dBy, pan3dBy, zoom3dAt } from './controls-3d.js';
+import { keyAction3d, orbit3dBy, pan3dBy, zoom3dAt } from './controls-3d.js';
 import type { Camera3dChange, DistanceLimits } from './controls-3d.js';
 
 export interface Controller3dOptions {
@@ -11,6 +11,7 @@ export interface Controller3dOptions {
   getCamera(): Camera3d;
   getLimits(): DistanceLimits;
   onCamera(change: Camera3dChange): void;
+  onFit?(): void;
 }
 
 export interface Controller3d {
@@ -103,6 +104,50 @@ export function attachController3d(options: Controller3dOptions): Controller3d {
       options.onCamera(change);
     }
   };
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.composedPath()[0] !== focusTarget) {
+      return;
+    }
+    const action = keyAction3d(event);
+    if (action === undefined) {
+      return;
+    }
+    const camera = options.getCamera();
+    const box = canvas.getBoundingClientRect();
+    const size = { width: box.width, height: box.height };
+    let change: Camera3dChange | undefined;
+    switch (action.type) {
+      case 'orbit':
+        change = {
+          heading: (((camera.heading + action.heading) % 360) + 360) % 360,
+          elevation: Math.min(89, Math.max(-89, camera.elevation + action.elevation)),
+        };
+        break;
+      case 'pan':
+        change = pan3dBy(camera, size, action.dx, action.dy);
+        break;
+      case 'zoom':
+        change = zoom3dAt(
+          camera,
+          size,
+          action.factor,
+          size.width / 2,
+          size.height / 2,
+          options.getLimits(),
+        );
+        break;
+      case 'fit':
+        if (options.onFit === undefined) {
+          return;
+        }
+        options.onFit();
+        break;
+    }
+    if (change !== undefined) {
+      options.onCamera(change);
+    }
+    event.preventDefault();
+  };
 
   element.addEventListener('pointerdown', onPointerDown);
   element.addEventListener('pointermove', onPointerMove);
@@ -111,6 +156,7 @@ export function attachController3d(options: Controller3dOptions): Controller3d {
   element.addEventListener('lostpointercapture', onPointerEnd);
   element.addEventListener('contextmenu', onContextMenu);
   element.addEventListener('wheel', onWheel, { passive: false });
+  element.addEventListener('keydown', onKeyDown);
 
   let disposed = false;
   return {
@@ -125,6 +171,7 @@ export function attachController3d(options: Controller3dOptions): Controller3d {
       element.removeEventListener('lostpointercapture', onPointerEnd);
       element.removeEventListener('contextmenu', onContextMenu);
       element.removeEventListener('wheel', onWheel);
+      element.removeEventListener('keydown', onKeyDown);
     },
   };
 }
