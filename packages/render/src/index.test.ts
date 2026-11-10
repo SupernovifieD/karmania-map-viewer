@@ -6,6 +6,7 @@ describe('@karmania/render', () => {
     expect(Object.keys(render).sort()).toEqual([
       'DEFAULT_DISTANCE_LIMITS',
       'DEFAULT_SCALE_LIMITS',
+      'KEY_ORBIT_DEGREES',
       'KEY_PAN_PIXELS',
       'KEY_ROTATE_DEGREES',
       'KEY_ZOOM_FACTOR',
@@ -27,6 +28,7 @@ describe('@karmania/render', () => {
       'createRenderer',
       'gatherSegments',
       'keyAction',
+      'keyAction3d',
       'mapToScreen',
       'orbit3dBy',
       'orthographicFrame',
