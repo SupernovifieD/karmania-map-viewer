@@ -773,6 +773,7 @@ export class KarmaniaViewer extends LitElement {
           .scale=${this.furniture.scale}
           .crs=${this.furniture.crs}
           .label=${this.furniture.label}
+          .viewMode=${this.store.getState().viewMode}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}

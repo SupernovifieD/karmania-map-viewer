@@ -9,6 +9,13 @@ const area = (page: Page): Locator => page.locator('karmania-map-area main');
 const canvas = (page: Page): Locator => page.locator('karmania-map-area canvas');
 const turn = (page: Page, heading: number): Promise<void> =>
   dispatch(page, { type: 'setCamera', patch: { camera2d: { heading } } });
+const keyDescription = (page: Page): Promise<string> =>
+  area(page).evaluate((element) => {
+    const id = element.getAttribute('aria-describedby') ?? '';
+    return element.getRootNode() instanceof ShadowRoot
+      ? ((element.getRootNode() as ShadowRoot).getElementById(id)?.textContent ?? '').trim()
+      : '';
+  });
 
 test.describe('the map for those who cannot see it', () => {
   test('is a picture named for the view, the layers and the way it is turned', async ({ page }) => {
@@ -56,12 +63,7 @@ test.describe('the map for those who cannot see it', () => {
     await expect(area(page)).not.toHaveAttribute('aria-describedby', /.*/);
     await withData(page);
     await expect(area(page)).toHaveAttribute('tabindex', '0');
-    const description = await area(page).evaluate((element) => {
-      const id = element.getAttribute('aria-describedby') ?? '';
-      return element.getRootNode() instanceof ShadowRoot
-        ? ((element.getRootNode() as ShadowRoot).getElementById(id)?.textContent ?? '')
-        : '';
-    });
+    const description = await keyDescription(page);
     for (const part of [
       'The arrow keys move the map.',
       'Plus and minus zoom in and out.',
@@ -72,6 +74,19 @@ test.describe('the map for those who cannot see it', () => {
       expect(description, part).toContain(part);
     }
     await expect(area(page)).toHaveAccessibleDescription(description.trim());
+
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    const description3d = await keyDescription(page);
+    for (const part of [
+      'The arrow keys orbit the map.',
+      'Shift with an arrow pans the map.',
+      'Plus and minus zoom in and out.',
+      'Home fits the map to the data.',
+    ]) {
+      expect(description3d, part).toContain(part);
+    }
+    expect(description3d).not.toContain('0 puts north up.');
+    await expect(area(page)).toHaveAccessibleDescription(description3d);
   });
 
   test('does what the description says', async ({ page }) => {

@@ -547,6 +547,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 18.2g Browser interaction proofs.
     - [x] 18.2g1 Pointer orbit, pan and pointer-anchored zoom.
     - [x] 18.2g2 Keyboard, fit, clamps and listener replacement.
+  - [x] 18.2F1 View-specific screen-reader keyboard instructions.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
