@@ -545,6 +545,8 @@ or releasing, and whenever the brief says to stop.
   - [x] 18.2e Keyboard event routing.
   - [x] 18.2f Extent-derived distance limits and viewer wiring.
   - [ ] 18.2g Browser interaction proofs.
+    - [x] 18.2g1 Pointer orbit, pan and pointer-anchored zoom.
+    - [ ] 18.2g2 Keyboard, fit, clamps and listener replacement.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
