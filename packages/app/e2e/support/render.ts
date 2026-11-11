@@ -47,6 +47,15 @@ export interface Camera {
   readonly heading: number;
 }
 
+/** The 3D camera of the scene. */
+export interface Camera3d {
+  readonly target: readonly [number, number, number];
+  readonly distance: number;
+  readonly heading: number;
+  readonly elevation: number;
+  readonly fov: number;
+}
+
 /** The frame of the scene: the map's coordinate system, the origin the card's positions are relative to, and who chose it. */
 export interface SceneFrame {
   readonly mapCrs: { readonly kind: string; readonly code?: number; readonly units?: string };
@@ -58,6 +67,7 @@ export interface SceneFrame {
 interface ViewerElement {
   scene(): {
     camera2d: Camera;
+    camera3d: Camera3d;
     frame: SceneFrame | null;
     layers: Record<string, { style: { colour: { mode: string; value?: string } } }>;
   };
@@ -146,6 +156,17 @@ export function camera(page: Page): Promise<Camera> {
       ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
     const { centre, unitsPerPixel, heading } = viewer.scene().camera2d;
     return { centre: [centre[0], centre[1]] as const, unitsPerPixel, heading };
+  });
+}
+
+/** The 3D camera of the scene as it is now. */
+export function camera3d(page: Page): Promise<Camera3d> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    const { target, distance, heading, elevation, fov } = viewer.scene().camera3d;
+    return { target: [target[0], target[1], target[2]], distance, heading, elevation, fov };
   });
 }
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { camera, dispatch, stats, withData } from './support/render.js';
-import type { Camera } from './support/render.js';
+import { camera, camera3d, dispatch, stats, withData } from './support/render.js';
+import type { Camera, Camera3d } from './support/render.js';
 
 const canvas = (page: Page) => page.locator('karmania-map-area canvas');
 
@@ -47,6 +47,55 @@ async function start(
     patch: { camera2d: { centre: [1000, 2000], unitsPerPixel: 2, heading } },
   });
   return boxOf(page);
+}
+
+/** A 3D map with a camera whose pointer changes are easy to read. */
+async function start3d(
+  page: Page,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const box = await start(page);
+  await dispatch(
+    page,
+    {
+      type: 'setCamera',
+      patch: {
+        camera3d: {
+          target: [1000, 2000, 100],
+          distance: 1000,
+          heading: 30,
+          elevation: 40,
+          fov: 50,
+        },
+      },
+    },
+    { type: 'setViewMode', mode: '3d' },
+  );
+  await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+  return box;
+}
+
+/** The point on the camera's target plane under a page point. */
+function targetPlaneAt(
+  view: Camera3d,
+  box: { x: number; y: number; width: number; height: number },
+  pageX: number,
+  pageY: number,
+): [number, number, number] {
+  const heading = (view.heading * Math.PI) / 180;
+  const elevation = (view.elevation * Math.PI) / 180;
+  const halfHeight = view.distance * Math.tan((view.fov * Math.PI) / 360);
+  const rightOffset =
+    ((2 * (pageX - box.x)) / box.width - 1) * halfHeight * (box.width / box.height);
+  const upOffset = (1 - (2 * (pageY - box.y)) / box.height) * halfHeight;
+  const right = [Math.cos(heading), -Math.sin(heading), 0];
+  const up = [
+    Math.sin(heading) * Math.sin(elevation),
+    Math.cos(heading) * Math.sin(elevation),
+    Math.cos(elevation),
+  ];
+  return view.target.map(
+    (value, axis) => value + (right[axis] ?? 0) * rightOffset + (up[axis] ?? 0) * upOffset,
+  ) as [number, number, number];
 }
 
 const near = (actual: number, expected: number, digits = 6): void => {
@@ -425,5 +474,83 @@ test.describe('moving the 2D map with the keyboard', () => {
       width: '2px',
       offset: '-2px',
     });
+  });
+});
+
+test.describe('moving the 3D map with the pointer', () => {
+  test('orbits with left drag, and pans equally with right drag or Shift-left drag', async ({
+    page,
+  }) => {
+    const box = await start3d(page);
+    const original = await camera3d(page);
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 120, y + 60, { steps: 4 });
+    await page.mouse.up();
+    const orbit = await camera3d(page);
+    near(orbit.heading, (original.heading - (120 * 180) / box.height + 360) % 360);
+    near(orbit.elevation, original.elevation - (60 * 180) / box.height);
+    expect(orbit.target).toEqual(original.target);
+    expect(orbit.distance).toBe(original.distance);
+
+    await dispatch(page, { type: 'setCamera', patch: { camera3d: original } });
+    await page.evaluate(() => {
+      (window as unknown as { menus: boolean[] }).menus = [];
+      window.addEventListener('contextmenu', (event) => {
+        (window as unknown as { menus: boolean[] }).menus.push(event.defaultPrevented);
+      });
+    });
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(x + 80, y - 40, { steps: 4 });
+    await page.mouse.up({ button: 'right' });
+    const right = await camera3d(page);
+    expect(right.target).not.toEqual(original.target);
+    expect({ ...right, target: original.target }).toEqual(original);
+    expect(await page.evaluate(() => (window as unknown as { menus: boolean[] }).menus)).toEqual([
+      true,
+    ]);
+
+    await dispatch(page, { type: 'setCamera', patch: { camera3d: original } });
+    await page.keyboard.down('Shift');
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 80, y - 40, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.up('Shift');
+    const shifted = await camera3d(page);
+    shifted.target.forEach((value, axis) => {
+      near(value, right.target[axis] ?? NaN);
+    });
+    expect({ ...shifted, target: original.target }).toEqual(original);
+  });
+
+  test('zooms to the pointer with the wheel and keeps its target-plane point there', async ({
+    page,
+  }) => {
+    const box = await start3d(page);
+    const [x, y] = [Math.round(box.x + box.width * 0.7), Math.round(box.y + box.height * 0.3)];
+    const before = await camera3d(page);
+    const under = targetPlaneAt(before, box, x, y);
+    await page.evaluate(() => {
+      (window as unknown as { wheels: boolean[] }).wheels = [];
+      window.addEventListener('wheel', (event) => {
+        (window as unknown as { wheels: boolean[] }).wheels.push(event.defaultPrevented);
+      });
+    });
+    await page.mouse.move(x, y);
+    await page.mouse.wheel(0, -300);
+    await expect.poll(async () => (await camera3d(page)).distance).toBeLessThan(before.distance);
+    const after = await camera3d(page);
+    const stillUnder = targetPlaneAt(after, box, x, y);
+    stillUnder.forEach((value, axis) => {
+      near(value, under[axis] ?? NaN);
+    });
+    expect(after.target).not.toEqual(before.target);
+    expect({ ...after, target: before.target, distance: before.distance }).toEqual(before);
+    expect(await page.evaluate(() => (window as unknown as { wheels: boolean[] }).wheels)).toEqual([
+      true,
+    ]);
   });
 });
