@@ -537,16 +537,16 @@ or releasing, and whenever the brief says to stop.
     uses the 3D camera.
   - [x] 18.1d Browser proofs cover perspective pose and clipping and one depth
     test across layers.
-- [ ] 18.2 Orbit controller (9.5) and keyboard.
+- [x] 18.2 Orbit controller (9.5) and keyboard.
   - [x] 18.2a Plain orbit and camera-plane pan arithmetic.
   - [x] 18.2b Pointer-anchored perspective zoom.
   - [x] 18.2c The 3D keyboard mapping.
   - [x] 18.2d Pointer and wheel DOM listeners.
   - [x] 18.2e Keyboard event routing.
   - [x] 18.2f Extent-derived distance limits and viewer wiring.
-  - [ ] 18.2g Browser interaction proofs.
+  - [x] 18.2g Browser interaction proofs.
     - [x] 18.2g1 Pointer orbit, pan and pointer-anchored zoom.
-    - [ ] 18.2g2 Keyboard, fit, clamps and listener replacement.
+    - [x] 18.2g2 Keyboard, fit, clamps and listener replacement.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
