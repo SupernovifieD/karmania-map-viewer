@@ -74,6 +74,25 @@ async function start3d(
   return box;
 }
 
+/** Puts the keyboard on the map: a press on it without a drag. */
+async function focusMap(
+  page: Page,
+  box: { x: number; y: number; width: number; height: number },
+): Promise<void> {
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        let active: Element | null = document.activeElement;
+        while (active?.shadowRoot?.activeElement) {
+          active = active.shadowRoot.activeElement;
+        }
+        return active?.tagName.toLowerCase();
+      }),
+    )
+    .toBe('main');
+}
+
 /** The point on the camera's target plane under a page point. */
 function targetPlaneAt(
   view: Camera3d,
@@ -285,25 +304,6 @@ test.describe('moving the 2D map with the keyboard', () => {
       ),
     ).toBe(false);
   });
-
-  /** Puts the keyboard on the map: a press on it without a drag. */
-  async function focusMap(
-    page: Page,
-    box: { x: number; y: number; width: number; height: number },
-  ): Promise<void> {
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect
-      .poll(() =>
-        page.evaluate(() => {
-          let active: Element | null = document.activeElement;
-          while (active?.shadowRoot?.activeElement) {
-            active = active.shadowRoot.activeElement;
-          }
-          return active?.tagName.toLowerCase();
-        }),
-      )
-      .toBe('main');
-  }
 
   test('pans by 50 pixels with an arrow, the view going the way of the arrow', async ({ page }) => {
     const box = await start(page);
@@ -552,5 +552,108 @@ test.describe('moving the 3D map with the pointer', () => {
     expect(await page.evaluate(() => (window as unknown as { wheels: boolean[] }).wheels)).toEqual([
       true,
     ]);
+  });
+});
+
+test.describe('moving the 3D map with the keyboard', () => {
+  test('orbits, pans, zooms, clamps and fits, and takes only its own keys', async ({ page }) => {
+    const box = await start3d(page);
+    await focusMap(page, box);
+    const original = await camera3d(page);
+
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera3d: { heading: 355, elevation: 88 } },
+    });
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    expect((await camera3d(page)).heading).toBe(10);
+    expect((await camera3d(page)).elevation).toBe(89);
+    await dispatch(page, { type: 'setCamera', patch: { camera3d: { elevation: -88 } } });
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    expect((await camera3d(page)).elevation).toBe(-89);
+
+    const beforePan = await camera3d(page);
+    await page.keyboard.press('Shift+ArrowRight');
+    const panned = await camera3d(page);
+    expect(panned.target).not.toEqual(beforePan.target);
+    expect({ ...panned, target: beforePan.target }).toEqual(beforePan);
+    await page.keyboard.press('+');
+    const zoomed = await camera3d(page);
+    near(zoomed.distance, panned.distance / Math.SQRT2, 9);
+    expect({ ...zoomed, distance: panned.distance }).toEqual(panned);
+
+    await dispatch(page, { type: 'setCamera', patch: { camera3d: original } });
+    await page.keyboard.press('Home');
+    const fitted = await camera3d(page);
+    expect(fitted.target).not.toEqual(original.target);
+    expect(fitted.distance).not.toBe(original.distance);
+    expect({ ...fitted, target: original.target, distance: original.distance }).toEqual(original);
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera3d: { target: [9, 8, 7], distance: fitted.distance / 1e10 } },
+    });
+    await page.keyboard.press('+');
+    near((await camera3d(page)).distance, fitted.distance / 100_000, 9);
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera3d: { target: [9, 8, 7], distance: fitted.distance * 1e10 } },
+    });
+    await page.keyboard.press('-');
+    near((await camera3d(page)).distance, fitted.distance * 100, 6);
+    await page.keyboard.press('Home');
+    expect(await camera3d(page)).toEqual(fitted);
+
+    await page.evaluate(() => {
+      (window as unknown as { keys: [string, boolean][] }).keys = [];
+      window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Control') {
+          (window as unknown as { keys: [string, boolean][] }).keys.push([
+            event.key,
+            event.defaultPrevented,
+          ]);
+        }
+      });
+    });
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('a');
+    await page.keyboard.press('Control+ArrowRight');
+    expect(
+      await page.evaluate(() => (window as unknown as { keys: [string, boolean][] }).keys),
+    ).toEqual([
+      ['ArrowLeft', true],
+      ['a', false],
+      ['ArrowRight', false],
+    ]);
+  });
+
+  test('replaces the active listener when the view changes', async ({ page }) => {
+    const box = await start3d(page);
+    const original2d = await camera(page);
+    const original3d = await camera3d(page);
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+
+    await dispatch(page, { type: 'setViewMode', mode: '2d' });
+    await expect.poll(async () => (await stats(page))?.viewMode).toBe('2d');
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 60, y, { steps: 3 });
+    await page.mouse.up();
+    const moved2d = await camera(page);
+    expect(moved2d).not.toEqual(original2d);
+    expect(await camera3d(page)).toEqual(original3d);
+
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 60, y, { steps: 3 });
+    await page.mouse.up();
+    const moved3d = await camera3d(page);
+    near(moved3d.heading, (original3d.heading - (60 * 180) / box.height + 360) % 360);
+    expect({ ...moved3d, heading: original3d.heading }).toEqual(original3d);
+    expect(await camera(page)).toEqual(moved2d);
   });
 });
