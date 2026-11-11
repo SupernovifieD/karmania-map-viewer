@@ -28,9 +28,10 @@ export function mapLabel(
   ].join(', ');
 }
 
-/**
- * What the keys do on the map in the 2D view, for a screen reader to be told when the map has the keyboard (section 10.2 of the brief). It is the
- * description in the 3D view too until its own keys are made (step 18.2).
- */
+/** What the keys do on the map in the 2D view, for a screen reader to be told when the map has the keyboard. */
 export const KEYS_2D =
   'The arrow keys move the map. Plus and minus zoom in and out. Shift with the left or right arrow turns the map by 15 degrees. 0 puts north up. Home fits the map to the data.';
+
+/** What the keys do on the map in the 3D view, for a screen reader to be told when the map has the keyboard. */
+export const KEYS_3D =
+  'The arrow keys orbit the map. Shift with an arrow pans the map. Plus and minus zoom in and out. Home fits the map to the data.';
