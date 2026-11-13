@@ -10,15 +10,13 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
 import { createClassedTriangles } from './class-triangles.js';
 import type { LayerObject } from './layer-set.js';
+import { AMBIENT } from './light.js';
 import { colourOf } from './look.js';
 import type { ClassColouring } from './look.js';
 import { createTriangleParts } from './triangle-parts.js';
 
-/**
- * How much of the colour a triangle that faces away from the light keeps: the rest is the light, which is all of it for a triangle
- * that faces it. A steep slope is dark and not black, so that its shape is seen in the layer's own colour.
- */
-export const MESH_AMBIENT = 0.25;
+/** How much of the colour a triangle that faces away from the light keeps (`AMBIENT`): the rest is the light, which is all of it for a triangle that faces it. */
+export const MESH_AMBIENT = AMBIENT;
 
 const VERTEX = /* glsl */ `
 varying vec3 vView;

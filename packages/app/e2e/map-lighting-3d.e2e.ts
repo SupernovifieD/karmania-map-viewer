@@ -11,9 +11,11 @@ import {
   drawn,
   layerColour,
   layerStatuses,
+  loadLattice,
   sceneFrame,
   stats,
 } from './support/render.js';
+import { fixture } from './support/fixtures.js';
 import { importAndLoad } from './support/wizard.js';
 
 /**
@@ -213,3 +215,217 @@ async function dispatchAndRead2d(
   );
   return (await around(page, x, y, 0)).at(0, 0);
 }
+
+/** A block of 100 metres a side, from `(EAST, NORTH, 0)`, turned about that corner. */
+const SIDE = 100;
+
+/** A point of the block's own axes (metres from its corner), as a point of the map, for a block that is turned `turn` degrees about its corner. */
+function onTheBlock(local: Vertex, turn: number): Vertex {
+  const angle = (turn * Math.PI) / 180;
+  return [
+    local[0] * Math.cos(angle) - local[1] * Math.sin(angle),
+    local[0] * Math.sin(angle) + local[1] * Math.cos(angle),
+    local[2],
+  ];
+}
+
+/** The six faces of the block: the middle of each along the block's own axes, and the normal of each. */
+const BLOCK_FACES: readonly { name: string; at: Vertex; normal: Vertex }[] = [
+  { name: 'top', at: [SIDE / 2, SIDE / 2, SIDE], normal: [0, 0, 1] },
+  { name: 'bottom', at: [SIDE / 2, SIDE / 2, 0], normal: [0, 0, -1] },
+  { name: 'its -x face', at: [0, SIDE / 2, SIDE / 2], normal: [-1, 0, 0] },
+  { name: 'its +x face', at: [SIDE, SIDE / 2, SIDE / 2], normal: [1, 0, 0] },
+  { name: 'its -y face', at: [SIDE / 2, 0, SIDE / 2], normal: [0, -1, 0] },
+  { name: 'its +y face', at: [SIDE / 2, SIDE, SIDE / 2], normal: [0, 1, 0] },
+];
+
+async function loadBlock(page: Page, rotation: number): Promise<void> {
+  await page.goto('/?theme=light');
+  await loadLattice(page, 'blocks', {
+    name: 'cube',
+    crs: { kind: 'epsg', code: 32640 },
+    origin: [EAST, NORTH, 0],
+    spacing: [SIDE, SIDE, SIDE],
+    dims: [1, 1, 1],
+    rotation,
+    values: [5],
+  });
+  await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+  await dispatch(page, {
+    type: 'setStyle',
+    layerId: 'layer-1',
+    patch: { colour: { mode: 'single', value: '#56b4e9' } },
+  });
+  await drawn(page);
+}
+
+/** Looks at the middle of the cube, 300 metres away, from `heading` and `elevation`, in 3D. */
+async function lookAtBlock(page: Page, turn: number, heading: number, elevation: number) {
+  const middle = onTheBlock([SIDE / 2, SIDE / 2, 0], turn);
+  await dispatch(
+    page,
+    {
+      type: 'setCamera',
+      patch: {
+        camera3d: {
+          target: [EAST + middle[0], NORTH + middle[1], SIDE / 2],
+          distance: 350,
+          heading,
+          elevation,
+          fov: 45,
+        },
+      },
+    },
+    { type: 'setViewMode', mode: '3d' },
+  );
+  await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+  const frame = await sceneFrame(page);
+  if (frame === null) {
+    throw new Error('The scene has no frame.');
+  }
+  return { now: await drawn(page), origin: frame.origin };
+}
+
+test.describe('blocks in 3D', () => {
+  for (const [turn, heading, elevation] of [
+    [0, 45, 35],
+    [0, 225, 50],
+    [30, 100, 40],
+    [30, 310, 25],
+  ] as const) {
+    test(`light each side of a block that is turned ${String(turn)} degrees by the face it has, seen from heading ${String(heading)} at ${String(elevation)} degrees up`, async ({
+      page,
+    }) => {
+      await loadBlock(page, turn);
+      const colour = bytes(await layerColour(page));
+      const view = await lookAtBlock(page, turn, heading, elevation);
+      const camera3d = view.now.perspective;
+      expect(camera3d).not.toBeNull();
+      let seen = 0;
+      for (const face of BLOCK_FACES) {
+        const turned = onTheBlock(face.at, turn);
+        const normal = onTheBlock(face.normal, turn);
+        const at: Vertex = [turned[0], turned[1], face.at[2]];
+        const here = pixelOf3d(view.now, view.origin, [EAST + at[0], NORTH + at[1], at[2]]);
+        // A face is looked at if the camera is clearly on the side that it faces.
+        const eye = camera3d?.position ?? [0, 0, 0];
+        const toEye: Vertex = [
+          eye[0] - (EAST + at[0] - view.origin[0]),
+          eye[1] - (NORTH + at[1] - view.origin[1]),
+          eye[2] - (at[2] - view.origin[2]),
+        ];
+        const facing =
+          (toEye[0] * normal[0] + toEye[1] * normal[1] + toEye[2] * face.normal[2]) /
+          Math.hypot(...toEye);
+        if (here === undefined || facing < 0.25) {
+          continue;
+        }
+        seen += 1;
+        const wanted = colour.map(
+          (channel) => channel * shadeOf([normal[0], normal[1], face.normal[2]]),
+        );
+        expect(
+          distance((await around(page, here.x, here.y, 0)).at(0, 0), wanted),
+          face.name,
+        ).toBeLessThanOrEqual(3);
+      }
+      // Three faces of a cube show from a corner, and at least two from anywhere that is not along an axis.
+      expect(seen).toBeGreaterThanOrEqual(2);
+    });
+  }
+
+  test('lights the top of a block as the plate of a mesh is lit, and a side that faces away from the light as the ambient only', async ({
+    page,
+  }) => {
+    await loadBlock(page, 0);
+    const colour = bytes(await layerColour(page));
+    // From the south-west, 35 degrees up: the top, the south side (which faces away from the light) and the west side (which faces it a little).
+    const view = await lookAtBlock(page, 0, 45, 35);
+    const top = (await around(page, ...pixelCoordinates(view, [SIDE / 2, SIDE / 2, SIDE]), 0)).at(
+      0,
+      0,
+    );
+    const south = (await around(page, ...pixelCoordinates(view, [SIDE / 2, 0, SIDE / 2]), 0)).at(
+      0,
+      0,
+    );
+    expect(
+      distance(
+        top,
+        colour.map((c) => c * (AMBIENT + (1 - AMBIENT) * Math.SQRT1_2)),
+      ),
+    ).toBeLessThanOrEqual(3);
+    expect(
+      distance(
+        south,
+        colour.map((c) => c * AMBIENT),
+      ),
+    ).toBeLessThanOrEqual(3);
+  });
+});
+
+/** The pixel of a point `local` of the block that is not turned, as the two numbers `around` takes. */
+function pixelCoordinates(
+  view: Awaited<ReturnType<typeof lookAtBlock>>,
+  local: Vertex,
+): [number, number] {
+  const pixel = pixelOf3d(view.now, view.origin, [EAST + local[0], NORTH + local[1], local[2]]);
+  if (pixel === undefined) {
+    throw new Error('The point is behind the camera.');
+  }
+  return [pixel.x, pixel.y];
+}
+
+test.describe('points and lines in 3D', () => {
+  /** True if one of the nine pixels round `(x, y)` is the colour, to within 2 of a byte: the thing is a pixel or two wide, and the projection rounds. */
+  async function isThere(page: Page, at: { x: number; y: number }, colour: number[]) {
+    const block = await around(page, at.x, at.y, 1);
+    return block.all().some(([, , pixel]) => distance(pixel, colour) <= 2);
+  }
+
+  test('are not lit: a point and a line are the colour of their layer from two different sides, as a lit face would not be', async ({
+    page,
+  }) => {
+    for (const [file, spot] of [
+      ['points', [500010.5, 2765020.25, 120.4]],
+      ['lines', [500025, 2765020, 101]],
+    ] as const) {
+      await page.goto('/?theme=light');
+      await importAndLoad(page, fixture(`${file}.csv`), fixture('points.prj', `${file}.prj`));
+      await drawn(page);
+      await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+      await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+      const colour = bytes(await layerColour(page));
+      for (const [heading, elevation] of [
+        [0, 60],
+        [130, 30],
+      ] as const) {
+        await dispatch(
+          page,
+          {
+            type: 'setCamera',
+            patch: {
+              camera3d: {
+                target: [spot[0], spot[1], spot[2]],
+                distance: 120,
+                heading,
+                elevation,
+                fov: 45,
+              },
+            },
+          },
+          { type: 'setViewMode', mode: '3d' },
+        );
+        await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+        const frame = await sceneFrame(page);
+        const now = await drawn(page);
+        const at = pixelOf3d(now, frame?.origin ?? [0, 0, 0], spot);
+        expect(at, `${file} at ${String(heading)}`).toBeDefined();
+        expect(
+          await isThere(page, at ?? { x: 0, y: 0 }, colour),
+          `${file} from heading ${String(heading)}, ${String(elevation)} degrees up`,
+        ).toBe(true);
+      }
+    }
+  });
+});
