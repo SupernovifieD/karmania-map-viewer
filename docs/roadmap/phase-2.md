@@ -548,10 +548,10 @@ or releasing, and whenever the brief says to stop.
     - [x] 18.2g1 Pointer orbit, pan and pointer-anchored zoom.
     - [x] 18.2g2 Keyboard, fit, clamps and listener replacement.
   - [x] 18.2F1 View-specific screen-reader keyboard instructions.
-- [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
+- [x] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
   - [x] 18.3a `k-segmented` in `@karmania/ui` (radio group, 32 high, choices at least 48 wide), in the gallery.
   - [x] 18.3b `Viewer.setViewMode(mode)` and `Viewer.on('scene')`; the switch keeps centre and heading (`cameraTo3d`, `cameraTo2d`).
-  - [ ] 18.3c The toolbar's View control, wired to the viewer; the shell baselines that have the toolbar retaken.
+  - [x] 18.3c The toolbar's View control, wired to the viewer; the shell baselines that have the toolbar retaken.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
   - [ ] 18.4a The light: from straight above in 2D, fixed in the world (north-west, 45 degrees) in 3D; the mesh takes it from the renderer.
   - [ ] 18.4b Blocks lit from face normals; points and lines proved unlit.

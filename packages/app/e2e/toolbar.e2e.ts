@@ -7,21 +7,48 @@ import { assertAligned, assertNoOverflow, assertNoOverlap, boxOf } from './suppo
 const toolbar = (page: Page) => page.locator('karmania-app header.toolbar');
 const wordmark = (page: Page) => toolbar(page).getByRole('heading', { name: 'Karmania' });
 const importButton = (page: Page) => toolbar(page).locator('k-button');
+const viewControl = (page: Page) => toolbar(page).locator('k-segmented');
+const viewChoice = (page: Page, name: string) =>
+  toolbar(page).getByRole('radio', { name, exact: true });
+
+/** The view the scene is in, as the viewer says. */
+const sceneView = (page: Page) =>
+  page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+      scene(): { viewMode: string };
+    };
+    return viewer.scene().viewMode;
+  });
 
 test.describe('the toolbar', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('has the name and then the Import button, and nothing on the right', async ({ page }) => {
+  test('has the name and then the Import button, and the control of the view at the right', async ({
+    page,
+  }) => {
     await page.goto('/');
     const order = await toolbar(page).evaluate((element) =>
-      [...element.children].map((child) => [child.tagName.toLowerCase(), child.textContent.trim()]),
+      [...element.children].map((child) => [
+        child.tagName.toLowerCase(),
+        child.className,
+        child.textContent.trim().replace(/\s+/g, ' '),
+      ]),
     );
+    // The control's choices are in its shadow root, so it has no text of its own.
     expect(order).toEqual([
-      ['h1', 'Karmania'],
-      ['k-button', 'Import'],
+      ['h1', 'wordmark', 'Karmania'],
+      ['k-button', '', 'Import'],
+      ['div', 'tools', ''],
     ]);
+    expect(
+      await toolbar(page)
+        .locator('.tools')
+        .evaluate((e) => [...e.children].map((c) => c.tagName.toLowerCase())),
+    ).toEqual(['k-segmented']);
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
   });
 
@@ -63,7 +90,63 @@ test.describe('the toolbar', () => {
 
       await assertNoOverlap(wordmark(page), importButton(page));
       await assertNoOverflow(toolbar(page));
+
+      // The control of the view is 16 from the right edge, 32 high and on the middle of the 48.
+      const view = await boxOf(viewControl(page), 'the control of the view');
+      expect(view.x + view.width).toBe(viewport.width - 16);
+      expect([view.y, view.height]).toEqual([8, 32]);
+      expect(view.x).toBeGreaterThan(button.x + button.width);
+      await assertAligned([importButton(page), viewControl(page)], 'vertical-centre');
+      await assertNoOverlap(importButton(page), viewControl(page));
     });
+  });
+
+  test('has the control of the view named View, with 2D and 3D, the one the scene is in chosen', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(toolbar(page).getByRole('radiogroup', { name: 'View', exact: true })).toHaveCount(
+      1,
+    );
+    await expect(viewChoice(page, '2D')).toHaveAttribute('aria-checked', 'true');
+    await expect(viewChoice(page, '3D')).toHaveAttribute('aria-checked', 'false');
+    expect(await sceneView(page)).toBe('2d');
+  });
+
+  test('switches the map to 3D and back when a person chooses, with the mouse and with the keyboard', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await viewChoice(page, '3D').click();
+    expect(await sceneView(page)).toBe('3d');
+    await expect(viewChoice(page, '3D')).toHaveAttribute('aria-checked', 'true');
+    await viewChoice(page, '2D').click();
+    expect(await sceneView(page)).toBe('2d');
+    // From Import, one Tab reaches the control (at the choice that is chosen), and the arrow keys choose.
+    await page.goto('/');
+    await page.keyboard.press('Tab');
+    await expect(importButton(page).locator('button')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(viewChoice(page, '2D')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(viewChoice(page, '3D')).toBeFocused();
+    expect(await sceneView(page)).toBe('3d');
+    await page.keyboard.press('ArrowLeft');
+    expect(await sceneView(page)).toBe('2d');
+  });
+
+  test('follows the scene when the view changes by other means', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        dispatch(command: unknown): unknown;
+      };
+      viewer.dispatch({ type: 'setViewMode', mode: '3d' });
+    });
+    await expect(viewChoice(page, '3D')).toHaveAttribute('aria-checked', 'true');
+    await expect(viewChoice(page, '2D')).toHaveAttribute('aria-checked', 'false');
   });
 
   test('draws a border of 1 pixel under itself, in the divider color', async ({ page }) => {

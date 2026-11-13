@@ -125,8 +125,8 @@ export const SHOTS: Shot[] = [
     name: 'shell-handle-focus',
     show: async (page) => {
       await startWith(page);
-      // Tab: the toolbar's Import, the map's Import, and the handle.
-      for (let presses = 0; presses < 3; presses += 1) {
+      // Tab: the toolbar's Import, the toolbar's view control, the map's Import, and the handle.
+      for (let presses = 0; presses < 4; presses += 1) {
         await page.keyboard.press('Tab');
       }
       return wholeApp(page);
