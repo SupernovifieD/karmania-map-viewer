@@ -17,6 +17,7 @@ const INFO: FrameInfo = {
   pixelRatio: 2,
   viewport: [800, 600],
   flat: true,
+  light: [0, 0, 1],
   outline: [0.1, 0.2, 0.3],
 };
 

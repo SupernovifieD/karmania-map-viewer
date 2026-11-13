@@ -33,8 +33,8 @@ void main() {
 /**
  * The normal of the triangle is the cross product of how the position changes along a row of pixels and down a column of them, in
  * the space of the camera. It faces the viewer whichever way the triangle is wound, so a triangle is lit the same from either side.
- * `uLight` is the direction to the light in that space: in the view from above, straight up is +z, and turning the map does not
- * change it.
+ * `uLight` is the direction to the light in that space, which the renderer gives each frame (`FrameInfo.light`): in the view from above it
+ * is straight up, +z, and turning the map does not change it; in 3D it is the light of the world (`light.ts`) as the camera sees it.
  */
 const FRAGMENT = /* glsl */ `
 uniform vec3 uColour;
@@ -111,9 +111,10 @@ export function createMeshLayer(
       uniforms.uOpacity.value = next.opacity;
       triangles.group.visible = next.visible;
     },
-    // The light is the same at every pixel ratio and on every theme.
-    prepareFrame() {
-      // (nothing: it has no size in pixels and no outline)
+    // The light is the frame's own (straight up in the view from above, the light of the world in 3D); it has no size in pixels and no outline. The
+    // triangles by class share this uniform with the layer's own.
+    prepareFrame(info) {
+      uniforms.uLight.value.set(...info.light);
     },
     setClasses(next: ClassColouring | undefined) {
       // The triangles by class are drawn in place of the layer's own, which are not drawn while they are (and are, when they are not).

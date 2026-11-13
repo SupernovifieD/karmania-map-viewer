@@ -13,7 +13,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 2,
 };
-const INFO: FrameInfo = { pixelRatio: 2, viewport: [800, 600], flat: true, outline: [0, 0, 0] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [800, 600],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 
 const points: RenderBuffers = { kind: 'points', positions: new Float32Array(3) };
 const mesh: RenderBuffers = {

@@ -1,5 +1,6 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth } from 'three';
+import type { Vector3 } from 'three';
 import type { Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { MESH_AMBIENT, createMeshLayer } from './mesh-layer.js';
@@ -53,6 +54,27 @@ describe('createMeshLayer', () => {
     const { uniforms } = material(createMeshLayer(square(), LOOK));
     expect(uniforms['uLight']?.value).toMatchObject({ x: 0, y: 0, z: 1 });
     expect(uniforms['uAmbient']?.value).toBe(0.25);
+  });
+
+  it('takes the light of each frame, the same for the layer and for the triangles it has by class, and starts straight above', () => {
+    const layer = createMeshLayer(square(), LOOK);
+    layer.setClasses?.({ indices: Uint8Array.of(1, 0), colours: ['#ff0000', '#00ff00'] });
+    const own = material(layer).uniforms['uLight']?.value as Vector3;
+    expect(own).toMatchObject({ x: 0, y: 0, z: 1 });
+    layer.prepareFrame({
+      pixelRatio: 1,
+      flat: false,
+      viewport: [800, 600],
+      light: [0.6, 0, 0.8],
+      outline: [0, 0, 0],
+    });
+    expect(own).toMatchObject({ x: 0.6, y: 0, z: 0.8 });
+    // The triangles by class use the same uniform object, so they are lit by it too.
+    const others = parts(layer).filter((mesh) => mesh.material !== material(layer));
+    expect(others.length).toBeGreaterThan(0);
+    for (const mesh of others) {
+      expect((mesh.material as ShaderMaterial).uniforms['uLight']?.value).toBe(own);
+    }
   });
 
   it('is drawn with depth, strictly nearer, so that the highest part shows, from either side', () => {
