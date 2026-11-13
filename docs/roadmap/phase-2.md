@@ -549,16 +549,31 @@ or releasing, and whenever the brief says to stop.
     - [x] 18.2g2 Keyboard, fit, clamps and listener replacement.
   - [x] 18.2F1 View-specific screen-reader keyboard instructions.
 - [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
+  - [x] 18.3a `k-segmented` in `@karmania/ui` (radio group, 32 high, choices at least 48 wide), in the gallery.
+  - [ ] 18.3b `Viewer.setViewMode(mode)` and `Viewer.on('scene')`; the switch keeps centre and heading (`cameraTo3d`, `cameraTo2d`).
+  - [ ] 18.3c The toolbar's View control, wired to the viewer; the shell baselines that have the toolbar retaken.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
+  - [ ] 18.4a The light: from straight above in 2D, fixed in the world (north-west, 45 degrees) in 3D; the mesh takes it from the renderer.
+  - [ ] 18.4b Blocks lit from face normals; points and lines proved unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
+  - [ ] 18.5a Layers that lie in one plane in 3D: the legend's order breaks the tie (polygon offset, brief 9.4).
+  - [ ] 18.5b The surface layer (a grid with elevations from a column), coloured per cell, lit like a mesh.
+  - [ ] 18.5c Browser proofs: a surface in 3D and 2D, a flat grid at its elevation.
 - [ ] 18.6 Blocks in 3D.
 - [ ] 18.7 Vertical exaggeration control in the toolbar (10.1), applied as a z
   scale about the origin.
+  - [ ] 18.7a The renderer scales the heights of every layer about the origin.
+  - [ ] 18.7b The toolbar's select (always there, disabled in 2D), wired to the scene; baselines retaken.
 - [ ] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
   resets it only.
+  - [ ] 18.8a The north arrow follows the active camera's heading; its reset in 3D keeps the elevation.
+  - [ ] 18.8b The navigation group in 3D: zoom in, zoom out, fit, reset view.
+  - [ ] 18.8c Overlay layout, status chip and scale bar in 3D; screenshots; axe.
 - [ ] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
   target is missed, add a step for drawing only exposed faces of dense models,
   then measure again.
+  - [ ] 18.9a Render golden images for 3D, reviewed.
+  - [ ] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`.
 - [ ] 18.G Gate (with `pnpm perf` for 3D).
 
 ## M19: Legend system
