@@ -343,6 +343,11 @@ export interface LatticeSpec {
   readonly dims: readonly [number, number, number];
   /** For a grid: the height of its plane in map units (a lattice's own origin has no height that a flat grid takes); 0 if not given. */
   readonly elevation?: number;
+  /**
+   * For a grid: the height of each cell, in the same order as `values` (a NaN is a cell with no height). The grid is then a surface, through the
+   * heights at the middles of the cells, instead of a flat image.
+   */
+  readonly heights?: readonly number[];
   /** Degrees anticlockwise about the origin. No file or step of the wizard gives one: the viewer's `load` is the way. */
   readonly rotation?: number;
   /** One value for each cell, X fastest, then Y, then Z. */
@@ -372,7 +377,13 @@ export function loadLattice(
         dims: lattice.dims,
         ...(lattice.rotation === undefined ? {} : { rotation: lattice.rotation }),
         ...(lattice.elevation === undefined ? {} : { elevation: lattice.elevation }),
-        columns: [{ name: 'value', type: 'float', values: new Float64Array(lattice.values) }],
+        ...(lattice.heights === undefined ? {} : { elevationColumn: 'height' }),
+        columns: [
+          { name: 'value', type: 'float', values: new Float64Array(lattice.values) },
+          ...(lattice.heights === undefined
+            ? []
+            : [{ name: 'height', type: 'float', values: new Float64Array(lattice.heights) }]),
+        ],
       });
     },
     [kind, spec] as const,
