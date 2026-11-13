@@ -23,6 +23,7 @@ import { CompiledLayers } from './compiled-layers.js';
 import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
+import { frameLight } from './light.js';
 import type { LayerOutcome } from './layer-set.js';
 import type { ClassColouring, LayerLook } from './look.js';
 
@@ -331,6 +332,8 @@ export async function createRenderer(
     camera3d.up.set(...perspective.up);
     camera3d.lookAt(...perspective.target);
     camera3d.updateProjectionMatrix();
+    // The view matrix is kept for the light of the frame (`frameLight`), which is worked out before three would update it in its own draw.
+    camera3d.updateMatrixWorld();
   }
 
   const activeCamera = () => (viewMode === '3d' ? camera3d : camera2d);
@@ -395,6 +398,7 @@ export async function createRenderer(
       pixelRatio: size.pixelRatio,
       viewport: [size.width, size.height],
       flat: viewMode === '2d',
+      light: frameLight(viewMode === '2d', camera3d.matrixWorldInverse.elements),
       outline,
     });
     // The map's colour first. In 2D each layer then has its own depth; in 3D the clear above is the only one, so all layers share it.

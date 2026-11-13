@@ -13,7 +13,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 2,
 };
-const FLAT: FrameInfo = { pixelRatio: 1, viewport: [800, 600], flat: true, outline: [0, 0, 0] };
+const FLAT: FrameInfo = {
+  pixelRatio: 1,
+  viewport: [800, 600],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 const SOLID: FrameInfo = { ...FLAT, flat: false };
 
 type Blocks = Extract<RenderBuffers, { kind: 'blocks' }>;

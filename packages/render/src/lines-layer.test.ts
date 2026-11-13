@@ -13,7 +13,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 3,
 };
-const INFO: FrameInfo = { pixelRatio: 2, viewport: [1600, 1200], flat: true, outline: [0, 0, 0] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [1600, 1200],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 
 /** `count` segments, each from vertex `i` to vertex `i + 1`, along the x axis. */
 const lines = (count: number): Extract<RenderBuffers, { kind: 'lines' }> => ({

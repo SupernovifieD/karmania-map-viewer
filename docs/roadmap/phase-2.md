@@ -553,7 +553,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 18.3b `Viewer.setViewMode(mode)` and `Viewer.on('scene')`; the switch keeps centre and heading (`cameraTo3d`, `cameraTo2d`).
   - [x] 18.3c The toolbar's View control, wired to the viewer; the shell baselines that have the toolbar retaken.
 - [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
-  - [ ] 18.4a The light: from straight above in 2D, fixed in the world (north-west, 45 degrees) in 3D; the mesh takes it from the renderer.
+  - [x] 18.4a The light: from straight above in 2D, fixed in the world (north-west, 45 degrees) in 3D; the mesh takes it from the renderer.
   - [ ] 18.4b Blocks lit from face normals; points and lines proved unlit.
 - [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
   - [ ] 18.5a Layers that lie in one plane in 3D: the legend's order breaks the tie (polygon offset, brief 9.4).

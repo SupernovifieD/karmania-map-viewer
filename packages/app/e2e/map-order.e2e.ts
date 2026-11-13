@@ -101,7 +101,10 @@ test.describe('the order the layers are drawn in', () => {
     page,
   }) => {
     await loadBoth(page);
-    const a = bytes(await layerColour(page, 'layer-1'));
+    // Seen from above in 3D, a square that lies flat has the colour of its layer lit by the light of the world (from the north-west, 45 degrees
+    // up: 0.25 + 0.75 * sqrt(1/2) of it, step 18.4a), and not all of it as in the view from above.
+    const lit = 0.25 + 0.75 * Math.SQRT1_2;
+    const a = bytes(await layerColour(page, 'layer-1')).map((channel) => channel * lit);
     await dispatch(
       page,
       {
