@@ -74,6 +74,25 @@ describe('gatherSegments', () => {
 });
 
 describe('createLinesLayer', () => {
+  it('writes the depth of the plane of the ribbon it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
+    const layer = createLinesLayer(lines(2), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(flat.vertexShader).not.toContain('vStartV');
+    layer.prepareFrame({ ...INFO, flat: false });
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    expect(solid.fragmentShader).toContain('ribbonNormal(vStartV, vEndV)');
+    expect(solid.vertexShader).toContain('vStartV');
+    expect(solid.uniforms).toBe(flat.uniforms);
+    expect(solid.fragmentShader.indexOf('planeDepth(vStartV')).toBeLessThan(
+      solid.fragmentShader.indexOf('discard;'),
+    );
+    layer.prepareFrame({ ...INFO, flat: true });
+    expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
   it('puts a layer of few segments in one part with one instance for each, and has nothing to step', () => {
     const layer = createLinesLayer(lines(10), LOOK);
     expect(parts(layer)).toHaveLength(1);

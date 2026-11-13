@@ -24,6 +24,7 @@ import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import { frameLight } from './light.js';
+import { tieBreak } from './tie-break.js';
 import type { LayerOutcome } from './layer-set.js';
 import type { ClassColouring, LayerLook } from './look.js';
 
@@ -250,6 +251,8 @@ export async function createRenderer(
    * draws it holds the page for about 50 ms, which is the longest task that a million points or a model of blocks put on it.
    */
   const programs = new CompiledLayers();
+  /** The layers that were moved by their place in the legend, in 3D, and are put back when the view is 2D. */
+  const broken = new Set<string>();
   gl.autoClear = false;
   // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
   // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
@@ -404,10 +407,18 @@ export async function createRenderer(
     // The map's colour first. In 2D each layer then has its own depth; in 3D the clear above is the only one, so all layers share it.
     gl.clear();
     let drawn = 0;
-    for (const id of drawOrder()) {
+    for (const [rank, id] of drawOrder().entries()) {
       const own = scenes.get(id);
       if (own === undefined) {
         continue;
+      }
+      // In 3D the layer that is higher in the legend is moved a little towards the camera, so that of two in one plane it is the one seen; in 2D
+      // they are where they are, as the depth is cleared between layers.
+      if (viewMode === '3d') {
+        tieBreak(own, rank);
+        broken.add(id);
+      } else if (broken.delete(id)) {
+        tieBreak(own, 0);
       }
       if (!everything && !programs.has(id)) {
         warm(id, own);
