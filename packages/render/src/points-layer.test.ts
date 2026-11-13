@@ -33,6 +33,38 @@ const uniforms = (layer: ReturnType<typeof createPointsLayer>) =>
   (parts(layer)[0]?.material as ShaderMaterial).uniforms;
 
 describe('createPointsLayer', () => {
+  it('writes the depth of the plane it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
+    const layer = createPointsLayer(points(3), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(flat.vertexShader).not.toContain('vCentre');
+    layer.prepareFrame({ ...INFO, flat: false });
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    expect(solid.vertexShader).toContain('vCentre');
+    expect(solid.uniforms).toBe(flat.uniforms);
+    // The change from pixel to pixel is worked out before the first discard, where every pixel of a block of four runs it.
+    expect(solid.fragmentShader.indexOf('planeDepth(vCentre')).toBeLessThan(
+      solid.fragmentShader.indexOf('discard;'),
+    );
+    layer.prepareFrame({ ...INFO, flat: true });
+    expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
+  it('gives a part that is built later the material of the view it is in, and frees both materials', () => {
+    const layer = createPointsLayer(points(POINTS_PER_PART + 2), LOOK);
+    layer.prepareFrame({ ...INFO, flat: false });
+    layer.step?.();
+    const [first, second] = parts(layer);
+    expect(second?.material).toBe(first?.material);
+    expect((second?.material as ShaderMaterial).fragmentShader).toContain('gl_FragDepth');
+    const freed: string[] = [];
+    (first?.material as ShaderMaterial).addEventListener('dispose', () => freed.push('3d'));
+    layer.dispose();
+    expect(freed).toEqual(['3d']);
+  });
+
   it('puts a layer of few points in one part, and has nothing to step', () => {
     const layer = createPointsLayer(points(10), LOOK);
     expect(parts(layer)).toHaveLength(1);
