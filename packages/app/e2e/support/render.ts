@@ -63,9 +63,19 @@ export interface SceneFrame {
   readonly source: string;
 }
 
+/** The part of the scene that the tests of the switch between views listen for. */
+interface ViewerElementScene {
+  readonly viewMode: '2d' | '3d';
+  readonly camera2d: Camera;
+  readonly camera3d: Camera3d;
+}
+
 /** The viewer of the page, in what the tests use of it. */
 interface ViewerElement {
+  setViewMode(mode: '2d' | '3d'): void;
+  subscribeToScene(listener: (scene: ViewerElementScene) => void): () => void;
   scene(): {
+    viewMode: '2d' | '3d';
     camera2d: Camera;
     camera3d: Camera3d;
     frame: SceneFrame | null;
@@ -147,6 +157,55 @@ export function dispatch(page: Page, ...commands: readonly unknown[]): Promise<v
 /** Lets a number of milliseconds pass in the page. */
 export const pause = (page: Page, ms: number): Promise<void> =>
   page.evaluate((time) => new Promise<void>((resolve) => setTimeout(resolve, time)), ms);
+
+/** Shows the map in 2D or in 3D, as the toolbar's control does (the viewer's `setViewMode`). */
+export function setViewMode(page: Page, mode: '2d' | '3d'): Promise<void> {
+  return page.evaluate((view) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    viewer.setViewMode(view);
+  }, mode);
+}
+
+/** What the scene's view was after one change of it. */
+export interface ViewRecord {
+  readonly viewMode: string;
+  readonly centre2d: readonly number[];
+  readonly heading2d: number;
+  readonly target3d: readonly number[];
+  readonly heading3d: number;
+}
+
+/**
+ * Asks the viewer for each of `modes` in turn while recording what the scene was after each change it made (the view mode and where the 3D
+ * camera looks), so that the order of the changes is seen.
+ */
+export function recordingViewChanges(
+  page: Page,
+  modes: readonly ('2d' | '3d')[],
+): Promise<ViewRecord[]> {
+  return page.evaluate((asked) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    const records: ViewRecord[] = [];
+    const stop = viewer.subscribeToScene((scene) => {
+      records.push({
+        viewMode: scene.viewMode,
+        centre2d: [...scene.camera2d.centre],
+        heading2d: scene.camera2d.heading,
+        target3d: [...scene.camera3d.target],
+        heading3d: scene.camera3d.heading,
+      });
+    });
+    for (const mode of asked) {
+      viewer.setViewMode(mode);
+    }
+    stop();
+    return records;
+  }, modes);
+}
 
 /** The 2D camera of the scene as it is now. */
 export function camera(page: Page): Promise<Camera> {
@@ -282,6 +341,8 @@ export interface LatticeSpec {
   readonly origin: readonly [number, number, number];
   readonly spacing: readonly [number, number, number];
   readonly dims: readonly [number, number, number];
+  /** For a grid: the height of its plane in map units (a lattice's own origin has no height that a flat grid takes); 0 if not given. */
+  readonly elevation?: number;
   /** Degrees anticlockwise about the origin. No file or step of the wizard gives one: the viewer's `load` is the way. */
   readonly rotation?: number;
   /** One value for each cell, X fastest, then Y, then Z. */
@@ -310,6 +371,7 @@ export function loadLattice(
         spacing: lattice.spacing,
         dims: lattice.dims,
         ...(lattice.rotation === undefined ? {} : { rotation: lattice.rotation }),
+        ...(lattice.elevation === undefined ? {} : { elevation: lattice.elevation }),
         columns: [{ name: 'value', type: 'float', values: new Float64Array(lattice.values) }],
       });
     },

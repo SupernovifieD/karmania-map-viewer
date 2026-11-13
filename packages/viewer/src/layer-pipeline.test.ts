@@ -927,6 +927,18 @@ describe('LayerPipeline: the view of the data', () => {
     });
   });
 
+  it('says the middle of the heights of the visible layers, and nothing when there is none', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    expect(t.pipeline.middleHeight()).toBeUndefined();
+    await t.add(0);
+    // The two points are at 0 and 5 above the origin of the frame, which is at 0: the middle is 2.5.
+    expect(t.pipeline.middleHeight()).toBe(2.5);
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.pipeline.middleHeight()).toBeUndefined();
+  });
+
   it('fits at the next look at the scene when the map area had no size at the first view', async () => {
     const t = setup();
     t.setViewport({ width: 0, height: 0 });

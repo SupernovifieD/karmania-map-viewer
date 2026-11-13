@@ -10,6 +10,10 @@ function page() {
     scene: ReturnType<typeof vi.fn>;
     dispatch: ReturnType<typeof vi.fn>;
     fit: ReturnType<typeof vi.fn>;
+    setViewMode: ReturnType<typeof vi.fn>;
+    subscribeToScene: ReturnType<typeof vi.fn>;
+    heard: ((scene: unknown, previous: unknown) => void)[];
+    stopped: ReturnType<typeof vi.fn>;
   }[] = [];
   const tags: string[] = [];
   const createElement = vi.fn((tag: string) => {
@@ -20,6 +24,13 @@ function page() {
       scene: vi.fn(() => scene),
       dispatch: vi.fn((command: unknown) => ({ command })),
       fit: vi.fn(),
+      setViewMode: vi.fn(),
+      heard: [] as ((scene: unknown, previous: unknown) => void)[],
+      stopped: vi.fn(),
+      subscribeToScene: vi.fn((listener: (scene: unknown, previous: unknown) => void) => {
+        element.heard.push(listener);
+        return element.stopped;
+      }),
     };
     made.push(element);
     return element;
@@ -87,6 +98,42 @@ describe('createViewer', () => {
     viewer.dispose();
     expect(() => viewer.dispatch(command)).toThrow('The viewer has been disposed.');
     expect(made[0]?.dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the viewer to show the map in the view it is given, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.setViewMode('3d');
+    viewer.setViewMode('2d');
+    expect(made[0]?.setViewMode.mock.calls).toEqual([['3d'], ['2d']]);
+    viewer.dispose();
+    expect(() => {
+      viewer.setViewMode('3d');
+    }).toThrow('The viewer has been disposed.');
+    expect(made[0]?.setViewMode).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells a listener of the scene each time it changes, with the document and not the one before, and stops when asked', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const heard: unknown[] = [];
+    const stop = viewer.on('scene', (scene) => heard.push(scene));
+    expect(made[0]?.subscribeToScene).toHaveBeenCalledTimes(1);
+    made[0]?.heard[0]?.({ version: 1 }, { version: 0 });
+    expect(heard).toEqual([{ version: 1 }]);
+    stop();
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
+    viewer.dispose();
+    stop();
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to listen to a viewer that was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.dispose();
+    expect(() => viewer.on('scene', () => undefined)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.subscribeToScene).not.toHaveBeenCalled();
   });
 
   it('takes the element out of the page when it is disposed, once, however often it is asked', () => {

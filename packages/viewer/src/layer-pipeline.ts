@@ -785,6 +785,12 @@ export class LayerPipeline {
     };
   }
 
+  /** The middle of the heights of the visible layers that were prepared, in map units: what a 3D camera looks at; `undefined` if there are none. */
+  middleHeight(): number | undefined {
+    const extent = this.visibleExtent();
+    return extent === undefined ? undefined : extent.min[2] / 2 + extent.max[2] / 2;
+  }
+
   /** Tells the renderer the heights and visible extent of what was prepared, or zero and no extent when there is none. */
   private depth(): void {
     const sink = this.options.sink();
