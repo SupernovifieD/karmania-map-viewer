@@ -562,7 +562,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 18.6 Blocks in 3D: browser proofs (all faces, one depth test, less than opaque, the fit).
 - [ ] 18.7 Vertical exaggeration control in the toolbar (10.1), applied as a z
   scale about the origin.
-  - [ ] 18.7a The renderer scales the heights of every layer about the origin.
+  - [x] 18.7a The renderer scales the heights of every layer about the origin.
   - [ ] 18.7b The toolbar's select (always there, disabled in 2D), wired to the scene; baselines retaken.
 - [ ] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
   resets it only.
