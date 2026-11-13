@@ -1299,18 +1299,42 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
   });
 
+  it('asks for the classes of the surface of a grid with elevations as for a grid, and gives them with the layer: its triangles take the class of their cell', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'surface',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0),
+          triangles: Uint32Array.of(0, 1, 2, 2, 1, 3),
+          triangleCell: Uint32Array.of(0, 0),
+        },
+        findings: [],
+      });
+    t.scene.dispatch({
+      type: 'addLayers',
+      datasets: [{ ...gridDataset(0), name: 'Surface' }],
+    });
+    await t.pipeline.idle();
+    // The default style of a grid: its first column of numbers, in 7 classes of equal intervals.
+    expect(t.classifyCalls).toEqual([[0, 'Au', 'equal', 7]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    expect(t.sink.setLayerClasses.mock.calls[0]?.[1]?.indices).toEqual(Uint8Array.of(0, 1));
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+  });
+
   it('does not ask for classes for a layer of a kind that is not coloured by them, whatever its style says', async () => {
     const t = setup();
     t.state.prepare = () =>
       Promise.resolve({
         status: 'drawn',
-        // The one kind that no layer is coloured by classes for: a surface, the picture of a grid with elevations, which 2D does not draw.
+        // Every kind of buffers is coloured by classes now, so this one is made up: a kind the pipeline has never heard of is not asked for any.
         buffers: {
-          kind: 'surface',
+          kind: 'future',
           positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
-          triangles: Uint32Array.of(0, 1, 2),
-          triangleCell: Uint32Array.of(0),
-        },
+        } as unknown as RenderBuffers,
         findings: [],
       });
     t.drawable([0, true]);
@@ -1332,7 +1356,6 @@ describe('LayerPipeline: the classes of a layer', () => {
     await t.pipeline.idle();
     expect(t.classifyCalls).toEqual([]);
     expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
-    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
   });
 
   it('gives new colours, and asks the engine for nothing, when only the ramp changes, or its direction', async () => {

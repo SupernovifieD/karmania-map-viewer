@@ -84,8 +84,8 @@ export const ZOOM_OUT_LIMIT = 100;
 export const MAX_TILE_SIZE = 4096;
 
 /**
- * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a triangle of a mesh, a grid's cell and a model's block are coloured by it. (The surface of a grid with
- * elevations is not drawn in 2D, so it has no colours here.)
+ * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a triangle of a mesh, a grid's cell (as an image or as
+ * the surface of a grid with elevations, whose triangles take the class of their cell) and a model's block are coloured by it.
  */
 const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
   'points',
@@ -93,6 +93,7 @@ const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
   'polygons',
   'mesh',
   'grid',
+  'surface',
   'blocks',
 ]);
 
@@ -100,7 +101,7 @@ const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
  * The kinds whose cells or blocks may have no value, and so are not all drawn when the layer is in one colour: they are given one class
  * (the cells that have a value in the first column of numbers) and the colour of the style.
  */
-const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'blocks']);
+const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'surface', 'blocks']);
 
 /** A text that is the same for styles that have the same classes: the column, the method and how many (the ramp is not of the classes). */
 function classKeyOf(colour: Extract<LayerColour, { mode: 'classes' }>): string {
