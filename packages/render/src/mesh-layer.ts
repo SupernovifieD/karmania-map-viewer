@@ -1,6 +1,7 @@
 /**
  * The layer of a mesh (section 9.3 of the brief): its triangles in the one colour of the layer, or, given their classes (`setClasses`: one for
- * each triangle), each in the colour of its class, lit from above. Each triangle is
+ * each triangle), each in the colour of its class, lit from above. A surface is drawn by it too (`createSurfaceLayer` in `layer-kinds.ts`), its
+ * classes being one for each cell. Each triangle is
  * shaded flat, with a normal that the fragment shader works out from how the position changes from one pixel to the next
  * (`dFdx`, `dFdy`), so that the vertices are not made again for each triangle and are shared as the engine sent them. The light
  * comes from straight above: a triangle that lies flat has the colour of the layer as it is, and one that slopes is darker the
@@ -49,7 +50,13 @@ void main() {
 }
 `;
 
-type MeshBuffers = Pick<Extract<RenderBuffers, { kind: 'mesh' }>, 'positions' | 'triangles'>;
+/**
+ * What a mesh is drawn from: its positions and triangles. A surface (a grid with an elevation for each cell) is the same, with the cell that
+ * each triangle takes its colour from (`owners`): its classes are of the cells and not of the triangles.
+ */
+type MeshBuffers = Pick<Extract<RenderBuffers, { kind: 'mesh' }>, 'positions' | 'triangles'> & {
+  readonly owners?: Uint32Array;
+};
 
 type MeshUniforms = {
   uColour: { value: Vector3 };
@@ -91,6 +98,7 @@ export function createMeshLayer(
   const classed = createClassedTriangles({
     positions: triangles.positions,
     triangles: buffers.triangles,
+    ...(buffers.owners === undefined ? {} : { owners: buffers.owners }),
     parent: triangles.group,
     make: () => {
       const colour = new Vector3();
