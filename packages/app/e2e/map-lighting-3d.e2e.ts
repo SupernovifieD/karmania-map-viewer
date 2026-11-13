@@ -429,3 +429,101 @@ test.describe('points and lines in 3D', () => {
     }
   });
 });
+
+/**
+ * The vertical exaggeration (step 18.7a): the heights of every layer are multiplied about the origin, in 3D, and the camera looks at the same
+ * place in the data. The pyramid of the mesh above has a rise of 50 over a run of 50, so under an exaggeration of 3 its faces have a rise of 150 over
+ * a run of 50, and are seen and lit as slopes of that steepness.
+ */
+test.describe('the vertical exaggeration', () => {
+  /** The shade of the west face (`[-1, 0, s]` with `s` the rise over the run, as a unit vector) under the light of 3D. */
+  const westShade = (rise: number): number => {
+    const length = Math.hypot(rise, 1);
+    return shadeOf([-rise / length, 0, 1 / length]);
+  };
+
+  async function lookExaggerated(page: Page, factor: number, heading = 0) {
+    await dispatch(page, { type: 'setVerticalExaggeration', factor });
+    const view = await lookFrom(page, heading, 55);
+    return view;
+  }
+
+  /** The colour of the picture at a point of the model, whose heights are multiplied by `factor` in the picture. */
+  async function atExaggerated(
+    page: Page,
+    view: Awaited<ReturnType<typeof lookFrom>>,
+    at: Vertex,
+    factor: number,
+  ): Promise<number[]> {
+    const pixel = pixelOf3d(view.now, view.origin, [EAST + at[0], NORTH + at[1], at[2]], factor);
+    if (pixel === undefined) {
+      throw new Error('The point is behind the camera.');
+    }
+    return (await around(page, pixel.x, pixel.y, 0)).at(0, 0);
+  }
+
+  const WEST_FACE = SPOTS.find((spot) => spot.name === 'the west face');
+  const PLATE = SPOTS.find((spot) => spot.name === 'the plate');
+
+  for (const factor of [1, 2, 3, 5, 10]) {
+    test(`multiplies the heights by ${String(factor)} about the origin: the slope is as steep as that, in the shade it has and at the pixel it lands on`, async ({
+      page,
+    }) => {
+      await loadMesh(page);
+      const colour = bytes(await layerColour(page));
+      const view = await lookExaggerated(page, factor);
+      const face = WEST_FACE;
+      const plate = PLATE;
+      expect(face).toBeDefined();
+      expect(plate).toBeDefined();
+      // The middle of the west face is at a third of the height of the apex, 50 / 3 m: at `factor` times that in the picture.
+      const seen = await atExaggerated(page, view, face?.at ?? [0, 0, 0], factor);
+      expect(
+        distance(
+          seen,
+          colour.map((c) => c * westShade(factor)),
+        ),
+      ).toBeLessThanOrEqual(3);
+      // The plate lies at the height of the origin, and is where it is, with the shade of a plate, whatever the factor.
+      const flat = await atExaggerated(page, view, plate?.at ?? [0, 0, 0], factor);
+      expect(
+        distance(
+          flat,
+          colour.map((c) => c * shadeOf([0, 0, 1])),
+        ),
+      ).toBeLessThanOrEqual(3);
+    });
+  }
+
+  test('is not applied in the view from above: the picture of the slopes there is the same under any factor', async ({
+    page,
+  }) => {
+    await loadMesh(page);
+    const colour = bytes(await layerColour(page));
+    const now2d = await camera(page);
+    // From above, the shade of a slope is that of its own steepness, 50 over 50, whatever the exaggeration that 3D has is.
+    await dispatch(page, { type: 'setVerticalExaggeration', factor: 10 });
+    const buffer = await drawn(page);
+    const west = FACES_WEST_2D;
+    const x = Math.floor(
+      buffer.width / 2 +
+        ((EAST + west[0] - now2d.centre[0]) / now2d.unitsPerPixel) * buffer.pixelRatio,
+    );
+    const y = Math.floor(
+      buffer.height / 2 +
+        ((NORTH + west[1] - now2d.centre[1]) / now2d.unitsPerPixel) * buffer.pixelRatio,
+    );
+    const seen = (await around(page, x, y, 0)).at(0, 0);
+    // The light from above: 0.25 + 0.75 of the part of the slope that faces up, for a rise of 50 over a run of 50.
+    const wanted = AMBIENT + (1 - AMBIENT) * Math.SQRT1_2;
+    expect(
+      distance(
+        seen,
+        colour.map((c) => c * wanted),
+      ),
+    ).toBeLessThanOrEqual(3);
+  });
+});
+
+/** A point on the west face of the pyramid, east and north of the corner of the model, as the view from above sees it. */
+const FACES_WEST_2D = [150 + 50 / 3, 50] as const;

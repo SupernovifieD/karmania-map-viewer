@@ -272,6 +272,12 @@ export async function createRenderer(
   };
   let viewMode: ViewMode = '2d';
   let verticalExaggeration = 1;
+  /**
+   * What heights are multiplied by when the layers are drawn: in 3D the scene's vertical exaggeration, about the origin (the positions the layers
+   * have are relative to it, so it is a scale of z of each layer's scene), and in the view from above 1, which has the heights it has (the depth that
+   * the 2D camera sees is made from them, and nothing in the picture changes with them).
+   */
+  const heightScale = (): number => (viewMode === '3d' ? verticalExaggeration : 1);
   let origin: readonly [number, number, number] = [0, 0, 0];
   let extent: BBox | null = null;
   const depth = { min: 0, max: 0 };
@@ -282,6 +288,7 @@ export async function createRenderer(
       add(object, id) {
         const own = new Scene();
         own.add(object);
+        own.scale.z = heightScale();
         scenes.set(id, own);
       },
       remove(object, id) {
@@ -528,6 +535,9 @@ export async function createRenderer(
       orbit = next.camera3d;
       origin = next.origin;
       verticalExaggeration = next.verticalExaggeration;
+      for (const own of scenes.values()) {
+        own.scale.z = heightScale();
+      }
       placeCameras();
       if (changedMode) {
         programs.reset();
