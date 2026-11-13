@@ -216,8 +216,8 @@ test.describe('the panel resize handle', () => {
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    // Tab to it as a person does: after the two Import buttons.
-    for (let presses = 0; presses < 5; presses += 1) {
+    // Tab to it as a person does: after the two Import buttons and the view control.
+    for (let presses = 0; presses < 6; presses += 1) {
       if (await handle(page).evaluate((element) => element.matches(':focus'))) {
         break;
       }
@@ -258,9 +258,10 @@ test.describe('the panel resize handle', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
     await expect(handle(page)).toBeFocused();
     expect(await styleOf(line(page), 'opacity')).toEqual(['1']);
-    // The order: toolbar Import, the map's Import, the handle, and then the panel's own tabs.
+    // The order: toolbar Import, the toolbar's view control, the map's Import, the handle, and then the panel's own tabs.
     await page.keyboard.press('Tab');
     await expect(tab(page, 'Legend')).toBeFocused();
     await page.mouse.move(100, 300);

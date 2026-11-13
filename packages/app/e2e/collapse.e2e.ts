@@ -428,10 +428,11 @@ test.describe('collapsing the panel into a rail', () => {
       }
       return seen;
     };
-    // The toolbar's Import, the map's Import, the handle on the panel's edge, the chosen tab (not
-    // the other) and the collapse button.
-    expect(await stops(5)).toEqual([
+    // The toolbar's Import, the toolbar's view control (at the choice that is chosen), the map's Import,
+    // the handle on the panel's edge, the chosen tab (not the other) and the collapse button.
+    expect(await stops(6)).toEqual([
       'Import',
+      '2D',
       'Import',
       'Resize panel',
       'Legend',

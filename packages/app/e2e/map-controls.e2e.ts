@@ -451,7 +451,8 @@ test.describe('moving the 2D map with the keyboard', () => {
     page,
   }) => {
     await start(page);
-    await page.locator('karmania-app header.toolbar k-button button').focus();
+    // From the toolbar's last control (the view), the next stop is the map area.
+    await page.locator('karmania-app header.toolbar k-segmented [aria-checked="true"]').focus();
     await page.keyboard.press('Tab');
     const ring = await page.evaluate(() => {
       let active: Element | null = document.activeElement;

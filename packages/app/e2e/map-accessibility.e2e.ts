@@ -121,8 +121,8 @@ test.describe('the map for those who cannot see it', () => {
   }) => {
     await page.goto('/');
     await withData(page);
-    // Tab from the toolbar's Import to the map area: the keyboard, so that the ring shows.
-    await page.locator('karmania-app header.toolbar k-button button').focus();
+    // Tab from the toolbar's last control (the view) to the map area: the keyboard, so that the ring shows.
+    await page.locator('karmania-app header.toolbar k-segmented [aria-checked="true"]').focus();
     await page.keyboard.press('Tab');
     await expect(area(page)).toBeFocused();
     const ring = await area(page).evaluate((element) => {
