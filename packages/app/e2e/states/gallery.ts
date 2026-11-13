@@ -215,6 +215,25 @@ export const SHOTS: Shot[] = [
       return [target];
     },
   })),
+  { name: 'segmented', show: wholeSection('segmented') },
+  {
+    name: 'segmented-hover',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #segmented-default');
+      await reveal(target);
+      await target.locator('[role="radio"][data-value="3d"]').hover();
+      return [target];
+    },
+  },
+  {
+    name: 'segmented-focus',
+    show: async (page) => {
+      const target = gallery(page, 'karmania-gallery #segmented-default');
+      await reveal(target);
+      await focusByKeyboard(page, target.locator('[role="radio"][aria-checked="true"]'));
+      return [target];
+    },
+  },
   ...['first', 'middle', 'last', 'crowded'].map((where): Shot => ({
     name: `steps-${where}`,
     show: async (page) => {

@@ -22,6 +22,8 @@ export { KInput, INPUT_CHANGE } from './components/input.js';
 export type { InputChange, InputMode } from './components/input.js';
 export { KSelect, SELECT_CHANGE } from './components/select.js';
 export type { SelectChange, SelectOption } from './components/select.js';
+export { KSegmented, SEGMENTED_CHANGE } from './components/segmented.js';
+export type { SegmentedChange, SegmentedOption } from './components/segmented.js';
 export { CHECKBOX_CHANGE, KCheckbox } from './components/checkbox.js';
 export type { CheckboxChange } from './components/checkbox.js';
 export { KProgress } from './components/progress.js';
