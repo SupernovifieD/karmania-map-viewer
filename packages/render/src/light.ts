@@ -7,6 +7,12 @@
  * each frame.
  */
 
+/**
+ * How much of its colour a face keeps that faces away from the light, which is the rest of the light for a face that faces it. A steep
+ * slope or the side of a block is dark and not black, so that its shape is seen in the layer's own colour.
+ */
+export const AMBIENT = 0.25;
+
 /** A direction, `[x, y, z]`, of length 1. */
 export type Direction = readonly [number, number, number];
 

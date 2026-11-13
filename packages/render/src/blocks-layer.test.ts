@@ -68,6 +68,33 @@ describe('createBlocksLayer', () => {
     expect(geometry?.index?.count).toBe(36);
   });
 
+  it('has the normal of each corner of the box, which a face is lit by, and the light of the frame, starting straight above', () => {
+    const layer = createBlocksLayer(blocks(), LOOK);
+    const geometry = geometryOf(parts(layer)[0]);
+    const normal = geometry?.getAttribute('normal');
+    expect(normal?.count).toBe(24);
+    // The top face (the fifth of six, four corners each) faces up.
+    expect([normal?.getX(16), normal?.getY(16), normal?.getZ(16)]).toEqual([0, 0, 1]);
+    expect(uniforms(layer)['uLight']?.value).toMatchObject({ x: 0, y: 0, z: 1 });
+    expect(uniforms(layer)['uAmbient']?.value).toBe(0.25);
+    layer.prepareFrame({ ...SOLID, light: [-0.5, 0.5, Math.SQRT1_2] });
+    expect(uniforms(layer)['uLight']?.value).toMatchObject({ x: -0.5, y: 0.5, z: Math.SQRT1_2 });
+    // The depth pass has the same uniforms, so it discards the same blocks.
+    expect(
+      (
+        depthPasses(createBlocksLayer(blocks(), { ...LOOK, opacity: 0.5 }))[0]
+          ?.material as ShaderMaterial
+      ).uniforms['uLight'],
+    ).toBeDefined();
+  });
+
+  it('turns the normal of a face with the block and takes it into the space of the camera, in the shader that lights the block', () => {
+    const material = parts(createBlocksLayer(blocks(), LOOK))[0]?.material as ShaderMaterial;
+    expect(material.vertexShader).toContain('normalMatrix * facing');
+    expect(material.vertexShader).toContain('uTurn.y * normal.x - uTurn.x * normal.y');
+    expect(material.fragmentShader).toContain('dot(normalize(vNormal), uLight)');
+  });
+
   it('draws only the top face from above, and every face otherwise', () => {
     const layer = createBlocksLayer(blocks(), LOOK);
     const geometry = geometryOf(parts(layer)[0]);
