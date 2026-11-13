@@ -17,8 +17,8 @@ import {
   zoomAt,
 } from '@karmania/render';
 import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
-import { createSceneStore, firstNumericColumn } from '@karmania/scene';
-import type { Command, SceneDocument } from '@karmania/scene';
+import { cameraTo2d, cameraTo3d, createSceneStore, firstNumericColumn } from '@karmania/scene';
+import type { Command, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
@@ -155,6 +155,45 @@ export class KarmaniaViewer extends LitElement {
   /** Changes the scene by a command (the same that the controls of the viewer use), and gives the document that comes of it. */
   dispatch(command: Command): SceneDocument {
     return this.store.dispatch(command);
+  }
+
+  /** Calls `listener` after each change of the scene, with the document that came of it and the one it replaced; gives the way to stop. */
+  subscribeToScene(listener: SceneListener): () => void {
+    return this.store.subscribe(listener);
+  }
+
+  /**
+   * Shows the map in 2D or in 3D, looking at the same place: the camera of the view it goes to is made from the camera of the view it
+   * leaves (`cameraTo3d`, `cameraTo2d`), so the centre, the heading and the scale at the centre are kept. Going to 3D looks at the middle of
+   * the height of the visible data, from the elevation and with the lens that the 3D camera had. The camera comes first and the mode
+   * after, so that the scene is never in 3D with a camera that was not made for it. With no map area to measure (nothing is shown yet) the
+   * camera is left as it is.
+   */
+  setViewMode(mode: ViewMode): void {
+    const state = this.store.getState();
+    if (state.viewMode === mode) {
+      return;
+    }
+    const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
+    const viewport = { width: box?.width ?? 0, height: box?.height ?? 0 };
+    if (mode === '3d') {
+      const camera3d = cameraTo3d({
+        camera2d: state.camera2d,
+        viewport,
+        fov: state.camera3d.fov,
+        elevation: state.camera3d.elevation,
+        targetZ: this.pipeline?.middleHeight() ?? state.camera3d.target[2],
+      });
+      if (camera3d !== undefined) {
+        this.store.dispatch({ type: 'setCamera', patch: { camera3d } });
+      }
+    } else {
+      const camera2d = cameraTo2d({ camera3d: state.camera3d, viewport });
+      if (camera2d !== undefined) {
+        this.store.dispatch({ type: 'setCamera', patch: { camera2d } });
+      }
+    }
+    this.store.dispatch({ type: 'setViewMode', mode });
   }
 
   /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the viewer is. */
