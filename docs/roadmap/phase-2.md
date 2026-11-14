@@ -597,6 +597,9 @@ or releasing, and whenever the brief says to stop.
 ## M19: Legend system
 
 - [ ] 19.1 Legend tab tree from the legend model: rows of 10.3, empty state kept.
+  - [x] 19.1a The pipeline gives the legend what it needs: the engine's verdicts and the breaks, only for the style's own classes.
+  - [ ] 19.1b The Legend tab element draws the rows (groups and layers, the room of each control kept).
+  - [ ] 19.1c The viewer gives the panel the model; browser proofs; baselines.
 - [ ] 19.2 Visibility for layers and groups (tri-state); keyboard.
 - [ ] 19.3 Class entries with counts and "No value".
 - [ ] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live

@@ -1951,3 +1951,76 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(t.pipeline.states().get('layer-1')?.status).toBe('failed');
   });
 });
+
+describe('LayerPipeline: what the legend is given', () => {
+  it('gives what the engine said of each dataset, as it said it, and nothing once nothing is loaded', async () => {
+    const t = setup();
+    t.drawable([0, true], [1, false]);
+    await t.add(0, 1);
+    const { drawable } = t.pipeline.legendInputs();
+    expect(drawable?.map((entry) => [entry.id, entry.status])).toEqual([
+      [0, 'drawn'],
+      [1, 'not_drawn'],
+    ]);
+    expect(drawable?.[1]?.findings.map((found) => found.code)).toEqual(['display.not_drawn']);
+    t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
+    t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 1 });
+    await t.pipeline.idle();
+    expect(t.pipeline.legendInputs().drawable).toEqual([]);
+  });
+
+  it('gives the breaks of a layer that is coloured by classes, and none for a layer that is not', async () => {
+    const t = gridSetup();
+    t.drawable([0, true], [1, true]);
+    await t.addGrid(0);
+    expect(t.pipeline.legendInputs().breaks).toEqual({ 'layer-1': ranges('Au') });
+    // One colour: the engine may be asked for the one class of the cells that have a value (the mask), and those are not classes to list.
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#0072b2' } },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls.length).toBeGreaterThan(0);
+    expect(t.pipeline.legendInputs().breaks).toEqual({});
+  });
+
+  it('gives the breaks of a layer only while they are of the classes its style asks for: not those of the style it had', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(Object.keys(t.pipeline.legendInputs().breaks ?? {})).toEqual(['layer-1']);
+    const slow = deferred<ClassifyResult>();
+    t.state.classify = () => slow.promise;
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, classes: 5 } as never },
+    });
+    await vi.waitFor(() => {
+      expect(t.classifyCalls).toHaveLength(2);
+    });
+    // The request for 5 classes is out: the breaks that are held are of 7, and are not given.
+    expect(t.pipeline.legendInputs().breaks).toEqual({});
+    const five: ClassBreaks = {
+      kind: 'ranges',
+      column: 'Au',
+      bounds: [0, 5],
+      counts: [2],
+      nulls: 0,
+    };
+    slow.resolve({ status: 'classified', breaks: five });
+    await t.pipeline.idle();
+    expect(t.pipeline.legendInputs().breaks).toEqual({ 'layer-1': five });
+  });
+
+  it('gives no breaks for a layer that is gone', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
+    await t.pipeline.idle();
+    expect(t.pipeline.legendInputs().breaks).toEqual({});
+  });
+});
