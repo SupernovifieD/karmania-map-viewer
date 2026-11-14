@@ -1,4 +1,5 @@
 import type {
+  ClassEntry,
   Command,
   GroupVisibility,
   LegendGroupEntry,
@@ -7,9 +8,18 @@ import type {
 } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
-import { itemKey, moveFrom, toggleCommand, treeItems } from './legend-tree.js';
+import {
+  expansionFor,
+  itemKey,
+  moveFrom,
+  stillThere,
+  toggleCommand,
+  treeItems,
+  withExpansion,
+} from './legend-tree.js';
 import type { MoveKey, TreeItem } from './legend-tree.js';
 
 /** The name of the event the tab sends when a person asks something of the scene. */
@@ -31,6 +41,12 @@ const CHECKED: Record<GroupVisibility, 'true' | 'mixed' | 'false'> = {
   some: 'mixed',
   none: 'false',
 };
+
+/** What the rows are drawn from: the row that has the stop for Tab, and every row that is shown, by its key. */
+interface View {
+  readonly stop: string | undefined;
+  readonly items: ReadonlyMap<string, TreeItem>;
+}
 
 const MOVES: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 
@@ -57,6 +73,7 @@ export class KarmaniaLegendTab extends LitElement {
   static override properties = {
     model: { attribute: false },
     current: { state: true },
+    open: { state: true },
   };
 
   static override styles = [
@@ -205,6 +222,55 @@ export class KarmaniaLegendTab extends LitElement {
         text-align: right;
       }
 
+      /* The button that opens a layer, in the room of 28 that is kept for it on every layer: for the pointer, and not a stop for Tab (Right and Left do it from the row). */
+      .open {
+        align-items: center;
+        color: var(--k-text-muted);
+        cursor: pointer;
+        display: flex;
+        height: 100%;
+        justify-content: center;
+      }
+
+      .open k-icon:not([data-open]) {
+        transform: rotate(-90deg);
+      }
+
+      /* The class lines of a layer that is open: their swatches are under the layer's own and their counts at the right edge, where a group's is. */
+      .classes {
+        padding: 0 0 var(--k-space-4)
+          calc(var(--k-icon-size-sm) + var(--k-space-8) + var(--k-space-24) + var(--k-space-8));
+      }
+
+      .classes[data-level='2'] {
+        margin-left: var(--k-space-24);
+      }
+
+      .entry {
+        align-items: center;
+        display: grid;
+        font-size: var(--k-font-size-secondary);
+        font-variant-numeric: tabular-nums;
+        gap: 0 var(--k-space-8);
+        grid-template-columns: var(--k-space-12) minmax(0, 1fr) auto;
+        height: var(--k-space-24);
+        line-height: var(--k-line-height-secondary);
+      }
+
+      /* The line of the cells that have no value has a swatch that is only its outline: it has no colour. */
+      .dot {
+        border: var(--k-border-width) solid var(--k-border-strong);
+        border-radius: var(--k-radius-sm);
+        box-sizing: border-box;
+        height: var(--k-space-12);
+        width: var(--k-space-12);
+      }
+
+      .figure {
+        color: var(--k-text-muted);
+        text-align: right;
+      }
+
       /* The room of 24 has a colour of 16 by 16 or the classes of 24 by 12, at its left, in the middle of the row. */
       .swatch {
         border: var(--k-border-width) solid var(--k-border-strong);
@@ -225,11 +291,21 @@ export class KarmaniaLegendTab extends LitElement {
   declare model: LegendModel | undefined;
   /** The key of the row that last had the keyboard, which is the row with the stop for Tab if it is still a row. */
   declare private current: string | undefined;
+  /** The ids of the layers that a person has opened (a layer is open only if it has lines to show: `treeItems`). */
+  declare private open: ReadonlySet<string>;
 
   constructor() {
     super();
     this.model = undefined;
     this.current = undefined;
+    this.open = new Set();
+  }
+
+  /** A layer that has gone is not kept open for another that is given its id. */
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has('model') && this.model !== undefined) {
+      this.open = stillThere(this.open, this.model);
+    }
   }
 
   /** Asks the scene for something. */
@@ -263,7 +339,7 @@ export class KarmaniaLegendTab extends LitElement {
     if (isMove(event.key)) {
       event.preventDefault();
       const next = moveFrom(
-        this.model === undefined ? [] : treeItems(this.model),
+        this.model === undefined ? [] : treeItems(this.model, this.open),
         itemKey(item),
         event.key,
       );
@@ -273,6 +349,12 @@ export class KarmaniaLegendTab extends LitElement {
     } else if (event.key === ' ') {
       event.preventDefault();
       this.ask(toggleCommand(item));
+    } else {
+      const expanded = expansionFor(item, event.key);
+      if (expanded !== undefined) {
+        event.preventDefault();
+        this.open = withExpansion(this.open, item.id, expanded);
+      }
     }
   }
 
@@ -305,16 +387,43 @@ export class KarmaniaLegendTab extends LitElement {
         ></span>`;
   }
 
-  private layer(layer: LegendLayerEntry, level: 1 | 2, stop: string | undefined) {
-    const item: TreeItem = {
-      kind: 'layer',
-      id: layer.id,
-      level,
-      visible: layer.visible,
-      expandable: layer.classes.length > 0,
-      expanded: false,
-    };
-    const key = itemKey(item);
+  /** The button that opens a layer, or the room that is kept for it if the layer has nothing to show. */
+  private opener(item: TreeItem) {
+    if (item.kind !== 'layer' || !item.expandable) {
+      return html`<span class="open"></span>`;
+    }
+    return html`<span
+      class="open"
+      aria-hidden="true"
+      @click=${() => {
+        this.focusRow(itemKey(item));
+        this.open = withExpansion(this.open, item.id, !item.expanded);
+      }}
+      ><k-icon name="chevron-down" size="16" ?data-open=${item.expanded}></k-icon
+    ></span>`;
+  }
+
+  /** A line of a layer's classes: its colour (the cells with no value have none), its label and how many it has. */
+  private entry(entry: ClassEntry) {
+    return html`<div class="entry">
+      <span
+        class="dot"
+        aria-hidden="true"
+        style=${entry.colour === null ? nothing : `background: ${safeColour(entry.colour)}`}
+      ></span>
+      <span class="label name" data-truncate title=${entry.label}>${entry.label}</span>
+      <span class="visually-hidden">, </span>
+      <span class="figure">${entry.countLabel}</span>
+    </div>`;
+  }
+
+  private layer(layer: LegendLayerEntry, level: 1 | 2, view: View) {
+    const key = `layer:${layer.id}`;
+    const item = view.items.get(key);
+    if (item?.kind !== 'layer') {
+      return nothing;
+    }
+    const classes = `legend-classes-${layer.id}`;
     return html`
       <li role="none">
         <div
@@ -322,7 +431,9 @@ export class KarmaniaLegendTab extends LitElement {
           role="treeitem"
           aria-level=${String(level)}
           aria-checked=${layer.visible ? 'true' : 'false'}
-          tabindex=${key === stop ? '0' : '-1'}
+          aria-expanded=${item.expandable ? String(item.expanded) : nothing}
+          aria-owns=${item.expanded ? classes : nothing}
+          tabindex=${key === view.stop ? '0' : '-1'}
           data-level=${String(level)}
           data-layer=${layer.id}
           data-key=${key}
@@ -337,14 +448,27 @@ export class KarmaniaLegendTab extends LitElement {
           ${this.switch(item, layer.visible ? 'checked' : 'unchecked')} ${this.swatch(layer)}
           <span class="name" data-truncate title=${layer.name}>${layer.name}</span>
           <span class="notice"></span>
-          <span class="open"></span>
+          ${this.opener(item)}
         </div>
+        ${
+          item.expanded
+            ? html`<div
+                class="classes"
+                role="group"
+                id=${classes}
+                aria-label=${`Classes of ${layer.name}`}
+                data-level=${String(level)}
+              >
+                ${layer.classes.map((entry) => this.entry(entry))}
+              </div>`
+            : nothing
+        }
       </li>
     `;
   }
 
   /** A group is a row, and the list of its layers is beside it and owned by it, so that the name of the group is its own words and not those of its layers. */
-  private group(group: LegendGroupEntry, stop: string | undefined) {
+  private group(group: LegendGroupEntry, view: View) {
     const items = `legend-items-${group.id}`;
     const item: TreeItem = {
       kind: 'group',
@@ -363,7 +487,7 @@ export class KarmaniaLegendTab extends LitElement {
           aria-expanded=${group.collapsed ? 'false' : 'true'}
           aria-checked=${CHECKED[group.visibility]}
           aria-owns=${group.collapsed ? nothing : items}
-          tabindex=${key === stop ? '0' : '-1'}
+          tabindex=${key === view.stop ? '0' : '-1'}
           data-level="1"
           data-group=${group.id}
           data-key=${key}
@@ -387,7 +511,7 @@ export class KarmaniaLegendTab extends LitElement {
                 ${repeat(
                   group.layers,
                   (layer) => layer.id,
-                  (layer) => this.layer(layer, 2, stop),
+                  (layer) => this.layer(layer, 2, view),
                 )}
               </ul>`
         }
@@ -400,7 +524,11 @@ export class KarmaniaLegendTab extends LitElement {
     if (model === undefined || model.layerCount === 0) {
       return html`<k-empty-state>Layers will appear here once maps are rendered.</k-empty-state>`;
     }
-    const stop = this.stopOf(treeItems(model));
+    const items = treeItems(model, this.open);
+    const view: View = {
+      stop: this.stopOf(items),
+      items: new Map(items.map((item) => [itemKey(item), item])),
+    };
     return html`
       <div class="top"><span>${model.layerCountLabel}</span></div>
       <ul role="tree" aria-label="Layers">
@@ -408,7 +536,7 @@ export class KarmaniaLegendTab extends LitElement {
           model.entries,
           (entry) => `${entry.type}:${entry.id}`,
           (entry) =>
-            entry.type === 'group' ? this.group(entry, stop) : this.layer(entry, 1, stop),
+            entry.type === 'group' ? this.group(entry, view) : this.layer(entry, 1, view),
         )}
       </ul>
     `;
