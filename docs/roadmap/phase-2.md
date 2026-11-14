@@ -592,7 +592,7 @@ or releasing, and whenever the brief says to stop.
     - [x] 18.F5c Unit tests: both materials of points and lines freed, the surface layer's cells, every kind of buffers, and what a dense model lets go of.
   - [x] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.
   - [x] 18.F7 The second review: a listener test that made one change, a title and a comment that said more than they were, the last choice's corners, and two references in `docs/perf.md`.
-- [ ] 18.G Gate (with `pnpm perf` for 3D).
+- [x] 18.G Gate (with `pnpm perf` for 3D).
 
 ## M19: Legend system
 
