@@ -157,16 +157,87 @@ test.describe('the switch between the 2D and the 3D view', () => {
     expect(toTwo[1]?.centre2d).toEqual([500_030, 2_765_020]);
   });
 
-  test('makes a 3D camera with no data too, and sends nothing wrong to the page', async ({
+  test('switches with no data, in the view that was asked for, and sends nothing wrong to the page', async ({
     page,
   }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/');
+    const view = () =>
+      page.evaluate(() => {
+        const viewer = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+          scene(): { viewMode: string };
+        };
+        return viewer.scene().viewMode;
+      });
     await setViewMode(page, '3d');
+    expect(await view()).toBe('3d');
     await setViewMode(page, '2d');
+    expect(await view()).toBe('2d');
     await setViewMode(page, '3d');
+    expect(await view()).toBe('3d');
     expect((await camera3d(page)).heading).toBe(0);
     expect(errors).toEqual([]);
+  });
+
+  test('keeps the centre and the heading when there is nothing to measure: a viewer that has no size, and one that is not drawn yet', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const outcome = await page.evaluate(async () => {
+      type Camera = { centre: number[]; heading: number };
+      type Orbit = { target: number[]; heading: number; distance: number };
+      type Scene = { viewMode: string; camera2d: Camera; camera3d: Orbit };
+      type Viewer = HTMLElement & {
+        updateComplete: Promise<boolean>;
+        scene(): Scene;
+        dispatch(command: unknown): unknown;
+        setViewMode(mode: string): void;
+      };
+      // A viewer in a box that is not shown: its map area has no size.
+      const host = document.createElement('div');
+      host.style.display = 'none';
+      document.body.append(host);
+      const viewer = document.createElement('karmania-viewer') as unknown as Viewer;
+      host.append(viewer);
+      await viewer.updateComplete;
+      viewer.dispatch({
+        type: 'setCamera',
+        patch: { camera2d: { centre: [500_123, 2_765_456], unitsPerPixel: 0.25, heading: 70 } },
+      });
+      const distance = viewer.scene().camera3d.distance;
+      viewer.setViewMode('3d');
+      const there = viewer.scene();
+      viewer.dispatch({
+        type: 'setCamera',
+        patch: { camera3d: { target: [500_999, 2_765_111, 40], heading: 200 } },
+      });
+      viewer.setViewMode('2d');
+      const back = viewer.scene();
+      let bad = '';
+      try {
+        viewer.setViewMode('3D');
+      } catch (error) {
+        bad = error instanceof RangeError ? error.message : String(error);
+      }
+      const after = viewer.scene();
+      viewer.remove();
+      host.remove();
+      return { distance, there, back, bad, after };
+    });
+    // Going to 3D: the place and the heading of the 2D camera, with the 3D camera's own distance.
+    expect(outcome.there.viewMode).toBe('3d');
+    expect(outcome.there.camera3d.target.slice(0, 2)).toEqual([500_123, 2_765_456]);
+    expect(outcome.there.camera3d.heading).toBe(70);
+    expect(outcome.there.camera3d.distance).toBe(outcome.distance);
+    // And back: the place and the heading of the 3D camera, with the 2D camera's own scale.
+    expect(outcome.back.viewMode).toBe('2d');
+    expect(outcome.back.camera2d.centre).toEqual([500_999, 2_765_111]);
+    expect(outcome.back.camera2d.heading).toBe(200);
+    // A mode that is not one is a mistake of the caller, and changes nothing.
+    expect(outcome.bad).toMatch(/"2d" or "3d"/);
+    expect(outcome.after).toEqual(outcome.back);
   });
 });
