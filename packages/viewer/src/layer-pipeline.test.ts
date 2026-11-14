@@ -902,13 +902,11 @@ describe('LayerPipeline: the view of the data', () => {
       patch: { camera3d: { heading: 35, elevation: 25, fov: 60 } },
     });
     await t.pipeline.idle();
-    expect(t.pipeline.distanceLimits()).toEqual(DEFAULT_DISTANCE_LIMITS);
     expect(t.scene.getState()).toMatchObject({
       viewMode: '3d',
       verticalExaggeration: 5,
       camera3d: { heading: 35, elevation: 25, fov: 60 },
     });
-    expect(t.pipeline.fit()).toBe(true);
     const expected = fitCamera3d({
       extent: { min: [1000, 2000, 0], max: [1010, 2010, 5] },
       viewport: { width: 1000, height: 500 },
@@ -918,6 +916,12 @@ describe('LayerPipeline: the view of the data', () => {
       verticalExaggeration: 5,
     });
     expect(expected).toBeDefined();
+    // Before any fit in 3D the limits are those that the fit would give: they go with the data, and not with the button having been pressed.
+    expect(t.pipeline.distanceLimits()).toEqual({
+      min: (expected?.distance ?? 0) / ZOOM_IN_LIMIT,
+      max: (expected?.distance ?? 0) * ZOOM_OUT_LIMIT,
+    });
+    expect(t.pipeline.fit()).toBe(true);
     expect(t.scene.getState().camera3d).toEqual(expected);
     expect(t.scene.getState().camera2d).toBe(camera2d);
     const distance = t.scene.getState().camera3d.distance;
@@ -937,6 +941,39 @@ describe('LayerPipeline: the view of the data', () => {
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
     await t.pipeline.idle();
     expect(t.pipeline.middleHeight()).toBeUndefined();
+  });
+
+  it('has the limits of the 2D view from the data shown when the first view of it was fitted in 3D, and the wide ones with nothing to show or no size to measure', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    // The scene is in 3D when the data comes, so the first fit is a 3D one and the 2D scale is not set by it.
+    t.scene.dispatch({ type: 'setViewMode', mode: '3d' });
+    await t.add(0);
+    const fitted = fitCamera2d({
+      extent: { min: [1000, 2000, 0], max: [1010, 2010, 5] },
+      viewport: { width: 1000, height: 500 },
+      heading: 0,
+      padding: FIT_PADDING,
+    });
+    expect(fitted).toBeDefined();
+    expect(t.pipeline.limits()).toEqual({
+      min: (fitted?.unitsPerPixel ?? 0) / ZOOM_IN_LIMIT,
+      max: (fitted?.unitsPerPixel ?? 0) * ZOOM_OUT_LIMIT,
+    });
+    // With no size to measure there is no fit to give, and the limits are the wide ones.
+    t.setViewport({ width: 0, height: 0 });
+    expect(t.pipeline.limits()).toEqual(DEFAULT_SCALE_LIMITS);
+  });
+
+  it('has the limits of the 3D distance from the data shown at once, in a scene that is never fitted in 3D, and not the wide ones', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.pipeline.distanceLimits()).not.toEqual(DEFAULT_DISTANCE_LIMITS);
+    // Hidden, there is nothing shown to make a fit of: the wide limits.
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.pipeline.distanceLimits()).toEqual(DEFAULT_DISTANCE_LIMITS);
   });
 
   it('fits at the next look at the scene when the map area had no size at the first view', async () => {

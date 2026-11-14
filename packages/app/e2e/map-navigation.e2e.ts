@@ -381,6 +381,26 @@ test.describe('the navigation group in 3D', () => {
     expect((await camera3d(page)).distance).toBe(farthest);
   });
 
+  test('has the limits of the distance from the data when the view was switched to 3D and never fitted: the same as after Fit', async ({
+    page,
+  }) => {
+    // Switched from 2D with no press of Fit: 60 presses of zoom in go as near as the limit lets them.
+    await start3d(page);
+    for (let press = 0; press < 40; press += 1) {
+      await button(page, 'Zoom in').click();
+    }
+    await expect.poll(async () => (await camera3d(page)).distance).toBeLessThan(500 / 1000);
+    const nearest = (await camera3d(page)).distance;
+    // After Fit, in another page: the limit is 100,000 times closer than the distance that the fit gives, which is the same.
+    await page.goto('/');
+    await withData(page);
+    await setViewMode(page, '3d');
+    await button(page, 'Fit to data').click();
+    await expect.poll(async () => (await camera3d(page)).distance).toBeGreaterThan(0);
+    const fitted = (await camera3d(page)).distance;
+    expect(nearest).toBeCloseTo(fitted / 100_000, 9);
+  });
+
   test('fits the data: the camera looks at the middle of it, from far enough, with the heading and the elevation it has', async ({
     page,
   }) => {
