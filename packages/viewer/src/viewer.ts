@@ -14,6 +14,7 @@ import {
   attachController2d,
   attachController3d,
   createRenderer,
+  zoom3dAt,
   zoomAt,
 } from '@karmania/render';
 import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
@@ -55,6 +56,9 @@ import type { Furniture } from './furniture.js';
 import { datasetNotices, sameNotices, summariseLayers } from './layer-summary.js';
 import { readoutAt, readoutWidth } from './pointer-readout.js';
 import { syncDatasets } from './scene-datasets.js';
+
+/** The elevation the 3D view is put at by "Reset view", in degrees above the horizon: that of the first view of the data (`fitCamera3d` and the empty scene). */
+const RESET_ELEVATION = 45;
 
 /**
  * The viewer, `<karmania-viewer>`: the map area and the side panel, side by side, and the import wizard that opens
@@ -677,19 +681,52 @@ export class KarmaniaViewer extends LitElement {
         this.fit();
         break;
       case 'reset':
-        this.onNorthReset();
-        this.fit();
+        this.resetView();
         break;
     }
   };
 
-  /** Changes the scale by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the limits. */
+  /**
+   * North up and the data in view. In 2D that is the heading turned to 0 and the data fitted at that heading; in 3D the camera's heading is turned to
+   * 0 and its elevation put to `RESET_ELEVATION`, and the data is fitted from there (a fit keeps the heading and the elevation it is given).
+   */
+  private resetView(): void {
+    if (this.store.getState().viewMode === '3d') {
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: { camera3d: { heading: 0, elevation: RESET_ELEVATION } },
+      });
+    } else {
+      this.onNorthReset();
+    }
+    this.fit();
+  }
+
+  /**
+   * Changes the scale (in 3D, the distance) by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the
+   * limits.
+   */
   private zoomBy(factor: number): void {
     const box = this.renderRoot.querySelector('karmania-map-area')?.canvas?.getBoundingClientRect();
     if (box === undefined) {
       return;
     }
     const size = { width: box.width, height: box.height };
+    const state = this.store.getState();
+    if (state.viewMode === '3d') {
+      const change3d = zoom3dAt(
+        state.camera3d,
+        size,
+        factor,
+        size.width / 2,
+        size.height / 2,
+        this.pipeline?.distanceLimits() ?? DEFAULT_DISTANCE_LIMITS,
+      );
+      if (change3d !== undefined) {
+        this.store.dispatch({ type: 'setCamera', patch: { camera3d: change3d } });
+      }
+      return;
+    }
     const change = zoomAt(
       this.store.getState().camera2d,
       size,

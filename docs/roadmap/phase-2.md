@@ -567,7 +567,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
   resets it only.
   - [x] 18.8a The north arrow follows the active camera's heading; its reset in 3D keeps the elevation.
-  - [ ] 18.8b The navigation group in 3D: zoom in, zoom out, fit, reset view.
+  - [x] 18.8b The navigation group in 3D: zoom in, zoom out, fit, reset view.
   - [ ] 18.8c Overlay layout, status chip and scale bar in 3D; screenshots; axe.
 - [ ] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
   target is missed, add a step for drawing only exposed faces of dense models,
