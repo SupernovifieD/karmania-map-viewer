@@ -11,6 +11,7 @@ import {
   layerColour,
   layerStatuses,
   loadLattice,
+  mapColour,
   sceneFrame,
   stats,
 } from './support/render.js';
@@ -272,6 +273,7 @@ test.describe('layers in one plane, in 3D', () => {
         ['layer-2', 'drawn'],
       ]);
     const mesh = lit(bytes(await layerColour(page, 'layer-1')));
+    const map = await mapColour(page);
     for (const order of ['grid on top', 'mesh on top'] as const) {
       if (order === 'mesh on top') {
         await toTheBottom(page, 'layer-2', 2);
@@ -288,7 +290,9 @@ test.describe('layers in one plane, in 3D', () => {
           if (order === 'mesh on top') {
             expect(distance(seen, mesh), label).toBeLessThanOrEqual(3);
           } else {
+            // Not the mesh, and not the map showing through either (a grid that was not drawn would also be "not the mesh"): the grid's own colour.
             expect(distance(seen, mesh), label).toBeGreaterThan(30);
+            expect(distance(seen, map), `${label}, not the map`).toBeGreaterThan(30);
           }
         }
       }

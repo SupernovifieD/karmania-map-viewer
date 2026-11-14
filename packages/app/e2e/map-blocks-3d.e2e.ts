@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { projectionFor } from './support/fixtures.js';
-import { pixelOf3d } from './support/project.js';
+import { depthOf3d, pixelOf3d } from './support/project.js';
 import {
   around,
   camera,
@@ -10,6 +10,7 @@ import {
   drawn,
   layerStatuses,
   loadLattice,
+  mapColour,
   sceneFrame,
   stats,
 } from './support/render.js';
@@ -99,15 +100,8 @@ async function colourAt(
   return (await around(page, at.x, at.y, 0)).at(0, 0);
 }
 
-async function mapColour(page: Page): Promise<number[]> {
-  return page.locator('karmania-map-area canvas').evaluate((element) => {
-    const text = getComputedStyle(element).backgroundColor;
-    return [...(text.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number), 255];
-  });
-}
-
 test.describe('block models in 3D', () => {
-  test('show the side of each layer and the top of the highest, each in the colour of its class at the shade of its face, and none of what is inside', async ({
+  test('show the side of each layer and the top of the highest, each in the colour of its class at the shade of its face', async ({
     page,
   }) => {
     await loadModel(page);
@@ -252,7 +246,7 @@ test.describe('block models in 3D', () => {
     ).toBeLessThanOrEqual(4);
   });
 
-  test('that are less than opaque have no seams: every pixel along the joins between blocks is the one blend, and not darker where the faces inside meet', async ({
+  test('that are less than opaque have no seams: the pixels every 2 metres along the joins between blocks are the one blend, and not darker where the faces inside meet', async ({
     page,
   }) => {
     await loadModel(page);
@@ -281,7 +275,7 @@ test.describe('block models in 3D', () => {
     expect(bad, 'the places along the joins that are not the blend of the top').toEqual([]);
   });
 
-  test('are all in the picture when the view is fitted to them, and none of them cut off in front or behind', async ({
+  test('are all in the picture when the view is fitted to them: the top is the model, and the eight corners of its box are in the picture and between the planes in front of and behind the camera', async ({
     page,
   }) => {
     await loadModel(page);
@@ -318,9 +312,27 @@ test.describe('block models in 3D', () => {
       ).toBeGreaterThan(30);
       expect(distance(colour, scaled(LAST, TOP))).toBeLessThanOrEqual(3);
     }
-    // The planes in front of and behind the camera hold the whole model, with room: its corners are between them.
+    // The whole box of the model, the corners that are not seen too (the bottom ones, which are behind the model, and the far ones): each is in the picture,
+    // and between the planes in front of and behind the camera, so that nothing of the model is cut off by either.
     const perspective = now.perspective;
     expect(perspective).not.toBeNull();
-    expect(perspective?.near ?? Infinity).toBeLessThan(perspective?.far ?? 0);
+    const near = perspective?.near ?? Infinity;
+    const far = perspective?.far ?? 0;
+    for (const east of [0, 80]) {
+      for (const north of [0, 80]) {
+        for (const up of [0, 40]) {
+          const corner = `the corner ${String(east)},${String(north)},${String(up)}`;
+          const depth = depthOf3d(now, view.origin, [EAST + east, NORTH + north, up]);
+          expect(depth, `${corner} is in front of the far plane`).toBeLessThan(far);
+          expect(depth, `${corner} is behind the near plane`).toBeGreaterThan(near);
+          const at = pixelOf3d(now, view.origin, [EAST + east, NORTH + north, up]);
+          expect(at, `${corner} is in front of the camera`).toBeDefined();
+          expect(at?.x ?? -1, `${corner} is not left of the picture`).toBeGreaterThanOrEqual(0);
+          expect(at?.x ?? Infinity, `${corner} is not right of it`).toBeLessThan(now.width);
+          expect(at?.y ?? -1, `${corner} is not below it`).toBeGreaterThanOrEqual(0);
+          expect(at?.y ?? Infinity, `${corner} is not above it`).toBeLessThan(now.height);
+        }
+      }
+    }
   });
 });

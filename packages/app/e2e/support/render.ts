@@ -315,7 +315,19 @@ export async function around(page: Page, x: number, y: number, half: number): Pr
 
 /** How far the pixel is from a colour, as the largest difference of a channel. */
 export function distance(pixel: readonly number[], colour: readonly number[]): number {
+  if (colour.length === 0) {
+    // The largest of no differences is minus infinity, which is within any tolerance: a test that compared with nothing could not fail.
+    throw new Error('There is no colour to compare the pixel with.');
+  }
   return Math.max(...colour.map((channel, i) => Math.abs((pixel[i] ?? 0) - channel)));
+}
+
+/** The colour the map shows where nothing is drawn: the background of the canvas, as the 4 bytes of a pixel. */
+export async function mapColour(page: Page): Promise<number[]> {
+  return page.locator('karmania-map-area canvas').evaluate((element) => {
+    const text = getComputedStyle(element).backgroundColor;
+    return [...(text.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number), 255];
+  });
 }
 
 /** The box (in pixels from the middle of the block) of the pixels that are not the background, and how many there are. */

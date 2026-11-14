@@ -587,6 +587,9 @@ or releasing, and whenever the brief says to stop.
     - [x] 18.F4a Points and lines: new classes are written into the attribute the layer has, which owns its array.
     - [x] 18.F4b Blocks: the same for a sparse model; a dense model's instances go in a new geometry and the old one is disposed.
   - [ ] 18.F5 Tests that could not fail, or whose titles said more than they check.
+    - [x] 18.F5a The fit of blocks in 3D (all eight corners between the planes and in the picture), the grid over the mesh (not the map either), `distance` refusing an empty colour, two titles.
+    - [ ] 18.F5b The exaggeration is not applied from above under every factor; the surface that falls is darker than the one that rises in the pictures of both.
+    - [ ] 18.F5c Unit tests: both materials of points and lines freed, the surface layer's cells, every kind of buffers, and what a dense model lets go of.
   - [ ] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.
 - [ ] 18.G Gate (with `pnpm perf` for 3D).
 
