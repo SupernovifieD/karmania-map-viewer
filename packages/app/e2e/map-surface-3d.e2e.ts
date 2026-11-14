@@ -11,6 +11,7 @@ import {
   layerColour,
   layerStatuses,
   loadLattice,
+  mapColour,
   sceneFrame,
   stats,
 } from './support/render.js';
@@ -115,13 +116,6 @@ async function colourOnSurface(
   return (await around(page, at.x, at.y, 0)).at(0, 0);
 }
 
-async function mapColour(page: Page): Promise<number[]> {
-  return page.locator('karmania-map-area canvas').evaluate((element) => {
-    const text = getComputedStyle(element).backgroundColor;
-    return [...(text.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number), 255];
-  });
-}
-
 const scaled = (colour: readonly number[], by: number): number[] => colour.map((c) => c * by);
 
 test.describe('the surface of a grid with elevations', () => {
@@ -161,16 +155,26 @@ test.describe('the surface of a grid with elevations', () => {
     }
   });
 
-  test('is lit by the light of the view in 3D that a slope the other way gets less of: a surface that falls to the east is darker than one that rises', async ({
+  test('is lit by the light of the view in 3D that a slope the other way gets less of: a surface that falls to the east is darker than one that rises, in the pictures of the two', async ({
     page,
   }) => {
+    // The same cells of the same class, seen from the same side: on a surface that rises to the east, and on one that falls to it.
+    await loadSurface(page, surface(0.5));
+    const rises = await colourOnSurface(page, await look3d(page, 20, 50), 30, 60, 0.5);
     await loadSurface(page, surface(-0.5));
-    const view = await look3d(page, 20, 50);
-    const shade = shade3d(rising(-0.5));
-    expect(shade).toBeLessThan(shade3d(rising(0.5)) - 0.2);
+    const falls = await colourOnSurface(page, await look3d(page, 20, 50), 30, 60, -0.5);
     expect(
-      distance(await colourOnSurface(page, view, 30, 60, -0.5), scaled(FIRST, shade)),
+      distance(rises, scaled(FIRST, shade3d(rising(0.5)))),
+      'the surface that rises is at its shade',
     ).toBeLessThanOrEqual(3);
+    expect(
+      distance(falls, scaled(FIRST, shade3d(rising(-0.5)))),
+      'the surface that falls is at its shade',
+    ).toBeLessThanOrEqual(3);
+    // And the two pictures say it by themselves, without the shades above: the one that falls has less of every colour of the class together.
+    const total = (colour: readonly number[]): number =>
+      (colour[0] ?? 0) + (colour[1] ?? 0) + (colour[2] ?? 0);
+    expect(total(falls), 'the pixel of the surface that falls').toBeLessThan(total(rises) - 30);
   });
 
   test('is drawn in 2D too, lit from straight above: the colour of the class at 0.25 + 0.75 of the part of a slope that faces up', async ({

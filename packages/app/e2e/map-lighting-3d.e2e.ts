@@ -495,33 +495,32 @@ test.describe('the vertical exaggeration', () => {
     });
   }
 
-  test('is not applied in the view from above: the picture of the slopes there is the same under any factor', async ({
+  test('is not applied in the view from above: the picture of the slopes there is the same under every factor of the select (1, 2, 3, 5 and 10)', async ({
     page,
   }) => {
     await loadMesh(page);
     const colour = bytes(await layerColour(page));
     const now2d = await camera(page);
-    // From above, the shade of a slope is that of its own steepness, 50 over 50, whatever the exaggeration that 3D has is.
-    await dispatch(page, { type: 'setVerticalExaggeration', factor: 10 });
-    const buffer = await drawn(page);
-    const west = FACES_WEST_2D;
-    const x = Math.floor(
-      buffer.width / 2 +
-        ((EAST + west[0] - now2d.centre[0]) / now2d.unitsPerPixel) * buffer.pixelRatio,
-    );
-    const y = Math.floor(
-      buffer.height / 2 +
-        ((NORTH + west[1] - now2d.centre[1]) / now2d.unitsPerPixel) * buffer.pixelRatio,
-    );
-    const seen = (await around(page, x, y, 0)).at(0, 0);
-    // The light from above: 0.25 + 0.75 of the part of the slope that faces up, for a rise of 50 over a run of 50.
-    const wanted = AMBIENT + (1 - AMBIENT) * Math.SQRT1_2;
-    expect(
-      distance(
-        seen,
-        colour.map((c) => c * wanted),
-      ),
-    ).toBeLessThanOrEqual(3);
+    // From above, the shade of a slope is that of its own steepness, 50 over 50, whatever the exaggeration that 3D has is: 0.25 + 0.75 of the part
+    // of the slope that faces up.
+    const wanted = colour.map((c) => c * (AMBIENT + (1 - AMBIENT) * Math.SQRT1_2));
+    for (const factor of [1, 2, 3, 5, 10]) {
+      await dispatch(page, { type: 'setVerticalExaggeration', factor });
+      const buffer = await drawn(page);
+      const x = Math.floor(
+        buffer.width / 2 +
+          ((EAST + FACES_WEST_2D[0] - now2d.centre[0]) / now2d.unitsPerPixel) * buffer.pixelRatio,
+      );
+      const y = Math.floor(
+        buffer.height / 2 +
+          ((NORTH + FACES_WEST_2D[1] - now2d.centre[1]) / now2d.unitsPerPixel) * buffer.pixelRatio,
+      );
+      const seen = (await around(page, x, y, 0)).at(0, 0);
+      expect(
+        distance(seen, wanted),
+        `the slope seen from above under x${String(factor)}`,
+      ).toBeLessThanOrEqual(3);
+    }
   });
 });
 
