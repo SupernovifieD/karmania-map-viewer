@@ -7,9 +7,9 @@ import './north-arrow.js';
 import './scale-bar.js';
 import './status-chip.js';
 import type { MapCrsText } from './map-crs-text.js';
-import { KEYS_2D } from './map-label.js';
+import { KEYS_2D, KEYS_3D } from './map-label.js';
 import type { Readout } from './pointer-readout.js';
-import type { ScaleBarModel } from '@karmania/scene';
+import type { ScaleBarModel, ViewMode } from '@karmania/scene';
 
 /** The name of the event the map area sends when a person asks to import files with its button. */
 export const IMPORT_REQUEST = 'karmania-import-request';
@@ -56,6 +56,7 @@ export class KarmaniaMapArea extends LitElement {
     scale: { attribute: false },
     crs: { attribute: false },
     label: { type: String },
+    viewMode: { type: String },
     readout: { attribute: false },
     readoutChars: { type: Number },
     preparing: { type: Number },
@@ -232,6 +233,8 @@ export class KarmaniaMapArea extends LitElement {
   declare crs: MapCrsText | undefined;
   /** What the map is called for those who cannot see it: `Map, 2D view, 3 layers, turned 30° from north`. */
   declare label: string;
+  /** Which camera is active: it chooses the keyboard instructions that describe the map. */
+  declare viewMode: ViewMode;
   /** Where the pointer is on the map, written, for the status chip; `undefined` when it is off the map or the view is 3D. */
   declare readout: Readout | undefined;
   /** How many characters wide the longest coordinate of the readout can be at this camera: what the chip keeps room for. */
@@ -265,6 +268,7 @@ export class KarmaniaMapArea extends LitElement {
     this.scale = undefined;
     this.crs = undefined;
     this.label = 'Map';
+    this.viewMode = '2d';
     this.readout = undefined;
     this.readoutChars = 0;
     this.preparing = 0;
@@ -311,7 +315,13 @@ export class KarmaniaMapArea extends LitElement {
         @drop=${this.onDrop}
       >
         <canvas role="img" aria-label=${this.label}></canvas>
-        ${this.interactive ? html`<p id="keys" class="visually-hidden">${KEYS_2D}</p>` : nothing}
+        ${
+          this.interactive
+            ? html`<p id="keys" class="visually-hidden">
+                ${this.viewMode === '3d' ? KEYS_3D : KEYS_2D}
+              </p>`
+            : nothing
+        }
         ${
           this.datasets === 0
             ? this.empty()

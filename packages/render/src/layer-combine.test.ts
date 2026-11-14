@@ -11,7 +11,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 2,
 };
-const INFO: FrameInfo = { pixelRatio: 2, viewport: [800, 600], flat: true, outline: [0, 0, 0] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [800, 600],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 
 /** A part that says what it was told, and that takes `parts` steps to build when it has any. */
 function part(name: string, parts = 0) {

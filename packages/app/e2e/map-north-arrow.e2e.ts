@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { camera, dispatch, withData } from './support/render.js';
+import { camera, camera3d, dispatch, setViewMode, withData } from './support/render.js';
 
 /** The map area's box and the north arrow's, on the page. */
 const area = (page: Page): Locator => page.locator('karmania-map-area main');
@@ -171,5 +171,123 @@ test.describe('the north arrow', () => {
     await page.mouse.move(box.x - 100, box.y + 100, { steps: 4 });
     await page.mouse.up();
     expect(await camera(page)).toEqual(before);
+  });
+});
+
+/**
+ * The north arrow in 3D (step 18.8a): its needle turns with the heading of the 3D camera, which the 2D camera's has nothing to do with while the
+ * view is 3D, and pressing it turns that heading to north and keeps the elevation, the target and the distance of the camera.
+ */
+test.describe('the north arrow in 3D', () => {
+  /** The 3D camera of the scene made easy to read: 40 degrees up, 500 away, looking at a place, turned `heading`. */
+  const orbit = (page: Page, heading: number): Promise<void> =>
+    dispatch(page, {
+      type: 'setCamera',
+      patch: {
+        camera3d: {
+          target: [500_100, 2_765_100, 110],
+          distance: 500,
+          heading,
+          elevation: 40,
+          fov: 45,
+        },
+      },
+    });
+
+  test('turns its needle with the heading of the 3D camera, and says the angle in its name, whatever the 2D camera has', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    // The 2D camera is turned 100 degrees and stays so; the view is 3D, with the other camera.
+    await turn(page, 100);
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    // (The command only changes the view, and does not make a camera from the other: the 3D camera is as it was, turned 0.)
+    await expect(page.locator('karmania-north-arrow g')).toHaveAttribute('data-angle', '0');
+    for (const [heading, angle, name] of [
+      [30, -30, 'Reset to north. Map turned 30° from north'],
+      [200, 160, 'Reset to north. Map turned 200° from north'],
+      [0, 0, 'Reset to north. North is up'],
+    ] as const) {
+      await orbit(page, heading);
+      await expect(page.locator('karmania-north-arrow g')).toHaveAttribute(
+        'data-angle',
+        String(angle),
+      );
+      await expect(button(page)).toHaveAccessibleName(name);
+    }
+    // Back in 2D the needle is the 2D camera's again.
+    await dispatch(page, { type: 'setViewMode', mode: '2d' });
+    await expect(page.locator('karmania-north-arrow g')).toHaveAttribute('data-angle', '-100');
+  });
+
+  test('points where north is on the screen in 3D too, which is the way the camera is turned from it', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    for (const [heading, dx, dy] of [
+      [0, 0, -1],
+      [90, -1, 0],
+      [180, 0, 1],
+      [270, 1, 0],
+    ] as const) {
+      await orbit(page, heading);
+      await expect
+        .poll(async () => {
+          const tip = await tipFromMiddle(page);
+          const length = Math.hypot(tip.dx, tip.dy);
+          return [Math.round(tip.dx / length), Math.round(tip.dy / length)];
+        })
+        .toEqual([dx, dy]);
+    }
+  });
+
+  test('turns the heading of the 3D camera to north when it is pressed, and keeps the elevation, the target and the distance, and the 2D camera', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    await turn(page, 100);
+    const flat = await camera(page);
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    await orbit(page, 75);
+    await button(page).click();
+    await expect.poll(async () => (await camera3d(page)).heading).toBe(0);
+    const after = await camera3d(page);
+    expect(after.elevation).toBe(40);
+    expect(after.distance).toBe(500);
+    expect(after.target).toEqual([500_100, 2_765_100, 110]);
+    expect(after.fov).toBe(45);
+    // The 2D camera was not what was turned: it is as it was.
+    expect(await camera(page)).toEqual(flat);
+    await expect(button(page)).toHaveAccessibleName('Reset to north. North is up');
+  });
+
+  test('does it from the keyboard too, with Enter and with Space', async ({ page }) => {
+    await page.goto('/');
+    await withData(page);
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    for (const key of ['Enter', 'Space']) {
+      await orbit(page, 45);
+      await button(page).focus();
+      await page.keyboard.press(key);
+      await expect.poll(async () => (await camera3d(page)).heading, key).toBe(0);
+    }
+  });
+
+  test('is the name of the map for those who cannot see it: the 3D view and how the camera is turned', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    await dispatch(page, { type: 'setViewMode', mode: '3d' });
+    await orbit(page, 40);
+    await expect(
+      page.getByRole('img', { name: 'Map, 3D view, 1 layer, turned 40° from north' }),
+    ).toBeVisible();
+    await setViewMode(page, '2d');
+    await expect(page.getByRole('img', { name: /Map, 2D view, 1 layer, / })).toBeVisible();
   });
 });

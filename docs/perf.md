@@ -485,3 +485,50 @@ The first WebGL context of a browser also starts its graphics process, which hel
 the timings make a context and use it before they measure; the cost to a page that is the first of its browser is what it was in the first runs. The Phase 1
 timings of the previous section, which did not draw a map, are in the full Chromium too from this step, and have the same start.
 
+## The 3D view with a model of 1,000,000 blocks (phase 2, steps 18.9b and 18.9c)
+
+Section 9.6 of the Phase 2 brief: a model of 1,000,000 blocks, loaded to the first frame under 3 s and, in a scripted 3D orbit, the 95th percentile of the frame time
+under 50 ms; no task of the main thread over 50 ms; and "if this is missed, a step may draw only the exposed faces of dense models; measure first". `pnpm perf`
+(the `render-performance` project, `render.perf.ts`) now does the orbit after the load: the view is switched to 3D with `viewer.setViewMode('3d')` and fitted (the time to the first
+frame that has the layer in it is printed as `switchMs`), and the camera is given a new place at each of 300 frames, going round a turn and a quarter (1.5 degrees a frame, 450 degrees in the 300) while it rises
+and falls between 25 and 65 degrees above the horizon; the time between two animation frames is what is measured, as in 2D, with the display's own beat measured in the same page. The
+file is `blocks-1m.csv` (a dense model of 100 by 100 by 100 blocks of 10 m, from `scripts/generate-fixtures`), the card the same as above (Intel Iris Plus Graphics, in the full Chromium).
+
+**First measurement, every face of every block drawn (the layer as it was after 18.4b):** the target was **missed**.
+
+| | Run 1 | Run 2 | Run 3 | Target |
+| --- | ---: | ---: | ---: | --- |
+| Loading to the first frame, ms | 2,181 (cold: the first run after the machine had been left) | 417 | 448 | 3,000 |
+| Median frame time of the orbit, ms | 86.3 | 81.1 | 83.7 | (not a target) |
+| 95th percentile of the same, ms | 126.7 | 101.1 | 108.2 | under 50 |
+| Switch to 3D and fit, to the first frame, ms | 28 | 22 | 28 | |
+| Longest task of the main thread, ms | none over 50 | none over 50 | none over 50 | 50 |
+
+At a median of 81 to 86 ms the page drew 12 frames a second. A solid model of 100 by 100 by 100 blocks has 6,000,000 faces, of which 60,000 (6 x 100 x 100) are on its outside; the rest are inside it and
+show from no side. **The cost is most likely the faces inside the model being drawn and then thrown away by the depth test, which I did not profile to confirm**; what is known is that drawing only the exposed faces, which does
+not change a pixel, took the frame from 81 to 86 ms to the display's beat. **So 18.9c draws only the exposed faces of a dense model** (the decision of 18.9c2 says how: when the
+classes arrive the layer makes instances for the blocks that are drawn and have a face that shows, with a mask of which, and the vertex shader leaves out the others; the kernel says the
+size of the lattice for it, 18.9c1). The picture is the same to the pixel (the 23 render golden images, at threshold 0).
+
+**After it, five runs** (the same machine and card; the cold first run of the table above was not seen again, and the instances are made 25,000 blocks a frame):
+
+| | Runs 1 to 5 | Target |
+| --- | ---: | --- |
+| Loading to the first frame, ms | 400, 456, 497, 453, 502 | 3,000 |
+| Median frame time of the orbit, ms | 16.7, 16.7, 16.7, 16.6, 16.7 (the display's beat, measured in the same page: 16.5 to 16.9) | (at the display's beat) |
+| 95th percentile of the same, ms | 17.3, 18.5, 19.0, 18.7, 18.3 | under 50 |
+| Frames the renderer drew for the 300 changes of the camera | 299 in every run | (the test asks for 290) |
+| Switch to 3D and fit, to the first frame, ms | 26, 23, 24, 25, 25 | |
+| Longest task of the main thread, ms | none over 50 in any | 50 |
+
+**All the targets of the block model are met, with a wide margin for the frames** (the median is the beat of the display and the 95th percentile 3 ms over it). Three things to say
+plainly. **(1)** Before the instances were made 25,000 blocks at a time (when a whole part of 100,000 was made in one go), three runs gave a median of 16.6 ms and a 95th percentile of 18.4 to 18.6 ms, and **one of the three had a
+task of 76 ms and a first frame of 1,338 ms**: the first part's loop running cold, in the first run after a pause. That is why the work is bounded in a frame (2 to 6 ms of it), and no task over 50 ms was seen in the
+five runs after, which does not prove there never is one on a slower machine. **(2)** The harness prints the frames that took over 50 ms (the Long Animation Frames API, `SLOW`): in each of the five runs there was one, of 50 to 67 ms, with a callback of a timer of 29 to 40 ms and
+one of a frame of 10 to 12 ms in it, early in the run (4.2 to 4.9 s after the page started); **it was not a task over 50 ms** (the long-task observer saw none) **and its cause was not looked into**, as the frames of the orbit are all at the display's beat. **(3)** The numbers are for this
+machine's integrated card; the software driver of the Docker image is not measured here (it took 2 s for a frame of a million points in 2D) and a model with many holes (a topography with air blocks, for instance) has more exposed faces than a solid one, so more instances: the cost goes with the surface of
+what is drawn, which a solid cube has the least of.
+
+**After step 18.F4b** (the geometry of a part of a dense model is replaced and the old one disposed, so that no buffer is left on the card): one run, started right after the golden images of the Docker image, on a busy machine (load average 11), **failed the longest-task target: 51 ms against 50**, its cause not looked into. Three runs with the change and three on the commit before it, on a quiet machine (load 2.2 at the start), saw no task over 50 ms in any: first frame 302 to 351 ms (354 to 426 before), 95th percentile 18.4 to 18.5 (18.5 to 18.7), switch to 3D and fit 24 to 29 ms (23 to 32), 299 frames of 300 in every run. So the figures above hold on a quiet machine, and **a busy one can miss the 50 ms by a millisecond**, as the first measurement of the 2D probes, in the section above, said it could (51 to 58 ms in later runs; the first measurement of the orbit had no task over 50 ms).
+
+What it takes to repeat: `pnpm perf` (about 5 minutes; it needs `scripts/generate-fixtures`, a quiet machine and a card), or `KARMANIA_PERF=1 pnpm --filter @karmania/app exec playwright test --project render-performance --workers=1 -g "1,000,000 blocks"` for this one.

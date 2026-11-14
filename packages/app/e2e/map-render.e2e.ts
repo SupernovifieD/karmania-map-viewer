@@ -137,6 +137,39 @@ test.describe('the renderer core', () => {
     expect(now.frame.right).toBeCloseTo((now.cssWidth * view.unitsPerPixel) / 2, 4);
   });
 
+  test('uses the perspective camera of a 3D scene, relative to the frame origin and clipped to the prepared extent', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await withData(page);
+    const origin = (await sceneFrame(page))?.origin ?? [0, 0, 0];
+    const target = [origin[0] + 100, origin[1] + 200, origin[2] + 30] as const;
+    await dispatch(
+      page,
+      {
+        type: 'setCamera',
+        patch: {
+          camera3d: { target, distance: 500, heading: 90, elevation: 30, fov: 60 },
+        },
+      },
+      { type: 'setViewMode', mode: '3d' },
+    );
+    await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+    await expect.poll(async () => (await stats(page))?.layersDrawn ?? 0).toBeGreaterThan(0);
+    const now = await stats(page);
+    const frame = now?.perspective;
+    expect(frame).not.toBeNull();
+    expect(frame?.fov).toBe(60);
+    expect(frame?.aspect).toBeCloseTo((now?.cssWidth ?? 1) / (now?.cssHeight ?? 1), 12);
+    expect(frame?.target).toEqual([100, 200, 30]);
+    expect(frame?.position[0]).toBeCloseTo(100 - 500 * Math.cos(Math.PI / 6), 10);
+    expect(frame?.position[1]).toBeCloseTo(200, 10);
+    expect(frame?.position[2]).toBeCloseTo(280, 10);
+    expect(frame?.up).toEqual([0, 0, 1]);
+    expect(frame?.near).toBeGreaterThan(0);
+    expect(frame?.far).toBeGreaterThan(frame?.near ?? Infinity);
+  });
+
   test('draws one frame for any number of changes made together, and none for a change that changes nothing', async ({
     page,
   }) => {

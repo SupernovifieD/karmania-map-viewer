@@ -6,6 +6,7 @@
 import type { CrsInfo } from '@karmania/engine';
 import { scaleBar } from '@karmania/scene';
 import type { SceneDocument, ScaleBarModel } from '@karmania/scene';
+import { headingOf } from './heading.js';
 import { mapCrsText } from './map-crs-text.js';
 import { mapLabel } from './map-label.js';
 import type { MapCrsText } from './map-crs-text.js';
@@ -13,7 +14,7 @@ import { unitsOf } from './map-units.js';
 
 /** What the furniture shows. */
 export interface Furniture {
-  /** The camera's heading, in degrees clockwise from grid north: the north arrow's needle turns with it. */
+  /** The heading of the camera of the view that is shown, in degrees clockwise from grid north: the north arrow's needle turns with it. */
   readonly heading: number;
   /** The scale bar, or why there is none. */
   readonly scale: ScaleBarModel;
@@ -29,7 +30,7 @@ export interface Furniture {
  */
 export function furnitureOf(state: SceneDocument, info: CrsInfo | null | undefined): Furniture {
   return {
-    heading: state.camera2d.heading,
+    heading: headingOf(state),
     scale: scaleBar({
       viewMode: state.viewMode,
       units: unitsOf(state.frame, info),

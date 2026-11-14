@@ -11,6 +11,7 @@ const scene = (
     Array.from({ length: layers }, (_, index) => [`layer-${String(index + 1)}`, {}]),
   ) as never,
   camera2d: { heading },
+  camera3d: { heading },
 });
 
 describe('the name of the map', () => {
@@ -38,5 +39,15 @@ describe('the name of the map', () => {
 
   it('says the 3D view', () => {
     expect(mapLabel(scene(0, 1, '3d'))).toBe('Map, 3D view, 1 layer, north up');
+  });
+
+  it('says how the map is turned in the view that is shown: the 3D camera’s heading in 3D, the 2D camera’s in 2D', () => {
+    const both = (viewMode: '2d' | '3d') => ({
+      ...scene(0, 1, viewMode),
+      camera2d: { heading: 30 },
+      camera3d: { heading: 200 },
+    });
+    expect(mapLabel(both('2d'))).toBe('Map, 2D view, 1 layer, turned 30° from north');
+    expect(mapLabel(both('3d'))).toBe('Map, 3D view, 1 layer, turned 200° from north');
   });
 });

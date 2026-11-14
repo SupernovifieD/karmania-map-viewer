@@ -102,12 +102,23 @@ pub(crate) fn buffers_to_js(buffers: &RenderBuffers) -> Result<JsValue, JsError>
             ("triangles", indices(&b.triangles)),
             ("triangleCell", indices(&b.triangle_cell)),
         ]),
-        RenderBuffers::Blocks(b) => object(&[
-            kind("blocks"),
-            ("centres", floats(&b.centres)),
-            ("spacing", numbers(&b.spacing)),
-            ("rotation", JsValue::from_f64(f64::from(b.rotation))),
-        ]),
+        RenderBuffers::Blocks(b) => {
+            let mut fields = vec![
+                kind("blocks"),
+                ("centres", floats(&b.centres)),
+                ("spacing", numbers(&b.spacing)),
+                ("rotation", JsValue::from_f64(f64::from(b.rotation))),
+            ];
+            // Only a dense model has them: the blocks along each axis, for the neighbours of a block.
+            if let Some(dims) = b.dims {
+                let dims: Array = dims
+                    .iter()
+                    .map(|n| JsValue::from_f64(f64::from(*n)))
+                    .collect();
+                fields.push(("dims", dims.into()));
+            }
+            object(&fields)
+        }
     }
 }
 

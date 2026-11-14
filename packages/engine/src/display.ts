@@ -139,6 +139,12 @@ export type RenderBuffers =
       readonly spacing: readonly [number, number, number];
       /** Degrees counter-clockwise about +Z that each box is turned by. */
       readonly rotation: number;
+      /**
+       * How many blocks there are along `i`, `j` and `k`, for a dense model only: one block for each cell of the lattice, in lattice order (`i`
+       * fastest, then `j`, then `k`), so that block `n` has the blocks `n ± 1`, `n ± dims[0]` and `n ± dims[0] * dims[1]` next to it. Absent for a
+       * sparse model.
+       */
+      readonly dims?: readonly [number, number, number];
     };
 
 /** What preparing a dataset came to. */

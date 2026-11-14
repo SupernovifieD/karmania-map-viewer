@@ -8,8 +8,8 @@ import type {
   RenderBuffers,
 } from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
-import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import { OTHER_COLOUR, createSceneStore, fitCamera2d } from '@karmania/scene';
+import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
+import { OTHER_COLOUR, createSceneStore, fitCamera2d, fitCamera3d } from '@karmania/scene';
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
 import { POSITIONS_PER_TURN } from './extent.js';
@@ -144,6 +144,7 @@ function setup(sinkOverride?: LayerSink | null) {
     setLayerClasses: vi.fn<LayerSink['setLayerClasses']>(),
     removeLayer: vi.fn(() => true),
     setDepthRange: vi.fn(),
+    setExtent: vi.fn(),
     maxTextureSize: 8192,
   };
   let current: LayerSink | undefined = sinkOverride === null ? undefined : (sinkOverride ?? sink);
@@ -700,11 +701,20 @@ describe('LayerPipeline: from the scene to the card', () => {
       });
     await t.add(0);
     expect(t.sink.setDepthRange).toHaveBeenCalledWith(3, 9);
+    expect(t.sink.setExtent).toHaveBeenCalledWith({
+      min: [1000, 2000, 103],
+      max: [1001, 2001, 109],
+    });
     expect(t.sink.setDepthRange.mock.invocationCallOrder[0]).toBeLessThan(
+      t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
+    );
+    const extentCall = t.sink.setExtent.mock.calls.findIndex(([extent]) => extent !== null);
+    expect(t.sink.setExtent.mock.invocationCallOrder[extentCall]).toBeLessThan(
       t.sink.setLayer.mock.invocationCallOrder[0] ?? Infinity,
     );
     t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
     expect(t.sink.setDepthRange).toHaveBeenLastCalledWith(0, 0);
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith(null);
   });
 
   it('asks for tiles of the size the card takes if that is less than the most a tile is, and the most if there is no card yet', async () => {
@@ -880,6 +890,92 @@ describe('LayerPipeline: the view of the data', () => {
     expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
   });
 
+  it('fits the 3D camera with its lens, heading, elevation and vertical exaggeration', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    const camera2d = t.scene.getState().camera2d;
+    t.scene.dispatch({ type: 'setViewMode', mode: '3d' });
+    t.scene.dispatch({ type: 'setVerticalExaggeration', factor: 5 });
+    t.scene.dispatch({
+      type: 'setCamera',
+      patch: { camera3d: { heading: 35, elevation: 25, fov: 60 } },
+    });
+    await t.pipeline.idle();
+    expect(t.scene.getState()).toMatchObject({
+      viewMode: '3d',
+      verticalExaggeration: 5,
+      camera3d: { heading: 35, elevation: 25, fov: 60 },
+    });
+    const expected = fitCamera3d({
+      extent: { min: [1000, 2000, 0], max: [1010, 2010, 5] },
+      viewport: { width: 1000, height: 500 },
+      fov: 60,
+      heading: 35,
+      elevation: 25,
+      verticalExaggeration: 5,
+    });
+    expect(expected).toBeDefined();
+    // Before any fit in 3D the limits are those that the fit would give: they go with the data, and not with the button having been pressed.
+    expect(t.pipeline.distanceLimits()).toEqual({
+      min: (expected?.distance ?? 0) / ZOOM_IN_LIMIT,
+      max: (expected?.distance ?? 0) * ZOOM_OUT_LIMIT,
+    });
+    expect(t.pipeline.fit()).toBe(true);
+    expect(t.scene.getState().camera3d).toEqual(expected);
+    expect(t.scene.getState().camera2d).toBe(camera2d);
+    const distance = t.scene.getState().camera3d.distance;
+    expect(t.pipeline.distanceLimits()).toEqual({
+      min: distance / ZOOM_IN_LIMIT,
+      max: distance * ZOOM_OUT_LIMIT,
+    });
+  });
+
+  it('says the middle of the heights of the visible layers, and nothing when there is none', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    expect(t.pipeline.middleHeight()).toBeUndefined();
+    await t.add(0);
+    // The two points are at 0 and 5 above the origin of the frame, which is at 0: the middle is 2.5.
+    expect(t.pipeline.middleHeight()).toBe(2.5);
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.pipeline.middleHeight()).toBeUndefined();
+  });
+
+  it('has the limits of the 2D view from the data shown when the first view of it was fitted in 3D, and the wide ones with nothing to show or no size to measure', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    // The scene is in 3D when the data comes, so the first fit is a 3D one and the 2D scale is not set by it.
+    t.scene.dispatch({ type: 'setViewMode', mode: '3d' });
+    await t.add(0);
+    const fitted = fitCamera2d({
+      extent: { min: [1000, 2000, 0], max: [1010, 2010, 5] },
+      viewport: { width: 1000, height: 500 },
+      heading: 0,
+      padding: FIT_PADDING,
+    });
+    expect(fitted).toBeDefined();
+    expect(t.pipeline.limits()).toEqual({
+      min: (fitted?.unitsPerPixel ?? 0) / ZOOM_IN_LIMIT,
+      max: (fitted?.unitsPerPixel ?? 0) * ZOOM_OUT_LIMIT,
+    });
+    // With no size to measure there is no fit to give, and the limits are the wide ones.
+    t.setViewport({ width: 0, height: 0 });
+    expect(t.pipeline.limits()).toEqual(DEFAULT_SCALE_LIMITS);
+  });
+
+  it('has the limits of the 3D distance from the data shown at once, in a scene that is never fitted in 3D, and not the wide ones', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    await t.add(0);
+    expect(t.pipeline.distanceLimits()).not.toEqual(DEFAULT_DISTANCE_LIMITS);
+    // Hidden, there is nothing shown to make a fit of: the wide limits.
+    t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.pipeline.distanceLimits()).toEqual(DEFAULT_DISTANCE_LIMITS);
+  });
+
   it('fits at the next look at the scene when the map area had no size at the first view', async () => {
     const t = setup();
     t.setViewport({ width: 0, height: 0 });
@@ -950,9 +1046,16 @@ describe('LayerPipeline: the view of the data', () => {
       });
     await t.add(0, 1);
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-2', visible: false });
+    await t.pipeline.idle();
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith({
+      min: [1000, 2000, 0],
+      max: [1010, 2010, 5],
+    });
     t.pipeline.fit();
     expect(t.scene.getState().camera2d.centre).toEqual([1005, 2005]);
     t.scene.dispatch({ type: 'setVisible', layerId: 'layer-1', visible: false });
+    await t.pipeline.idle();
+    expect(t.sink.setExtent).toHaveBeenLastCalledWith(null);
     t.scene.dispatch({ type: 'setCamera', patch: { camera2d: { centre: [7, 7] } } });
     t.pipeline.fit();
     expect(t.scene.getState().camera2d.centre).toEqual([7, 7]);
@@ -1233,18 +1336,42 @@ describe('LayerPipeline: the classes of a layer', () => {
     expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
   });
 
+  it('asks for the classes of the surface of a grid with elevations as for a grid, and gives them with the layer: its triangles take the class of their cell', async () => {
+    const t = setup();
+    t.drawable([0, true]);
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'surface',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0),
+          triangles: Uint32Array.of(0, 1, 2, 2, 1, 3),
+          triangleCell: Uint32Array.of(0, 0),
+        },
+        findings: [],
+      });
+    t.scene.dispatch({
+      type: 'addLayers',
+      datasets: [{ ...gridDataset(0), name: 'Surface' }],
+    });
+    await t.pipeline.idle();
+    // The default style of a grid: its first column of numbers, in 7 classes of equal intervals.
+    expect(t.classifyCalls).toEqual([[0, 'Au', 'equal', 7]]);
+    expect(t.sink.setLayerClasses).toHaveBeenCalledTimes(1);
+    expect(t.sink.setLayerClasses.mock.calls[0]?.[1]?.indices).toEqual(Uint8Array.of(0, 1));
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+  });
+
   it('does not ask for classes for a layer of a kind that is not coloured by them, whatever its style says', async () => {
     const t = setup();
     t.state.prepare = () =>
       Promise.resolve({
         status: 'drawn',
-        // The one kind that no layer is coloured by classes for: a surface, the picture of a grid with elevations, which 2D does not draw.
+        // Every kind of buffers is coloured by classes now, so this one is made up: a kind the pipeline has never heard of is not asked for any.
         buffers: {
-          kind: 'surface',
+          kind: 'future',
           positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 10, 0),
-          triangles: Uint32Array.of(0, 1, 2),
-          triangleCell: Uint32Array.of(0),
-        },
+        } as unknown as RenderBuffers,
         findings: [],
       });
     t.drawable([0, true]);
@@ -1266,7 +1393,6 @@ describe('LayerPipeline: the classes of a layer', () => {
     await t.pipeline.idle();
     expect(t.classifyCalls).toEqual([]);
     expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
-    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
   });
 
   it('gives new colours, and asks the engine for nothing, when only the ramp changes, or its direction', async () => {

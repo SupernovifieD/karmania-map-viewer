@@ -528,20 +528,71 @@ or releasing, and whenever the brief says to stop.
 
 ## M18: 3D view
 
-- [ ] 18.1 Perspective camera from camera3d; near and far from the extent.
-- [ ] 18.2 Orbit controller (9.5) and keyboard.
-- [ ] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
-- [ ] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit.
-- [ ] 18.5 Grid surfaces in 3D; flat grids at their elevation.
-- [ ] 18.6 Blocks in 3D.
-- [ ] 18.7 Vertical exaggeration control in the toolbar (10.1), applied as a z
+- [x] 18.1 Perspective camera from camera3d; near and far from the extent.
+  - [x] 18.1a Perspective-camera arithmetic: rebasing, pose, aspect and clipping
+    planes from the extent.
+  - [x] 18.1b The renderer owns an orthographic and a perspective camera; in 3D,
+    one depth test spans all layers.
+  - [x] 18.1c The viewer supplies the 3D camera and prepared extent, and fitting
+    uses the 3D camera.
+  - [x] 18.1d Browser proofs cover perspective pose and clipping and one depth
+    test across layers.
+- [x] 18.2 Orbit controller (9.5) and keyboard.
+  - [x] 18.2a Plain orbit and camera-plane pan arithmetic.
+  - [x] 18.2b Pointer-anchored perspective zoom.
+  - [x] 18.2c The 3D keyboard mapping.
+  - [x] 18.2d Pointer and wheel DOM listeners.
+  - [x] 18.2e Keyboard event routing.
+  - [x] 18.2f Extent-derived distance limits and viewer wiring.
+  - [x] 18.2g Browser interaction proofs.
+    - [x] 18.2g1 Pointer orbit, pan and pointer-anchored zoom.
+    - [x] 18.2g2 Keyboard, fit, clamps and listener replacement.
+  - [x] 18.2F1 View-specific screen-reader keyboard instructions.
+- [x] 18.3 Toolbar 2D | 3D control; switching keeps centre and heading.
+  - [x] 18.3a `k-segmented` in `@karmania/ui` (radio group, 32 high, choices at least 48 wide), in the gallery.
+  - [x] 18.3b `Viewer.setViewMode(mode)` and `Viewer.on('scene')`; the switch keeps centre and heading (`cameraTo3d`, `cameraTo2d`).
+  - [x] 18.3c The toolbar's View control, wired to the viewer; the shell baselines that have the toolbar retaken.
+- [x] 18.4 Lighting for meshes, surfaces and blocks; points and lines unlit. (Surfaces are lit by 18.5b, which makes them.)
+  - [x] 18.4a The light: from straight above in 2D, fixed in the world (north-west, 45 degrees) in 3D; the mesh takes it from the renderer.
+  - [x] 18.4b Blocks lit from face normals; points and lines proved unlit.
+- [x] 18.5 Grid surfaces in 3D; flat grids at their elevation.
+  - [x] 18.5a Layers that lie in one plane in 3D: the legend's order breaks the tie (polygon offset, brief 9.4).
+  - [x] 18.5b The surface layer (a grid with elevations from a column), coloured per cell, lit like a mesh.
+  - [x] 18.5c Browser proofs: a surface in 3D and 2D, a flat grid at its elevation.
+- [x] 18.6 Blocks in 3D: browser proofs (all faces, one depth test, less than opaque, the fit).
+- [x] 18.7 Vertical exaggeration control in the toolbar (10.1), applied as a z
   scale about the origin.
-- [ ] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
+  - [x] 18.7a The renderer scales the heights of every layer about the origin.
+  - [x] 18.7b The toolbar's select (always there, disabled in 2D), wired to the scene; baselines retaken.
+- [x] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
   resets it only.
-- [ ] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
+  - [x] 18.8a The north arrow follows the active camera's heading; its reset in 3D keeps the elevation.
+  - [x] 18.8b The navigation group in 3D: zoom in, zoom out, fit, reset view.
+  - [x] 18.8c Overlay layout, status chip and scale bar in 3D; screenshots; axe.
+- [x] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
   target is missed, add a step for drawing only exposed faces of dense models,
   then measure again.
-- [ ] 18.G Gate (with `pnpm perf` for 3D).
+  - [x] 18.9a1 Translucent blocks: no seams between blocks (found by looking at the first golden image of them); the colour pass draws only at the depth the first pass wrote.
+  - [x] 18.9a Render golden images for 3D, reviewed.
+  - [x] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`. **First measurement: the target is missed** (median 81 to 86 ms, 95th percentile 101 to 127 ms against 50, in three runs of which the first was cold), so, as the brief says, 18.9c draws only the exposed faces of dense models and 18.9b is measured again.
+  - [x] 18.9c Only the exposed faces of a dense model of blocks are drawn (the brief's remedy for a missed target).
+    - [x] 18.9c1 The kernel says how many blocks there are along each axis of a dense model (`dims`), so that the neighbours of a block are known.
+    - [x] 18.9c2 The layer builds its instances for the blocks that have a face that shows, with a mask of the faces; the others are not drawn.
+    - [x] 18.9c3 Measured again; `docs/perf.md`; the probe is committed with the numbers.
+- [x] 18.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
+  - [x] 18.F1 The viewer API: a switch with nothing to measure keeps the centre and the heading; a mode that is not `2d` or `3d` is refused before it changes anything; disposing stops the listeners.
+  - [x] 18.F2 The limits of the zoom, in 3D and in 2D, are made from the data that is shown when there has been no fit in that view.
+  - [x] 18.F3 The controls: the exaggeration select describes why it is disabled to a screen reader, the segmented control leaves the keys with a modifier alone, its ring is not cut at the corners, and what the controls show is what the scene has.
+  - [x] 18.F4 The buffers of attributes that are replaced on the card are freed when they are replaced.
+    - [x] 18.F4a Points and lines: new classes are written into the attribute the layer has, which owns its array.
+    - [x] 18.F4b Blocks: the same for a sparse model; a dense model's instances go in a new geometry and the old one is disposed.
+  - [x] 18.F5 Tests that could not fail, or whose titles said more than they check.
+    - [x] 18.F5a The fit of blocks in 3D (all eight corners between the planes and in the picture), the grid over the mesh (not the map either), `distance` refusing an empty colour, two titles.
+    - [x] 18.F5b The exaggeration is not applied from above under every factor; the surface that falls is darker than the one that rises in the pictures of both.
+    - [x] 18.F5c Unit tests: both materials of points and lines freed, the surface layer's cells, every kind of buffers, and what a dense model lets go of.
+  - [x] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.
+  - [x] 18.F7 The second review: a listener test that made one change, a title and a comment that said more than they were, the last choice's corners, and two references in `docs/perf.md`.
+- [x] 18.G Gate (with `pnpm perf` for 3D).
 
 ## M19: Legend system
 

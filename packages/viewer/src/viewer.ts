@@ -8,15 +8,18 @@ import type {
   Summary,
 } from '@karmania/engine';
 import {
+  DEFAULT_DISTANCE_LIMITS,
   DEFAULT_SCALE_LIMITS,
   KEY_ZOOM_FACTOR,
   attachController2d,
+  attachController3d,
   createRenderer,
+  zoom3dAt,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Renderer, RenderStats } from '@karmania/render';
-import { createSceneStore, firstNumericColumn } from '@karmania/scene';
-import type { Command, SceneDocument } from '@karmania/scene';
+import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
+import { cameraTo2d, cameraTo3d, createSceneStore, firstNumericColumn } from '@karmania/scene';
+import type { Command, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
@@ -53,6 +56,9 @@ import type { Furniture } from './furniture.js';
 import { datasetNotices, sameNotices, summariseLayers } from './layer-summary.js';
 import { readoutAt, readoutWidth } from './pointer-readout.js';
 import { syncDatasets } from './scene-datasets.js';
+
+/** The elevation the 3D view is put at by "Reset view", in degrees above the horizon: that of the first view of the data (`fitCamera3d` and the empty scene). */
+const RESET_ELEVATION = 45;
 
 /**
  * The viewer, `<karmania-viewer>`: the map area and the side panel, side by side, and the import wizard that opens
@@ -153,6 +159,66 @@ export class KarmaniaViewer extends LitElement {
   /** Changes the scene by a command (the same that the controls of the viewer use), and gives the document that comes of it. */
   dispatch(command: Command): SceneDocument {
     return this.store.dispatch(command);
+  }
+
+  /** Calls `listener` after each change of the scene, with the document that came of it and the one it replaced; gives the way to stop. */
+  subscribeToScene(listener: SceneListener): () => void {
+    return this.store.subscribe(listener);
+  }
+
+  /**
+   * Shows the map in 2D or in 3D, looking at the same place: the camera of the view it goes to is made from the camera of the view it
+   * leaves (`cameraTo3d`, `cameraTo2d`), so the centre, the heading and the scale at the centre are kept. Going to 3D looks at the middle of
+   * the height of the visible data, from the elevation and with the lens that the 3D camera had. The camera comes first and the mode
+   * after, so that the scene is never in 3D with a camera that was not made for it. **With no map area to measure** (nothing is drawn yet, or the
+   * viewer is hidden) the scale cannot be converted, but the centre and the heading can still be kept, so they are: the camera that is gone to has
+   * the centre and the heading of the one that is left, and its own distance or scale.
+   *
+   * @throws RangeError for a mode that is not `2d` or `3d`, which is a mistake of the caller.
+   */
+  setViewMode(mode: ViewMode): void {
+    // (The type says it is one of two; a caller in plain JavaScript can still give another.)
+    if (!(['2d', '3d'] as readonly string[]).includes(mode)) {
+      throw new RangeError(`The view is "2d" or "3d", and not ${JSON.stringify(mode)}.`);
+    }
+    const state = this.store.getState();
+    if (state.viewMode === mode) {
+      return;
+    }
+    const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
+    const viewport = { width: box?.width ?? 0, height: box?.height ?? 0 };
+    if (mode === '3d') {
+      const targetZ = this.pipeline?.middleHeight() ?? state.camera3d.target[2];
+      const camera3d = cameraTo3d({
+        camera2d: state.camera2d,
+        viewport,
+        fov: state.camera3d.fov,
+        elevation: state.camera3d.elevation,
+        targetZ,
+      });
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: {
+          // Without a size to measure, the place and the way it faces are still kept; the distance is the 3D camera's own.
+          camera3d: camera3d ?? {
+            target: [state.camera2d.centre[0], state.camera2d.centre[1], targetZ],
+            heading: state.camera2d.heading,
+          },
+        },
+      });
+    } else {
+      const camera2d = cameraTo2d({ camera3d: state.camera3d, viewport });
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: {
+          camera2d: camera2d ?? {
+            centre: [state.camera3d.target[0], state.camera3d.target[1]],
+            heading: state.camera3d.heading,
+          },
+        },
+      });
+    }
+    this.store.dispatch({ type: 'setViewMode', mode });
   }
 
   /** Gets rows of a dataset from the engine, for the table. It is one function for as long as the viewer is. */
@@ -285,8 +351,7 @@ export class KarmaniaViewer extends LitElement {
     this.renderer = made;
     this.cannotDraw = made === undefined;
     this.lookThroughCamera();
-    this.controller = made === undefined ? undefined : this.listenToPerson(area, canvas);
-    area.interactive = this.controller !== undefined;
+    this.refreshController();
     this.pipeline?.rendererReady();
   }
 
@@ -301,15 +366,30 @@ export class KarmaniaViewer extends LitElement {
   }
 
   /** What moves the map when a person drags it, turns the wheel or presses a key: it asks the scene for a camera. */
-  private controller: Controller2d | undefined;
+  private controller: Controller2d | Controller3d | undefined;
 
   private listenToPerson(
     area: KarmaniaMapArea,
     canvas: HTMLCanvasElement,
-  ): Controller2d | undefined {
+  ): Controller2d | Controller3d | undefined {
     const focusTarget = area.focusTarget;
     if (focusTarget === undefined) {
       return undefined;
+    }
+    if (this.store.getState().viewMode === '3d') {
+      return attachController3d({
+        element: area,
+        canvas,
+        focusTarget,
+        getCamera: () => this.store.getState().camera3d,
+        getLimits: () => this.pipeline?.distanceLimits() ?? DEFAULT_DISTANCE_LIMITS,
+        onFit: () => {
+          this.fit();
+        },
+        onCamera: (change) => {
+          this.store.dispatch({ type: 'setCamera', patch: { camera3d: change } });
+        },
+      });
     }
     return attachController2d({
       element: area,
@@ -326,10 +406,30 @@ export class KarmaniaViewer extends LitElement {
     });
   }
 
-  /** Gives the renderer the camera and the origin of the scene. */
+  /** Replaces the listener when the renderer arrives or the active camera changes. */
+  private refreshController(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    const canvas = area?.canvas;
+    this.controller?.dispose();
+    this.controller =
+      this.renderer === undefined || area === null || canvas === undefined
+        ? undefined
+        : this.listenToPerson(area, canvas);
+    if (area !== null) {
+      area.interactive = this.controller !== undefined;
+    }
+  }
+
+  /** Gives the renderer both cameras, the active view and the origin of the scene. */
   private lookThroughCamera(): void {
-    const { camera2d, frame } = this.store.getState();
-    this.renderer?.setCamera2d(camera2d, frame?.origin ?? [0, 0, 0]);
+    const { viewMode, camera2d, camera3d, frame, verticalExaggeration } = this.store.getState();
+    this.renderer?.setView({
+      viewMode,
+      camera2d,
+      camera3d,
+      origin: frame?.origin ?? [0, 0, 0],
+      verticalExaggeration,
+    });
   }
 
   /**
@@ -391,6 +491,9 @@ export class KarmaniaViewer extends LitElement {
           setDepthRange: (min, max) => {
             renderer.setDepthRange(min, max);
           },
+          setExtent: (extent) => {
+            renderer.setExtent(extent);
+          },
           get maxTextureSize() {
             return renderer.stats().maxTextureSize;
           },
@@ -415,8 +518,17 @@ export class KarmaniaViewer extends LitElement {
     if (this.engine !== undefined) {
       this.pipelineFor(this.engine).update();
     }
-    if (state.camera2d !== previous.camera2d || state.frame !== previous.frame) {
+    if (
+      state.viewMode !== previous.viewMode ||
+      state.camera2d !== previous.camera2d ||
+      state.camera3d !== previous.camera3d ||
+      state.verticalExaggeration !== previous.verticalExaggeration ||
+      state.frame !== previous.frame
+    ) {
       this.lookThroughCamera();
+    }
+    if (state.viewMode !== previous.viewMode) {
+      this.refreshController();
     }
     // The scale bar is in the units of the map's coordinate system, which the definitions say for an EPSG code: asked once.
     const crs = state.frame?.mapCrs;
@@ -563,9 +675,18 @@ export class KarmaniaViewer extends LitElement {
     this.changePanel({ tab: 'legend', collapsed: false });
   };
 
-  /** The north arrow was pressed: north is up, with the centre and the scale as they are. */
+  /**
+   * The north arrow was pressed: north is up, with the centre and the scale as they are. In 3D the heading of the 3D camera is what is turned, and
+   * only that: the elevation, the target and the distance are kept (a patch gives what changes and no more).
+   */
   private readonly onNorthReset = (): void => {
-    this.store.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 0 } } });
+    this.store.dispatch({
+      type: 'setCamera',
+      patch:
+        this.store.getState().viewMode === '3d'
+          ? { camera3d: { heading: 0 } }
+          : { camera2d: { heading: 0 } },
+    });
   };
 
   /** A button of the navigation group was pressed: the same as the key that does it, or, for the last, north up and the data in view. */
@@ -581,19 +702,52 @@ export class KarmaniaViewer extends LitElement {
         this.fit();
         break;
       case 'reset':
-        this.onNorthReset();
-        this.fit();
+        this.resetView();
         break;
     }
   };
 
-  /** Changes the scale by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the limits. */
+  /**
+   * North up and the data in view. In 2D that is the heading turned to 0 and the data fitted at that heading; in 3D the camera's heading is turned to
+   * 0 and its elevation put to `RESET_ELEVATION`, and the data is fitted from there (a fit keeps the heading and the elevation it is given).
+   */
+  private resetView(): void {
+    if (this.store.getState().viewMode === '3d') {
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: { camera3d: { heading: 0, elevation: RESET_ELEVATION } },
+      });
+    } else {
+      this.onNorthReset();
+    }
+    this.fit();
+  }
+
+  /**
+   * Changes the scale (in 3D, the distance) by `factor` (less than 1 comes closer) about the middle of the map, as the keys do, and not past the
+   * limits.
+   */
   private zoomBy(factor: number): void {
     const box = this.renderRoot.querySelector('karmania-map-area')?.canvas?.getBoundingClientRect();
     if (box === undefined) {
       return;
     }
     const size = { width: box.width, height: box.height };
+    const state = this.store.getState();
+    if (state.viewMode === '3d') {
+      const change3d = zoom3dAt(
+        state.camera3d,
+        size,
+        factor,
+        size.width / 2,
+        size.height / 2,
+        this.pipeline?.distanceLimits() ?? DEFAULT_DISTANCE_LIMITS,
+      );
+      if (change3d !== undefined) {
+        this.store.dispatch({ type: 'setCamera', patch: { camera3d: change3d } });
+      }
+      return;
+    }
     const change = zoomAt(
       this.store.getState().camera2d,
       size,
@@ -725,6 +879,7 @@ export class KarmaniaViewer extends LitElement {
           .scale=${this.furniture.scale}
           .crs=${this.furniture.crs}
           .label=${this.furniture.label}
+          .viewMode=${this.store.getState().viewMode}
           .preparing=${layers.preparing}
           .progress=${layers.progress}
           .reasons=${layers.reasons}
