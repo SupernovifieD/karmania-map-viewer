@@ -26,11 +26,11 @@ const points = (count: number): Extract<RenderBuffers, { kind: 'points' }> => ({
   positions: Float32Array.from({ length: count * 3 }, (_, i) => i),
 });
 
-/** The parts of the layer, which are the objects in its group. */
 /** How many times the attribute has been marked to be sent to the card again. */
 const versionOf = (attribute: unknown): number =>
   (attribute as { version: number } | undefined)?.version ?? 0;
 
+/** The parts of the layer, which are the objects in its group. */
 const parts = (layer: ReturnType<typeof createPointsLayer>): Points[] =>
   layer.object.children as Points[];
 const uniforms = (layer: ReturnType<typeof createPointsLayer>) =>
@@ -58,15 +58,19 @@ describe('createPointsLayer', () => {
 
   it('gives a part that is built later the material of the view it is in, and frees both materials', () => {
     const layer = createPointsLayer(points(POINTS_PER_PART + 2), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
     layer.prepareFrame({ ...INFO, flat: false });
     layer.step?.();
     const [first, second] = parts(layer);
     expect(second?.material).toBe(first?.material);
+    expect(first?.material).not.toBe(flat);
     expect((second?.material as ShaderMaterial).fragmentShader).toContain('gl_FragDepth');
+    // Both materials are freed: the one of the view from above, which the layer was made with, and the one of 3D, which it made when it was first in 3D.
     const freed: string[] = [];
+    flat.addEventListener('dispose', () => freed.push('from above'));
     (first?.material as ShaderMaterial).addEventListener('dispose', () => freed.push('3d'));
     layer.dispose();
-    expect(freed).toEqual(['3d']);
+    expect(freed.sort()).toEqual(['3d', 'from above']);
   });
 
   it('puts a layer of few points in one part, and has nothing to step', () => {
