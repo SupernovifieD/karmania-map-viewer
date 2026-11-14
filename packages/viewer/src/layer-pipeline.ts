@@ -19,7 +19,7 @@ import type { BBox, Finding } from '@karmania/engine/types';
 import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import type { ClassColouring, DistanceLimits, ScaleLimits } from '@karmania/render';
 import { OTHER_COLOUR, classColours, fitCamera2d, fitCamera3d } from '@karmania/scene';
-import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
+import type { Camera2d, Camera3d, LayerColour, LayerId, SceneStore } from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
 
 /** Where a layer is. */
@@ -175,18 +175,54 @@ export class LayerPipeline {
     return new Map([...this.entries].map(([id, entry]) => [id, entry.state]));
   }
 
-  /** How near and how far the map may be taken: from the fit, once there is one. */
+  /**
+   * How near and how far the map may be taken: from the fit of the view, once there is one. Until there has been a fit in 2D (the first view of the
+   * data was fitted in 3D, say) they are from the fit that the data shown would be given, which is the same numbers: the limits go with the data
+   * and not with whether the button was pressed. With nothing to show they are the wide defaults.
+   */
   limits(): ScaleLimits {
-    return this.scale === undefined
+    const base = this.scale ?? this.wouldFit2d()?.unitsPerPixel;
+    return base === undefined
       ? DEFAULT_SCALE_LIMITS
-      : { min: this.scale / ZOOM_IN_LIMIT, max: this.scale * ZOOM_OUT_LIMIT };
+      : { min: base / ZOOM_IN_LIMIT, max: base * ZOOM_OUT_LIMIT };
   }
 
-  /** How near and how far the orbit camera may go: from its fit, once there is one. */
+  /** How near and how far the orbit camera may go: from its fit, or the one the data shown would be given if there has been none (see `limits`). */
   distanceLimits(): DistanceLimits {
-    return this.distance === undefined
+    const base = this.distance ?? this.wouldFit3d()?.distance;
+    return base === undefined
       ? DEFAULT_DISTANCE_LIMITS
-      : { min: this.distance / ZOOM_IN_LIMIT, max: this.distance * ZOOM_OUT_LIMIT };
+      : { min: base / ZOOM_IN_LIMIT, max: base * ZOOM_OUT_LIMIT };
+  }
+
+  /** The 2D camera that a fit would make now, without making it; `undefined` if there is nothing to show or the map area has no size. */
+  private wouldFit2d(): Camera2d | undefined {
+    const doc = this.options.scene.getState();
+    const extent = this.visibleExtent(doc);
+    return extent === undefined
+      ? undefined
+      : fitCamera2d({
+          extent,
+          viewport: this.options.viewport(),
+          heading: doc.camera2d.heading,
+          padding: FIT_PADDING,
+        });
+  }
+
+  /** The 3D camera that a fit would make now, without making it (see `wouldFit2d`). */
+  private wouldFit3d(): Camera3d | undefined {
+    const doc = this.options.scene.getState();
+    const extent = this.visibleExtent(doc);
+    return extent === undefined
+      ? undefined
+      : fitCamera3d({
+          extent,
+          viewport: this.options.viewport(),
+          fov: doc.camera3d.fov,
+          heading: doc.camera3d.heading,
+          elevation: doc.camera3d.elevation,
+          verticalExaggeration: doc.verticalExaggeration,
+        });
   }
 
   /** Whether a layer has been prepared and waits for the renderer. */
