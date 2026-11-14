@@ -577,7 +577,7 @@ or releasing, and whenever the brief says to stop.
   - [ ] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`. **First measurement: the target is missed** (median 81 to 84 ms, 95th percentile 101 to 108 ms against 50), so, as the brief says, 18.9c draws only the exposed faces of dense models and 18.9b is measured again.
   - [ ] 18.9c Only the exposed faces of a dense model of blocks are drawn (the brief's remedy for a missed target).
     - [x] 18.9c1 The kernel says how many blocks there are along each axis of a dense model (`dims`), so that the neighbours of a block are known.
-    - [ ] 18.9c2 The layer builds its instances for the blocks that have a face that shows, with a mask of the faces; the others are not drawn.
+    - [x] 18.9c2 The layer builds its instances for the blocks that have a face that shows, with a mask of the faces; the others are not drawn.
     - [ ] 18.9c3 Measured again; `docs/perf.md`; the probe is committed with the numbers.
 - [ ] 18.G Gate (with `pnpm perf` for 3D).
 
