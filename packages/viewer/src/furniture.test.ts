@@ -4,6 +4,7 @@ import { emptyScene } from '@karmania/scene';
 import type { SceneDocument } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
 import { furnitureOf, sameFurniture } from './furniture.js';
+import { headingOf } from './heading.js';
 
 const UTM: CrsInfo = { code: 32640, name: 'WGS 84 / UTM zone 40N', kind: 'projected', units: 'm' };
 const DEGREES: CrsInfo = { code: 4326, name: 'WGS 84', kind: 'geographic', units: 'degree' };
@@ -23,6 +24,29 @@ describe('the furniture of the scene', () => {
     const furniture = furnitureOf(scene(), UTM);
     expect(furniture.heading).toBe(30);
     expect(furniture.scale).toMatchObject({ kind: 'bar', label: '100 m', unit: 'm' });
+  });
+
+  it('has the heading of the camera of the view that is shown: the 3D camera’s in 3D, the 2D camera’s in 2D', () => {
+    const turned = (viewMode: '2d' | '3d') =>
+      scene({
+        viewMode,
+        camera2d: { centre: [0, 0], unitsPerPixel: 1, heading: 30 },
+        camera3d: { target: [0, 0, 0], distance: 100, heading: 200, elevation: 45, fov: 45 },
+      });
+    expect(furnitureOf(turned('2d'), UTM).heading).toBe(30);
+    expect(furnitureOf(turned('3d'), UTM).heading).toBe(200);
+    expect(headingOf(turned('2d'))).toBe(30);
+    expect(headingOf(turned('3d'))).toBe(200);
+  });
+
+  it('is not the same furniture when the view changes and the headings of the two cameras differ', () => {
+    const base = scene({
+      camera2d: { centre: [0, 0], unitsPerPixel: 1, heading: 30 },
+      camera3d: { target: [0, 0, 0], distance: 100, heading: 200, elevation: 45, fov: 45 },
+    });
+    expect(
+      sameFurniture(furnitureOf(base, UTM), furnitureOf({ ...base, viewMode: '3d' }, UTM)),
+    ).toBe(false);
   });
 
   it('has no scale bar until the units are known (and says they are being looked up), with no map, in degrees and in 3D', () => {

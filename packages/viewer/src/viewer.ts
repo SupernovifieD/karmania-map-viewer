@@ -650,9 +650,18 @@ export class KarmaniaViewer extends LitElement {
     this.changePanel({ tab: 'legend', collapsed: false });
   };
 
-  /** The north arrow was pressed: north is up, with the centre and the scale as they are. */
+  /**
+   * The north arrow was pressed: north is up, with the centre and the scale as they are. In 3D the heading of the 3D camera is what is turned, and
+   * only that: the elevation, the target and the distance are kept (a patch gives what changes and no more).
+   */
   private readonly onNorthReset = (): void => {
-    this.store.dispatch({ type: 'setCamera', patch: { camera2d: { heading: 0 } } });
+    this.store.dispatch({
+      type: 'setCamera',
+      patch:
+        this.store.getState().viewMode === '3d'
+          ? { camera3d: { heading: 0 } }
+          : { camera2d: { heading: 0 } },
+    });
   };
 
   /** A button of the navigation group was pressed: the same as the key that does it, or, for the last, north up and the data in view. */
