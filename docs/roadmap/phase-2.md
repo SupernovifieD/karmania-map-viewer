@@ -601,7 +601,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.1b The Legend tab element draws the rows (groups and layers, the room of each control kept).
   - [ ] 19.1c The viewer gives the panel the model; browser proofs; baselines.
     - [x] 19.1c1 The viewer builds the legend and the panel shows it; the viewer is told when classes arrive.
-    - [ ] 19.1c2 Browser proofs of the tab: rows, indent, alignment, swatches, long names, the scene followed, axe.
+    - [x] 19.1c2 Browser proofs of the tab: rows, indent, alignment, swatches, long names, the scene followed, axe.
     - [ ] 19.1c3 Screenshot states of the tab and their baselines, looked at.
 - [ ] 19.2 Visibility for layers and groups (tri-state); keyboard.
 - [ ] 19.3 Class entries with counts and "No value".
