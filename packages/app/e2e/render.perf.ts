@@ -213,7 +213,7 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
        let last = performance.now();
        for (let i = 0; i < 300; i += 1) {
          if (orbit) {
-           // The camera goes round the model a turn and a third (1.5 degrees a frame) while it rises and falls between 25 and 65 degrees above the horizon.
+           // The camera goes round the model a turn and a quarter (1.5 degrees a frame, 450 degrees in the 300) while it rises and falls between 25 and 65 degrees above the horizon.
            v.dispatch({
              type: 'setCamera',
              patch: { camera3d: { heading: (start3d.heading + i * 1.5) % 360, elevation: 45 + 20 * Math.sin((i / 100) * Math.PI) } },
