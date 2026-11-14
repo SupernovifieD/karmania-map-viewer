@@ -306,7 +306,14 @@ export class KarmaniaLegendTab extends LitElement {
   }
 
   private layer(layer: LegendLayerEntry, level: 1 | 2, stop: string | undefined) {
-    const item: TreeItem = { kind: 'layer', id: layer.id, level, visible: layer.visible };
+    const item: TreeItem = {
+      kind: 'layer',
+      id: layer.id,
+      level,
+      visible: layer.visible,
+      expandable: layer.classes.length > 0,
+      expanded: false,
+    };
     const key = itemKey(item);
     return html`
       <li role="none">

@@ -2,9 +2,9 @@
  * What the Legend tab does with its rows, as functions of the legend model, so that it is tried without a browser: which rows a person can reach, where
  * the arrow keys go, and what a switch asks of the scene.
  */
-import type { Command, GroupVisibility, LegendModel } from '@karmania/scene';
+import type { Command, GroupVisibility, LegendLayerEntry, LegendModel } from '@karmania/scene';
 
-/** A row of the tree that is shown (a layer of a group that is folded away is not). */
+/** A row of the tree that is shown (a layer of a group that is folded away is not). A layer can be opened if it has lines to show, and `expanded` says it is. */
 export type TreeItem =
   | {
       readonly kind: 'group';
@@ -18,6 +18,8 @@ export type TreeItem =
       readonly id: string;
       readonly level: 1 | 2;
       readonly visible: boolean;
+      readonly expandable: boolean;
+      readonly expanded: boolean;
     };
 
 /** What names a row among the others: a layer and a group are told apart by their kind, whatever their ids. */
@@ -25,11 +27,28 @@ export function itemKey(item: Pick<TreeItem, 'kind' | 'id'>): string {
   return `${item.kind}:${item.id}`;
 }
 
-/** The rows that are shown, from the top: each group, and under it its layers if it is open. */
-export function treeItems(model: LegendModel): readonly TreeItem[] {
+/**
+ * The rows that are shown, from the top: each group, and under it its layers if it is open. `open` is the ids of the layers that a person has opened: a
+ * layer is open only if it has lines to show (its classes), so one that loses them is closed, and open again if it has them again.
+ */
+export function treeItems(
+  model: LegendModel,
+  open: ReadonlySet<string> = new Set(),
+): readonly TreeItem[] {
+  const layerItem = (layer: LegendLayerEntry, level: 1 | 2): TreeItem => {
+    const expandable = layer.classes.length > 0;
+    return {
+      kind: 'layer',
+      id: layer.id,
+      level,
+      visible: layer.visible,
+      expandable,
+      expanded: expandable && open.has(layer.id),
+    };
+  };
   return model.entries.flatMap((entry): TreeItem[] => {
     if (entry.type === 'layer') {
-      return [{ kind: 'layer', id: entry.id, level: 1, visible: entry.visible }];
+      return [layerItem(entry, 1)];
     }
     const group: TreeItem = {
       kind: 'group',
@@ -38,18 +57,54 @@ export function treeItems(model: LegendModel): readonly TreeItem[] {
       collapsed: entry.collapsed,
       visibility: entry.visibility,
     };
-    return entry.collapsed
-      ? [group]
-      : [
-          group,
-          ...entry.layers.map((layer): TreeItem => ({
-            kind: 'layer',
-            id: layer.id,
-            level: 2,
-            visible: layer.visible,
-          })),
-        ];
+    return entry.collapsed ? [group] : [group, ...entry.layers.map((layer) => layerItem(layer, 2))];
   });
+}
+
+/** The ids of the layers that are open, with `id` opened or closed: the same set if it already is so. */
+export function withExpansion(
+  open: ReadonlySet<string>,
+  id: string,
+  expanded: boolean,
+): ReadonlySet<string> {
+  if (open.has(id) === expanded) {
+    return open;
+  }
+  const next = new Set(open);
+  if (expanded) {
+    next.add(id);
+  } else {
+    next.delete(id);
+  }
+  return next;
+}
+
+/** The ids of `open` that are still layers of the legend: a layer that has gone is not kept open for another that is given its id. */
+export function stillThere(open: ReadonlySet<string>, model: LegendModel): ReadonlySet<string> {
+  const ids = new Set(
+    model.entries.flatMap((entry) =>
+      entry.type === 'layer' ? [entry.id] : entry.layers.map((layer) => layer.id),
+    ),
+  );
+  const kept = [...open].filter((id) => ids.has(id));
+  return kept.length === open.size ? open : new Set(kept);
+}
+
+/**
+ * What a key does to whether a row is open: Right opens a layer that can be opened and is closed, Left closes one that is open. `undefined` when the
+ * key does nothing to this row (any other key, a group, a layer with nothing to show, or one that is so already).
+ */
+export function expansionFor(item: TreeItem, key: string): boolean | undefined {
+  if (item.kind !== 'layer' || !item.expandable) {
+    return undefined;
+  }
+  if (key === 'ArrowRight' && !item.expanded) {
+    return true;
+  }
+  if (key === 'ArrowLeft' && item.expanded) {
+    return false;
+  }
+  return undefined;
 }
 
 /** The keys that move between rows. */
