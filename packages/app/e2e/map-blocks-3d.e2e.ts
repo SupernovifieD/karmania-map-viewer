@@ -252,6 +252,35 @@ test.describe('block models in 3D', () => {
     ).toBeLessThanOrEqual(4);
   });
 
+  test('that are less than opaque have no seams: every pixel along the joins between blocks is the one blend, and not darker where the faces inside meet', async ({
+    page,
+  }) => {
+    await loadModel(page);
+    await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    await drawn(page);
+    const map = await mapColour(page);
+    const view = await look3d(page, 20, 55, 400);
+    const blend = (colour: readonly number[], by: number) =>
+      colour.map((c, i) => 0.5 * c * by + 0.5 * (map[i] ?? 0));
+    const wanted = blend(LAST, TOP);
+    // The joins between the blocks of the top: along x = 20, 40, 60 and along y = 20, 40, 60, with a pixel for every 2 metres.
+    const bad: string[] = [];
+    for (const join of [20, 40, 60]) {
+      for (let along = 6; along <= 74; along += 2) {
+        for (const [east, north] of [
+          [join, along],
+          [along, join],
+        ] as const) {
+          const seen = await colourAt(page, view, east, north, 40);
+          if (distance(seen, wanted) > 4) {
+            bad.push(`${String(east)},${String(north)}`);
+          }
+        }
+      }
+    }
+    expect(bad, 'the places along the joins that are not the blend of the top').toEqual([]);
+  });
+
   test('are all in the picture when the view is fitted to them, and none of them cut off in front or behind', async ({
     page,
   }) => {

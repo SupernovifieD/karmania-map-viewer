@@ -572,7 +572,8 @@ or releasing, and whenever the brief says to stop.
 - [ ] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
   target is missed, add a step for drawing only exposed faces of dense models,
   then measure again.
-  - [ ] 18.9a Render golden images for 3D, reviewed.
+  - [x] 18.9a1 Translucent blocks: no seams between blocks (found by looking at the first golden image of them); the colour pass draws only at the depth the first pass wrote.
+  - [x] 18.9a Render golden images for 3D, reviewed.
   - [ ] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`.
 - [ ] 18.G Gate (with `pnpm perf` for 3D).
 

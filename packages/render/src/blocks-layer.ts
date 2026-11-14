@@ -18,7 +18,7 @@ import {
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   LessDepth,
-  LessEqualDepth,
+  EqualDepth,
   Mesh,
   NormalBlending,
   ShaderMaterial,
@@ -43,6 +43,9 @@ const TOP_FACE = 4;
  * account). Each face has corners of its own, so the normal is the same over the face: it is shaded flat.
  */
 const VERTEX = /* glsl */ `
+// The depth pass and the colour pass of a layer that is less than opaque are two programs of this one shader, and the colour is drawn only where its
+// depth is the depth that the first wrote: so the position has to come out the same bit for bit in both.
+invariant gl_Position;
 attribute vec3 aCentre;
 attribute float aClass;
 uniform vec3 uSize;
@@ -138,8 +141,9 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     depthTest: true,
     side: DoubleSide,
   });
-  // A layer that is less than opaque is drawn in two passes: depth alone, a little farther than it is, and then the colour where the depth is
-  // the nearest, so that a top that has another under it is blended once. (An opaque layer is one pass.)
+  // A layer that is less than opaque is drawn in two passes: depth alone, and then the colour only where the depth is exactly what the first wrote
+  // (`EqualDepth`, which both programs of the shader have to agree on, so the position is `invariant`), so that what is nearest is blended once, and
+  // a face that is behind it, at a seam between blocks too, is not. (An opaque layer is one pass.)
   const depthMaterial = new ShaderMaterial({
     uniforms,
     vertexShader: VERTEX,
@@ -148,9 +152,6 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     depthTest: true,
     depthFunc: LessDepth,
     depthWrite: true,
-    polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
     side: DoubleSide,
   });
   // One box, with its triangles and corners, that every part uses: the blocks are the instances.
@@ -223,7 +224,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       uniforms.uOpacity.value = next.opacity;
       translucent = next.opacity < 1;
       // Less than opaque: the depth pass has the nearest top and the colour is drawn where it is (it writes no depth); opaque: one pass.
-      material.depthFunc = translucent ? LessEqualDepth : LessDepth;
+      material.depthFunc = translucent ? EqualDepth : LessDepth;
       material.depthWrite = !translucent;
       for (const part of parts) {
         part.depth.visible = translucent;
