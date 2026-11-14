@@ -132,16 +132,24 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
   let size = look.pointSize;
   let ratio = 1;
 
-  /** Gives a part the classes of its points, as a view of them, or takes them away. */
+  /**
+   * Gives a part the classes of its points. The attribute is made once, with an array of its own (a copy: it is written to, and the classes
+   * are the caller's), and the next classes are put into it and sent to the card again, so that no buffer of the card is left behind by an
+   * attribute that was replaced (three frees a buffer only when the geometry that holds its attribute is disposed). With no classes the attribute
+   * is left as it is: the shader does not read it then (`uClassed`).
+   */
   function classesOf(part: { geometry: BufferGeometry; first: number; count: number }): void {
     if (classes === undefined) {
-      part.geometry.deleteAttribute('aClass');
       return;
     }
-    part.geometry.setAttribute(
-      'aClass',
-      new BufferAttribute(classes.subarray(part.first, part.first + part.count), 1),
-    );
+    const view = classes.subarray(part.first, part.first + part.count);
+    const held = part.geometry.getAttribute('aClass') as BufferAttribute | undefined;
+    if (held !== undefined) {
+      (held.array as Uint8Array).set(view);
+      held.needsUpdate = true;
+      return;
+    }
+    part.geometry.setAttribute('aClass', new BufferAttribute(view.slice(), 1));
   }
 
   /** Puts the next part of the points on the card. `true` if there are more to come. */

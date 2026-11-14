@@ -181,23 +181,27 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
   let width = look.lineWidth;
   let ratio = 1;
 
-  /** Gives a part the class of each of its segments (that of its line), or takes the classes away. */
+  /**
+   * Gives a part the class of each of its segments (that of its line). The attribute is made once and the next classes are put into it and sent to the
+   * card again, so that no buffer of the card is left behind by an attribute that was replaced (see `classesOf` of the points). With no classes
+   * it is left as it is: the shader does not read it then (`uClassed`).
+   */
   function classesOf(part: {
     geometry: InstancedBufferGeometry;
     first: number;
     count: number;
   }): void {
     if (classes === undefined) {
-      part.geometry.deleteAttribute('aClass');
       return;
     }
-    part.geometry.setAttribute(
-      'aClass',
-      new InstancedBufferAttribute(
-        classesOfPieces(classes, buffers.segmentLine, part.first, part.count),
-        1,
-      ),
-    );
+    const kinds = classesOfPieces(classes, buffers.segmentLine, part.first, part.count);
+    const held = part.geometry.getAttribute('aClass') as InstancedBufferAttribute | undefined;
+    if (held !== undefined) {
+      (held.array as Uint8Array).set(kinds);
+      held.needsUpdate = true;
+      return;
+    }
+    part.geometry.setAttribute('aClass', new InstancedBufferAttribute(kinds, 1));
   }
 
   /** Puts the next part of the segments on the card. `true` if there are more to come. */
