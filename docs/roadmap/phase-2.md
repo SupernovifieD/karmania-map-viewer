@@ -564,11 +564,11 @@ or releasing, and whenever the brief says to stop.
   scale about the origin.
   - [x] 18.7a The renderer scales the heights of every layer about the origin.
   - [x] 18.7b The toolbar's select (always there, disabled in 2D), wired to the scene; baselines retaken.
-- [ ] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
+- [x] 18.8 Furniture in 3D: no scale bar; the north arrow shows the heading and
   resets it only.
   - [x] 18.8a The north arrow follows the active camera's heading; its reset in 3D keeps the elevation.
   - [x] 18.8b The navigation group in 3D: zoom in, zoom out, fit, reset view.
-  - [ ] 18.8c Overlay layout, status chip and scale bar in 3D; screenshots; axe.
+  - [x] 18.8c Overlay layout, status chip and scale bar in 3D; screenshots; axe.
 - [ ] 18.9 Render golden images for 3D, reviewed; 3D perf measured. If the block
   target is missed, add a step for drawing only exposed faces of dense models,
   then measure again.

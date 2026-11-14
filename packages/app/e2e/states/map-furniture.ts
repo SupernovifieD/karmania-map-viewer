@@ -8,7 +8,7 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import type { Shot } from '../support/screenshots.js';
-import { dispatch, layerStatuses, withData } from '../support/render.js';
+import { dispatch, drawn, layerStatuses, stats, withData } from '../support/render.js';
 import { importAsLocalGrid } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
@@ -34,6 +34,14 @@ async function mapWith(page: Page, width = 360): Promise<void> {
   await keepPanel(page, width);
   await withData(page);
   await page.evaluate(() => document.fonts.ready);
+  await page.mouse.move(0, 0);
+}
+
+/** Puts the map in 3D with the toolbar's control, and waits for the picture to have been drawn there, with the pointer out of the way. */
+async function in3d(page: Page): Promise<void> {
+  await page.locator('karmania-app header.toolbar').getByRole('radio', { name: '3D' }).click();
+  await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+  await drawn(page);
   await page.mouse.move(0, 0);
 }
 
@@ -104,6 +112,27 @@ export const SHOTS: Shot[] = [
       await mapWith(page);
       await dispatch(page, { type: 'setCamera', patch: { camera2d: { heading: 30 } } });
       await expect(page.locator('karmania-north-arrow g')).toHaveAttribute('data-angle', '-30');
+      return whole(page);
+    },
+  },
+  {
+    // The view in 3D: the points seen from above at an angle, the north arrow and the navigation group as in 2D, no scale bar, a dash in the chip.
+    name: 'map-furniture-3d',
+    show: async (page) => {
+      await mapWith(page);
+      await in3d(page);
+      return whole(page);
+    },
+  },
+  {
+    // The 3D camera turned: the needle of the north arrow with it.
+    name: 'map-furniture-3d-turned',
+    show: async (page) => {
+      await mapWith(page);
+      await in3d(page);
+      await dispatch(page, { type: 'setCamera', patch: { camera3d: { heading: 30 } } });
+      await expect(page.locator('karmania-north-arrow g')).toHaveAttribute('data-angle', '-30');
+      await page.mouse.move(0, 0);
       return whole(page);
     },
   },
