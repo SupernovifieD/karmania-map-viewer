@@ -771,6 +771,8 @@ export class LayerPipeline {
         entry.classKey = key;
         entry.breaks = result.breaks;
         entry.indices = indices;
+        // The legend lists these classes, and the layer's own state does not change for them: the viewer is told.
+        this.changed();
       } catch (error) {
         if (stale()) {
           return;

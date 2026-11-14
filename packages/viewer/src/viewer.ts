@@ -18,8 +18,14 @@ import {
   zoomAt,
 } from '@karmania/render';
 import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
-import { cameraTo2d, cameraTo3d, createSceneStore, firstNumericColumn } from '@karmania/scene';
-import type { Command, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
+import {
+  cameraTo2d,
+  cameraTo3d,
+  createSceneStore,
+  firstNumericColumn,
+  legendModel,
+} from '@karmania/scene';
+import type { Command, LegendModel, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
@@ -507,6 +513,20 @@ export class KarmaniaViewer extends LitElement {
 
   /** Why each dataset that is not drawn is not, as the Data tab was last given it. */
   private notices: ReadonlyMap<number, string> = new Map();
+  /** The legend the Legend tab shows, and the text it was made into, so that the same legend is the same object (a turn of the map draws the viewer again). */
+  private legend: LegendModel | undefined;
+  private legendKey = '';
+
+  /** The legend of the scene now: the layers and groups, with the classes the engine has given and why a layer is not drawn. */
+  private currentLegend(): LegendModel {
+    const next = legendModel(this.store.getState(), this.pipeline?.legendInputs() ?? {});
+    const key = JSON.stringify(next);
+    if (this.legend === undefined || key !== this.legendKey) {
+      this.legend = next;
+      this.legendKey = key;
+    }
+    return this.legend;
+  }
 
   /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
   layerStates(): [string, LayerState][] {
@@ -542,6 +562,10 @@ export class KarmaniaViewer extends LitElement {
       state.viewMode !== previous.viewMode
     ) {
       this.updateReadout();
+    }
+    // The Legend tab lists the layers, with their names, switches, styles and order.
+    if (state.layers !== previous.layers || state.legend !== previous.legend) {
+      this.requestUpdate();
     }
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
@@ -866,6 +890,7 @@ export class KarmaniaViewer extends LitElement {
       this.notices = found;
     }
     const notices = this.notices;
+    const legend = this.currentLegend();
     return html`
       <div
         class="workspace"
@@ -898,6 +923,7 @@ export class KarmaniaViewer extends LitElement {
           .max=${limits.max}
           .reset=${PANEL_WIDTH.default}
           .tab=${this.panel.tab}
+          .legend=${legend}
           .datasets=${this.datasets}
           .selected=${this.selected}
           .rows=${this.rows}
