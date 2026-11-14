@@ -113,19 +113,34 @@ describe('createViewer', () => {
     expect(made[0]?.setViewMode).toHaveBeenCalledTimes(2);
   });
 
-  it('tells a listener of the scene each time it changes, with the document and not the one before, and stops when asked', () => {
+  it('tells a listener of the scene each time it changes, with the document and nothing else (not the one before), and stops when asked', () => {
     const { made, container } = page();
     const viewer = createViewer(container().element);
-    const heard: unknown[] = [];
-    const stop = viewer.on('scene', (scene) => heard.push(scene));
+    const listener = vi.fn();
+    const stop = viewer.on('scene', listener);
     expect(made[0]?.subscribeToScene).toHaveBeenCalledTimes(1);
     made[0]?.heard[0]?.({ version: 1 }, { version: 0 });
-    expect(heard).toEqual([{ version: 1 }]);
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ version: 1 });
     stop();
     expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
-    viewer.dispose();
+    // Stopping again does nothing more.
     stop();
-    expect(made[0]?.stopped).toHaveBeenCalledTimes(2);
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops every listener when it is disposed, and only the ones that were not stopped already', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const first = viewer.on('scene', () => undefined);
+    viewer.on('scene', () => undefined);
+    viewer.on('scene', () => undefined);
+    first();
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
+    viewer.dispose();
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(3);
+    // The way to stop one that was stopped by the disposal does nothing more.
+    first();
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(3);
   });
 
   it('refuses to listen to a viewer that was disposed', () => {

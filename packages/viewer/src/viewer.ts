@@ -170,10 +170,17 @@ export class KarmaniaViewer extends LitElement {
    * Shows the map in 2D or in 3D, looking at the same place: the camera of the view it goes to is made from the camera of the view it
    * leaves (`cameraTo3d`, `cameraTo2d`), so the centre, the heading and the scale at the centre are kept. Going to 3D looks at the middle of
    * the height of the visible data, from the elevation and with the lens that the 3D camera had. The camera comes first and the mode
-   * after, so that the scene is never in 3D with a camera that was not made for it. With no map area to measure (nothing is shown yet) the
-   * camera is left as it is.
+   * after, so that the scene is never in 3D with a camera that was not made for it. **With no map area to measure** (nothing is drawn yet, or the
+   * viewer is hidden) the scale cannot be converted, but the centre and the heading can still be kept, so they are: the camera that is gone to has
+   * the centre and the heading of the one that is left, and its own distance or scale.
+   *
+   * @throws RangeError for a mode that is not `2d` or `3d`, which is a mistake of the caller.
    */
   setViewMode(mode: ViewMode): void {
+    // (The type says it is one of two; a caller in plain JavaScript can still give another.)
+    if (!(['2d', '3d'] as readonly string[]).includes(mode)) {
+      throw new RangeError(`The view is "2d" or "3d", and not ${JSON.stringify(mode)}.`);
+    }
     const state = this.store.getState();
     if (state.viewMode === mode) {
       return;
@@ -181,21 +188,35 @@ export class KarmaniaViewer extends LitElement {
     const box = this.renderRoot.querySelector('karmania-map-area')?.getBoundingClientRect();
     const viewport = { width: box?.width ?? 0, height: box?.height ?? 0 };
     if (mode === '3d') {
+      const targetZ = this.pipeline?.middleHeight() ?? state.camera3d.target[2];
       const camera3d = cameraTo3d({
         camera2d: state.camera2d,
         viewport,
         fov: state.camera3d.fov,
         elevation: state.camera3d.elevation,
-        targetZ: this.pipeline?.middleHeight() ?? state.camera3d.target[2],
+        targetZ,
       });
-      if (camera3d !== undefined) {
-        this.store.dispatch({ type: 'setCamera', patch: { camera3d } });
-      }
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: {
+          // Without a size to measure, the place and the way it faces are still kept; the distance is the 3D camera's own.
+          camera3d: camera3d ?? {
+            target: [state.camera2d.centre[0], state.camera2d.centre[1], targetZ],
+            heading: state.camera2d.heading,
+          },
+        },
+      });
     } else {
       const camera2d = cameraTo2d({ camera3d: state.camera3d, viewport });
-      if (camera2d !== undefined) {
-        this.store.dispatch({ type: 'setCamera', patch: { camera2d } });
-      }
+      this.store.dispatch({
+        type: 'setCamera',
+        patch: {
+          camera2d: camera2d ?? {
+            centre: [state.camera3d.target[0], state.camera3d.target[1]],
+            heading: state.camera3d.heading,
+          },
+        },
+      });
     }
     this.store.dispatch({ type: 'setViewMode', mode });
   }
