@@ -52,6 +52,9 @@ const geometryOf = (mesh: Mesh | undefined) =>
   mesh?.geometry as InstancedBufferGeometry | undefined;
 const uniforms = (layer: ReturnType<typeof createBlocksLayer>) =>
   (parts(layer)[0]?.material as ShaderMaterial).uniforms;
+/** How many times an attribute has been sent to the card (three counts the times that `needsUpdate` was set). */
+const versionOf = (attribute: unknown): number =>
+  (attribute as { version: number } | undefined)?.version ?? 0;
 const centres = (mesh: Mesh | undefined) => [
   ...((geometryOf(mesh)?.getAttribute('aCentre').array as Float32Array | undefined) ?? []),
 ];
@@ -186,7 +189,7 @@ describe('createBlocksLayer', () => {
     expect(classes?.itemSize).toBe(1);
   });
 
-  it('cuts the classes into the parts as views, and gives a part that is built later the classes that are there', () => {
+  it('cuts the classes into the parts as copies of its own, and gives a part that is built later the classes that are there', () => {
     const colouring = numbered(BLOCKS_PER_PART + 3);
     const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 3), LOOK);
     layer.setClasses?.(colouring);
@@ -197,8 +200,11 @@ describe('createBlocksLayer', () => {
     );
     expect(first?.length).toBe(BLOCKS_PER_PART);
     expect(second?.length).toBe(3);
-    expect(second?.buffer).toBe(colouring.indices.buffer);
-    expect(second?.byteOffset).toBe(BLOCKS_PER_PART);
+    expect([...(second ?? [])]).toEqual([...colouring.indices.subarray(BLOCKS_PER_PART)]);
+    expect([...(first ?? []).slice(0, 4)]).toEqual([...colouring.indices.subarray(0, 4)]);
+    // Copies, not views: an attribute is written to when other classes come, and the classes are the caller's (the pipeline keeps them).
+    expect(first?.buffer).not.toBe(colouring.indices.buffer);
+    expect(second?.buffer).not.toBe(colouring.indices.buffer);
   });
 
   it('keeps the classes it has when it is given the same ones with other colours: only the palette changes', () => {
@@ -212,8 +218,28 @@ describe('createBlocksLayer', () => {
     const palette = uniforms(layer)['uPalette']?.value as { x: number }[];
     expect(palette[0]?.x).toBe(1);
     expect(layer.object.visible).toBe(true);
-    layer.setClasses?.({ indices: Uint8Array.from(classes.indices), colours: classes.colours });
-    expect(geometryOf(parts(layer)[0])?.getAttribute('aClass')).not.toBe(attribute);
+    // Other classes go into the attribute it has, which is sent to the card again: a new attribute would leave the card's buffer of the old one
+    // behind, as three frees a buffer only when the geometry that holds its attribute is disposed.
+    const version = versionOf(attribute);
+    layer.setClasses?.({ indices: Uint8Array.from([2, 1, 0]), colours: classes.colours });
+    const after = geometryOf(parts(layer)[0])?.getAttribute('aClass');
+    expect(after).toBe(attribute);
+    expect([...(after?.array ?? [])]).toEqual([2, 1, 0]);
+    expect(versionOf(after)).toBeGreaterThan(version);
+  });
+
+  it('never writes into the classes it is given, though it writes other classes into its own attribute', () => {
+    const layer = createBlocksLayer(blocks(3), LOOK);
+    const first = Uint8Array.from([0, 1, 2]);
+    layer.setClasses?.({ indices: first, colours: ['#ff0000', '#00ff00', '#0000ff'] });
+    const second = Uint8Array.from([2, 2, 2]);
+    layer.setClasses?.({ indices: second, colours: ['#ff0000', '#00ff00', '#0000ff'] });
+    expect([...first]).toEqual([0, 1, 2]);
+    expect([...second]).toEqual([2, 2, 2]);
+    first[0] = 1;
+    expect([...(geometryOf(parts(layer)[0])?.getAttribute('aClass').array ?? [])]).toEqual([
+      2, 2, 2,
+    ]);
   });
 
   it('has the colours of the classes in the palette, as many as there are, and no more than it can hold', () => {
@@ -234,17 +260,23 @@ describe('createBlocksLayer', () => {
   it('draws nothing for classes that are not one byte for each block, and takes the classes away when told to', () => {
     const layer = createBlocksLayer(blocks(3), LOOK);
     layer.setClasses?.(numbered(3));
+    const attribute = geometryOf(parts(layer)[0])?.getAttribute('aClass');
     layer.setClasses?.(numbered(2));
     expect(layer.object.visible).toBe(false);
-    expect(geometryOf(parts(layer)[0])?.hasAttribute('aClass')).toBe(false);
+    expect(uniforms(layer)['uCount']?.value).toBe(0);
     layer.setClasses?.(numbered(4));
     expect(layer.object.visible).toBe(false);
     layer.setClasses?.(numbered(3));
     expect(layer.object.visible).toBe(true);
     layer.setClasses?.(undefined);
     expect(layer.object.visible).toBe(false);
-    expect(geometryOf(parts(layer)[0])?.hasAttribute('aClass')).toBe(false);
     expect(uniforms(layer)['uCount']?.value).toBe(0);
+    // The attribute is not taken away (it is not drawn, and the next classes go into it, so that its buffer on the card is not left behind).
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aClass')).toBe(attribute);
+    layer.setClasses?.(numbered(3));
+    expect(layer.object.visible).toBe(true);
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aClass')).toBe(attribute);
+    expect([...(attribute?.array ?? [])]).toEqual([0, 1, 2]);
   });
 
   it('takes the opacity of its look, shows or hides, and what is shown is what has classes', () => {
@@ -554,6 +586,39 @@ describe('createBlocksLayer: a dense model, by its exposed faces', () => {
     // The same classes with fewer colours: the blocks of the class that has none are not drawn, so the instances are made again.
     layer.setClasses?.({ indices: second.indices, colours: ['#ff0000'] });
     expect(parts(layer)[0]?.visible).toBe(false);
+  });
+
+  it('puts new instances in a geometry of their own and frees the one they replace, leaving the box that every part uses to the others', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), { ...LOOK, opacity: 0.5 });
+    layer.setClasses?.(every(27));
+    settle(layer);
+    const old = geometryOf(parts(layer)[0]);
+    const corners = old?.getAttribute('position');
+    let freed = 0;
+    old?.addEventListener('dispose', () => {
+      freed += 1;
+    });
+    // The block at a corner of the model is taken out: 25 of the 26 on the outside are left.
+    const hole = every(27);
+    hole.indices[0] = NO_VALUE;
+    layer.setClasses?.(hole);
+    expect(freed).toBe(0);
+    settle(layer);
+    const next = geometryOf(parts(layer)[0]);
+    expect(next).not.toBe(old);
+    expect(freed).toBe(1);
+    expect(next?.instanceCount).toBe(25);
+    // Both passes draw the new one, with the box (its corners are the same attribute, not made again) and nothing of the old instances.
+    expect(depthPasses(layer)[0]?.geometry).toBe(next);
+    expect(next?.getAttribute('position')).toBe(corners);
+    expect(old?.hasAttribute('position')).toBe(false);
+    // And it is drawn as the others of the layer are: from above, only the tops.
+    layer.prepareFrame(FLAT);
+    expect(next?.drawRange).toEqual({ start: 24, count: 6 });
+    layer.setClasses?.(every(27));
+    layer.prepareFrame(SOLID);
+    settle(layer);
+    expect(geometryOf(parts(layer)[0])?.drawRange.count).toBe(Infinity);
   });
 
   it('draws the depth pass and the colour pass of a part when its instances are there, and neither before', () => {
