@@ -1,5 +1,5 @@
 import type { RenderBuffers } from '@karmania/engine/display';
-import { DoubleSide, LessDepth, LessEqualDepth } from 'three';
+import { DoubleSide, EqualDepth, LessDepth } from 'three';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { BLOCKS_PER_PART, createBlocksLayer } from './blocks-layer.js';
@@ -279,7 +279,7 @@ describe('createBlocksLayer', () => {
     expect([material.depthWrite, material.depthFunc]).toEqual([true, LessDepth]);
   });
 
-  it('is two passes when it is less than opaque: the depth first, a little farther, and the colour where it is, writing no depth', () => {
+  it('is two passes when it is less than opaque: the depth first, and the colour only where the depth is exactly that, writing none', () => {
     const layer = createBlocksLayer(blocks(BLOCKS_PER_PART + 1), { ...LOOK, opacity: 0.5 });
     layer.step?.();
     expect(depthPasses(layer).map((mesh) => mesh.visible)).toEqual([true, true]);
@@ -288,11 +288,23 @@ describe('createBlocksLayer', () => {
     expect(depth.depthWrite).toBe(true);
     expect(depth.depthTest).toBe(true);
     expect(depth.depthFunc).toBe(LessDepth);
-    expect(depth.polygonOffset).toBe(true);
-    expect(depth.polygonOffsetFactor).toBeGreaterThan(0);
-    expect(depth.polygonOffsetUnits).toBeGreaterThan(0);
+    // Not offset: the colour is drawn only where its depth is the depth that was written, so that the faces inside the model, which are behind the
+    // nearest surface by any amount at all (and at the seams between blocks by none that can be seen), are not blended in: an offset would let them in.
+    expect(depth.polygonOffset).toBe(false);
     const colour = parts(layer)[0]?.material as ShaderMaterial;
-    expect([colour.depthWrite, colour.depthFunc]).toEqual([false, LessEqualDepth]);
+    expect([colour.depthWrite, colour.depthFunc, colour.polygonOffset]).toEqual([
+      false,
+      EqualDepth,
+      false,
+    ]);
+  });
+
+  it('puts the position of both passes through the same shader, whose output is declared the same bit for bit', () => {
+    const layer = createBlocksLayer(blocks(2), { ...LOOK, opacity: 0.5 });
+    const depth = depthPasses(layer)[0]?.material as ShaderMaterial;
+    const colour = parts(layer)[0]?.material as ShaderMaterial;
+    expect(depth.vertexShader).toBe(colour.vertexShader);
+    expect(colour.vertexShader).toContain('invariant gl_Position;');
   });
 
   it('goes from one pass to two and back as the opacity changes, without being built again', () => {

@@ -19,7 +19,7 @@ export const TIE_SLOPE = 1;
 /** The same step as a depth, for what writes its own (`plane-depth.ts`): the depth buffer has 2 to the 24 steps from 0 to 1. */
 export const TIE_DEPTH = TIE_UNITS * 2 ** -24;
 
-/** What a material had before it was moved, which is what rank 0 gives back (the depth pass of a block is already offset). */
+/** What a material had before it was moved, which is what rank 0 gives back (a material that is offset already keeps its own offset under the rank's). */
 interface Base {
   readonly enabled: boolean;
   readonly factor: number;

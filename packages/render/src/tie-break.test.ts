@@ -19,7 +19,7 @@ describe('the tie-break of layers in one plane', () => {
     expect(offsetOf(material)).toEqual([true, -3 * TIE_SLOPE, -3 * TIE_UNITS]);
   });
 
-  it('gives back what the material had at rank 0, which is nothing for most and the offset of the depth pass of a block for that', () => {
+  it('gives back what the material had at rank 0, which is nothing for most and the offset it was made with for one that has one', () => {
     const plain = new MeshBasicMaterial();
     const depthPass = new MeshBasicMaterial({
       polygonOffset: true,
@@ -34,7 +34,7 @@ describe('the tie-break of layers in one plane', () => {
     expect(offsetOf(depthPass)).toEqual([true, 1, 1]);
   });
 
-  it('keeps the depth pass of a block that much behind the colour of it, whatever the rank (they move together)', () => {
+  it('keeps a material that is offset that much behind another that is not, whatever the rank (they move together)', () => {
     const colour = new MeshBasicMaterial();
     const depthPass = new MeshBasicMaterial({
       polygonOffset: true,
