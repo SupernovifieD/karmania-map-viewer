@@ -2,7 +2,14 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertAligned, assertNoOverflow, textStartOf } from './support/layout.js';
-import { legend, loadGrid, loadLegendScene, showLegend } from './support/legend.js';
+import {
+  groupRow,
+  layerRow,
+  legend,
+  loadGrid,
+  loadLegendScene,
+  showLegend,
+} from './support/legend.js';
 import { dispatch } from './support/render.js';
 
 /**
@@ -15,12 +22,7 @@ import { dispatch } from './support/render.js';
 const FIRST = '#440154';
 const LAST = '#fde725';
 
-/** The row of a layer, which is its tree item. */
-const layerRow = (page: Page, id: string): Locator =>
-  legend(page).locator(`.row[data-layer="${id}"]`);
 const layerName = (page: Page, id: string): Locator => layerRow(page, id).locator('.name');
-const groupRow = (page: Page, id: string): Locator =>
-  legend(page).locator(`.row[data-group="${id}"]`);
 const groupName = (page: Page, id: string): Locator => groupRow(page, id).locator('.name');
 
 /** The number of the dataset that a layer is of, from the scene (the engine numbers them, and the first need not be 0). */
