@@ -11,6 +11,13 @@ const NORTH = 2_765_000;
 /** The Legend tab of the page. */
 export const legend = (page: Page): Locator => page.locator('karmania-legend-tab');
 
+/** The row of a layer, which is its tree item. */
+export const layerRow = (page: Page, id: string): Locator =>
+  legend(page).locator(`.row[data-layer="${id}"]`);
+/** The row of a group, which is its tree item. */
+export const groupRow = (page: Page, id: string): Locator =>
+  legend(page).locator(`.row[data-group="${id}"]`);
+
 /** Loading data opens the Data tab; the Legend tab is chosen again. */
 export const showLegend = (page: Page): Promise<void> =>
   page.getByRole('tab', { name: 'Legend', exact: true }).click();

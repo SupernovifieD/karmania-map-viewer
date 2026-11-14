@@ -24,6 +24,15 @@ async function rest(page: Page): Promise<Locator[]> {
   return [panel(page)];
 }
 
+/** The same, but the keyboard is left where it is: what is photographed is a row with its ring. */
+async function restWithFocus(page: Page): Promise<Locator[]> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  await page.mouse.move(0, 0);
+  return [panel(page)];
+}
+
 /** A name of 120 characters that begins with `start`, so that the names that are too long for their rows are told apart by their beginnings. */
 const long = (start: string): string =>
   `${start} of the northern pit, drill holes and trenches, seen from the west and from the south of it all`
@@ -41,6 +50,30 @@ export const SHOTS: Shot[] = [
     show: async (page) => {
       await loadLegendScene(page);
       return rest(page);
+    },
+  },
+  {
+    // The three states of a switch: a layer that is off has its name muted, a group with some of its layers on has a bar in its box, and a group with none has an empty one.
+    name: 'legend-tab-off',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await dispatch(
+        page,
+        { type: 'setVisible', layerId: 'layer-2', visible: false },
+        { type: 'setVisible', layerId: 'layer-3', visible: false },
+        { type: 'setVisible', layerId: 'layer-5', visible: false },
+      );
+      return rest(page);
+    },
+  },
+  {
+    // The row that has the keyboard has its ring inside it, over its hover colour's place.
+    name: 'legend-tab-focus',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.keyboard.press('Shift');
+      await page.locator('karmania-legend-tab .row[data-layer="layer-3"]').focus();
+      return restWithFocus(page);
     },
   },
   {
