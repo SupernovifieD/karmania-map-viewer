@@ -609,7 +609,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.2c Browser proofs; the three states photographed again.
 - [ ] 19.3 Class entries with counts and "No value".
   - [x] 19.3a Which layers can be opened, which are, and what Right and Left do, as functions.
-  - [ ] 19.3b The tab draws the button, the class lines and the keys.
+  - [x] 19.3b The tab draws the button, the class lines and the keys.
   - [ ] 19.3c Browser proofs; the states photographed.
 - [ ] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live
   announcements; draw order follows.
