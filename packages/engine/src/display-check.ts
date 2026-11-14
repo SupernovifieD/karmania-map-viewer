@@ -111,6 +111,7 @@ export function checkedRenderBuffers(value: unknown, path = 'buffers'): RenderBu
       'centres',
       'spacing',
       'rotation',
+      'dims',
     ],
   )['kind'];
   const floats = (o: Record<string, unknown>, key: string) =>
@@ -207,11 +208,21 @@ export function checkedRenderBuffers(value: unknown, path = 'buffers'): RenderBu
       return o as unknown as RenderBuffers;
     }
     case 'blocks': {
-      const o = checkedObject(value, path, ['kind', 'centres', 'spacing', 'rotation']);
-      if (floats(o, 'centres').length % 3 !== 0)
-        throw new ContractError(path, 'x, y and z for each centre');
+      const o = checkedObject(value, path, ['kind', 'centres', 'spacing', 'rotation'], ['dims']);
+      const centres = floats(o, 'centres');
+      if (centres.length % 3 !== 0) throw new ContractError(path, 'x, y and z for each centre');
       checkedNumbers(o['spacing'], `${path}.spacing`, 3);
       checkedNumber(o['rotation'], `${path}.rotation`);
+      if (o['dims'] !== undefined) {
+        // A dense model has a block for each cell: the blocks along the three axes make the blocks there are.
+        const dims = checkedNumbers(o['dims'], `${path}.dims`, 3);
+        if (dims.some((n) => !Number.isInteger(n) || n < 0)) {
+          throw new ContractError(`${path}.dims`, 'whole numbers of blocks, none negative');
+        }
+        if ((dims[0] ?? 0) * (dims[1] ?? 0) * (dims[2] ?? 0) !== centres.length / 3) {
+          throw new ContractError(`${path}.dims`, 'as many blocks as there are centres');
+        }
+      }
       return o as unknown as RenderBuffers;
     }
     default:

@@ -198,6 +198,33 @@ describe('what is wrong in one way is rejected', () => {
     );
   });
 
+  it('takes the blocks along each axis of a dense model, and refuses what does not make the blocks there are', () => {
+    const blocks = (dims: unknown, centres = 12) => ({
+      kind: 'blocks',
+      centres: new Float32Array(centres),
+      spacing: [1, 1, 1],
+      rotation: 0,
+      dims,
+    });
+    // 2 by 2 by 1 blocks have 4 centres of 3 numbers.
+    expect(checkedRenderBuffers(blocks([2, 2, 1]))).toMatchObject({ dims: [2, 2, 1] });
+    expect(() => checkedRenderBuffers(blocks([2, 2, 2]))).toThrow(
+      /as many blocks as there are centres/,
+    );
+    expect(() => checkedRenderBuffers(blocks([2.5, 2, 1]))).toThrow(/whole numbers/);
+    expect(() => checkedRenderBuffers(blocks([-1, -2, 1]))).toThrow(/none negative/);
+    expect(() => checkedRenderBuffers(blocks([2, 2]))).toThrow();
+    // A sparse model has none, and is as it was.
+    expect(
+      checkedRenderBuffers({
+        kind: 'blocks',
+        centres: new Float32Array(12),
+        spacing: [1, 1, 1],
+        rotation: 0,
+      }),
+    ).not.toHaveProperty('dims');
+  });
+
   it('a grid with both a placement and a warp, with neither, or with a warp that does not add up', () => {
     const placement = { origin: [0, 0, 0], spacing: [1, 1], rotation: 0 };
     const warp = {
