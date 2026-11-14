@@ -1,7 +1,16 @@
+import type { ClassBreaks } from '@karmania/engine/display';
 import { createSceneStore, legendModel } from '@karmania/scene';
 import type { NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
-import { itemKey, moveFrom, toggleCommand, treeItems } from './legend-tree.js';
+import {
+  expansionFor,
+  itemKey,
+  moveFrom,
+  stillThere,
+  toggleCommand,
+  treeItems,
+  withExpansion,
+} from './legend-tree.js';
 import type { TreeItem } from './legend-tree.js';
 
 const dataset = (id: number): NewDataset => ({
@@ -158,5 +167,107 @@ describe('toggleCommand', () => {
       groupId: 'group-2',
       visible: true,
     });
+  });
+});
+
+const gridDataset = (id: number): NewDataset => ({
+  id,
+  name: `Grid ${String(id)}`,
+  kind: 'grid',
+  elementCount: 5,
+  columns: [{ name: 'Au', type: 'float', nullCount: 1 }],
+});
+
+const breaks: ClassBreaks = {
+  kind: 'ranges',
+  column: 'Au',
+  bounds: [0, 1, 2],
+  counts: [2, 2],
+  nulls: 1,
+};
+
+/**
+ * `layer-1` is a grid coloured by classes, with the classes given (two ranges and a cell with no value), `layer-2` is a grid with no classes given yet,
+ * and `layer-3` is points in one colour; a group holds `layer-4`, a grid with classes.
+ */
+function classified() {
+  const store = createSceneStore();
+  store.dispatch({ type: 'addLayers', datasets: [gridDataset(0), gridDataset(1)] });
+  store.dispatch({ type: 'addLayers', datasets: [dataset(2), gridDataset(3)] });
+  store.dispatch({ type: 'createGroup', name: 'Samples' });
+  store.dispatch({ type: 'moveNode', id: 'layer-4', to: { parent: 'group-1', index: 0 } });
+  return legendModel(store.getState(), {
+    breaks: { 'layer-1': breaks, 'layer-4': breaks },
+  });
+}
+
+describe('treeItems with layers that can be opened', () => {
+  it('says a layer can be opened when it has lines to show: its classes, and not before the engine has given them or in one colour', () => {
+    const items = treeItems(classified());
+    const by = (id: string) => items.find((item) => item.kind === 'layer' && item.id === id);
+    expect(by('layer-1')).toMatchObject({ expandable: true, expanded: false });
+    expect(by('layer-4')).toMatchObject({ expandable: true, level: 2 });
+    expect(by('layer-2')).toMatchObject({ expandable: false });
+    expect(by('layer-3')).toMatchObject({ expandable: false });
+  });
+
+  it('says a layer is open when it has been opened and can be, and not for one that has nothing to show', () => {
+    const items = treeItems(classified(), new Set(['layer-1', 'layer-2', 'layer-3']));
+    const by = (id: string) => items.find((item) => item.kind === 'layer' && item.id === id);
+    expect(by('layer-1')).toMatchObject({ expanded: true });
+    expect(by('layer-2')).toMatchObject({ expandable: false, expanded: false });
+    expect(by('layer-3')).toMatchObject({ expanded: false });
+  });
+});
+
+describe('withExpansion', () => {
+  it('gives a set with the layer opened or closed, and the same set when nothing changes', () => {
+    const none: ReadonlySet<string> = new Set();
+    const one = withExpansion(none, 'layer-1', true);
+    expect([...one]).toEqual(['layer-1']);
+    expect(none.size).toBe(0);
+    expect(withExpansion(one, 'layer-1', true)).toBe(one);
+    expect([...withExpansion(one, 'layer-1', false)]).toEqual([]);
+    expect(withExpansion(none, 'layer-1', false)).toBe(none);
+  });
+});
+
+describe('stillThere', () => {
+  it('keeps the ids that are layers of the legend, in groups or not, and drops the others', () => {
+    const model = classified();
+    expect([...stillThere(new Set(['layer-1', 'layer-4', 'layer-9', 'group-1']), model)]).toEqual([
+      'layer-1',
+      'layer-4',
+    ]);
+  });
+
+  it('gives the same set when all are still there', () => {
+    const open: ReadonlySet<string> = new Set(['layer-1']);
+    expect(stillThere(open, classified())).toBe(open);
+  });
+});
+
+describe('expansionFor', () => {
+  const items = treeItems(classified(), new Set(['layer-4']));
+  const row = (kind: 'layer' | 'group', id: string) => {
+    const found = items.find((item) => item.kind === kind && item.id === id);
+    if (found === undefined) {
+      throw new Error(`There is no row ${id}.`);
+    }
+    return found;
+  };
+
+  it('opens a layer that can be opened with Right, and closes one that is open with Left', () => {
+    expect(expansionFor(row('layer', 'layer-1'), 'ArrowRight')).toBe(true);
+    expect(expansionFor(row('layer', 'layer-4'), 'ArrowLeft')).toBe(false);
+  });
+
+  it('does nothing when the layer is so already, has nothing to show, is a group, or the key is another', () => {
+    expect(expansionFor(row('layer', 'layer-1'), 'ArrowLeft')).toBeUndefined();
+    expect(expansionFor(row('layer', 'layer-4'), 'ArrowRight')).toBeUndefined();
+    expect(expansionFor(row('layer', 'layer-3'), 'ArrowRight')).toBeUndefined();
+    expect(expansionFor(row('layer', 'layer-2'), 'ArrowRight')).toBeUndefined();
+    expect(expansionFor(row('group', 'group-1'), 'ArrowRight')).toBeUndefined();
+    expect(expansionFor(row('layer', 'layer-1'), 'Enter')).toBeUndefined();
   });
 });
