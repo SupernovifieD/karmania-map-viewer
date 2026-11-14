@@ -5,7 +5,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { camera, dispatch, drawn, layerStatuses } from './render.js';
+import { camera, camera3d, dispatch, drawn, layerStatuses } from './render.js';
 
 /** The size of the map canvas of every golden image, in CSS pixels. */
 export const GOLDEN_SIZE = { width: 800, height: 600 } as const;
@@ -61,6 +61,36 @@ export async function lookAt(
     .poll(async () => {
       const now = await camera(page);
       return Math.abs(now.unitsPerPixel - scale) / scale + Math.abs(now.heading - heading);
+    })
+    .toBeLessThan(1e-9);
+  await drawn(page);
+}
+
+/**
+ * Looks in 3D at `target` (map units, with its height) from `distance` away, `heading` degrees clockwise from north and `elevation` degrees above
+ * the horizon, with the lens of the scene, and waits for the camera to be there and a frame to be drawn.
+ */
+export async function lookFrom(
+  page: Page,
+  target: readonly [number, number, number],
+  distance: number,
+  heading: number,
+  elevation: number,
+  exaggeration: 1 | 2 | 3 | 5 | 10 = 1,
+): Promise<void> {
+  await dispatch(
+    page,
+    { type: 'setVerticalExaggeration', factor: exaggeration },
+    {
+      type: 'setCamera',
+      patch: { camera3d: { target: [...target], distance, heading, elevation, fov: 45 } },
+    },
+    { type: 'setViewMode', mode: '3d' },
+  );
+  await expect
+    .poll(async () => {
+      const now = await camera3d(page);
+      return Math.abs(now.distance - distance) / distance + Math.abs(now.heading - heading);
     })
     .toBeLessThan(1e-9);
   await drawn(page);

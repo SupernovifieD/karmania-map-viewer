@@ -1,12 +1,14 @@
 /**
- * The render golden images of the 2D view (section 10.8 of the phase 2 brief): a map canvas of 800 by 600 pixels in the browser of the Docker
- * image, light and dark, one picture for each case: each kind of layer, class colours, rotation, draw order and precision. The data is
+ * The render golden images (section 10.8 of the phase 2 brief): a map canvas of 800 by 600 pixels in the browser of the Docker
+ * image, light and dark, one picture for each case: in 2D each kind of layer, class colours, rotation, draw order and precision, and in 3D (cases
+ * named `3d-...`) each kind seen at an angle, the surface of a grid, a flat grid above another layer, the vertical exaggeration, layers in one plane
+ * and a model of blocks that is less than opaque. The data is
  * the sample files of the repository and a few small files made here. Run with `pnpm test:visual`; `pnpm test:visual:update` takes
  * them again, and every new picture has to be looked at before it is committed. A difference is a failure, however small.
  */
 import { test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { expectGolden, lookAt, settled, sizeMap, THEMES } from './support/golden.js';
+import { expectGolden, lookAt, lookFrom, settled, sizeMap, THEMES } from './support/golden.js';
 import { fixture, projectionFor } from './support/fixtures.js';
 import { dispatch, loadLattice } from './support/render.js';
 import { goTo, importAndLoad, startWizard, wizard } from './support/wizard.js';
@@ -299,7 +301,141 @@ const CASES: readonly Case[] = [
   },
 ];
 
-for (const item of CASES) {
+/** The 3D cases: each kind of layer seen at an angle, lit by the light of 3D, with depth. */
+const CASES_3D: readonly Case[] = [
+  {
+    name: '3d-points',
+    layers: 1,
+    load: (page) => importAndLoad(page, fixture('points.csv'), projectionFor('points.prj')),
+    view: (page) => lookFrom(page, [500_098, 2_765_113, 115], 320, 20, 40),
+  },
+  {
+    name: '3d-lines',
+    layers: 1,
+    load: async (page) => {
+      await importAndLoad(page, fixture('lines.csv'), projectionFor('lines.prj'));
+      await settled(page, 1);
+      await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { lineWidth: 6 } });
+    },
+    view: (page) => lookFrom(page, [500_130, 2_765_050, 100], 300, 330, 35),
+  },
+  {
+    name: '3d-polygons',
+    layers: 1,
+    load: (page) =>
+      importAndLoad(page, geojson('lease.geojson', [polygon(EAST, NORTH, 100, null, 40)])),
+    view: (page) => lookFrom(page, [EAST + 50, NORTH + 50, 0], 200, 25, 50),
+  },
+  {
+    // The plate and two pyramids lit from the north-west, seen from the south-west so that the faces that face the light are in view.
+    name: '3d-mesh',
+    layers: 1,
+    load: (page) => importAndLoad(page, hills(), projectionFor('hills.prj')),
+    view: (page) => lookFrom(page, [EAST + 200, NORTH + 50, 30], 520, 40, 35),
+  },
+  {
+    // The same hills with the heights multiplied by 3: the slopes steeper, and their shades with them.
+    name: '3d-exaggeration',
+    layers: 1,
+    load: (page) => importAndLoad(page, hills(), projectionFor('hills.prj')),
+    view: (page) => lookFrom(page, [EAST + 200, NORTH + 50, 60], 800, 40, 35, 3),
+  },
+  {
+    // A grid with an elevation for each cell: a hill with a cell with no height, coloured by the cell's value (its height), lit.
+    name: '3d-surface',
+    layers: 1,
+    load: async (page) => {
+      const heights: number[] = [];
+      for (let j = 0; j < 12; j += 1) {
+        for (let i = 0; i < 12; i += 1) {
+          const [dx, dy] = [(i + 0.5) * 10 - 60, (j + 0.5) * 10 - 60];
+          heights.push(i === 8 && j === 3 ? NaN : 20 + 18 * Math.exp(-(dx * dx + dy * dy) / 700));
+        }
+      }
+      await loadLattice(page, 'grid', {
+        name: 'ground',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [EAST, NORTH, 0],
+        spacing: [10, 10, 1],
+        dims: [12, 12, 1],
+        values: heights.map((height) => (Number.isNaN(height) ? 0 : height)),
+        heights,
+      });
+    },
+    view: (page) => lookFrom(page, [EAST + 60, NORTH + 60, 25], 260, 340, 38),
+  },
+  {
+    // A polygon on the ground and a flat grid 40 m above it: the grid is a plane at its own height, which the angle of the view shows.
+    name: '3d-grid',
+    layers: 2,
+    load: async (page) => {
+      await importAndLoad(page, geojson('ground.geojson', [polygon(EAST, NORTH, 100, null)]));
+      await settled(page, 1);
+      await loadLattice(page, 'grid', {
+        name: 'cells',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [EAST + 10, NORTH + 10, 0],
+        spacing: [16, 16, 1],
+        dims: [5, 5, 1],
+        elevation: 40,
+        values: Array.from({ length: 25 }, (_, index) => index + 1),
+      });
+    },
+    view: (page) => lookFrom(page, [EAST + 50, NORTH + 50, 20], 240, 20, 28),
+  },
+  {
+    name: '3d-blocks',
+    layers: 1,
+    load: importBlocks,
+    view: (page) => lookFrom(page, [EAST + 15, NORTH + 15, 100], 80, 30, 35),
+  },
+  {
+    // The same blocks half opaque: what is nearest of them, once.
+    name: '3d-blocks-translucent',
+    layers: 1,
+    load: async (page) => {
+      await importBlocks(page);
+      await settled(page, 1);
+      await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    },
+    view: (page) => lookFrom(page, [EAST + 15, NORTH + 15, 100], 80, 30, 35),
+  },
+  {
+    // Layers in one plane (everything at 0): two squares that overlap, a point and a line over them. The legend's order says which is on top, at an angle.
+    name: '3d-order',
+    layers: 4,
+    load: async (page) => {
+      await importAndLoad(page, flat('a.obj', 0, 0, 0), projectionFor('a.prj'));
+      await settled(page, 1);
+      await importAndLoad(page, flat('b.obj', 50, 50, 0), projectionFor('b.prj'));
+      await settled(page, 2);
+      await importAndLoad(
+        page,
+        made(
+          'dot.csv',
+          'text/csv',
+          `Easting,Northing,RL\n${String(EAST + 75)},${String(NORTH + 75)},0\n`,
+        ),
+        projectionFor('dot.prj'),
+      );
+      await settled(page, 3);
+      await importAndLoad(
+        page,
+        made(
+          'cross.csv',
+          'text/csv',
+          `Line,X,Y,Z\nA,${String(EAST + 20)},${String(NORTH + 120)},0\nA,${String(EAST + 140)},${String(NORTH + 30)},0\n`,
+        ),
+        projectionFor('cross.prj'),
+      );
+      await settled(page, 4);
+      await dispatch(page, { type: 'setStyle', layerId: 'layer-4', patch: { lineWidth: 5 } });
+    },
+    view: (page) => lookFrom(page, [EAST + 75, NORTH + 75, 0], 260, 25, 40),
+  },
+];
+
+for (const item of [...CASES, ...CASES_3D]) {
   test(`the render golden image "${item.name}", light and dark`, async ({ page }) => {
     for (const theme of THEMES satisfies readonly Theme[]) {
       await page.goto(`/?theme=${theme}`);
