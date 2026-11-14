@@ -582,7 +582,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 18.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
   - [x] 18.F1 The viewer API: a switch with nothing to measure keeps the centre and the heading; a mode that is not `2d` or `3d` is refused before it changes anything; disposing stops the listeners.
   - [x] 18.F2 The limits of the zoom, in 3D and in 2D, are made from the data that is shown when there has been no fit in that view.
-  - [ ] 18.F3 The controls: the exaggeration select describes why it is disabled to a screen reader, the segmented control leaves the keys with a modifier alone, its ring is not cut at the corners, and what the controls show is what the scene has.
+  - [x] 18.F3 The controls: the exaggeration select describes why it is disabled to a screen reader, the segmented control leaves the keys with a modifier alone, its ring is not cut at the corners, and what the controls show is what the scene has.
   - [ ] 18.F4 The buffers of attributes that are replaced on the card are freed when they are replaced.
   - [ ] 18.F5 Tests that could not fail, or whose titles said more than they check.
   - [ ] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.

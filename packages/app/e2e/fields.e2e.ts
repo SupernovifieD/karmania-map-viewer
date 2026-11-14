@@ -61,6 +61,22 @@ const heard = (page: Page): Promise<unknown[]> =>
   page.evaluate(() => (window as unknown as { heard: unknown[] }).heard);
 
 test.describe('the select', () => {
+  test('gives the native select the description that it is given as `aria-description` (which a tooltip does), and takes it away again', async ({
+    page,
+  }) => {
+    await page.goto('/gallery.html');
+    const host = demo(page, 'select-default').locator('k-select');
+    await expect(select(page, 'select-default')).toHaveAccessibleDescription('');
+    await host.evaluate((element) => {
+      element.setAttribute('aria-description', 'Only in the 3D view');
+    });
+    await expect(select(page, 'select-default')).toHaveAccessibleDescription('Only in the 3D view');
+    await host.evaluate((element) => {
+      element.removeAttribute('aria-description');
+    });
+    await expect(select(page, 'select-default')).toHaveAccessibleDescription('');
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/gallery.html');

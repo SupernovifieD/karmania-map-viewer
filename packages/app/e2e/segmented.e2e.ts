@@ -61,9 +61,7 @@ test.describe('the segmented control', () => {
     await expect(radios(page, 'segmented-three')).toHaveText(['Day', 'Week', 'Month']);
   });
 
-  test('is 32 high, each choice 48 wide or as wide as its words need, and the choices touch', async ({
-    page,
-  }) => {
+  test('is 32 high, with each choice at least 48 wide, and the choices touch', async ({ page }) => {
     const group = await rect(demo(page, 'segmented-default').locator('[role="radiogroup"]'));
     expect(group.height).toBe(32);
     const [first, second] = await Promise.all([
@@ -159,7 +157,7 @@ test.describe('the segmented control', () => {
     await expect(radio(page, 'segmented-three', 'month')).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('shows a focus ring that is inside the choice, where nothing clips it, and that shows on the fill', async ({
+  test('shows a focus ring that is inside the choice, whose outer corners are rounded as the box is, and that shows on the fill', async ({
     page,
   }) => {
     for (const theme of ['light', 'dark'] as const) {
@@ -167,6 +165,18 @@ test.describe('the segmented control', () => {
       await page.keyboard.press('Shift');
       const chosen = radio(page, 'segmented-default', '2d');
       await chosen.focus();
+      // The box clips to its rounded corners, so the first and last choice have those corners (the radius less the border): the ring follows them.
+      const corners = await styleOf(
+        chosen,
+        'border-top-left-radius',
+        'border-bottom-left-radius',
+        'border-top-right-radius',
+      );
+      expect(corners).toEqual({
+        'border-top-left-radius': '5px',
+        'border-bottom-left-radius': '5px',
+        'border-top-right-radius': '0px',
+      });
       const ring = await styleOf(
         chosen,
         'outline-style',
@@ -196,6 +206,33 @@ test.describe('the segmented control', () => {
         contrastBetween(plain['outline-color'] ?? '', box['background-color'] ?? ''),
       ).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  test('leaves the keys with Alt, Control or Command to the browser: they do not choose, and are not stopped', async ({
+    page,
+  }) => {
+    await listen(page, 'segmented-three');
+    await page.keyboard.press('Shift');
+    await radio(page, 'segmented-three', 'week').focus();
+    const outcome = await radio(page, 'segmented-three', 'week').evaluate((element) =>
+      [{ altKey: true }, { ctrlKey: true }, { metaKey: true }].map((modifiers) => {
+        const event = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          ...modifiers,
+        });
+        element.dispatchEvent(event);
+        return event.defaultPrevented;
+      }),
+    );
+    expect(outcome).toEqual([false, false, false]);
+    expect(await heard(page)).toEqual([]);
+    await expect(radio(page, 'segmented-three', 'week')).toBeFocused();
+    // The same key without them is the control's.
+    await page.keyboard.press('ArrowRight');
+    expect(await heard(page)).toEqual(['month']);
   });
 
   test('enters at the chosen choice when it is focused', async ({ page }) => {
@@ -257,9 +294,7 @@ test.describe('the segmented control', () => {
     expect(outcome.none).toBe('fine');
   });
 
-  test('has no overflow, and nothing in it that a person using a screen reader or a keyboard cannot reach', async ({
-    page,
-  }) => {
+  test('has no overflow and no serious accessibility violation', async ({ page }) => {
     await assertNoOverflow(page.locator('[data-section="segmented"]'), { window: 'horizontal' });
     await expectNoSeriousViolations(page);
   });

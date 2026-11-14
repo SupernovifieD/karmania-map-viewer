@@ -1,5 +1,12 @@
 import { kButton, sharedStyles } from '@karmania/ui';
-import type { SegmentedChange, SegmentedOption, SelectChange, SelectOption } from '@karmania/ui';
+import type {
+  KSegmented,
+  KSelect,
+  SegmentedChange,
+  SegmentedOption,
+  SelectChange,
+  SelectOption,
+} from '@karmania/ui';
 import { createViewer } from '@karmania/viewer';
 import type { Viewer } from '@karmania/viewer';
 import { css, html, LitElement } from 'lit';
@@ -149,11 +156,17 @@ export class KarmaniaApp extends LitElement {
     if (factor !== undefined) {
       this.viewer?.dispatch({ type: 'setVerticalExaggeration', factor });
     }
+    // The select shows what the scene has, which is what was chosen unless the scene did not take it: the control has changed itself already.
+    (event.currentTarget as KSelect).value = String(
+      this.viewer?.scene().verticalExaggeration ?? this.exaggeration,
+    );
   };
 
   /** A person chose a view: the viewer switches, and the scene tells the control (which is what it shows) when it has. */
   private readonly onView = (event: CustomEvent<SegmentedChange>): void => {
     this.viewer?.setViewMode(event.detail.value === '3d' ? '3d' : '2d');
+    // The control shows the view the scene is in, which is what was chosen unless the scene did not take it: the control has changed itself already.
+    (event.currentTarget as KSegmented).value = this.viewer?.scene().viewMode ?? this.view;
   };
 
   /** Opens the viewer's file picker. */
