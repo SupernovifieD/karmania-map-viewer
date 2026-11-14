@@ -1,8 +1,18 @@
 import { kButton, sharedStyles } from '@karmania/ui';
-import type { SegmentedChange, SegmentedOption } from '@karmania/ui';
+import type { SegmentedChange, SegmentedOption, SelectChange, SelectOption } from '@karmania/ui';
 import { createViewer } from '@karmania/viewer';
 import type { Viewer } from '@karmania/viewer';
 import { css, html, LitElement } from 'lit';
+
+/** What heights can be multiplied by in 3D, as the scene allows (`VerticalExaggeration`), each as the toolbar's select says it: `×1` to `×10`. */
+const EXAGGERATIONS = [1, 2, 3, 5, 10] as const;
+const EXAGGERATION_OPTIONS: readonly SelectOption[] = EXAGGERATIONS.map((factor) => ({
+  value: String(factor),
+  label: `×${String(factor)}`,
+}));
+
+/** Why the select of the exaggeration cannot be used in 2D, for the tooltip of the disabled control. */
+const ONLY_IN_3D = 'Only in the 3D view';
 
 /** The views the map can be shown in, as the toolbar's control offers them. */
 const VIEWS: readonly SegmentedOption[] = [
@@ -21,6 +31,7 @@ const VIEWS: readonly SegmentedOption[] = [
 export class KarmaniaApp extends LitElement {
   static override properties = {
     view: { state: true },
+    exaggeration: { state: true },
   };
 
   static override styles = [
@@ -62,6 +73,11 @@ export class KarmaniaApp extends LitElement {
         margin-inline-start: auto;
       }
 
+      /* The select of the exaggeration is 72 wide, as the brief has it, so it is the same width in 2D and 3D and switching moves nothing. */
+      .exaggeration {
+        width: calc(var(--k-space-48) + var(--k-space-24));
+      }
+
       /* What the viewer fills: the rest of the window under the toolbar. */
       .viewer {
         min-height: 0;
@@ -76,12 +92,16 @@ export class KarmaniaApp extends LitElement {
   /** The view the scene is in, which the control shows. */
   declare private view: string;
 
+  /** What the scene multiplies heights by, which the select shows. */
+  declare private exaggeration: number;
+
   /** Stops following the scene. */
   private unfollow: (() => void) | undefined;
 
   constructor() {
     super();
     this.view = '2d';
+    this.exaggeration = 1;
   }
 
   override connectedCallback(): void {
@@ -113,12 +133,23 @@ export class KarmaniaApp extends LitElement {
     if (container !== null && this.viewer === undefined) {
       const viewer = createViewer(container);
       this.viewer = viewer;
-      this.view = viewer.scene().viewMode;
+      const start = viewer.scene();
+      this.view = start.viewMode;
+      this.exaggeration = start.verticalExaggeration;
       this.unfollow = viewer.on('scene', (scene) => {
         this.view = scene.viewMode;
+        this.exaggeration = scene.verticalExaggeration;
       });
     }
   }
+
+  /** A person chose how much to multiply heights by: the scene is given it, and tells the select (which is what it shows) when it has it. */
+  private readonly onExaggeration = (event: CustomEvent<SelectChange>): void => {
+    const factor = EXAGGERATIONS.find((each) => String(each) === event.detail.value);
+    if (factor !== undefined) {
+      this.viewer?.dispatch({ type: 'setVerticalExaggeration', factor });
+    }
+  };
 
   /** A person chose a view: the viewer switches, and the scene tells the control (which is what it shows) when it has. */
   private readonly onView = (event: CustomEvent<SegmentedChange>): void => {
@@ -142,6 +173,18 @@ export class KarmaniaApp extends LitElement {
             .options=${VIEWS}
             @k-segmented-change=${this.onView}
           ></k-segmented>
+          <!-- Always there, so that switching the view moves nothing; in 2D it is disabled, and the tooltip says why. -->
+          <k-tooltip text=${this.view === '3d' ? '' : ONLY_IN_3D}>
+            <k-select
+              class="exaggeration"
+              label="Vertical exaggeration"
+              hide-label
+              .value=${String(this.exaggeration)}
+              .options=${EXAGGERATION_OPTIONS}
+              ?disabled=${this.view !== '3d'}
+              @k-select-change=${this.onExaggeration}
+            ></k-select>
+          </k-tooltip>
         </div>
       </header>
       <div class="viewer"></div>
