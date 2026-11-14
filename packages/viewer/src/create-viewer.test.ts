@@ -121,6 +121,10 @@ describe('createViewer', () => {
     expect(made[0]?.subscribeToScene).toHaveBeenCalledTimes(1);
     made[0]?.heard[0]?.({ version: 1 }, { version: 0 });
     expect(listener).toHaveBeenCalledExactlyOnceWith({ version: 1 });
+    // Each change is told, with the document it made and not the one before it.
+    made[0]?.heard[0]?.({ version: 2 }, { version: 1 });
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith({ version: 2 });
     stop();
     expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
     // Stopping again does nothing more.

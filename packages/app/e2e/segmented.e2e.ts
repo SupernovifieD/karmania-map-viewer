@@ -177,6 +177,19 @@ test.describe('the segmented control', () => {
         'border-bottom-left-radius': '5px',
         'border-top-right-radius': '0px',
       });
+      // And the last choice has them at its other side.
+      expect(
+        await styleOf(
+          radio(page, 'segmented-default', '3d'),
+          'border-top-left-radius',
+          'border-top-right-radius',
+          'border-bottom-right-radius',
+        ),
+      ).toEqual({
+        'border-top-left-radius': '0px',
+        'border-top-right-radius': '5px',
+        'border-bottom-right-radius': '5px',
+      });
       const ring = await styleOf(
         chosen,
         'outline-style',

@@ -182,7 +182,7 @@ test.describe('the switch between the 2D and the 3D view', () => {
     expect(errors).toEqual([]);
   });
 
-  test('keeps the centre and the heading when there is nothing to measure: a viewer that has no size, and one that is not drawn yet', async ({
+  test('keeps the centre and the heading when there is nothing to measure: a viewer that has no size, in a box that is not shown', async ({
     page,
   }) => {
     await page.goto('/');

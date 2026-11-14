@@ -384,7 +384,7 @@ test.describe('the navigation group in 3D', () => {
   test('has the limits of the distance from the data when the view was switched to 3D and never fitted: the same as after Fit', async ({
     page,
   }) => {
-    // Switched from 2D with no press of Fit: 60 presses of zoom in go as near as the limit lets them.
+    // Switched from 2D with no press of Fit: 40 presses of zoom in go as near as the limit lets them.
     await start3d(page);
     for (let press = 0; press < 40; press += 1) {
       await button(page, 'Zoom in').click();
