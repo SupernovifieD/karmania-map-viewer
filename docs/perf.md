@@ -490,7 +490,7 @@ timings of the previous section, which did not draw a map, are in the full Chrom
 Section 9.6 of the Phase 2 brief: a model of 1,000,000 blocks, loaded to the first frame under 3 s and, in a scripted 3D orbit, the 95th percentile of the frame time
 under 50 ms; no task of the main thread over 50 ms; and "if this is missed, a step may draw only the exposed faces of dense models; measure first". `pnpm perf`
 (the `render-performance` project, `render.perf.ts`) now does the orbit after the load: the view is switched to 3D with `viewer.setViewMode('3d')` and fitted (the time to the first
-frame that has the layer in it is printed as `switchMs`), and the camera is given a new place at each of 300 frames, going round a turn and a third (1.5 degrees a frame) while it rises
+frame that has the layer in it is printed as `switchMs`), and the camera is given a new place at each of 300 frames, going round a turn and a quarter (1.5 degrees a frame, 450 degrees in the 300) while it rises
 and falls between 25 and 65 degrees above the horizon; the time between two animation frames is what is measured, as in 2D, with the display's own beat measured in the same page. The
 file is `blocks-1m.csv` (a dense model of 100 by 100 by 100 blocks of 10 m, from `scripts/generate-fixtures`), the card the same as above (Intel Iris Plus Graphics, in the full Chromium).
 

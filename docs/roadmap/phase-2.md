@@ -574,12 +574,12 @@ or releasing, and whenever the brief says to stop.
   then measure again.
   - [x] 18.9a1 Translucent blocks: no seams between blocks (found by looking at the first golden image of them); the colour pass draws only at the depth the first pass wrote.
   - [x] 18.9a Render golden images for 3D, reviewed.
-  - [x] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`. **First measurement: the target is missed** (median 81 to 84 ms, 95th percentile 101 to 108 ms against 50), so, as the brief says, 18.9c draws only the exposed faces of dense models and 18.9b is measured again.
+  - [x] 18.9b 3D orbit performance of one million blocks measured; `docs/perf.md`. **First measurement: the target is missed** (median 81 to 86 ms, 95th percentile 101 to 127 ms against 50, in three runs of which the first was cold), so, as the brief says, 18.9c draws only the exposed faces of dense models and 18.9b is measured again.
   - [x] 18.9c Only the exposed faces of a dense model of blocks are drawn (the brief's remedy for a missed target).
     - [x] 18.9c1 The kernel says how many blocks there are along each axis of a dense model (`dims`), so that the neighbours of a block are known.
     - [x] 18.9c2 The layer builds its instances for the blocks that have a face that shows, with a mask of the faces; the others are not drawn.
     - [x] 18.9c3 Measured again; `docs/perf.md`; the probe is committed with the numbers.
-- [ ] 18.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
+- [x] 18.F The review of the milestone (five reviewers of a cheaper model, one for each part of it; each finding checked against the code before it was taken)
   - [x] 18.F1 The viewer API: a switch with nothing to measure keeps the centre and the heading; a mode that is not `2d` or `3d` is refused before it changes anything; disposing stops the listeners.
   - [x] 18.F2 The limits of the zoom, in 3D and in 2D, are made from the data that is shown when there has been no fit in that view.
   - [x] 18.F3 The controls: the exaggeration select describes why it is disabled to a screen reader, the segmented control leaves the keys with a modifier alone, its ring is not cut at the corners, and what the controls show is what the scene has.
@@ -590,7 +590,7 @@ or releasing, and whenever the brief says to stop.
     - [x] 18.F5a The fit of blocks in 3D (all eight corners between the planes and in the picture), the grid over the mesh (not the map either), `distance` refusing an empty colour, two titles.
     - [x] 18.F5b The exaggeration is not applied from above under every factor; the surface that falls is darker than the one that rises in the pictures of both.
     - [x] 18.F5c Unit tests: both materials of points and lines freed, the surface layer's cells, every kind of buffers, and what a dense model lets go of.
-  - [ ] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.
+  - [x] 18.F6 The records: figures and counts that were wrong, a step ticked before its commit, two steps in one commit, and what is known and left.
 - [ ] 18.G Gate (with `pnpm perf` for 3D).
 
 ## M19: Legend system
