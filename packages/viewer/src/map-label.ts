@@ -4,6 +4,7 @@
  */
 import { northArrow } from '@karmania/scene';
 import type { SceneDocument } from '@karmania/scene';
+import { headingOf } from './heading.js';
 
 /** How many layers, in words. */
 function layersIn(count: number): string {
@@ -11,15 +12,16 @@ function layersIn(count: number): string {
 }
 
 /**
- * The name of the map for the scene as it is: the view, how many layers there are, and how the map is turned from north. The view is the scene's
- * `viewMode`, and the renderer draws 2D until M18, so a scene in 3D is named so while 2D is what is drawn.
+ * The name of the map for the scene as it is: the view, how many layers there are, and how the map is turned from north (the heading of the camera of
+ * the view that is shown).
  */
 export function mapLabel(
   scene: Pick<SceneDocument, 'viewMode' | 'layers'> & {
     camera2d: Pick<SceneDocument['camera2d'], 'heading'>;
+    camera3d: Pick<SceneDocument['camera3d'], 'heading'>;
   },
 ): string {
-  const arrow = northArrow(scene.camera2d.heading);
+  const arrow = northArrow(headingOf(scene));
   return [
     'Map',
     `${scene.viewMode === '3d' ? '3D' : '2D'} view`,
