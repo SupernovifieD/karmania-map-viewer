@@ -81,7 +81,7 @@ export class KarmaniaLegendTab extends LitElement {
       }
 
       /* The layers of a group are 24 in. */
-      li[data-level='2'] > .row {
+      .row[data-level='2'] {
         margin-left: var(--k-space-24);
       }
 
@@ -152,13 +152,14 @@ export class KarmaniaLegendTab extends LitElement {
 
   private layer(layer: LegendLayerEntry, level: 1 | 2) {
     return html`
-      <li
-        role="treeitem"
-        aria-level=${String(level)}
-        data-level=${String(level)}
-        data-layer=${layer.id}
-      >
-        <div class="row layer">
+      <li role="none">
+        <div
+          class="row layer"
+          role="treeitem"
+          aria-level=${String(level)}
+          data-level=${String(level)}
+          data-layer=${layer.id}
+        >
           <span class="handle"></span>
           <span class="box"></span>
           ${this.swatch(layer)}
@@ -170,17 +171,21 @@ export class KarmaniaLegendTab extends LitElement {
     `;
   }
 
+  /** A group is a row, and the list of its layers is beside it and owned by it, so that the name of the group is its own words and not those of its layers. */
   private group(group: LegendGroupEntry) {
+    const items = `legend-items-${group.id}`;
     return html`
-      <li
-        role="treeitem"
-        aria-level="1"
-        aria-expanded=${group.collapsed ? 'false' : 'true'}
-        aria-label=${group.name}
-        data-level="1"
-        data-group=${group.id}
-      >
-        <div class="row group" ?data-collapsed=${group.collapsed}>
+      <li role="none">
+        <div
+          class="row group"
+          role="treeitem"
+          aria-level="1"
+          aria-expanded=${group.collapsed ? 'false' : 'true'}
+          aria-owns=${group.collapsed ? nothing : items}
+          data-level="1"
+          data-group=${group.id}
+          ?data-collapsed=${group.collapsed}
+        >
           <k-icon class="chevron" name="chevron-down" size="16" aria-hidden="true"></k-icon>
           <span class="box"></span>
           <span class="name" data-truncate title=${group.name}>${group.name}</span>
@@ -189,7 +194,7 @@ export class KarmaniaLegendTab extends LitElement {
         ${
           group.collapsed
             ? nothing
-            : html`<ul role="group">
+            : html`<ul role="group" id=${items}>
                 ${group.layers.map((layer) => this.layer(layer, 2))}
               </ul>`
         }

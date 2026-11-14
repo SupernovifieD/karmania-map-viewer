@@ -2015,6 +2015,23 @@ describe('LayerPipeline: what the legend is given', () => {
     expect(t.pipeline.legendInputs().breaks).toEqual({ 'layer-1': five });
   });
 
+  it('tells the viewer when the breaks of a layer arrive, though the layer stays drawn: the legend lists them', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+    const told = t.changes.mock.calls.length;
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, classes: 5 } as never },
+    });
+    await t.pipeline.idle();
+    expect(statuses(t.pipeline)).toEqual([['layer-1', 'drawn']]);
+    expect(t.changes.mock.calls.length).toBeGreaterThan(told);
+  });
+
   it('gives no breaks for a layer that is gone', async () => {
     const t = gridSetup();
     t.drawable([0, true]);
