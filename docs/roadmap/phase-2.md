@@ -604,6 +604,9 @@ or releasing, and whenever the brief says to stop.
     - [x] 19.1c2 Browser proofs of the tab: rows, indent, alignment, swatches, long names, the scene followed, axe.
     - [x] 19.1c3 Screenshot states of the tab and their baselines, looked at.
 - [ ] 19.2 Visibility for layers and groups (tri-state); keyboard.
+  - [x] 19.2a The rows that can be reached, the arrow keys and what a switch asks of the scene, as functions.
+  - [ ] 19.2b The tab draws the switches (a tri-state one for a group), has one tab stop with the arrow keys and Space, and the viewer gives the scene what it asks.
+  - [ ] 19.2c Browser proofs; the three states photographed again.
 - [ ] 19.3 Class entries with counts and "No value".
 - [ ] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live
   announcements; draw order follows.
