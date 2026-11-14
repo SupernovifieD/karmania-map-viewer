@@ -48,7 +48,7 @@ export class KSegmented extends LitElement {
         vertical-align: middle;
       }
 
-      /* The box clips the chosen choice's fill to its rounded corners; the focus ring is drawn inside the choice, so it is not clipped. */
+      /* The box clips the chosen choice's fill to its rounded corners; the focus ring is drawn inside the choice, which has those corners itself, so it is not cut. */
       .group {
         background: var(--k-surface);
         border: var(--k-border-width) solid var(--k-border-strong);
@@ -82,6 +82,18 @@ export class KSegmented extends LitElement {
 
       .option:focus-visible {
         outline-offset: calc(var(--k-focus-width) * -1);
+      }
+
+      /* The outer corners of the first and last choice are rounded as the inside of the box is (its radius less its border), so that the box's clip
+         does not cut the corners of the ring, which follows the choice's own corners. */
+      .option:first-child {
+        border-top-left-radius: calc(var(--k-radius-md) - var(--k-border-width));
+        border-bottom-left-radius: calc(var(--k-radius-md) - var(--k-border-width));
+      }
+
+      .option:last-child {
+        border-top-right-radius: calc(var(--k-radius-md) - var(--k-border-width));
+        border-bottom-right-radius: calc(var(--k-radius-md) - var(--k-border-width));
       }
 
       /* The ring of the chosen choice is in the color of its words: the accent, which is the ring's own, is the fill there and would not show. */
@@ -162,6 +174,10 @@ export class KSegmented extends LitElement {
   }
 
   private onKeyDown(event: KeyboardEvent, index: number): void {
+    // A key with Alt, Control or Command is the browser's (Alt and an arrow is Back, say), not a way to choose.
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
     const last = this.options.length - 1;
     const target = {
       ArrowRight: index === last ? 0 : index + 1,

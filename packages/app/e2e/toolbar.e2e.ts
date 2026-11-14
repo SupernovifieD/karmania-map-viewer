@@ -141,6 +141,18 @@ test.describe('the toolbar', () => {
     await expect(exaggerationSelect(page)).toBeDisabled();
   });
 
+  test('describes why the select is disabled to a screen reader, on the select that it reaches, in 2D, and describes nothing in 3D', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    // The description is of the native select inside the control, which is what a screen reader meets.
+    await expect(exaggerationSelect(page)).toHaveAccessibleDescription('Only in the 3D view');
+    await viewChoice(page, '3D').click();
+    await expect(exaggerationSelect(page)).toHaveAccessibleDescription('');
+    await viewChoice(page, '2D').click();
+    await expect(exaggerationSelect(page)).toHaveAccessibleDescription('Only in the 3D view');
+  });
+
   test('says why the select is disabled in 2D, when the pointer is over it, and says nothing in 3D', async ({
     page,
   }) => {
@@ -206,6 +218,7 @@ test.describe('the toolbar', () => {
     // In 2D the select is disabled and not a stop: the next is the map's Import.
     await page.keyboard.press('Tab');
     await expect(exaggerationSelect(page)).not.toBeFocused();
+    await expect(page.locator('karmania-map-area k-button button')).toBeFocused();
     await viewChoice(page, '3D').click();
     await viewChoice(page, '3D').focus();
     await page.keyboard.press('Tab');
@@ -244,6 +257,33 @@ test.describe('the toolbar', () => {
     expect(await sceneView(page)).toBe('3d');
     await page.keyboard.press('ArrowLeft');
     expect(await sceneView(page)).toBe('2d');
+  });
+
+  test('shows what the scene has, and not what was chosen, when the scene did not take it', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    // The viewer is made to refuse: its way to switch the view and its commands do nothing.
+    await page.evaluate(() => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        setViewMode: (mode: string) => void;
+        dispatch: (command: unknown) => unknown;
+      };
+      viewer.setViewMode = () => undefined;
+      viewer.dispatch = () => undefined;
+    });
+    await viewChoice(page, '3D').click();
+    expect(await sceneView(page)).toBe('2d');
+    await expect(viewChoice(page, '2D')).toHaveAttribute('aria-checked', 'true');
+    await expect(viewChoice(page, '3D')).toHaveAttribute('aria-checked', 'false');
+    // The select, made to be enabled, shows the factor the scene has too.
+    await exaggerationSelect(page).evaluate((element) => {
+      (element as HTMLSelectElement).disabled = false;
+    });
+    await exaggerationSelect(page).selectOption('5');
+    await expect.poll(() => exaggerationSelect(page).inputValue()).toBe('1');
   });
 
   test('follows the scene when the view changes by other means', async ({ page }) => {

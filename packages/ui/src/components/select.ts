@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { defineOnce } from '../define.js';
 import { fieldStyles } from './field-styles.js';
 import { sharedStyles } from '../shared-styles.js';
@@ -47,6 +48,8 @@ export class KSelect extends LitElement {
     hideLabel: { type: Boolean, attribute: 'hide-label' },
     help: { type: String },
     reserve: { type: Boolean, reflect: true },
+    // What a tooltip says of the select, which it sets as the select's `aria-description`: the control that a screen reader reaches is the native one inside.
+    description: { type: String, attribute: 'aria-description' },
   };
 
   static override styles = [
@@ -84,6 +87,8 @@ export class KSelect extends LitElement {
   declare hideLabel: boolean;
   declare help: string;
   declare reserve: boolean;
+  /** A description for people who cannot see the page, given as the attribute `aria-description` (which a tooltip does): the native select has it. */
+  declare description: string | null;
 
   constructor() {
     super();
@@ -95,6 +100,7 @@ export class KSelect extends LitElement {
     this.hideLabel = false;
     this.help = '';
     this.reserve = false;
+    this.description = null;
   }
 
   private readonly onChange = (event: Event): void => {
@@ -130,6 +136,7 @@ export class KSelect extends LitElement {
             id="control"
             ?disabled=${this.disabled}
             aria-describedby=${this.help === '' ? nothing : 'help'}
+            aria-description=${ifDefined(this.description === null || this.description === '' ? undefined : this.description)}
             @change=${this.onChange}
           >
             ${this.options.map(
