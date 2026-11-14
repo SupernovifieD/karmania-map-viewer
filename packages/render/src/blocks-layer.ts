@@ -138,9 +138,12 @@ type BlockBuffers = Pick<
   'centres' | 'spacing' | 'rotation' | 'dims'
 >;
 
-/** A part of the blocks on the card. `ready` is whether its instances are of the classes that the layer has now (always, for a sparse model). */
+/**
+ * A part of the blocks on the card. `ready` is whether its instances are of the classes that the layer has now (always, for a sparse model). The
+ * geometry of a part of a dense model is made again when its instances are (their number changes with the classes), and the old one is freed.
+ */
 interface Part {
-  readonly geometry: InstancedBufferGeometry;
+  geometry: InstancedBufferGeometry;
   readonly first: number;
   readonly count: number;
   readonly depth: Mesh;
@@ -226,13 +229,20 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       return;
     }
     if (classes === undefined) {
-      part.geometry.deleteAttribute('aClass');
+      // The attribute is left where it is (the shader reads it only for a colour that a class has, and `show` draws nothing without classes).
       return;
     }
-    part.geometry.setAttribute(
-      'aClass',
-      new InstancedBufferAttribute(classes.subarray(part.first, part.first + part.count), 1),
-    );
+    // Made once, with an array of its own (it is written to, and the classes are the caller's); the next classes are put into it and sent to the card
+    // again, so that no buffer of the card is left behind by an attribute that was replaced (three frees a buffer only when the geometry that
+    // holds its attribute is disposed).
+    const view = classes.subarray(part.first, part.first + part.count);
+    const held = part.geometry.getAttribute('aClass') as InstancedBufferAttribute | undefined;
+    if (held !== undefined) {
+      (held.array as Uint8Array).set(view);
+      held.needsUpdate = true;
+      return;
+    }
+    part.geometry.setAttribute('aClass', new InstancedBufferAttribute(view.slice(), 1));
   }
 
   /** The instances of a part that are being made, a few blocks of it at a time (`BLOCKS_PER_STEP`): the part, where it has got to, and what it has made. */
@@ -315,19 +325,25 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       return false;
     }
     const { part, at } = work;
-    part.geometry.setAttribute(
-      'aCentre',
-      new InstancedBufferAttribute(work.centres.subarray(0, at * 3), 3),
-    );
-    part.geometry.setAttribute(
-      'aClass',
-      new InstancedBufferAttribute(work.kinds.subarray(0, at), 1),
-    );
-    part.geometry.setAttribute(
-      'aExposed',
-      new InstancedBufferAttribute(work.masks.subarray(0, at), 1),
-    );
-    part.geometry.instanceCount = at;
+    // The instances are a different number each time, so they are put in a geometry of their own, which takes the place of the part's, and the old one is
+    // freed (with its instance buffers: the box's attributes, which every part uses, are taken out of it first, and stay).
+    const next = new InstancedBufferGeometry();
+    next.setIndex(box.getIndex());
+    next.setAttribute('position', box.getAttribute('position'));
+    next.setAttribute('normal', box.getAttribute('normal'));
+    next.setAttribute('aCentre', new InstancedBufferAttribute(work.centres.subarray(0, at * 3), 3));
+    next.setAttribute('aClass', new InstancedBufferAttribute(work.kinds.subarray(0, at), 1));
+    next.setAttribute('aExposed', new InstancedBufferAttribute(work.masks.subarray(0, at), 1));
+    next.instanceCount = at;
+    drawRange(next);
+    const old = part.geometry;
+    part.geometry = next;
+    part.mesh.geometry = next;
+    part.depth.geometry = next;
+    old.deleteAttribute('position');
+    old.deleteAttribute('normal');
+    old.setIndex(null);
+    old.dispose();
     part.ready = true;
     visibility(part);
     return true;
