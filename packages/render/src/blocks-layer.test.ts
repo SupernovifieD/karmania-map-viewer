@@ -559,11 +559,25 @@ describe('createBlocksLayer: a dense model, by its exposed faces', () => {
     other.indices.fill(NO_VALUE, 0, 50_000);
     layer.setClasses?.(other);
     expect(parts(layer)[0]?.visible).toBe(false);
-    settle(layer);
+    // The part is drawn when its instances are ready, and the first time it is it has to be for the classes that the layer has now: what was half made
+    // for the others would be finished, and drawn, a frame or two before the instances of these, if it was not let go (the instances that are there at
+    // the end are the same either way, since the part is made again, so it is the first picture that is looked at).
+    let steps = 0;
+    while (parts(layer)[0]?.visible !== true && steps < 20) {
+      layer.step?.();
+      steps += 1;
+    }
     expect(parts(layer)[0]?.visible).toBe(true);
-    // The first 50,000 blocks (5 layers of 100 by 100) are not drawn, so the bottom 5 layers are gone and the 6th shows its bottom.
-    const masks = masksOf(parts(layer)[0]);
-    expect(masks.filter((mask) => (mask & 32) === 32).length).toBeGreaterThanOrEqual(100 * 100);
+    // The first 50,000 blocks (5 layers of 100 by 100) are not drawn, so layers 5 to 9 are the model. What shows is the whole of layer 5 (its bottom is
+    // open), the whole of layer 9 (its top), and the 396 blocks round the edge of each of the three between (2 * 100 + 2 * 98): 21,188 instances. The
+    // model of the first classes had 23,168 (its layer 0 and layer 9 whole, and 396 for each of 8 between), the lowest at 5 metres, so neither the count
+    // nor the lowest block could be the same if any of what was made for them was kept.
+    expect(instanceCount(layer)).toBe(21_188);
+    const mesh = parts(layer)[0];
+    const heights = centresOfInstances(mesh).filter((_, n) => n % 3 === 2);
+    expect(Math.min(...heights)).toBe(55);
+    // The bottoms that show are those of layer 5 and no others: 100 by 100 of them.
+    expect(masksOf(mesh).filter((mask) => (mask & 32) === 32)).toHaveLength(100 * 100);
   });
 
   it('makes its instances again when other classes come, and keeps them when the same ones come with other colours', () => {

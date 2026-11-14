@@ -169,18 +169,27 @@ describe('createLinesLayer', () => {
     expect(uniforms(layer)['uDepthScale']?.value).toBe(1);
   });
 
-  it('frees every part and its material when it is disposed', () => {
+  it('frees every part and both its materials, the one of the view from above and the one of 3D, when it is disposed', () => {
     const layer = createLinesLayer(lines(SEGMENTS_PER_PART + 1), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    // (The material of 3D is made when the layer is first seen in 3D.)
+    layer.prepareFrame({ ...INFO, flat: false });
     layer.step?.();
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
     const freed: string[] = [];
     for (const [i, part] of parts(layer).entries()) {
       part.geometry.addEventListener('dispose', () => freed.push(`geometry ${String(i)}`));
     }
-    (parts(layer)[0]?.material as ShaderMaterial).addEventListener('dispose', () =>
-      freed.push('material'),
-    );
+    flat.addEventListener('dispose', () => freed.push('material from above'));
+    solid.addEventListener('dispose', () => freed.push('material of 3d'));
     layer.dispose();
-    expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
+    expect(freed.sort()).toEqual([
+      'geometry 0',
+      'geometry 1',
+      'material from above',
+      'material of 3d',
+    ]);
     expect(parts(layer)).toHaveLength(0);
   });
 
