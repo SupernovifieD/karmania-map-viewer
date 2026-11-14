@@ -2,9 +2,9 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, EqualDepth, LessDepth } from 'three';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { BLOCKS_PER_PART, createBlocksLayer } from './blocks-layer.js';
+import { BLOCKS_PER_PART, BLOCKS_PER_STEP, createBlocksLayer } from './blocks-layer.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
-import { MAX_CLASSES } from './look.js';
+import { MAX_CLASSES, NO_VALUE } from './look.js';
 
 const LOOK: LayerLook = {
   visible: true,
@@ -355,5 +355,223 @@ describe('createBlocksLayer', () => {
     layer.dispose();
     expect(freed.sort()).toEqual(['depth material', 'geometry 0', 'geometry 1', 'material']);
     expect(layer.object.children).toHaveLength(0);
+  });
+});
+
+/** A dense model of `nx` by `ny` by `nz` blocks of 10 metres, with its centres in lattice order (`i` fastest) and its size said. */
+const dense = (
+  nx: number,
+  ny: number,
+  nz: number,
+): Blocks & { dims: [number, number, number] } => ({
+  kind: 'blocks',
+  centres: Float32Array.from({ length: nx * ny * nz * 3 }, (_, at) => {
+    const block = Math.floor(at / 3);
+    const [i, j, k] = [block % nx, Math.floor(block / nx) % ny, Math.floor(block / (nx * ny))];
+    return [i * 10 + 5, j * 10 + 5, k * 10 + 5][at % 3] ?? 0;
+  }),
+  spacing: [10, 10, 10],
+  rotation: 0,
+  dims: [nx, ny, nz],
+});
+
+/** The same class (with a colour) for every block, or `classes` where given. */
+const every = (count: number, kind = 0): ClassColouring => ({
+  indices: new Uint8Array(count).fill(kind),
+  colours: ['#ff0000', '#00ff00'],
+});
+
+/** Works the layer through until it has nothing left to make (a dense model makes its instances a part at a time, between frames); how many times it was asked. */
+function settle(layer: ReturnType<typeof createBlocksLayer>): number {
+  let calls = 1;
+  while (layer.step?.() === true) {
+    calls += 1;
+  }
+  return calls;
+}
+
+const instanceCount = (layer: ReturnType<typeof createBlocksLayer>): number =>
+  parts(layer).reduce((sum, mesh) => sum + (geometryOf(mesh)?.instanceCount ?? 0), 0);
+
+const centresOfInstances = (mesh: Mesh | undefined): number[] => [
+  ...((geometryOf(mesh)?.getAttribute('aCentre').array as Float32Array | undefined) ?? []),
+];
+
+const masksOf = (mesh: Mesh | undefined): number[] => [
+  ...((geometryOf(mesh)?.getAttribute('aExposed').array as Uint8Array | undefined) ?? []),
+];
+
+describe('createBlocksLayer: a dense model, by its exposed faces', () => {
+  it('draws nothing until it has classes, and says that it has work to do when it has them: its instances are made then', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    expect(uniforms(layer)['uMasked']?.value).toBe(1);
+    expect(typeof layer.step).toBe('function');
+    expect(layer.object.visible).toBe(false);
+    expect(instanceCount(layer)).toBe(0);
+    layer.setClasses?.(every(27));
+    expect(layer.object.visible).toBe(true);
+    // Not drawn until the instances are made, which is a part of the work between frames.
+    expect(parts(layer)[0]?.visible).toBe(false);
+    settle(layer);
+    expect(parts(layer)[0]?.visible).toBe(true);
+  });
+
+  it('leaves out the block that is inside a model, which no face of it shows from, and keeps the 26 that are on its outside', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    layer.setClasses?.(every(27));
+    settle(layer);
+    expect(instanceCount(layer)).toBe(26);
+    // The middle block, the 14th (index 13), has its centre at (15, 15, 15): none of the instances is there.
+    const centres = centresOfInstances(parts(layer)[0]);
+    const at = Array.from({ length: 26 }, (_, n) => centres.slice(n * 3, n * 3 + 3));
+    expect(at.some(([x, y, z]) => x === 15 && y === 15 && z === 15)).toBe(false);
+    expect(at.some(([x, y, z]) => x === 5 && y === 5 && z === 5)).toBe(true);
+  });
+
+  it('says which faces show with a bit for each: a corner has three, an edge four, a face of the model five, and the faces between blocks are not there', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    layer.setClasses?.(every(27));
+    settle(layer);
+    const masks = masksOf(parts(layer)[0]);
+    const bits = (mask: number): number =>
+      [0, 1, 2, 3, 4, 5].filter((bit) => (mask >> bit) % 2 === 1).length;
+    // 8 corners with 3 faces, 12 edges with 2... as each block counts: a corner block shows 3 of its faces, an edge block 2, a face block 1.
+    const counts = masks.map(bits);
+    expect(counts.filter((n) => n === 3)).toHaveLength(8);
+    expect(counts.filter((n) => n === 2)).toHaveLength(12);
+    expect(counts.filter((n) => n === 1)).toHaveLength(6);
+    // The first block, (0, 0, 0): its -x, -y and -z faces (bits 1, 3 and 5) show, and +x, +y, +z, which have blocks beside them, do not.
+    expect(masks[0]).toBe(2 + 8 + 32);
+  });
+
+  it('shows the faces that look at a block that is not drawn: a block with no value is a hole, and its neighbours have a face to it', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    const classes = every(27);
+    classes.indices[13] = NO_VALUE;
+    layer.setClasses?.(classes);
+    settle(layer);
+    // All 26 that are drawn are on the outside or beside the hole, and the hole has six blocks beside it, each with a face to it.
+    expect(instanceCount(layer)).toBe(26);
+    const masks = masksOf(parts(layer)[0]);
+    const centres = centresOfInstances(parts(layer)[0]);
+    const maskAt = (x: number, y: number, z: number): number | undefined => {
+      for (let n = 0; n < masks.length; n += 1) {
+        if (centres[n * 3] === x && centres[n * 3 + 1] === y && centres[n * 3 + 2] === z) {
+          return masks[n];
+        }
+      }
+      return undefined;
+    };
+    // The block at (0.., 1, 1) is beside the hole along +x: its +x face (bit 0) shows now, as well as its own -x face (bit 1).
+    expect(maskAt(5, 15, 15)).toBe(1 + 2);
+    // The one at (2, 1, 1) is beside it along -x: its -x face (bit 1) shows, and its +x face (bit 0), as it is on the model's side.
+    expect(maskAt(25, 15, 15)).toBe(1 + 2);
+    // The one over it, at (1, 1, 2): its -z face (bit 5) looks at the hole, and its +z face (bit 4) is on the outside.
+    expect(maskAt(15, 15, 25)).toBe(16 + 32);
+  });
+
+  it('draws a block whose class has no colour as one that is not drawn: its neighbours have a face to it', () => {
+    const layer = createBlocksLayer(dense(3, 1, 1), LOOK);
+    const classes = every(3);
+    // Two colours: the class 5 of the middle block has none.
+    classes.indices[1] = 5;
+    layer.setClasses?.(classes);
+    settle(layer);
+    expect(instanceCount(layer)).toBe(2);
+    // The block at (0, 0, 0): +x (bit 0) shows because the block beside it is not drawn; and the rest do, as there is nothing beside them.
+    expect(masksOf(parts(layer)[0])[0]).toBe(63);
+  });
+
+  it('makes its instances a part at a time, with the neighbours right across the edge of a part', () => {
+    // 101,000 blocks in a row of 1 by 1000 by 101: two parts of 100,000 and 1,000.
+    const [nx, ny, nz] = [101, 1000, 1];
+    const layer = createBlocksLayer(dense(nx, ny, nz), LOOK);
+    layer.setClasses?.(every(nx * ny * nz));
+    const steps = settle(layer);
+    expect(parts(layer)).toHaveLength(2);
+    // The instances of a part are made BLOCKS_PER_STEP blocks at a time: 4 steps for the 100,000 and 1 for the 1,000 (the second part is built by
+    // the first of the steps that it is waited for).
+    expect(steps).toBe(Math.ceil(BLOCKS_PER_PART / BLOCKS_PER_STEP) + 1);
+    // One layer of 101 by 1000 blocks: every block shows its top and its bottom, the blocks on the rim show a side or two, and the inside shows 2 faces.
+    expect(instanceCount(layer)).toBe(nx * ny);
+    const all = parts(layer).flatMap((mesh) => masksOf(mesh));
+    expect(all.filter((mask) => mask === 16 + 32)).toHaveLength((nx - 2) * (ny - 2));
+    // A block of the first part whose neighbour (in +y) is in the second part has no +y face: the one at the last row of the part is index 99,999,
+    // which is (i = 99999 % 101 = 100? 99,999 = 990 * 101 + 9): its +y neighbour is the block 100,100, in the second part.
+    const first = masksOf(parts(layer)[0]);
+    expect(first).toHaveLength(100_000);
+    expect(((first[99_999] ?? 0) & 4) === 4).toBe(false);
+  });
+
+  it('does no more than BLOCKS_PER_STEP blocks of work in a step, so that the work of a frame does not grow with the model, and is ready when the last of them is done', () => {
+    const [nx, ny, nz] = [100, 100, 10];
+    const layer = createBlocksLayer(dense(nx, ny, nz), LOOK);
+    layer.setClasses?.(every(nx * ny * nz));
+    // The first part is 100,000 blocks: a quarter of it each step, ready at the fourth.
+    for (let step = 1; step <= 3; step += 1) {
+      layer.step?.();
+      expect(parts(layer)[0]?.visible, `after step ${String(step)}`).toBe(false);
+    }
+    layer.step?.();
+    expect(parts(layer)[0]?.visible).toBe(true);
+    expect(BLOCKS_PER_STEP).toBeLessThan(BLOCKS_PER_PART);
+  });
+
+  it('lets go of what it was making when other classes come, and makes the instances of the new ones', () => {
+    const layer = createBlocksLayer(dense(100, 100, 10), LOOK);
+    layer.setClasses?.(every(100_000));
+    layer.step?.();
+    layer.step?.();
+    // Half done for these classes; the next are of a model with a hole, and nothing that was made for the first is used.
+    const other = every(100_000);
+    other.indices.fill(NO_VALUE, 0, 50_000);
+    layer.setClasses?.(other);
+    expect(parts(layer)[0]?.visible).toBe(false);
+    settle(layer);
+    expect(parts(layer)[0]?.visible).toBe(true);
+    // The first 50,000 blocks (5 layers of 100 by 100) are not drawn, so the bottom 5 layers are gone and the 6th shows its bottom.
+    const masks = masksOf(parts(layer)[0]);
+    expect(masks.filter((mask) => (mask & 32) === 32).length).toBeGreaterThanOrEqual(100 * 100);
+  });
+
+  it('makes its instances again when other classes come, and keeps them when the same ones come with other colours', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    const first = every(27);
+    layer.setClasses?.(first);
+    settle(layer);
+    const attribute = geometryOf(parts(layer)[0])?.getAttribute('aCentre');
+    layer.setClasses?.({ indices: first.indices, colours: ['#0000ff', '#ffff00'] });
+    expect(layer.step?.() ?? false).toBe(false);
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aCentre')).toBe(attribute);
+    // Other classes: a model with a hole in it.
+    const second = every(27);
+    second.indices[13] = NO_VALUE;
+    layer.setClasses?.(second);
+    expect(parts(layer)[0]?.visible).toBe(false);
+    settle(layer);
+    expect(parts(layer)[0]?.visible).toBe(true);
+    expect(geometryOf(parts(layer)[0])?.getAttribute('aCentre')).not.toBe(attribute);
+    // The same classes with fewer colours: the blocks of the class that has none are not drawn, so the instances are made again.
+    layer.setClasses?.({ indices: second.indices, colours: ['#ff0000'] });
+    expect(parts(layer)[0]?.visible).toBe(false);
+  });
+
+  it('draws the depth pass and the colour pass of a part when its instances are there, and neither before', () => {
+    const layer = createBlocksLayer(dense(2, 2, 2), { ...LOOK, opacity: 0.5 });
+    layer.setClasses?.(every(8));
+    expect([parts(layer)[0]?.visible, depthPasses(layer)[0]?.visible]).toEqual([false, false]);
+    settle(layer);
+    expect([parts(layer)[0]?.visible, depthPasses(layer)[0]?.visible]).toEqual([true, true]);
+    layer.setLook({ ...LOOK, opacity: 1 });
+    expect([parts(layer)[0]?.visible, depthPasses(layer)[0]?.visible]).toEqual([true, false]);
+  });
+
+  it('puts a face that is not shown outside the clip volume in the shader, from the normal of the corner and the bit of its face', () => {
+    const material = parts(createBlocksLayer(dense(2, 2, 2), LOOK))[0]?.material as ShaderMaterial;
+    expect(material.vertexShader).toContain('attribute float aExposed;');
+    expect(material.vertexShader).toContain('mod(floor(aExposed / exp2(face)), 2.0) < 0.5');
+    expect(material.vertexShader).toContain('gl_Position = vec4(2.0, 2.0, 2.0, 1.0);');
+    // A sparse model is not masked: all its faces are drawn, as before.
+    expect(uniforms(createBlocksLayer(blocks(3), LOOK))['uMasked']?.value).toBe(0);
   });
 });

@@ -279,3 +279,44 @@ describe('LayerSet', () => {
     expect(made[1]?.classes).toEqual([]);
   });
 });
+
+describe('LayerSet: a layer that makes more of itself when its classes come', () => {
+  /** A layer with work that is left when it is made and again after each `setClasses`, as a dense model of blocks has. */
+  function layerWithWork() {
+    let work = 1;
+    const calls: string[] = [];
+    const set = new LayerSet(
+      { add: () => undefined, remove: () => undefined },
+      (): LayerObject => ({
+        object: new Group(),
+        dispose: () => undefined,
+        setLook: () => undefined,
+        prepareFrame: () => undefined,
+        setClasses: () => {
+          work = 2;
+        },
+        step: () => {
+          calls.push('step');
+          work -= 1;
+          return work > 0;
+        },
+      }),
+    );
+    return { set, calls };
+  }
+
+  it('is stepped again after its classes are set, though it had finished: the work comes with them', () => {
+    const { set, calls } = layerWithWork();
+    set.set('layer-1', points, LOOK);
+    // Built with a step to do, which finishes it.
+    expect(set.step()).toBe(false);
+    expect(calls).toEqual(['step']);
+    expect(set.step()).toBe(false);
+    expect(calls).toEqual(['step']);
+    // The classes come: two steps of work, the first of which says there is more.
+    set.setClasses('layer-1', { indices: new Uint8Array(1), colours: ['#ff0000'] });
+    expect(set.step()).toBe(true);
+    expect(set.step()).toBe(false);
+    expect(calls).toEqual(['step', 'step', 'step']);
+  });
+});
