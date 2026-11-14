@@ -5,8 +5,9 @@
  *     display (the median at the beat of the display, which is 16.7 ms at 60 Hz: the owner's reading of the brief's "under 16.7 ms") and the
  *     95th percentile under 33 ms;
  *   - a grid of 4,000,000 cells: from loading to the first frame under 1.5 s; new classes visible under 300 ms;
- *   - a model of 1,000,000 blocks: from loading to the first frame under 3 s (its 3D orbit is a later milestone's);
- *   - no task on the main thread over 50 ms in any of them.
+ *   - a model of 1,000,000 blocks: from loading to the first frame under 3 s; and, in 3D, the 95th percentile of the frame time of a scripted
+ *     orbit under 50 ms (step 18.9b);
+ *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
  * It needs a quiet machine, so it is a project of its own, like `performance.perf.ts`: `pnpm perf` runs both. The numbers are for
  * `docs/perf.md`. The browser draws with the software driver of the Playwright image unless the machine gives it a card (the
@@ -84,6 +85,8 @@ interface Measured {
     /** How many frames the renderer drew meanwhile, which is what makes the gaps those of drawing and not of an idle page. */
     readonly drawn: number;
   };
+  /** From switching to 3D (and fitting) to the first frame that has the layer in it, in 3D, ms. */
+  readonly switchMs?: number;
   /** From asking for new classes to the picture having them. */
   readonly restyleMs?: number;
   /** The longest task of the main thread, from pressing Load to the end. */
@@ -99,6 +102,8 @@ interface Options {
   readonly blockSize?: number;
   readonly path: boolean;
   readonly restyle: boolean;
+  /** After the first frame, the view is switched to 3D, fitted, and a scripted orbit is drawn: 300 frames of the camera going round and up and down. */
+  readonly orbit?: boolean;
 }
 
 async function measure(browser: Browser, options: Options): Promise<Measured> {
@@ -162,7 +167,25 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   );
 
   let frames: Measured['frames'];
-  if (options.path) {
+  let switchMs: number | undefined;
+  if (options.orbit === true) {
+    // To 3D: the view is switched (the camera is made from the 2D one) and fitted to the model, and the time is from the command to the first frame
+    // that has the layer in it in 3D (its programs for that view are compiled meanwhile, a layer is not drawn before).
+    switchMs = await inPage<number>(
+      page,
+      `const v = perf.viewer();
+       const framesBefore = v.renderStats().frames;
+       const at = performance.now();
+       v.setViewMode('3d');
+       v.fit();
+       const done = await perf.until(() => {
+         const stats = v.renderStats();
+         return stats && stats.viewMode === '3d' && stats.frames > framesBefore && stats.layersDrawn > 0;
+       }, 120000);
+       return done - at;`,
+    );
+  }
+  if (options.path || options.orbit === true) {
     // The path: 100 frames of pan, 100 of zoom in and out, 100 of rotate, the camera given a new place each frame, and the time between
     // the frames that the browser gave, which is what a person sees as smooth or not.
     const { gaps, drawn, idle } = await inPage<{ gaps: number[]; drawn: number; idle: number[] }>(
@@ -170,6 +193,8 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
       `const v = perf.viewer();
        const doc = v.scene();
        const start = doc.camera2d;
+       const orbit = ${options.orbit === true ? 'true' : 'false'};
+       const start3d = doc.camera3d;
        const wait = () => new Promise((resolve) => requestAnimationFrame(resolve));
        // The beat of the display: 60 frames of the page with nothing happening in it (the rest of the layer is on the card by now: a part comes
        // in each frame, and a million points are ten of them).
@@ -187,6 +212,18 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
        const gaps = [];
        let last = performance.now();
        for (let i = 0; i < 300; i += 1) {
+         if (orbit) {
+           // The camera goes round the model a turn and a third (1.5 degrees a frame) while it rises and falls between 25 and 65 degrees above the horizon.
+           v.dispatch({
+             type: 'setCamera',
+             patch: { camera3d: { heading: (start3d.heading + i * 1.5) % 360, elevation: 45 + 20 * Math.sin((i / 100) * Math.PI) } },
+           });
+           await wait();
+           const at = performance.now();
+           gaps.push(at - last);
+           last = at;
+           continue;
+         }
          const t = i % 100;
          const camera2d = i < 100
            ? { centre: [start.centre[0] + t * start.unitsPerPixel * 4, start.centre[1] + t * start.unitsPerPixel * 2], unitsPerPixel: start.unitsPerPixel, heading: 0 }
@@ -277,6 +314,7 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     renderer,
     firstFrameMs: Math.round(first - started),
     ...(frames === undefined ? {} : { frames }),
+    ...(switchMs === undefined ? {} : { switchMs: Math.round(switchMs) }),
     ...(restyleMs === undefined ? {} : { restyleMs: Math.round(restyleMs) }),
     longestTaskMs: Math.round(
       Math.max(0, ...tasks.filter((task) => task.start >= started).map((task) => task.duration)),
@@ -351,7 +389,9 @@ test.describe('the 2D view with the large files', () => {
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
 
-  test('1,000,000 blocks: the first frame', async ({ browser }) => {
+  test('1,000,000 blocks: the first frame, and the frames of an orbit in 3D', async ({
+    browser,
+  }) => {
     test.setTimeout(900_000);
     const result = await measure(browser, {
       data: 'blocks-1m.csv',
@@ -359,9 +399,14 @@ test.describe('the 2D view with the large files', () => {
       blockSize: 10,
       path: false,
       restyle: false,
+      orbit: true,
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(3000);
+    // The renderer drew a frame for each of the 300 changes of the camera: the gaps are those of a page that draws, not of one that is idle.
+    expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
+    expect(result.frames?.p95, '95th percentile frame time of the orbit').toBeLessThan(50);
+    // The switch to 3D, the fit and the orbit together: no task of the main thread over 50 ms.
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
 });
