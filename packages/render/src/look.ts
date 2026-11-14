@@ -28,6 +28,12 @@ export interface FrameInfo {
   readonly flat: boolean;
   /** The size of the drawing buffer, in device pixels (what a layer that is drawn in screen space needs to turn clip space into pixels). */
   readonly viewport: readonly [number, number];
+  /**
+   * The direction to the light, of length 1, in the space of the camera that draws the frame (the space that a layer works out the normals
+   * of its triangles in): straight up in the view from above, and in 3D the light of the world as that camera sees it (`light.ts`). Only layers
+   * that are lit (meshes, surfaces, blocks) read it.
+   */
+  readonly light: readonly [number, number, number];
   /** The colour of outlines, `[r, g, b]` each from 0 to 1 in sRGB: the colour of the text, which contrasts with the map. */
   readonly outline: readonly [number, number, number];
 }

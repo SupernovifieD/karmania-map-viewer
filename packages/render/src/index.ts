@@ -4,13 +4,17 @@
 export { bufferSize } from './buffer-size.js';
 export { mapToScreen, orthographicFrame, screenToMap } from './camera-2d.js';
 export type { DepthRange, OrthographicFrame, Size } from './camera-2d.js';
+export { perspectiveFrame } from './camera-3d.js';
+export type { PerspectiveFrame } from './camera-3d.js';
 export { parseCssColour } from './css-colour.js';
 export type { Rgba } from './css-colour.js';
 export type { BufferSize } from './buffer-size.js';
 export { createRenderer } from './renderer.js';
-export type { RenderStats, Renderer, RendererOptions } from './renderer.js';
+export type { RenderStats, Renderer, RendererOptions, RendererView } from './renderer.js';
 export { attachController2d } from './controller-2d.js';
 export type { Controller2d, Controller2dOptions } from './controller-2d.js';
+export { attachController3d } from './controller-3d.js';
+export type { Controller3d, Controller3dOptions } from './controller-3d.js';
 export {
   DEFAULT_SCALE_LIMITS,
   KEY_PAN_PIXELS,
@@ -26,6 +30,16 @@ export {
   zoomAt,
 } from './controls-2d.js';
 export type { CameraChange, KeyAction, KeyInput, ScaleLimits } from './controls-2d.js';
+export {
+  DEFAULT_DISTANCE_LIMITS,
+  KEY_ORBIT_DEGREES,
+  clampDistance,
+  keyAction3d,
+  orbit3dBy,
+  pan3dBy,
+  zoom3dAt,
+} from './controls-3d.js';
+export type { Camera3dChange, DistanceLimits, KeyAction3d } from './controls-3d.js';
 export { LayerSet } from './layer-set.js';
 export type { Container, LayerMaker, LayerObject, LayerOutcome } from './layer-set.js';
 export { OUTLINE_WIDTH, POINTS_PER_PART } from './points-layer.js';

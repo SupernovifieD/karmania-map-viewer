@@ -1,6 +1,7 @@
 /**
  * The layer of a mesh (section 9.3 of the brief): its triangles in the one colour of the layer, or, given their classes (`setClasses`: one for
- * each triangle), each in the colour of its class, lit from above. Each triangle is
+ * each triangle), each in the colour of its class, lit from above. A surface is drawn by it too (`createSurfaceLayer` in `layer-kinds.ts`), its
+ * classes being one for each cell. Each triangle is
  * shaded flat, with a normal that the fragment shader works out from how the position changes from one pixel to the next
  * (`dFdx`, `dFdy`), so that the vertices are not made again for each triangle and are shared as the engine sent them. The light
  * comes from straight above: a triangle that lies flat has the colour of the layer as it is, and one that slopes is darker the
@@ -10,15 +11,13 @@ import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
 import { createClassedTriangles } from './class-triangles.js';
 import type { LayerObject } from './layer-set.js';
+import { AMBIENT } from './light.js';
 import { colourOf } from './look.js';
 import type { ClassColouring } from './look.js';
 import { createTriangleParts } from './triangle-parts.js';
 
-/**
- * How much of the colour a triangle that faces away from the light keeps: the rest is the light, which is all of it for a triangle
- * that faces it. A steep slope is dark and not black, so that its shape is seen in the layer's own colour.
- */
-export const MESH_AMBIENT = 0.25;
+/** How much of the colour a triangle that faces away from the light keeps (`AMBIENT`): the rest is the light, which is all of it for a triangle that faces it. */
+export const MESH_AMBIENT = AMBIENT;
 
 const VERTEX = /* glsl */ `
 varying vec3 vView;
@@ -33,8 +32,8 @@ void main() {
 /**
  * The normal of the triangle is the cross product of how the position changes along a row of pixels and down a column of them, in
  * the space of the camera. It faces the viewer whichever way the triangle is wound, so a triangle is lit the same from either side.
- * `uLight` is the direction to the light in that space: in the view from above, straight up is +z, and turning the map does not
- * change it.
+ * `uLight` is the direction to the light in that space, which the renderer gives each frame (`FrameInfo.light`): in the view from above it
+ * is straight up, +z, and turning the map does not change it; in 3D it is the light of the world (`light.ts`) as the camera sees it.
  */
 const FRAGMENT = /* glsl */ `
 uniform vec3 uColour;
@@ -51,7 +50,13 @@ void main() {
 }
 `;
 
-type MeshBuffers = Pick<Extract<RenderBuffers, { kind: 'mesh' }>, 'positions' | 'triangles'>;
+/**
+ * What a mesh is drawn from: its positions and triangles. A surface (a grid with an elevation for each cell) is the same, with the cell that
+ * each triangle takes its colour from (`owners`): its classes are of the cells and not of the triangles.
+ */
+type MeshBuffers = Pick<Extract<RenderBuffers, { kind: 'mesh' }>, 'positions' | 'triangles'> & {
+  readonly owners?: Uint32Array;
+};
 
 type MeshUniforms = {
   uColour: { value: Vector3 };
@@ -93,6 +98,7 @@ export function createMeshLayer(
   const classed = createClassedTriangles({
     positions: triangles.positions,
     triangles: buffers.triangles,
+    ...(buffers.owners === undefined ? {} : { owners: buffers.owners }),
     parent: triangles.group,
     make: () => {
       const colour = new Vector3();
@@ -111,9 +117,10 @@ export function createMeshLayer(
       uniforms.uOpacity.value = next.opacity;
       triangles.group.visible = next.visible;
     },
-    // The light is the same at every pixel ratio and on every theme.
-    prepareFrame() {
-      // (nothing: it has no size in pixels and no outline)
+    // The light is the frame's own (straight up in the view from above, the light of the world in 3D); it has no size in pixels and no outline. The
+    // triangles by class share this uniform with the layer's own.
+    prepareFrame(info) {
+      uniforms.uLight.value.set(...info.light);
     },
     setClasses(next: ClassColouring | undefined) {
       // The triangles by class are drawn in place of the layer's own, which are not drawn while they are (and are, when they are not).

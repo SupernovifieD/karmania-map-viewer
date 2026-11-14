@@ -1,16 +1,46 @@
 import { kButton, sharedStyles } from '@karmania/ui';
+import type {
+  KSegmented,
+  KSelect,
+  SegmentedChange,
+  SegmentedOption,
+  SelectChange,
+  SelectOption,
+} from '@karmania/ui';
 import { createViewer } from '@karmania/viewer';
 import type { Viewer } from '@karmania/viewer';
 import { css, html, LitElement } from 'lit';
+
+/** What heights can be multiplied by in 3D, as the scene allows (`VerticalExaggeration`), each as the toolbar's select says it: `×1` to `×10`. */
+const EXAGGERATIONS = [1, 2, 3, 5, 10] as const;
+const EXAGGERATION_OPTIONS: readonly SelectOption[] = EXAGGERATIONS.map((factor) => ({
+  value: String(factor),
+  label: `×${String(factor)}`,
+}));
+
+/** Why the select of the exaggeration cannot be used in 2D, for the tooltip of the disabled control. */
+const ONLY_IN_3D = 'Only in the 3D view';
+
+/** The views the map can be shown in, as the toolbar's control offers them. */
+const VIEWS: readonly SegmentedOption[] = [
+  { value: '2d', label: '2D' },
+  { value: '3d', label: '3D' },
+];
 
 /**
  * The root of the app, `<karmania-app>`: the toolbar across the top (the name, and the Import button), and under it the
  * viewer, which has the map area, the side panel and the import wizard. It fills the window and never scrolls.
  *
  * The viewer is put in the page by `createViewer`, as an embedder would, and taken out again (`dispose`) when the app leaves the page.
- * The Import button asks it to open its file picker; everything that follows is the viewer's.
+ * The Import button asks it to open its file picker; everything that follows is the viewer's. At the other end of the toolbar is the
+ * control for the view (2D or 3D), which asks the viewer to switch and follows the scene when the view changes by other means.
  */
 export class KarmaniaApp extends LitElement {
+  static override properties = {
+    view: { state: true },
+    exaggeration: { state: true },
+  };
+
   static override styles = [
     sharedStyles,
     css`
@@ -42,6 +72,19 @@ export class KarmaniaApp extends LitElement {
         margin: 0;
       }
 
+      /* What is at the right of the toolbar: the controls of the view, 8 apart (the toolbar's own 16 is between the groups). */
+      .tools {
+        align-items: center;
+        display: flex;
+        gap: var(--k-space-8);
+        margin-inline-start: auto;
+      }
+
+      /* The select of the exaggeration is 72 wide, as the brief has it, so it is the same width in 2D and 3D and switching moves nothing. */
+      .exaggeration {
+        width: calc(var(--k-space-48) + var(--k-space-24));
+      }
+
       /* What the viewer fills: the rest of the window under the toolbar. */
       .viewer {
         min-height: 0;
@@ -52,6 +95,21 @@ export class KarmaniaApp extends LitElement {
 
   /** The viewer, from the page being rendered until the app leaves it. */
   private viewer: Viewer | undefined;
+
+  /** The view the scene is in, which the control shows. */
+  declare private view: string;
+
+  /** What the scene multiplies heights by, which the select shows. */
+  declare private exaggeration: number;
+
+  /** Stops following the scene. */
+  private unfollow: (() => void) | undefined;
+
+  constructor() {
+    super();
+    this.view = '2d';
+    this.exaggeration = 1;
+  }
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -67,6 +125,8 @@ export class KarmaniaApp extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.unfollow?.();
+    this.unfollow = undefined;
     this.viewer?.dispose();
     this.viewer = undefined;
   }
@@ -78,9 +138,36 @@ export class KarmaniaApp extends LitElement {
   private mount(): void {
     const container = this.renderRoot.querySelector<HTMLElement>('.viewer');
     if (container !== null && this.viewer === undefined) {
-      this.viewer = createViewer(container);
+      const viewer = createViewer(container);
+      this.viewer = viewer;
+      const start = viewer.scene();
+      this.view = start.viewMode;
+      this.exaggeration = start.verticalExaggeration;
+      this.unfollow = viewer.on('scene', (scene) => {
+        this.view = scene.viewMode;
+        this.exaggeration = scene.verticalExaggeration;
+      });
     }
   }
+
+  /** A person chose how much to multiply heights by: the scene is given it, and tells the select (which is what it shows) when it has it. */
+  private readonly onExaggeration = (event: CustomEvent<SelectChange>): void => {
+    const factor = EXAGGERATIONS.find((each) => String(each) === event.detail.value);
+    if (factor !== undefined) {
+      this.viewer?.dispatch({ type: 'setVerticalExaggeration', factor });
+    }
+    // The select shows what the scene has, which is what was chosen unless the scene did not take it: the control has changed itself already.
+    (event.currentTarget as KSelect).value = String(
+      this.viewer?.scene().verticalExaggeration ?? this.exaggeration,
+    );
+  };
+
+  /** A person chose a view: the viewer switches, and the scene tells the control (which is what it shows) when it has. */
+  private readonly onView = (event: CustomEvent<SegmentedChange>): void => {
+    this.viewer?.setViewMode(event.detail.value === '3d' ? '3d' : '2d');
+    // The control shows the view the scene is in, which is what was chosen unless the scene did not take it: the control has changed itself already.
+    (event.currentTarget as KSegmented).value = this.viewer?.scene().viewMode ?? this.view;
+  };
 
   /** Opens the viewer's file picker. */
   private readonly openImport = (): void => {
@@ -92,6 +179,26 @@ export class KarmaniaApp extends LitElement {
       <header class="toolbar">
         <h1 class="wordmark">Karmania</h1>
         ${kButton({ icon: 'upload', children: 'Import', onClick: this.openImport })}
+        <div class="tools">
+          <k-segmented
+            label="View"
+            .value=${this.view}
+            .options=${VIEWS}
+            @k-segmented-change=${this.onView}
+          ></k-segmented>
+          <!-- Always there, so that switching the view moves nothing; in 2D it is disabled, and the tooltip says why. -->
+          <k-tooltip text=${this.view === '3d' ? '' : ONLY_IN_3D}>
+            <k-select
+              class="exaggeration"
+              label="Vertical exaggeration"
+              hide-label
+              .value=${String(this.exaggeration)}
+              .options=${EXAGGERATION_OPTIONS}
+              ?disabled=${this.view !== '3d'}
+              @k-select-change=${this.onExaggeration}
+            ></k-select>
+          </k-tooltip>
+        </div>
       </header>
       <div class="viewer"></div>
     `;

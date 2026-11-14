@@ -26,12 +26,14 @@ import {
 import type { LayerObject } from './layer-set.js';
 import { classesOfPieces, coversOwners } from './class-map.js';
 import { MAX_CLASSES, colourOf } from './look.js';
+import { PLANE_DEPTH_GLSL, RIBBON_GLSL } from './plane-depth.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
 /** The segments are put on the card this many at a time (2.4 MB of ends), the first part at once. */
 export const SEGMENTS_PER_PART = 100_000;
 
-const VERTEX = /* glsl */ `
+/** The vertex shader; for 3D it also says where the ends of the segment are in the space of the camera, for the plane it lies in. */
+const vertex = (plane: boolean): string => /* glsl */ `
 attribute vec2 corner;
 attribute vec3 aStart;
 attribute vec3 aEnd;
@@ -42,9 +44,11 @@ uniform float uDepthScale;
 varying vec2 vStart;
 varying vec2 vEnd;
 varying float vClass;
+${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
 
 void main() {
   vClass = aClass;
+  ${plane ? 'vStartV = (modelViewMatrix * vec4(aStart, 1.0)).xyz;\n  vEndV = (modelViewMatrix * vec4(aEnd, 1.0)).xyz;' : ''}
   vec4 a = projectionMatrix * modelViewMatrix * vec4(aStart, 1.0);
   vec4 b = projectionMatrix * modelViewMatrix * vec4(aEnd, 1.0);
   // The ends in pixels of the buffer.
@@ -65,7 +69,11 @@ void main() {
 }
 `;
 
-const FRAGMENT = /* glsl */ `
+/**
+ * The fragment shader: the segment at the distance of each pixel from it. For 3D it also writes the depth of the plane the segment lies in at each
+ * pixel of it (`plane-depth.ts`), where the depth of its ends would put it behind the plane of the layers under it over half of its width.
+ */
+const fragment = (plane: boolean): string => /* glsl */ `
 uniform float uWidth;
 uniform vec3 uColour;
 uniform float uOpacity;
@@ -75,8 +83,11 @@ uniform float uClassed;
 varying vec2 vStart;
 varying vec2 vEnd;
 varying float vClass;
+${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
+${plane ? PLANE_DEPTH_GLSL + RIBBON_GLSL : ''}
 
 void main() {
+  ${plane ? 'vec2 plane = planeDepth(vStartV, ribbonNormal(vStartV, vEndV));' : ''}
   vec2 along = vEnd - vStart;
   float length2 = dot(along, along);
   float t = length2 > 0.0 ? clamp(dot(gl_FragCoord.xy - vStart, along) / length2, 0.0, 1.0) : 0.0;
@@ -95,6 +106,7 @@ void main() {
     colour = uPalette[int(line)];
   }
   gl_FragColor = vec4(colour, inside * uOpacity);
+  ${plane ? 'gl_FragDepth = tiedDepth(plane);' : ''}
 }
 `;
 
@@ -134,25 +146,32 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     uViewport: { value: new Vector2(1, 1) },
     uWidth: { value: 0 },
     uDepthScale: { value: 0 },
+    uTieBreak: { value: 0 },
     uColour: { value: new Vector3() },
     uOpacity: { value: 1 },
     uPalette: { value: Array.from({ length: MAX_CLASSES }, () => new Vector3()) },
     uCount: { value: 0 },
     uClassed: { value: 0 },
   };
-  const material = new ShaderMaterial({
-    uniforms,
-    vertexShader: VERTEX,
-    fragmentShader: FRAGMENT,
-    transparent: true,
-    blending: NormalBlending,
-    depthTest: true,
-    // Strictly nearer (three's own is nearer or as near): a fragment at the depth of one that is there does not overdraw it.
-    depthFunc: LessDepth,
-    depthWrite: true,
-    // The quad of a segment faces whichever way the segment goes on the screen: it is never a back.
-    side: DoubleSide,
-  });
+  /** The material for a view; the one for 3D writes the depth of the plane the segments lie in. The two share their uniforms. */
+  const materialFor = (plane: boolean): ShaderMaterial =>
+    new ShaderMaterial({
+      uniforms,
+      vertexShader: vertex(plane),
+      fragmentShader: fragment(plane),
+      transparent: true,
+      blending: NormalBlending,
+      depthTest: true,
+      // Strictly nearer (three's own is nearer or as near): a fragment at the depth of one that is there does not overdraw it.
+      depthFunc: LessDepth,
+      depthWrite: true,
+      // The quad of a segment faces whichever way the segment goes on the screen: it is never a back.
+      side: DoubleSide,
+    });
+  const material = materialFor(false);
+  // (Made when first wanted: a layer that is only seen from above does not have it.)
+  let material3d: ShaderMaterial | undefined;
+  let current = material;
   const group = new Group();
   const parts: { geometry: InstancedBufferGeometry; first: number; count: number }[] = [];
   const total = Math.floor(buffers.segments.length / 2);
@@ -162,23 +181,27 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
   let width = look.lineWidth;
   let ratio = 1;
 
-  /** Gives a part the class of each of its segments (that of its line), or takes the classes away. */
+  /**
+   * Gives a part the class of each of its segments (that of its line). The attribute is made once and the next classes are put into it and sent to the
+   * card again, so that no buffer of the card is left behind by an attribute that was replaced (see `classesOf` of the points). With no classes
+   * it is left as it is: the shader does not read it then (`uClassed`).
+   */
   function classesOf(part: {
     geometry: InstancedBufferGeometry;
     first: number;
     count: number;
   }): void {
     if (classes === undefined) {
-      part.geometry.deleteAttribute('aClass');
       return;
     }
-    part.geometry.setAttribute(
-      'aClass',
-      new InstancedBufferAttribute(
-        classesOfPieces(classes, buffers.segmentLine, part.first, part.count),
-        1,
-      ),
-    );
+    const kinds = classesOfPieces(classes, buffers.segmentLine, part.first, part.count);
+    const held = part.geometry.getAttribute('aClass') as InstancedBufferAttribute | undefined;
+    if (held !== undefined) {
+      (held.array as Uint8Array).set(kinds);
+      held.needsUpdate = true;
+      return;
+    }
+    part.geometry.setAttribute('aClass', new InstancedBufferAttribute(kinds, 1));
   }
 
   /** Puts the next part of the segments on the card. `true` if there are more to come. */
@@ -203,7 +226,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     const entry = { geometry, first: built, count: end - built };
     parts.push(entry);
     classesOf(entry);
-    const part = new Mesh(geometry, material);
+    const part = new Mesh(geometry, current);
     part.frustumCulled = false;
     group.add(part);
     built = end;
@@ -225,6 +248,16 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       uniforms.uWidth.value = width * ratio;
       uniforms.uViewport.value.set(info.viewport[0], info.viewport[1]);
       uniforms.uDepthScale.value = info.flat ? 0 : 1;
+      // The view from above and the view in 3D draw a segment's depth differently, so each has its own material.
+      if (info.flat) {
+        current = material;
+      } else {
+        material3d ??= materialFor(true);
+        current = material3d;
+      }
+      for (const part of group.children) {
+        (part as Mesh).material = current;
+      }
     },
     setClasses(next: ClassColouring | undefined) {
       if (next !== undefined && coversOwners(next.indices, buffers.segmentLine)) {
@@ -257,6 +290,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
         geometry.dispose();
       }
       material.dispose();
+      material3d?.dispose();
     },
   };
   layer.setLook(look);

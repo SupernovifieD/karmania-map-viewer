@@ -94,6 +94,10 @@ export class LayerSet {
       return false;
     }
     layer.setClasses(classes);
+    // A layer that makes more of itself between frames (a dense model of blocks makes its instances from its classes) has work to do again.
+    if (layer.step !== undefined) {
+      this.building.add(id);
+    }
     return true;
   }
 

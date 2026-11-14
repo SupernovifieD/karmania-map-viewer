@@ -13,7 +13,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 3,
 };
-const INFO: FrameInfo = { pixelRatio: 2, viewport: [1600, 1200], flat: true, outline: [0, 0, 0] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [1600, 1200],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 
 /** `count` segments, each from vertex `i` to vertex `i + 1`, along the x axis. */
 const lines = (count: number): Extract<RenderBuffers, { kind: 'lines' }> => ({
@@ -22,6 +28,10 @@ const lines = (count: number): Extract<RenderBuffers, { kind: 'lines' }> => ({
   segments: Uint32Array.from({ length: count * 2 }, (_, i) => Math.floor(i / 2) + (i % 2)),
   segmentLine: new Uint32Array(count),
 });
+
+/** How many times the attribute has been marked to be sent to the card again. */
+const versionOf = (attribute: unknown): number =>
+  (attribute as { version: number } | undefined)?.version ?? 0;
 
 const parts = (layer: ReturnType<typeof createLinesLayer>): Mesh[] =>
   layer.object.children as Mesh[];
@@ -68,6 +78,25 @@ describe('gatherSegments', () => {
 });
 
 describe('createLinesLayer', () => {
+  it('writes the depth of the plane of the ribbon it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
+    const layer = createLinesLayer(lines(2), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(flat.vertexShader).not.toContain('vStartV');
+    layer.prepareFrame({ ...INFO, flat: false });
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    expect(solid.fragmentShader).toContain('ribbonNormal(vStartV, vEndV)');
+    expect(solid.vertexShader).toContain('vStartV');
+    expect(solid.uniforms).toBe(flat.uniforms);
+    expect(solid.fragmentShader.indexOf('planeDepth(vStartV')).toBeLessThan(
+      solid.fragmentShader.indexOf('discard;'),
+    );
+    layer.prepareFrame({ ...INFO, flat: true });
+    expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
   it('puts a layer of few segments in one part with one instance for each, and has nothing to step', () => {
     const layer = createLinesLayer(lines(10), LOOK);
     expect(parts(layer)).toHaveLength(1);
@@ -140,18 +169,27 @@ describe('createLinesLayer', () => {
     expect(uniforms(layer)['uDepthScale']?.value).toBe(1);
   });
 
-  it('frees every part and its material when it is disposed', () => {
+  it('frees every part and both its materials, the one of the view from above and the one of 3D, when it is disposed', () => {
     const layer = createLinesLayer(lines(SEGMENTS_PER_PART + 1), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    // (The material of 3D is made when the layer is first seen in 3D.)
+    layer.prepareFrame({ ...INFO, flat: false });
     layer.step?.();
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
     const freed: string[] = [];
     for (const [i, part] of parts(layer).entries()) {
       part.geometry.addEventListener('dispose', () => freed.push(`geometry ${String(i)}`));
     }
-    (parts(layer)[0]?.material as ShaderMaterial).addEventListener('dispose', () =>
-      freed.push('material'),
-    );
+    flat.addEventListener('dispose', () => freed.push('material from above'));
+    solid.addEventListener('dispose', () => freed.push('material of 3d'));
     layer.dispose();
-    expect(freed.sort()).toEqual(['geometry 0', 'geometry 1', 'material']);
+    expect(freed.sort()).toEqual([
+      'geometry 0',
+      'geometry 1',
+      'material from above',
+      'material of 3d',
+    ]);
     expect(parts(layer)).toHaveLength(0);
   });
 
@@ -175,7 +213,8 @@ describe('createLinesLayer', () => {
       layer.setClasses?.(undefined);
       expect(uniforms(layer)['uClassed']?.value).toBe(0);
       expect(uniforms(layer)['uCount']?.value).toBe(0);
-      expect(classOf(parts(layer)[0])).toBeUndefined();
+      // The attribute is left where it is (the shader does not read it, `uClassed`): replacing or deleting it would leave its buffer on the card.
+      expect(classOf(parts(layer)[0])).toBeDefined();
     });
 
     it('gives each segment the class of its line, and the colours of the classes go in the palette', () => {
@@ -223,7 +262,6 @@ describe('createLinesLayer', () => {
       expect(uniforms(layer)['uClassed']?.value).toBe(1);
       layer.setClasses?.({ indices: Uint8Array.of(0), colours: colours(2) });
       expect(uniforms(layer)['uClassed']?.value).toBe(0);
-      expect(classOf(parts(layer)[0])).toBeUndefined();
       // More classes than lines is as it should be: a line with no segment has a class and nothing to draw it in.
       layer.setClasses?.({ indices: Uint8Array.of(0, 1, 2, 3), colours: colours(4) });
       expect(uniforms(layer)['uClassed']?.value).toBe(1);
@@ -237,8 +275,26 @@ describe('createLinesLayer', () => {
       layer.setClasses?.({ indices, colours: ['#ff0000'] });
       expect(classOf(parts(layer)[0])).toBe(attribute);
       expect(uniforms(layer)['uCount']?.value).toBe(1);
+      // Other classes with the same values: put into the same attribute, and sent again.
+      const version = versionOf(attribute);
       layer.setClasses?.({ indices: Uint8Array.from(indices), colours: colours(2) });
-      expect(classOf(parts(layer)[0])).not.toBe(attribute);
+      expect(classOf(parts(layer)[0])).toBe(attribute);
+      expect(versionOf(attribute)).toBeGreaterThan(version);
+    });
+
+    it('puts new classes into the attribute it has and has them sent to the card again, and writes nothing to the classes it was given', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      const first = Uint8Array.of(0, 1);
+      layer.setClasses?.({ indices: first, colours: colours(3) });
+      const attribute = classOf(parts(layer)[0]);
+      const version = versionOf(attribute);
+      const second = Uint8Array.of(2, 0);
+      layer.setClasses?.({ indices: second, colours: colours(3) });
+      expect(classOf(parts(layer)[0])).toBe(attribute);
+      // Each segment has the class of its line: two lines of two segments, so 2, 2, 0, 0.
+      expect([...(attribute?.array ?? [])]).toEqual([2, 2, 0, 0]);
+      expect(versionOf(attribute)).toBeGreaterThan(version);
+      expect([...first]).toEqual([0, 1]);
     });
 
     it('keeps the width, the opacity and the draw order of one colour', () => {

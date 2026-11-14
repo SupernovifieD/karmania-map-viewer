@@ -16,10 +16,10 @@
 import type { Engine } from '@karmania/engine';
 import type { ClassBreaks, ClassMethod, Frame, RenderBuffers } from '@karmania/engine/display';
 import type { BBox, Finding } from '@karmania/engine/types';
-import { DEFAULT_SCALE_LIMITS } from '@karmania/render';
-import type { ClassColouring, ScaleLimits } from '@karmania/render';
-import { OTHER_COLOUR, classColours, fitCamera2d } from '@karmania/scene';
-import type { LayerColour, LayerId, SceneStore } from '@karmania/scene';
+import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
+import type { ClassColouring, DistanceLimits, ScaleLimits } from '@karmania/render';
+import { OTHER_COLOUR, classColours, fitCamera2d, fitCamera3d } from '@karmania/scene';
+import type { Camera2d, Camera3d, LayerColour, LayerId, SceneStore } from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
 
 /** Where a layer is. */
@@ -43,6 +43,8 @@ export interface LayerSink {
   removeLayer(id: string): boolean;
   /** The heights that are drawn, relative to the origin of the frame: what the card's camera has to see. */
   setDepthRange(min: number, max: number): void;
+  /** The absolute extent of the visible prepared layers, for the perspective camera and its clipping planes. */
+  setExtent(extent: BBox | null): void;
   /** The largest texture the card takes, in cells on a side. */
   readonly maxTextureSize: number;
 }
@@ -82,8 +84,8 @@ export const ZOOM_OUT_LIMIT = 100;
 export const MAX_TILE_SIZE = 4096;
 
 /**
- * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a triangle of a mesh, a grid's cell and a model's block are coloured by it. (The surface of a grid with
- * elevations is not drawn in 2D, so it has no colours here.)
+ * The kinds of buffers whose layers take the class of each element: a point, a line, a polygon, a triangle of a mesh, a grid's cell (as an image or as
+ * the surface of a grid with elevations, whose triangles take the class of their cell) and a model's block are coloured by it.
  */
 const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
   'points',
@@ -91,6 +93,7 @@ const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
   'polygons',
   'mesh',
   'grid',
+  'surface',
   'blocks',
 ]);
 
@@ -98,7 +101,7 @@ const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
  * The kinds whose cells or blocks may have no value, and so are not all drawn when the layer is in one colour: they are given one class
  * (the cells that have a value in the first column of numbers) and the colour of the style.
  */
-const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'blocks']);
+const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'surface', 'blocks']);
 
 /** A text that is the same for styles that have the same classes: the column, the method and how many (the ramp is not of the classes). */
 function classKeyOf(colour: Extract<LayerColour, { mode: 'classes' }>): string {
@@ -163,6 +166,7 @@ export class LayerPipeline {
   /** The map CRS that the camera was last fitted for; the camera goes back to its start when that changes. */
   private fittedFor: Frame | null | undefined;
   private scale: number | undefined;
+  private distance: number | undefined;
 
   constructor(private readonly options: PipelineOptions) {}
 
@@ -171,11 +175,54 @@ export class LayerPipeline {
     return new Map([...this.entries].map(([id, entry]) => [id, entry.state]));
   }
 
-  /** How near and how far the map may be taken: from the fit, once there is one. */
+  /**
+   * How near and how far the map may be taken: from the fit of the view, once there is one. Until there has been a fit in 2D (the first view of the
+   * data was fitted in 3D, say) they are from the fit that the data shown would be given, which is the same numbers: the limits go with the data
+   * and not with whether the button was pressed. With nothing to show they are the wide defaults.
+   */
   limits(): ScaleLimits {
-    return this.scale === undefined
+    const base = this.scale ?? this.wouldFit2d()?.unitsPerPixel;
+    return base === undefined
       ? DEFAULT_SCALE_LIMITS
-      : { min: this.scale / ZOOM_IN_LIMIT, max: this.scale * ZOOM_OUT_LIMIT };
+      : { min: base / ZOOM_IN_LIMIT, max: base * ZOOM_OUT_LIMIT };
+  }
+
+  /** How near and how far the orbit camera may go: from its fit, or the one the data shown would be given if there has been none (see `limits`). */
+  distanceLimits(): DistanceLimits {
+    const base = this.distance ?? this.wouldFit3d()?.distance;
+    return base === undefined
+      ? DEFAULT_DISTANCE_LIMITS
+      : { min: base / ZOOM_IN_LIMIT, max: base * ZOOM_OUT_LIMIT };
+  }
+
+  /** The 2D camera that a fit would make now, without making it; `undefined` if there is nothing to show or the map area has no size. */
+  private wouldFit2d(): Camera2d | undefined {
+    const doc = this.options.scene.getState();
+    const extent = this.visibleExtent(doc);
+    return extent === undefined
+      ? undefined
+      : fitCamera2d({
+          extent,
+          viewport: this.options.viewport(),
+          heading: doc.camera2d.heading,
+          padding: FIT_PADDING,
+        });
+  }
+
+  /** The 3D camera that a fit would make now, without making it (see `wouldFit2d`). */
+  private wouldFit3d(): Camera3d | undefined {
+    const doc = this.options.scene.getState();
+    const extent = this.visibleExtent(doc);
+    return extent === undefined
+      ? undefined
+      : fitCamera3d({
+          extent,
+          viewport: this.options.viewport(),
+          fov: doc.camera3d.fov,
+          heading: doc.camera3d.heading,
+          elevation: doc.camera3d.elevation,
+          verticalExaggeration: doc.verticalExaggeration,
+        });
   }
 
   /** Whether a layer has been prepared and waits for the renderer. */
@@ -200,6 +247,8 @@ export class LayerPipeline {
         this.depth();
       }
     }
+    // Visibility changes do not prepare a layer again, but they do change the extent fitted and clipped in 3D.
+    this.depth();
     const chosen = doc.frame?.source === 'user' ? doc.frame : null;
     if (chosen !== null && this.frame !== null && !sameFrame(chosen, this.frame)) {
       for (const entry of this.entries.values()) {
@@ -234,25 +283,26 @@ export class LayerPipeline {
    */
   fit(): boolean {
     const doc = this.options.scene.getState();
-    const extents = [...this.entries]
-      .filter(([id]) => doc.layers[id]?.visible === true)
-      .flatMap(([, entry]) => (entry.extent === undefined ? [] : [entry.extent]));
-    const first = extents[0];
-    if (first === undefined) {
+    const extent = this.visibleExtent(doc);
+    if (extent === undefined) {
       return false;
     }
-    const extent: BBox = {
-      min: [
-        Math.min(...extents.map((box) => box.min[0])),
-        Math.min(...extents.map((box) => box.min[1])),
-        Math.min(...extents.map((box) => box.min[2])),
-      ],
-      max: [
-        Math.max(...extents.map((box) => box.max[0])),
-        Math.max(...extents.map((box) => box.max[1])),
-        Math.max(...extents.map((box) => box.max[2])),
-      ],
-    };
+    if (doc.viewMode === '3d') {
+      const camera = fitCamera3d({
+        extent,
+        viewport: this.options.viewport(),
+        fov: doc.camera3d.fov,
+        heading: doc.camera3d.heading,
+        elevation: doc.camera3d.elevation,
+        verticalExaggeration: doc.verticalExaggeration,
+      });
+      if (camera === undefined) {
+        return false;
+      }
+      this.distance = camera.distance;
+      this.options.scene.dispatch({ type: 'setCamera', patch: { camera3d: camera } });
+      return true;
+    }
     const camera = fitCamera2d({
       extent,
       viewport: this.options.viewport(),
@@ -350,6 +400,7 @@ export class LayerPipeline {
     this.chosenFor = '';
     this.fittedFor = undefined;
     this.scale = undefined;
+    this.distance = undefined;
     this.drawable = new Map();
     if (this.options.scene.getState().frame !== null) {
       this.options.scene.dispatch({ type: 'setFrame', frame: null });
@@ -749,7 +800,35 @@ export class LayerPipeline {
     this.changed();
   }
 
-  /** Tells the renderer the heights of what was prepared, relative to the origin: the least and the greatest, or 0 for none. */
+  /** The combined extent of the visible layers that have been prepared. */
+  private visibleExtent(doc = this.options.scene.getState()): BBox | undefined {
+    const extents = [...this.entries]
+      .filter(([id]) => doc.layers[id]?.visible === true)
+      .flatMap(([, entry]) => (entry.extent === undefined ? [] : [entry.extent]));
+    if (extents.length === 0) {
+      return undefined;
+    }
+    return {
+      min: [
+        Math.min(...extents.map((box) => box.min[0])),
+        Math.min(...extents.map((box) => box.min[1])),
+        Math.min(...extents.map((box) => box.min[2])),
+      ],
+      max: [
+        Math.max(...extents.map((box) => box.max[0])),
+        Math.max(...extents.map((box) => box.max[1])),
+        Math.max(...extents.map((box) => box.max[2])),
+      ],
+    };
+  }
+
+  /** The middle of the heights of the visible layers that were prepared, in map units: what a 3D camera looks at; `undefined` if there are none. */
+  middleHeight(): number | undefined {
+    const extent = this.visibleExtent();
+    return extent === undefined ? undefined : extent.min[2] / 2 + extent.max[2] / 2;
+  }
+
+  /** Tells the renderer the heights and visible extent of what was prepared, or zero and no extent when there is none. */
   private depth(): void {
     const sink = this.options.sink();
     const origin = this.frame?.origin[2] ?? 0;
@@ -762,6 +841,7 @@ export class LayerPipeline {
       heights.length === 0 ? 0 : Math.min(...heights),
       heights.length === 0 ? 0 : Math.max(...heights),
     );
+    sink?.setExtent(this.visibleExtent() ?? null);
   }
 
   /** The first view of data that was just prepared, and again when the map's coordinate system changes. */

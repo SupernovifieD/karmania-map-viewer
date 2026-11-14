@@ -1,6 +1,6 @@
 /**
  * Which kinds of buffers are drawn, and how: one maker for each kind of `RenderBuffers` (section 11.4 of the brief). A kind
- * that has none yet is `undefined`, which the renderer says as "unsupported" and draws nothing for; the type makes a new kind
+ * that has none is `undefined`, which the renderer says as "unsupported" and draws nothing for; the type makes a new kind
  * of buffers a compile error until it has an entry here.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
@@ -22,7 +22,18 @@ const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } 
     buffers.kind === 'polygons' ? createPolygonsLayer(buffers, look) : undefined,
   mesh: (buffers, look) => (buffers.kind === 'mesh' ? createMeshLayer(buffers, look) : undefined),
   grid: (buffers, look) => (buffers.kind === 'grid' ? createGridLayer(buffers, look) : undefined),
-  surface: undefined,
+  // A surface is a mesh whose triangles take their colour from a cell: the classes of a grid are of its cells.
+  surface: (buffers, look) =>
+    buffers.kind === 'surface'
+      ? createMeshLayer(
+          {
+            positions: buffers.positions,
+            triangles: buffers.triangles,
+            owners: buffers.triangleCell,
+          },
+          look,
+        )
+      : undefined,
   blocks: (buffers, look) =>
     buffers.kind === 'blocks' ? createBlocksLayer(buffers, look) : undefined,
 };

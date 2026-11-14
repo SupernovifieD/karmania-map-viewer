@@ -17,6 +17,11 @@ pub struct BlocksBuffers {
     pub spacing: [f32; 3],
     /// Degrees counter-clockwise about +Z that each box is turned by, about its own centre.
     pub rotation: f32,
+    /// How many blocks there are along `i`, `j` and `k`, **for a dense model only** (one block for each cell of the lattice, in lattice
+    /// order: `i` fastest, then `j`, then `k`), so that the neighbours of block `n` are the blocks `n ± 1`, `n ± dims[0]` and
+    /// `n ± dims[0] * dims[1]`, and the faces between blocks that are next to each other can be left out. `None` for a sparse model,
+    /// whose blocks are given with their own `i, j, k` and in any order.
+    pub dims: Option<[u32; 3]>,
 }
 
 /// Prepares a block model for drawing in `frame`. Blocks are not warped in phase 2: they are drawn only
@@ -90,6 +95,7 @@ impl BlocksBuilder {
             centres: self.centres,
             spacing: [dx as f32, dy as f32, dz as f32],
             rotation: blocks.lattice.rotation as f32,
+            dims: blocks.is_dense().then_some(blocks.lattice.dims),
         }
     }
 }
@@ -132,6 +138,8 @@ mod tests {
             .buffers;
         assert_eq!(out.spacing, [10.0, 20.0, 5.0]);
         assert_eq!(out.rotation, 0.0);
+        // A dense model says how many blocks there are along each axis, which is what makes the neighbours of a block known.
+        assert_eq!(out.dims, Some([2, 2, 2]));
         assert_eq!(out.centres.len(), 24);
         // Block 0 is cell (0, 0, 0): the centre is half a block from the corner. Block 1 is (1, 0, 0),
         // block 2 is (0, 1, 0), block 4 is (0, 0, 1).
@@ -149,6 +157,8 @@ mod tests {
         };
         let out = blocks_buffers(&b, LOCAL, &frame([0.0; 3])).unwrap().buffers;
         // Three whole triplets (a partial one is not a block); the third is not in the lattice.
+        // A sparse model has no dims: its blocks are in any order, and a block's neighbours are not by arithmetic.
+        assert_eq!(out.dims, None);
         assert_eq!(out.centres.len(), 9);
         assert_eq!(out.centres[..3], [135.0, 270.0, 67.5]);
         assert_eq!(out.centres[3..6], [105.0, 230.0, 62.5]);

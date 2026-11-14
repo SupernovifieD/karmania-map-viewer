@@ -17,6 +17,7 @@ const INFO: FrameInfo = {
   pixelRatio: 2,
   viewport: [800, 600],
   flat: true,
+  light: [0, 0, 1],
   outline: [0.1, 0.2, 0.3],
 };
 
@@ -25,6 +26,10 @@ const points = (count: number): Extract<RenderBuffers, { kind: 'points' }> => ({
   positions: Float32Array.from({ length: count * 3 }, (_, i) => i),
 });
 
+/** How many times the attribute has been marked to be sent to the card again. */
+const versionOf = (attribute: unknown): number =>
+  (attribute as { version: number } | undefined)?.version ?? 0;
+
 /** The parts of the layer, which are the objects in its group. */
 const parts = (layer: ReturnType<typeof createPointsLayer>): Points[] =>
   layer.object.children as Points[];
@@ -32,6 +37,42 @@ const uniforms = (layer: ReturnType<typeof createPointsLayer>) =>
   (parts(layer)[0]?.material as ShaderMaterial).uniforms;
 
 describe('createPointsLayer', () => {
+  it('writes the depth of the plane it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
+    const layer = createPointsLayer(points(3), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(flat.vertexShader).not.toContain('vCentre');
+    layer.prepareFrame({ ...INFO, flat: false });
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(flat);
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    expect(solid.vertexShader).toContain('vCentre');
+    expect(solid.uniforms).toBe(flat.uniforms);
+    // The change from pixel to pixel is worked out before the first discard, where every pixel of a block of four runs it.
+    expect(solid.fragmentShader.indexOf('planeDepth(vCentre')).toBeLessThan(
+      solid.fragmentShader.indexOf('discard;'),
+    );
+    layer.prepareFrame({ ...INFO, flat: true });
+    expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
+  it('gives a part that is built later the material of the view it is in, and frees both materials', () => {
+    const layer = createPointsLayer(points(POINTS_PER_PART + 2), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    layer.prepareFrame({ ...INFO, flat: false });
+    layer.step?.();
+    const [first, second] = parts(layer);
+    expect(second?.material).toBe(first?.material);
+    expect(first?.material).not.toBe(flat);
+    expect((second?.material as ShaderMaterial).fragmentShader).toContain('gl_FragDepth');
+    // Both materials are freed: the one of the view from above, which the layer was made with, and the one of 3D, which it made when it was first in 3D.
+    const freed: string[] = [];
+    flat.addEventListener('dispose', () => freed.push('from above'));
+    (first?.material as ShaderMaterial).addEventListener('dispose', () => freed.push('3d'));
+    layer.dispose();
+    expect(freed.sort()).toEqual(['3d', 'from above']);
+  });
+
   it('puts a layer of few points in one part, and has nothing to step', () => {
     const layer = createPointsLayer(points(10), LOOK);
     expect(parts(layer)).toHaveLength(1);
@@ -156,7 +197,8 @@ describe('createPointsLayer', () => {
       layer.setClasses?.(undefined);
       expect(uniforms(layer)['uClassed']?.value).toBe(0);
       expect(uniforms(layer)['uCount']?.value).toBe(0);
-      expect(classAttribute(parts(layer)[0])).toBeUndefined();
+      // The attribute is left where it is (the shader does not read it, `uClassed`): replacing or deleting it would leave its buffer on the card.
+      expect(classAttribute(parts(layer)[0])).toBeDefined();
     });
 
     it('has the class of each point as an attribute of its vertex, and the colours of the classes in the palette', () => {
@@ -183,7 +225,7 @@ describe('createPointsLayer', () => {
       expect(uniforms(layer)['uCount']?.value).toBe(MAX_CLASSES);
     });
 
-    it('cuts the classes into the parts as views, and gives a part that is put on later its share', () => {
+    it('cuts the classes into the parts, copies of their own (it writes to them, and the classes are the caller’s), and gives a part that is put on later its share', () => {
       const colouring = numbered(POINTS_PER_PART + 3);
       const layer = createPointsLayer(points(POINTS_PER_PART + 3), LOOK);
       layer.setClasses?.(colouring);
@@ -191,8 +233,25 @@ describe('createPointsLayer', () => {
       const [first, second] = parts(layer).map((part) => classAttribute(part)?.array);
       expect(first?.length).toBe(POINTS_PER_PART);
       expect(second?.length).toBe(3);
-      expect(second?.buffer).toBe(colouring.indices.buffer);
-      expect(second?.byteOffset).toBe(POINTS_PER_PART);
+      expect(second?.buffer).not.toBe(colouring.indices.buffer);
+      expect([...(second ?? [])]).toEqual([...colouring.indices.subarray(POINTS_PER_PART)]);
+    });
+
+    it('puts new classes into the attribute it has and has them sent to the card again, and writes nothing to the classes it was given', () => {
+      const layer = createPointsLayer(points(3), LOOK);
+      const first = Uint8Array.of(0, 1, 2);
+      layer.setClasses?.({ indices: first, colours: ['#ff0000', '#00ff00', '#0000ff'] });
+      const attribute = classAttribute(parts(layer)[0]);
+      const version = versionOf(attribute);
+      const second = Uint8Array.of(2, 2, 0);
+      layer.setClasses?.({ indices: second, colours: ['#ff0000', '#00ff00', '#0000ff'] });
+      // The same attribute, so no buffer of the card is left behind by one that was replaced; its values are the new ones, and it is to be uploaded.
+      expect(classAttribute(parts(layer)[0])).toBe(attribute);
+      expect([...(attribute?.array ?? [])]).toEqual([2, 2, 0]);
+      expect(versionOf(attribute)).toBeGreaterThan(version);
+      // The first classes, which the caller still has, are as they were.
+      expect([...first]).toEqual([0, 1, 2]);
+      expect([...second]).toEqual([2, 2, 0]);
     });
 
     it('is in the colour of the layer for classes that are not one byte for each point', () => {
@@ -200,7 +259,6 @@ describe('createPointsLayer', () => {
       layer.setClasses?.(numbered(3));
       layer.setClasses?.(numbered(2));
       expect(uniforms(layer)['uClassed']?.value).toBe(0);
-      expect(classAttribute(parts(layer)[0])).toBeUndefined();
       layer.setClasses?.(numbered(4));
       expect(uniforms(layer)['uClassed']?.value).toBe(0);
     });
@@ -214,11 +272,14 @@ describe('createPointsLayer', () => {
       expect(classAttribute(parts(layer)[0])).toBe(attribute);
       expect(uniforms(layer)['uCount']?.value).toBe(2);
       expect(uniforms(layer)['uClassed']?.value).toBe(1);
+      // Other classes with the same values: put into the same attribute, and sent again.
+      const version = versionOf(attribute);
       layer.setClasses?.({
         indices: Uint8Array.from(colouring.indices),
         colours: colouring.colours,
       });
-      expect(classAttribute(parts(layer)[0])).not.toBe(attribute);
+      expect(classAttribute(parts(layer)[0])).toBe(attribute);
+      expect(versionOf(attribute)).toBeGreaterThan(version);
     });
 
     it('does not change what it looks like in one colour: the layer colour, size and opacity are as they were', () => {

@@ -12,7 +12,13 @@ const LOOK: LayerLook = {
   pointSize: 6,
   lineWidth: 4,
 };
-const INFO: FrameInfo = { pixelRatio: 2, viewport: [800, 600], flat: true, outline: [0, 0, 0] };
+const INFO: FrameInfo = {
+  pixelRatio: 2,
+  viewport: [800, 600],
+  flat: true,
+  light: [0, 0, 1],
+  outline: [0, 0, 0],
+};
 
 /** One square polygon of two triangles and a closed outline of four segments, as the engine makes them. */
 const square = (): Extract<RenderBuffers, { kind: 'polygons' }> => ({

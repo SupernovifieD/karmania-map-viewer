@@ -13,6 +13,7 @@ import { dialogSection } from './sections/dialog.js';
 import { emptyStateSection } from './sections/empty-state.js';
 import { fieldsSection } from './sections/fields.js';
 import { iconsSection } from './sections/icons.js';
+import { segmentedSection } from './sections/segmented.js';
 import { stepsSection } from './sections/steps.js';
 import { tabsSection } from './sections/tabs.js';
 import { tableSection } from './sections/table.js';
@@ -240,7 +241,7 @@ export class KarmaniaGallery extends LitElement {
         <p>From ${PACKAGE_NAME}.</p>
         ${iconsSection()} ${buttonsSection()} ${tabsSection()} ${tooltipsSection()}
         ${emptyStateSection()} ${fieldsSection()} ${stepsSection()} ${dialogSection()}
-        ${tableSection()}
+        ${tableSection()} ${segmentedSection()}
       </main>
     `;
   }

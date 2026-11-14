@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { camera, dispatch, withData } from './support/render.js';
+import { camera, camera3d, dispatch, setViewMode, withData } from './support/render.js';
 
 const area = (page: Page): Locator => page.locator('karmania-map-area main');
 const group = (page: Page): Locator => page.locator('karmania-nav-group .group');
@@ -272,5 +272,172 @@ test.describe('the navigation group', () => {
     await page.mouse.move(box.x - 150, box.y - 60, { steps: 4 });
     await page.mouse.up();
     expect(await camera(page)).toEqual(before);
+  });
+});
+
+/**
+ * The navigation group in 3D (step 18.8b): the same four buttons, with what they do to the 3D camera. Zoom changes the distance about the middle of the
+ * map, as the keys do, and not past the limits that the last fit gives; fit puts the camera at the middle of the data and far enough for it, and keeps the
+ * heading and the elevation the camera has; reset view turns north up and puts the elevation at 45 degrees, and fits.
+ */
+test.describe('the navigation group in 3D', () => {
+  /** The middle of the data of `points.csv` (X 500010.5 to 500185.5, Y 2765020.25 to 2765205.25, Z 109.3 to 120.4), where a fit looks. */
+  const MIDDLE = [500_098, 2_765_112.75, 114.85] as const;
+
+  /** A 3D map with a camera that is easy to read, and the 2D camera as it was left, to see that it is not touched. */
+  async function start3d(page: Page, heading = 0, elevation = 40) {
+    await page.goto('/');
+    await withData(page);
+    const flat = await camera(page);
+    await setViewMode(page, '3d');
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: {
+        camera3d: {
+          target: [500_300, 2_765_300, 150],
+          distance: 500,
+          heading,
+          elevation,
+          fov: 45,
+        },
+      },
+    });
+    return flat;
+  }
+
+  test('has the four buttons, each with its name, as in 2D', async ({ page }) => {
+    await start3d(page);
+    for (const name of NAMES) {
+      await expect(button(page, name)).toBeVisible();
+      await expect(button(page, name)).toBeEnabled();
+    }
+  });
+
+  test('zooms in and out about the middle of the map, by the same factor as the keys, and keeps the target, the heading and the elevation', async ({
+    page,
+  }) => {
+    const flat = await start3d(page, 70, 33);
+    await button(page, 'Zoom in').click();
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(500 / Math.SQRT2, 6);
+    let now = await camera3d(page);
+    expect([now.heading, now.elevation, now.fov]).toEqual([70, 33, 45]);
+    for (const [axis, value] of [500_300, 2_765_300, 150].entries()) {
+      expect(now.target[axis]).toBeCloseTo(value, 6);
+    }
+    await button(page, 'Zoom out').click();
+    await button(page, 'Zoom out').click();
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(500 * Math.SQRT2, 6);
+    now = await camera3d(page);
+    for (const [axis, value] of [500_300, 2_765_300, 150].entries()) {
+      expect(now.target[axis]).toBeCloseTo(value, 6);
+    }
+    // The 2D camera is not what was zoomed.
+    expect(await camera(page)).toEqual(flat);
+  });
+
+  test('zooms the same as the + and − keys of the map', async ({ page }) => {
+    await start3d(page);
+    await button(page, 'Zoom in').click();
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(500 / Math.SQRT2, 6);
+    const byButton = await camera3d(page);
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera3d: { target: [500_300, 2_765_300, 150], distance: 500 } },
+    });
+    await area(page).focus();
+    await page.keyboard.press('+');
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(500 / Math.SQRT2, 6);
+    const byKey = await camera3d(page);
+    expect(byKey.distance).toBeCloseTo(byButton.distance, 9);
+    for (const axis of [0, 1, 2]) {
+      expect(byKey.target[axis]).toBeCloseTo(byButton.target[axis] ?? 0, 6);
+    }
+  });
+
+  test('does not go past the limits of the distance that the last fit gives, and does nothing there', async ({
+    page,
+  }) => {
+    await start3d(page);
+    await button(page, 'Fit to data').click();
+    await expect.poll(async () => (await camera3d(page)).distance).not.toBe(500);
+    const fitted = (await camera3d(page)).distance;
+    // 100,000 times closer is the nearest, and 100 times farther the farthest (the limits the pipeline makes from a fit).
+    for (let press = 0; press < 40; press += 1) {
+      await button(page, 'Zoom in').click();
+    }
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(fitted / 100_000, 9);
+    const nearest = (await camera3d(page)).distance;
+    await button(page, 'Zoom in').click();
+    await settle(page);
+    expect((await camera3d(page)).distance).toBe(nearest);
+    // From the nearest to the farthest is a factor of 10 million, which takes 47 presses of the square root of two.
+    for (let press = 0; press < 50; press += 1) {
+      await button(page, 'Zoom out').click();
+    }
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(fitted * 100, 3);
+    const farthest = (await camera3d(page)).distance;
+    await button(page, 'Zoom out').click();
+    await settle(page);
+    expect((await camera3d(page)).distance).toBe(farthest);
+  });
+
+  test('has the limits of the distance from the data when the view was switched to 3D and never fitted: the same as after Fit', async ({
+    page,
+  }) => {
+    // Switched from 2D with no press of Fit: 40 presses of zoom in go as near as the limit lets them.
+    await start3d(page);
+    for (let press = 0; press < 40; press += 1) {
+      await button(page, 'Zoom in').click();
+    }
+    await expect.poll(async () => (await camera3d(page)).distance).toBeLessThan(500 / 1000);
+    const nearest = (await camera3d(page)).distance;
+    // After Fit, in another page: the limit is 100,000 times closer than the distance that the fit gives, which is the same.
+    await page.goto('/');
+    await withData(page);
+    await setViewMode(page, '3d');
+    await button(page, 'Fit to data').click();
+    await expect.poll(async () => (await camera3d(page)).distance).toBeGreaterThan(0);
+    const fitted = (await camera3d(page)).distance;
+    expect(nearest).toBeCloseTo(fitted / 100_000, 9);
+  });
+
+  test('fits the data: the camera looks at the middle of it, from far enough, with the heading and the elevation it has', async ({
+    page,
+  }) => {
+    const flat = await start3d(page, 125, 28);
+    await button(page, 'Fit to data').click();
+    await expect.poll(async () => (await camera3d(page)).distance).not.toBe(500);
+    const now = await camera3d(page);
+    expect([now.heading, now.elevation]).toEqual([125, 28]);
+    for (const [axis, value] of MIDDLE.entries()) {
+      expect(now.target[axis]).toBeCloseTo(value, 2);
+    }
+    // The same as the key that the tooltip says, Home, does.
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera3d: { target: [500_300, 2_765_300, 150], distance: 500 } },
+    });
+    await area(page).focus();
+    await page.keyboard.press('Home');
+    await expect.poll(async () => (await camera3d(page)).distance).toBeCloseTo(now.distance, 6);
+    expect(await camera(page)).toEqual(flat);
+  });
+
+  test('resets the view: north up, 45 degrees up, and the data fitted', async ({ page }) => {
+    const flat = await start3d(page, 133, 12);
+    await button(page, 'Reset view').click();
+    await expect.poll(async () => (await camera3d(page)).heading).toBe(0);
+    await expect.poll(async () => (await camera3d(page)).distance).not.toBe(500);
+    const now = await camera3d(page);
+    expect(now.elevation).toBe(45);
+    for (const [axis, value] of MIDDLE.entries()) {
+      expect(now.target[axis]).toBeCloseTo(value, 2);
+    }
+    // It is the fit that a button gives, from the north-up view at 45 degrees.
+    await button(page, 'Fit to data').click();
+    await settle(page);
+    const fitted = await camera3d(page);
+    expect(fitted.distance).toBeCloseTo(now.distance, 6);
+    expect(await camera(page)).toEqual(flat);
   });
 });

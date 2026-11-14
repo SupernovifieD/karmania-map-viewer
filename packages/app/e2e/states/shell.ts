@@ -114,6 +114,29 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    // The view in 3D with an exaggeration of 3: the select is enabled and says it.
+    name: 'shell-3d',
+    show: async (page) => {
+      await startWith(page);
+      await page.locator('karmania-app header.toolbar').getByRole('radio', { name: '3D' }).click();
+      await page.locator('karmania-app header.toolbar select').selectOption('3');
+      await page.mouse.move(0, 0);
+      return wholeApp(page);
+    },
+  },
+  {
+    // In 2D the select is disabled, and the pointer over it says why.
+    name: 'shell-exaggeration-tooltip',
+    show: async (page) => {
+      await startWith(page);
+      await page.locator('karmania-app header.toolbar k-select').hover();
+      await page
+        .locator('karmania-app header.toolbar k-tooltip[text="Only in the 3D view"] .tip')
+        .waitFor({ state: 'visible' });
+      return wholeApp(page);
+    },
+  },
+  {
     name: 'shell-handle-hover',
     show: async (page) => {
       await startWith(page);
@@ -125,8 +148,8 @@ export const SHOTS: Shot[] = [
     name: 'shell-handle-focus',
     show: async (page) => {
       await startWith(page);
-      // Tab: the toolbar's Import, the map's Import, and the handle.
-      for (let presses = 0; presses < 3; presses += 1) {
+      // Tab: the toolbar's Import, the toolbar's view control, the map's Import, and the handle.
+      for (let presses = 0; presses < 4; presses += 1) {
         await page.keyboard.press('Tab');
       }
       return wholeApp(page);

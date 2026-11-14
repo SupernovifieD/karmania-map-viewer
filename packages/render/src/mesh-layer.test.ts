@@ -1,5 +1,6 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth } from 'three';
+import type { Vector3 } from 'three';
 import type { Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { MESH_AMBIENT, createMeshLayer } from './mesh-layer.js';
@@ -55,6 +56,27 @@ describe('createMeshLayer', () => {
     expect(uniforms['uAmbient']?.value).toBe(0.25);
   });
 
+  it('takes the light of each frame, the same for the layer and for the triangles it has by class, and starts straight above', () => {
+    const layer = createMeshLayer(square(), LOOK);
+    layer.setClasses?.({ indices: Uint8Array.of(1, 0), colours: ['#ff0000', '#00ff00'] });
+    const own = material(layer).uniforms['uLight']?.value as Vector3;
+    expect(own).toMatchObject({ x: 0, y: 0, z: 1 });
+    layer.prepareFrame({
+      pixelRatio: 1,
+      flat: false,
+      viewport: [800, 600],
+      light: [0.6, 0, 0.8],
+      outline: [0, 0, 0],
+    });
+    expect(own).toMatchObject({ x: 0.6, y: 0, z: 0.8 });
+    // The triangles by class use the same uniform object, so they are lit by it too.
+    const others = parts(layer).filter((mesh) => mesh.material !== material(layer));
+    expect(others.length).toBeGreaterThan(0);
+    for (const mesh of others) {
+      expect((mesh.material as ShaderMaterial).uniforms['uLight']?.value).toBe(own);
+    }
+  });
+
   it('is drawn with depth, strictly nearer, so that the highest part shows, from either side', () => {
     const m = material(createMeshLayer(square(), LOOK));
     expect(m.depthTest).toBe(true);
@@ -106,6 +128,58 @@ describe('createMeshLayer', () => {
     layer.dispose();
     expect(freed.sort()).toEqual(['geometry', 'material']);
     expect(parts(layer)).toHaveLength(0);
+  });
+
+  describe('as the surface of a grid with elevations', () => {
+    const colours = ['#ff0000', '#00ff00'];
+    /** Four cell centres and two triangles, one in each of two cells (the cells' own numbers are the owners). */
+    const surface = () => ({
+      positions: Float32Array.of(0, 0, 5, 10, 0, 6, 10, 10, 7, 0, 10, 8),
+      triangles: Uint32Array.of(0, 1, 2, 0, 2, 3),
+      owners: Uint32Array.of(0, 1),
+    });
+    const others = (layer: ReturnType<typeof createMeshLayer>): Mesh[] =>
+      parts(layer).filter((mesh) => mesh.material !== parts(layer)[0]?.material);
+
+    it('is drawn as a mesh, with the heights it is given', () => {
+      const layer = createMeshLayer(surface(), LOOK);
+      expect(parts(layer)).toHaveLength(1);
+      expect(parts(layer)[0]?.geometry.getAttribute('position').getZ(2)).toBe(7);
+    });
+
+    it('colours each triangle by the class of the cell it belongs to: the classes are one for each cell, not for each triangle', () => {
+      const layer = createMeshLayer(surface(), LOOK);
+      // Cell 0 is of class 1 and cell 1 of class 0: the first triangle is green, the second red.
+      layer.setClasses?.({ indices: Uint8Array.of(1, 0), colours });
+      expect(others(layer).map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [0, 2, 3],
+        [0, 1, 2],
+      ]);
+    });
+
+    it('draws a triangle of a cell that has no value, or no class given, in no colour', () => {
+      const layer = createMeshLayer(surface(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(255, 0), colours });
+      expect(others(layer).map((mesh) => [...(mesh.geometry.index?.array ?? [])])).toEqual([
+        [0, 2, 3],
+      ]);
+    });
+
+    it('does not use classes that stop short of its cells: they are not of its grid, and the layer stays in its one colour', () => {
+      const layer = createMeshLayer(surface(), LOOK);
+      layer.setClasses?.({ indices: Uint8Array.of(0), colours });
+      expect(others(layer)).toHaveLength(0);
+      expect((parts(layer)[0]?.material as ShaderMaterial).visible).toBe(true);
+    });
+
+    it('keeps its triangles and only changes their colours when the same classes come with another ramp', () => {
+      const layer = createMeshLayer(surface(), LOOK);
+      const indices = Uint8Array.of(1, 0);
+      layer.setClasses?.({ indices, colours });
+      const before = others(layer);
+      layer.setClasses?.({ indices, colours: ['#0000ff', '#ffff00'] });
+      expect(others(layer)).toEqual(before);
+    });
   });
 
   describe('coloured by classes', () => {

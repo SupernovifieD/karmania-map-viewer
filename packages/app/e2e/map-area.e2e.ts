@@ -271,11 +271,13 @@ test.describe('the map area', () => {
     });
   });
 
-  test('is the page’s main area, called Map, and the button in it reaches the keyboard second', async ({
+  test('is the page’s main area, called Map, and the button in it reaches the keyboard after the toolbar’s two controls', async ({
     page,
   }) => {
     await page.goto('/');
     await expect(page.getByRole('main', { name: 'Map' })).toHaveCount(1);
+    // The toolbar's Import and its view control come first.
+    await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await expect(part(page, 'k-button').getByRole('button', { name: 'Import' })).toBeFocused();
