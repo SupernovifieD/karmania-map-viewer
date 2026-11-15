@@ -10,6 +10,7 @@ import chevronsRight from 'lucide-static/icons/chevrons-right.svg?raw';
 import circleAlert from 'lucide-static/icons/circle-alert.svg?raw';
 import file from 'lucide-static/icons/file.svg?raw';
 import grid from 'lucide-static/icons/grid-3x3.svg?raw';
+import gripVertical from 'lucide-static/icons/grip-vertical.svg?raw';
 import info from 'lucide-static/icons/info.svg?raw';
 import layers from 'lucide-static/icons/layers.svg?raw';
 import map from 'lucide-static/icons/map.svg?raw';
@@ -38,6 +39,7 @@ export const ICON_NAMES = [
   'circle-alert',
   'file',
   'grid-3x3',
+  'grip-vertical',
   'info',
   'layers',
   'map',
@@ -69,6 +71,7 @@ const DRAWINGS: Readonly<Record<IconName, string>> = {
   'circle-alert': circleAlert,
   file,
   'grid-3x3': grid,
+  'grip-vertical': gripVertical,
   info,
   layers,
   map,

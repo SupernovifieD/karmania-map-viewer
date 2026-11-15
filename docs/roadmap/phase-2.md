@@ -616,7 +616,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.4a Where Alt + Up or Down takes a row, and what is said when a row is moved, as functions.
   - [x] 19.4b Where a row dropped at a point of the list lands, and where the line is, as functions.
   - [x] 19.4c The tab moves the row with Alt + Up or Down, says it in a polite live region and keeps the keyboard on the row; browser proofs, with the draw order following.
-  - [ ] 19.4d The tab has the drag handle, drags a row with the pointer and shows the drop line.
+  - [x] 19.4d The tab has the drag handle, drags a row with the pointer and shows the drop line; browser proofs.
   - [ ] 19.4e Browser proofs of dragging; the states photographed.
 - [ ] 19.5 Groups: create, rename, delete, collapse, move layers in and out (drag
   and Alt + Right/Left).
