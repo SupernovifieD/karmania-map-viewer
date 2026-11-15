@@ -9,8 +9,12 @@ import { PATH, SHOTS } from './states/legend-tab.js';
 
 test.use({ reducedMotion: 'reduce' });
 
+/** The states that load 50 layers, each time the page is made again (six times): they take most of the minute that a test has, and more when the machine is busy. */
+const SLOW = ['legend-tab-many', 'legend-tab-many-end'];
+
 for (const each of SHOTS) {
   test(`the state "${each.name}", at every window size in both themes`, async ({ page }) => {
+    test.slow(SLOW.includes(each.name), 'it loads 50 layers for each of the six pictures');
     await photograph(page, PATH, each);
   });
 }

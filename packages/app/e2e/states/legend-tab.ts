@@ -5,7 +5,7 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { dispatch, withData } from '../support/render.js';
-import { loadGrid, loadLegendScene, showLegend } from '../support/legend.js';
+import { loadGrid, loadLegendScene, loadMany, showLegend } from '../support/legend.js';
 import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 import type { Shot } from '../support/screenshots.js';
 
@@ -56,6 +56,20 @@ const long = (start: string): string =>
   `${start} of the northern pit, drill holes and trenches, seen from the west and from the south of it all`
     .padEnd(120, '.')
     .slice(0, 120);
+
+/** 16 cells of `i / 7` (bounds of 15 digits, as the classes of such numbers are), the last three with no value. */
+const SEVENTHS = [
+  ...Array.from({ length: 13 }, (_, i) => (i + 1) / 7),
+  Number.NaN,
+  Number.NaN,
+  Number.NaN,
+];
+
+/** Counts as large as those of a model of ten million blocks, for the 13 lines of 12 classes and the cells with no value. */
+const BIG = [
+  10_000_000, 9_876_543, 8_765_432, 7_654_321, 6_543_210, 5_432_109, 4_321_098, 3_210_987,
+  2_109_876, 1_098_765, 987_654, 123_456, 123_456_789,
+];
 
 /** 16 cells, the last three with no value. */
 const WITH_HOLES = Array.from({ length: 16 }, (_, i) => (i < 13 ? i + 1 : Number.NaN));
@@ -210,6 +224,75 @@ export const SHOTS: Shot[] = [
       await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .notice k-icon').waitFor();
       await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
       await page.locator('karmania-legend-tab #legend-reason-layer-2').waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // 50 layers: the list scrolls inside the panel, with its caption and the rows as they are for 5.
+    name: 'legend-tab-many',
+    show: async (page) => {
+      await loadMany(page, 50);
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"]').waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // The same list at its end, reached with the keyboard: the last row with its ring, whole, and the room of the panel under it.
+    name: 'legend-tab-many-end',
+    show: async (page) => {
+      await loadMany(page, 50);
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-50"]').focus();
+      await page.keyboard.press('End');
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"]:focus').waitFor();
+      return restWithFocus(page);
+    },
+  },
+  {
+    // 12 classes of numbers that are not rounded, with counts of ten million, under a name of 120 characters: every label is cut and every count is whole.
+    name: 'legend-tab-twelve',
+    show: async (page) => {
+      await loadGrid(page, long('Assays'), 1, SEVENTHS);
+      await dispatch(page, {
+        type: 'setStyle',
+        layerId: 'layer-1',
+        patch: {
+          colour: {
+            mode: 'classes',
+            column: 'value',
+            method: 'equal',
+            classes: 12,
+            ramp: 'viridis',
+            reverse: false,
+          },
+        },
+      });
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+      await page.locator('karmania-legend-tab #legend-classes-layer-1 .entry').nth(12).waitFor();
+      await page.locator('karmania-legend-tab').evaluate((tab, big) => {
+        type Line = Record<string, unknown>;
+        const shown = tab as unknown as {
+          model: { entries: { type: string; classes?: Line[] }[] } & Record<string, unknown>;
+        };
+        shown.model = {
+          ...shown.model,
+          entries: shown.model.entries.map((entry) =>
+            entry.type === 'layer' && entry.classes !== undefined
+              ? {
+                  ...entry,
+                  classes: entry.classes.map((line, i) => ({
+                    ...line,
+                    count: big[i],
+                    countLabel: (big[i] ?? 0).toLocaleString('en-US'),
+                  })),
+                }
+              : entry,
+          ),
+        };
+      }, BIG);
+      await page.locator('karmania-legend-tab #legend-classes-layer-1 .figure').first().waitFor();
       return rest(page);
     },
   },
