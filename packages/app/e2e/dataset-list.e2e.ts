@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
-import { expectLayersDrawn, layerStatuses } from './support/render.js';
+import { expectLayersDrawn, layerStatuses, loadLattice } from './support/render.js';
 import { importAndLoad } from './support/wizard.js';
 
 function parts(page: Page) {
@@ -38,6 +38,8 @@ interface Crafted {
   readonly kind: string;
   readonly elementCount: number;
   readonly warnings?: number;
+  /** The dataset these are contour lines of. */
+  readonly contoursOf?: number;
 }
 
 /** Gives the app datasets that were not imported, to look at the list with: only what it shows is in them. */
@@ -55,6 +57,15 @@ async function setDatasets(page: Page, crafted: readonly Crafted[]): Promise<voi
       elementCount: each.elementCount,
       hasZ: false,
       columns: [],
+      ...(each.contoursOf === undefined
+        ? {}
+        : {
+            derivedFrom: {
+              id: each.contoursOf,
+              kind: 'contours',
+              params: { interval: 2.5, base: 0, indexEvery: 5 },
+            },
+          }),
       findings: Array.from({ length: each.warnings ?? 0 }, (_, index) => ({
         code: 'values.points.duplicate',
         severity: 'warning',
@@ -410,5 +421,153 @@ test.describe('loading and removing datasets', () => {
     await expect(q.map).toContainText('No data yet');
     expect(await layerStatuses(page)).toEqual([]);
     await expect(q.emptyImport).toBeFocused();
+  });
+});
+
+/** A grid, a lines dataset loaded after it, and the contour lines of the grid, which come last. */
+const WITH_CONTOURS: Crafted[] = [
+  { id: 1, name: 'Collars', kind: 'points', elementCount: 12 },
+  { id: 2, name: 'Surface', kind: 'grid', elementCount: 1200 },
+  { id: 3, name: 'Faults', kind: 'lines', elementCount: 40, warnings: 2 },
+  {
+    id: 4,
+    name: 'Contours of Surface (every 2.5)',
+    kind: 'lines',
+    elementCount: 31,
+    contoursOf: 2,
+  },
+];
+
+test.describe('datasets made from another', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+  });
+
+  test('are listed directly under their source, whenever they were loaded', async ({ page }) => {
+    const p = parts(page);
+    await setDatasets(page, WITH_CONTOURS);
+    const names = await p.rows.evaluateAll((all) =>
+      all.map((row) => row.getAttribute('data-dataset')),
+    );
+    expect(names).toEqual(['Collars', 'Surface', 'Contours of Surface (every 2.5)', 'Faults']);
+  });
+
+  test('are indented by 24 from their source, with an icon of their own, and keep the row of 40 and the columns of the others', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await setDatasets(page, WITH_CONTOURS);
+    const [source, lines, other] = [
+      p.row('Surface'),
+      p.row('Contours of Surface (every 2.5)'),
+      p.row('Faults'),
+    ];
+    await expect(lines.locator('.icon')).toHaveAttribute('name', 'mountain');
+    await expect(source.locator('.icon')).toHaveAttribute('name', 'grid-3x3');
+    expect((await rect(lines)).height).toBe(40);
+    // The icon is 24 in from the icon of its source, and the name follows it as for any row.
+    const [sourceIcon, linesIcon] = [
+      await rect(source.locator('.icon')),
+      await rect(lines.locator('.icon')),
+    ];
+    expect(linesIcon.x - sourceIcon.x).toBe(24);
+    expect(linesIcon.y - (await rect(lines)).y).toBe(sourceIcon.y - (await rect(source)).y);
+    const [sourceName, linesName] = [
+      await rect(source.locator('.name')),
+      await rect(lines.locator('.name')),
+    ];
+    expect(linesName.x - sourceName.x).toBe(24);
+    // The counts and the room of the badge and the button are where they are in every row.
+    for (const part of ['.count', '.badge', '.remove']) {
+      const [a, b] = [await rect(lines.locator(part)), await rect(other.locator(part))];
+      expect([a.x, a.width]).toEqual([b.x, b.width]);
+    }
+    await expect(lines.locator('.count')).toHaveText('31');
+  });
+
+  test('have no button to remove them, since they go with their source', async ({ page }) => {
+    const p = parts(page);
+    await setDatasets(page, WITH_CONTOURS);
+    await expect(p.row('Contours of Surface (every 2.5)').locator('.remove k-button')).toHaveCount(
+      0,
+    );
+    await expect(p.row('Surface').locator('.remove k-button')).toHaveCount(1);
+  });
+
+  test('say which dataset they were made from in words, for those who cannot see the indent', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await setDatasets(page, WITH_CONTOURS);
+    await expect(p.row('Contours of Surface (every 2.5)').locator('.visually-hidden')).toHaveText(
+      'lines, made from Surface',
+    );
+    await expect(p.row('Surface').locator('.visually-hidden')).toHaveText('cells');
+    // A row that has warnings says them after that.
+    await expect(p.row('Faults').locator('.visually-hidden')).toHaveText('lines, 2 warnings');
+  });
+
+  test('are named in the question that asks before their source is removed', async ({ page }) => {
+    const p = parts(page);
+    await setDatasets(page, WITH_CONTOURS);
+    await p.remove('Surface').click();
+    const confirm = p.list.locator('.confirm');
+    await expect(confirm).toContainText('Surface');
+    await expect(confirm).toContainText('1,200 cells');
+    await expect(confirm.locator('.made')).toHaveCount(1);
+    await expect(confirm.locator('.made')).toContainText('Contours of Surface (every 2.5)');
+    await expect(confirm.locator('.made')).toContainText('31 lines');
+    await expect(confirm).toContainText('removed with it');
+    // A dataset that nothing was made from does not say it.
+    await p.keep.click();
+    await p.remove('Faults').click();
+    await expect(confirm.locator('.made')).toHaveCount(0);
+    await expect(confirm).not.toContainText('removed with it');
+  });
+
+  test('go with their source when it is removed, from the engine and from the list', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await loadLattice(page, 'grid', {
+      name: 'Surface',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [500_000, 4_000_000, 0],
+      spacing: [10, 10, 1],
+      dims: [12, 8, 1],
+      values: Array.from({ length: 96 }, (_, k) => (k % 12) + Math.floor(k / 12)),
+    });
+    await page.locator('karmania-viewer').evaluate(async (element) => {
+      const viewer = element as unknown as {
+        engine: {
+          datasets: () => { id: number }[];
+          contours: (id: number, params: object) => Promise<{ status: string }>;
+        };
+        datasets: unknown[];
+        updateComplete: Promise<boolean>;
+      };
+      const [source] = viewer.engine.datasets();
+      if (source === undefined) throw new Error('nothing loaded');
+      const made = await viewer.engine.contours(source.id, { interval: 2, base: 0, indexEvery: 5 });
+      if (made.status !== 'loaded') throw new Error('no contours');
+      viewer.datasets = viewer.engine.datasets();
+      await viewer.updateComplete;
+    });
+    await page.locator('karmania-panel k-tabs [role="tab"]').filter({ hasText: 'Data' }).click();
+    await expect(p.rows).toHaveCount(2);
+    await expect(p.rows.nth(1)).toHaveAttribute('data-dataset', 'Contours of Surface (every 2)');
+    await p.remove('Surface').click();
+    await expect(p.list.locator('.confirm .made')).toContainText('Contours of Surface (every 2)');
+    await p.confirm.click();
+    await expect(p.rows).toHaveCount(0);
+    const left = await page.locator('karmania-viewer').evaluate((element) => {
+      const viewer = element as unknown as {
+        datasets: unknown[];
+        engine: { datasets: () => unknown[] };
+      };
+      return { shown: viewer.datasets.length, engine: viewer.engine.datasets().length };
+    });
+    expect(left).toEqual({ shown: 0, engine: 0 });
   });
 });
