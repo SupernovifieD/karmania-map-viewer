@@ -111,6 +111,14 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Divide the column into ranges instead.
 - Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
 
+## `contours.base.too_far`
+
+- Severity: error
+- Step: none
+- Message: The values are too many intervals away from the base for the contour lines to be worked out.
+- Hint: Set the base near the values, or use a larger interval.
+- Example: The values are too many intervals away from the base for the contour lines to be worked out.
+
 ## `contours.column.missing`
 
 - Severity: warning
