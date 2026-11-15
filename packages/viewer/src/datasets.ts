@@ -71,6 +71,32 @@ export function selectionAfterRemoving(
   return neighbour?.id;
 }
 
+/**
+ * The dataset to select when the engine's datasets changed from `before` to `after` (contour lines were made again, or taken away): the one that was
+ * selected if it is still there; otherwise, for lines that were replaced, the lines that replaced them (made from the same dataset), or the dataset they
+ * were made from if the lines are gone; otherwise the first dataset listed, or none.
+ */
+export function selectionAfterChange(
+  before: readonly Summary[],
+  after: readonly Summary[],
+  selected: number | undefined,
+): number | undefined {
+  if (selected === undefined || after.some((dataset) => dataset.id === selected)) {
+    return selected;
+  }
+  const source = before.find((dataset) => dataset.id === selected)?.derivedFrom?.id;
+  if (source !== undefined) {
+    const lines = after.find((dataset) => dataset.derivedFrom?.id === source);
+    if (lines !== undefined) {
+      return lines.id;
+    }
+    if (after.some((dataset) => dataset.id === source)) {
+      return source;
+    }
+  }
+  return listedDatasets(after)[0]?.id;
+}
+
 /** The coordinate system of a dataset in a few words: `EPSG 32640`, or `Local grid, metres`. */
 export function crsLabel(crs: Summary['crs']): string {
   if (crs === undefined) {

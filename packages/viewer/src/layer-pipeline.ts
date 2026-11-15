@@ -118,6 +118,12 @@ const COLOURED_BY_CLASS: ReadonlySet<RenderBuffers['kind']> = new Set([
  */
 const NEEDS_MASK: ReadonlySet<RenderBuffers['kind']> = new Set(['grid', 'surface', 'blocks']);
 
+/**
+ * How much wider an index line of contours is drawn than the others (brief 10.3: "index contours drawn thicker"): the lines of a derived layer
+ * of contours are given two classes, ordinary and index, in the one colour of the layer, and the class of the index lines has this width.
+ */
+export const INDEX_LINE_WIDTH = 2;
+
 /** A text that is the same for styles that have the same classes: the column, the method and how many (the ramp is not of the classes). */
 function classKeyOf(colour: Extract<LayerColour, { mode: 'classes' }>): string {
   return [colour.column, colour.method, String(colour.classes)].join('\u0000');
@@ -286,7 +292,9 @@ export class LayerPipeline {
     // request that the pipeline is waiting for is back.
     const doc = this.options.scene.getState();
     for (const [id, entry] of this.entries) {
-      if (doc.layers[id] === undefined) {
+      // A layer that is given another dataset (the layer of contours, when the lines are made again) is a layer to prepare afresh: what was prepared is of
+      // a dataset that is gone.
+      if (doc.layers[id] === undefined || doc.layers[id]?.datasetId !== entry.datasetId) {
         entry.abort?.abort();
         this.options.sink()?.removeLayer(id);
         this.entries.delete(id);
@@ -725,7 +733,7 @@ export class LayerPipeline {
     if (colour === undefined || entry.kind === undefined || !COLOURED_BY_CLASS.has(entry.kind)) {
       return;
     }
-    const wanted = this.classesWanted(entry, colour);
+    const wanted = this.classesWanted(id, entry, colour);
     if (wanted === undefined) {
       // Nothing to colour by (one colour for a kind that has no cells with no value, or no column of numbers to say which have one).
       delete entry.problem;
@@ -757,7 +765,7 @@ export class LayerPipeline {
           signal?.aborted === true ||
           this.entries.get(id) !== entry ||
           now === undefined ||
-          this.classesWanted(entry, now)?.key !== key
+          this.classesWanted(id, entry, now)?.key !== key
         );
       };
       try {
@@ -798,18 +806,25 @@ export class LayerPipeline {
     if (breaks === undefined || indices === undefined) {
       return;
     }
+    // The index lines of contours: one colour for both classes, and the class of the index lines (the value `true`) wider.
+    const heavy =
+      colour.mode === 'single' && key === 'index' && breaks.kind === 'categories'
+        ? breaks.values.map((value) => (value === true ? INDEX_LINE_WIDTH : 1))
+        : undefined;
     // The classes of a column of categories have "Other" after them, which is a grey of the scene's own; one colour is one class.
     const colours =
-      colour.mode === 'single'
-        ? [colour.value]
-        : [
-            ...classColours(colour, breaks),
-            ...(breaks.kind === 'categories' && breaks.other !== undefined ? [OTHER_COLOUR] : []),
-          ];
+      heavy !== undefined && colour.mode === 'single'
+        ? heavy.map(() => colour.value)
+        : colour.mode === 'single'
+          ? [colour.value]
+          : [
+              ...classColours(colour, breaks),
+              ...(breaks.kind === 'categories' && breaks.other !== undefined ? [OTHER_COLOUR] : []),
+            ];
     const signature = `${key}\u0001${colours.join(',')}`;
     if (signature !== entry.signature) {
       entry.signature = signature;
-      entry.classes = { indices, colours };
+      entry.classes = { indices, colours, ...(heavy === undefined ? {} : { widths: heavy }) };
     }
     this.give(id, entry);
   }
@@ -819,6 +834,7 @@ export class LayerPipeline {
    * one colour, for one class of the cells that have a value (in the first column of numbers). `undefined` for a style that has nothing to ask.
    */
   private classesWanted(
+    id: LayerId,
     entry: Entry,
     colour: LayerColour,
   ): { key: string; column: string; method: ClassMethod; classes: number } | undefined {
@@ -829,6 +845,13 @@ export class LayerPipeline {
         method: colour.method,
         classes: colour.classes,
       };
+    }
+    // The lines of a derived layer of contours, in one colour: their classes are the ordinary lines and the index lines, to draw the second wider.
+    if (
+      entry.kind === 'lines' &&
+      this.options.scene.getState().layers[id]?.derived?.kind === 'contours'
+    ) {
+      return { key: 'index', column: 'index', method: 'categories', classes: 2 };
     }
     if (entry.kind === undefined || !NEEDS_MASK.has(entry.kind)) {
       return undefined;
