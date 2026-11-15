@@ -16,6 +16,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { PATH as DATA_TAB_PATH, SHOTS as DATA_TAB } from './states/data-tab.js';
 import { PATH as GALLERY_PATH, SHOTS as GALLERY } from './states/gallery.js';
+import { PATH as LEGEND_TAB_PATH, SHOTS as LEGEND_TAB } from './states/legend-tab.js';
 import { PATH as LONG_PATH, SHOTS as LONG } from './states/long-content.js';
 import { PATH as FURNITURE_PATH, SHOTS as FURNITURE } from './states/map-furniture.js';
 import { PATH as SHELL_PATH, SHOTS as SHELL } from './states/shell.js';
@@ -113,6 +114,7 @@ const APP: readonly (readonly [string, string, readonly Shot[]])[] = [
   ['shell', SHELL_PATH, SHELL],
   ['wizard', WIZARD_PATH, WIZARD],
   ['data tab', DATA_TAB_PATH, DATA_TAB],
+  ['legend tab', LEGEND_TAB_PATH, LEGEND_TAB],
   ['long content', LONG_PATH, LONG],
   ['map furniture', FURNITURE_PATH, FURNITURE],
 ];
