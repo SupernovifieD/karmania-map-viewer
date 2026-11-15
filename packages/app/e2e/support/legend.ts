@@ -4,6 +4,7 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { dispatch, layerStatuses, loadLattice } from './render.js';
+import type { LatticeSpec } from './render.js';
 
 const EAST = 500_000;
 const NORTH = 2_765_000;
@@ -22,6 +23,32 @@ export const groupRow = (page: Page, id: string): Locator =>
 export const showLegend = (page: Page): Promise<void> =>
   page.getByRole('tab', { name: 'Legend', exact: true }).click();
 
+/** A grid of 4 by 4 cells with the values 1 to 16 (or `values`, a NaN being a cell with no value). */
+function gridSpec(
+  name: string,
+  values: readonly number[] = Array.from({ length: 16 }, (_, i) => i + 1),
+): LatticeSpec {
+  return {
+    name,
+    crs: { kind: 'epsg', code: 32640 },
+    origin: [EAST, NORTH, 0],
+    spacing: [10, 10, 1],
+    dims: [4, 4, 1],
+    values,
+  };
+}
+
+/** Waits until `count` layers are on the map and all of them are drawn: 5 seconds, and half a second more for each layer, since each is prepared by the engine. */
+async function untilDrawn(page: Page, count: number): Promise<void> {
+  const timeout = 5_000 + count * 500;
+  await expect.poll(async () => (await layerStatuses(page)).length, { timeout }).toBe(count);
+  await expect
+    .poll(async () => (await layerStatuses(page)).every(([, status]) => status === 'drawn'), {
+      timeout,
+    })
+    .toBe(true);
+}
+
 /**
  * A grid of 4 by 4 cells with the values 1 to 16 (or `values`, a NaN being a cell with no value): its layer is coloured by classes of them, as a grid's is
  * at first. Waits until `count` layers are drawn.
@@ -30,20 +57,18 @@ export async function loadGrid(
   page: Page,
   name: string,
   count: number,
-  values: readonly number[] = Array.from({ length: 16 }, (_, i) => i + 1),
+  values?: readonly number[],
 ): Promise<void> {
-  await loadLattice(page, 'grid', {
-    name,
-    crs: { kind: 'epsg', code: 32640 },
-    origin: [EAST, NORTH, 0],
-    spacing: [10, 10, 1],
-    dims: [4, 4, 1],
-    values,
-  });
-  await expect.poll(async () => (await layerStatuses(page)).length).toBe(count);
-  await expect
-    .poll(async () => (await layerStatuses(page)).every(([, status]) => status === 'drawn'))
-    .toBe(true);
+  await loadLattice(page, 'grid', gridSpec(name, values));
+  await untilDrawn(page, count);
+}
+
+/** `count` grids, named `Layer 01`, `Layer 02` and so on, loaded one after the other and waited for once at the end: the quantity that a legend has to hold. */
+export async function loadMany(page: Page, count: number): Promise<void> {
+  for (let at = 1; at <= count; at += 1) {
+    await loadLattice(page, 'grid', gridSpec(`Layer ${String(at).padStart(2, '0')}`));
+  }
+  await untilDrawn(page, count);
 }
 
 /** The names of the five layers of `loadLegendScene`, in the order they are loaded. */

@@ -115,9 +115,10 @@ export class KarmaniaPanel extends LitElement {
         padding: 0;
       }
 
+      /* The tab is as tall as what is in it (it does not shrink to the room that there is, and spill out of itself): the body scrolls when there is more, and
+         it takes the room that is left when there is less, for its empty state. */
       .body karmania-legend-tab {
-        flex: 1 1 auto;
-        min-height: 0;
+        flex: 1 0 auto;
       }
 
       /* Buttons stacked from the top, 8 from the top and 4 apart. At the sides there are 4 from the
