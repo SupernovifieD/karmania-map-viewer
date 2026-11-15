@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use karmania_core::{CrsKinds, Dataset, Findings, Wgs84Only};
+use karmania_core::{CrsKinds, Dataset, DerivedFrom, Findings, Wgs84Only};
 
 use crate::build::{
     BlocksInput, GridInput, LinesInput, MeshInput, PointsInput, PolygonsInput, build_blocks,
@@ -155,6 +155,13 @@ impl Kernel {
                 .load_with(vec![dataset], findings, self.kinds.as_ref()),
             None => LoadResult::Blocked { findings },
         }
+    }
+
+    /// Loads a dataset that was made from another that is loaded (contour lines): validated like any other, and its summary says what it
+    /// was made from. `None` if the source is not loaded; see [`Registry::load_derived`].
+    pub fn load_derived(&mut self, dataset: Dataset, from: DerivedFrom) -> Option<LoadResult> {
+        self.registry
+            .load_derived(dataset, from, self.kinds.as_ref())
     }
 
     /// How many imports are under way.
