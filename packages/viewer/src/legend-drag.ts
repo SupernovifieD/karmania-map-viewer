@@ -25,8 +25,9 @@ interface Pressed {
 
 /**
  * Dragging a row of the Legend tab with the pointer: a press on a row's handle (or on a group's row), a move of more than a few pixels, and a release, with
- * the gap the row would land in found at each move (`pickDrop`) for the tab to draw its line at. The tab's element has the pointer from the press to the end of
- * the drag, wherever it goes, and the drag ends at the release (the row is moved), at Escape or when the pointer is taken away (nothing is moved).
+ * the gap the row would land in found at each move (`pickDrop`) for the tab to draw its line at. The tab's element has the pointer from the start of the drag
+ * to its end, wherever it goes (and not before, so that a click is a click), and the drag ends at the release (the row is moved), at Escape or when the
+ * pointer is taken away (nothing is moved).
  *
  * It says what was dropped (`onDrop`) and what is dragged and where it would land (`dragging`, `drop`) for the tab to draw.
  */
@@ -56,11 +57,10 @@ export class LegendDrag implements ReactiveController {
     }
     this.end();
     this.pressed = { id, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    this.host.setPointerCapture(event.pointerId);
+    // The pointer is not taken yet: a press that is a click (or half a double click) has to reach what was pressed, and a capture would give the click to the tab.
     this.host.addEventListener('pointermove', this.onMove);
     this.host.addEventListener('pointerup', this.onUp);
     this.host.addEventListener('pointercancel', this.onCancel);
-    this.host.addEventListener('lostpointercapture', this.onCancel);
   }
 
   /** Whether a row is being dragged (and not only pressed). */
@@ -83,6 +83,9 @@ export class LegendDrag implements ReactiveController {
         return;
       }
       this.dragging = { id: pressed.id, kind: pressed.kind };
+      // From here the tab has the pointer, wherever it goes.
+      this.host.setPointerCapture(pressed.pointerId);
+      this.host.addEventListener('lostpointercapture', this.onCancel);
       this.host.toggleAttribute('data-dragging', true);
     }
     const rows = this.host.measureRows();

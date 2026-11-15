@@ -6,13 +6,13 @@ import type {
   LegendLayerEntry,
   LegendModel,
 } from '@karmania/scene';
-import { sharedStyles } from '@karmania/ui';
+import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { LegendDrag } from './legend-drag.js';
 import type { DropRow } from './legend-drop.js';
-import { announceMove, placeOf, stepMove } from './legend-order.js';
+import { announceMove, newGroup, placeOf, stepMove } from './legend-order.js';
 import type { Move } from './legend-order.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
 import {
@@ -79,6 +79,7 @@ export class KarmaniaLegendTab extends LitElement {
     current: { state: true },
     open: { state: true },
     announcement: { state: true },
+    renaming: { state: true },
   };
 
   static override styles = [
@@ -118,6 +119,26 @@ export class KarmaniaLegendTab extends LitElement {
 
       .tree {
         position: relative;
+      }
+
+      /* The name of a group that is being renamed: a field in the place of the name, with the ring of a field inside it. */
+      .rename {
+        background: var(--k-surface);
+        border: var(--k-border-width) solid var(--k-border-strong);
+        border-radius: var(--k-radius-sm);
+        box-sizing: border-box;
+        color: var(--k-text);
+        font: inherit;
+        font-weight: var(--k-weight-medium);
+        height: var(--k-control-height-compact);
+        min-width: 0;
+        padding: 0 var(--k-space-4);
+        width: 100%;
+      }
+
+      .rename:focus-visible {
+        outline: var(--k-focus-width) solid var(--k-accent);
+        outline-offset: calc(var(--k-focus-width) * -1);
       }
 
       /* Where the row that is dragged will land: a line of 2 over the rows, in the accent, which takes no room and no pointer. */
@@ -345,6 +366,10 @@ export class KarmaniaLegendTab extends LitElement {
   declare private current: string | undefined;
   /** The ids of the layers that a person has opened (a layer is open only if it has lines to show: `treeItems`). */
   declare private open: ReadonlySet<string>;
+  /** The group whose name is being changed in place, if one is. */
+  declare private renaming: string | undefined;
+  /** The legend as it was when `New group` was pressed, to find the group that was made (which is then renamed). */
+  private creating: LegendModel | undefined;
   /** What the polite live region says: the last move, or why a row was not moved. */
   declare private announcement: string;
   /** The key of a row that was moved, which has the keyboard again once the legend that has it in its new place comes. */
@@ -362,6 +387,8 @@ export class KarmaniaLegendTab extends LitElement {
     this.current = undefined;
     this.open = new Set();
     this.announcement = '';
+    this.renaming = undefined;
+    this.creating = undefined;
     this.refocus = undefined;
   }
 
@@ -369,6 +396,12 @@ export class KarmaniaLegendTab extends LitElement {
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('model') && this.model !== undefined) {
       this.open = stillThere(this.open, this.model);
+      if (
+        this.renaming !== undefined &&
+        !this.model.entries.some((entry) => entry.type === 'group' && entry.id === this.renaming)
+      ) {
+        this.renaming = undefined;
+      }
       const dragged = this.drag.dragging;
       if (dragged !== undefined && placeOf(this.model, dragged.id) === undefined) {
         this.drag.cancel();
@@ -442,12 +475,53 @@ export class KarmaniaLegendTab extends LitElement {
   }
 
   /** A row that was moved is in its new place now, and has the keyboard again (moving it in the page took it away). */
-  protected override updated(changed: PropertyValues<this>): void {
+  protected override updated(changed: PropertyValues): void {
+    if (changed.has('model') && this.creating !== undefined && this.model !== undefined) {
+      const made = newGroup(this.creating, this.model);
+      this.creating = undefined;
+      if (made !== undefined) {
+        this.renaming = made;
+      }
+    }
+    if (changed.has('renaming') && this.renaming !== undefined) {
+      const field = this.renderRoot.querySelector<HTMLInputElement>('.rename');
+      field?.focus();
+      field?.select();
+    }
     if (changed.has('model') && this.refocus !== undefined) {
       const key = this.refocus;
       this.refocus = undefined;
       this.focusRow(key);
     }
+  }
+
+  /** `New group`: a group is made at the top, and the tab asks to rename it as soon as it is there. */
+  private makeGroup(): void {
+    this.creating = this.model;
+    this.ask({ type: 'createGroup', name: 'New group' });
+  }
+
+  /** Ends the rename of a group: the name in the field is kept (a name that is only space is no name, and the old one stays) or it is not. */
+  private endRename(keep: boolean): void {
+    const id = this.renaming;
+    if (id === undefined) {
+      return;
+    }
+    // Set first: the field loses the keyboard when it goes, and that must not end the rename again.
+    this.renaming = undefined;
+    const field = this.renderRoot.querySelector<HTMLInputElement>('.rename');
+    const name = field?.value.trim() ?? '';
+    if (keep && name !== '' && this.model !== undefined) {
+      const was = this.model.entries.find((entry) => entry.type === 'group' && entry.id === id);
+      if (was?.name !== name) {
+        this.say(`Renamed group to ${name}`);
+        this.ask({ type: 'renameGroup', groupId: id, name });
+      }
+    }
+    this.refocus = undefined;
+    void this.updateComplete.then(() => {
+      this.focusRow(`group:${id}`);
+    });
   }
 
   /** Says something in the live region. */
@@ -508,6 +582,11 @@ export class KarmaniaLegendTab extends LitElement {
         event.preventDefault();
         this.moveRow(item, event.key === 'ArrowUp' ? 'up' : 'down');
       }
+      return;
+    }
+    if (event.key === 'F2' && item.kind === 'group') {
+      event.preventDefault();
+      this.renaming = item.id;
       return;
     }
     if (isMove(event.key)) {
@@ -691,7 +770,40 @@ export class KarmaniaLegendTab extends LitElement {
         >
           <k-icon class="chevron" name="chevron-down" size="16" aria-hidden="true"></k-icon>
           ${this.switch(item, BOX[group.visibility])}
-          <span class="name" data-truncate title=${group.name}>${group.name}</span>
+          ${
+            this.renaming === group.id
+              ? html`<input
+                  class="rename"
+                  aria-label="Group name"
+                  .value=${group.name}
+                  @pointerdown=${(event: PointerEvent) => {
+                    event.stopPropagation();
+                  }}
+                  @keydown=${(event: KeyboardEvent) => {
+                    // What is typed in the field is the field's: the row's keys (Space switches, the arrows move) do not see it.
+                    event.stopPropagation();
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      this.endRename(true);
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault();
+                      this.endRename(false);
+                    }
+                  }}
+                  @blur=${() => {
+                    this.endRename(true);
+                  }}
+                />`
+              : html`<span
+                  class="name"
+                  data-truncate
+                  title=${group.name}
+                  @dblclick=${() => {
+                    this.renaming = group.id;
+                  }}
+                  >${group.name}</span
+                >`
+          }
           <span class="count">${String(group.layers.length)}</span>
         </div>
         ${
@@ -720,7 +832,17 @@ export class KarmaniaLegendTab extends LitElement {
       items: new Map(items.map((item) => [itemKey(item), item])),
     };
     return html`
-      <div class="top"><span>${model.layerCountLabel}</span></div>
+      <div class="top">
+        <span>${model.layerCountLabel}</span>
+        ${kButton({
+          icon: 'folder-plus',
+          children: 'New group',
+          variant: 'ghost',
+          onClick: () => {
+            this.makeGroup();
+          },
+        })}
+      </div>
       <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
         ${this.announcement}
       </div>
