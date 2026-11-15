@@ -18,6 +18,7 @@ pub mod class_index;
 pub mod classify;
 pub mod contour_grid;
 pub mod contour_levels;
+pub mod contours;
 pub mod drawable;
 pub mod frame;
 pub mod grid;
@@ -45,6 +46,7 @@ pub use classify::{
 };
 pub use contour_grid::{Contour, Field, Scan, Vertex, contour_field};
 pub use contour_levels::{Levels, LevelsError, MAX_LEVELS};
+pub use contours::{ContourError, ContourLines, ContourParams, contour_grid, contours_name};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use grid::{
