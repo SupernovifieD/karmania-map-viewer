@@ -17,6 +17,8 @@ export type TreeItem =
       readonly kind: 'layer';
       readonly id: string;
       readonly level: 1 | 2;
+      /** The group the layer is in, or `null` for a layer of the top of the legend. */
+      readonly parent: string | null;
       readonly visible: boolean;
       readonly expandable: boolean;
       readonly expanded: boolean;
@@ -35,12 +37,13 @@ export function treeItems(
   model: LegendModel,
   open: ReadonlySet<string> = new Set(),
 ): readonly TreeItem[] {
-  const layerItem = (layer: LegendLayerEntry, level: 1 | 2): TreeItem => {
+  const layerItem = (layer: LegendLayerEntry, level: 1 | 2, parent: string | null): TreeItem => {
     const expandable = layer.classes.length > 0;
     return {
       kind: 'layer',
       id: layer.id,
       level,
+      parent,
       visible: layer.visible,
       expandable,
       expanded: expandable && open.has(layer.id),
@@ -48,7 +51,7 @@ export function treeItems(
   };
   return model.entries.flatMap((entry): TreeItem[] => {
     if (entry.type === 'layer') {
-      return [layerItem(entry, 1)];
+      return [layerItem(entry, 1, null)];
     }
     const group: TreeItem = {
       kind: 'group',
@@ -57,7 +60,9 @@ export function treeItems(
       collapsed: entry.collapsed,
       visibility: entry.visibility,
     };
-    return entry.collapsed ? [group] : [group, ...entry.layers.map((layer) => layerItem(layer, 2))];
+    return entry.collapsed
+      ? [group]
+      : [group, ...entry.layers.map((layer) => layerItem(layer, 2, entry.id))];
   });
 }
 
@@ -148,4 +153,45 @@ export function toggleCommand(item: TreeItem): Command {
   return item.kind === 'layer'
     ? { type: 'setVisible', layerId: item.id, visible: !item.visible }
     : { type: 'setGroupVisible', groupId: item.id, visible: item.visibility !== 'all' };
+}
+
+/** What a key asks of the tree beyond moving between rows: to open or close a layer, to fold or unfold a group, or to put the keyboard on another row. */
+export type KeyAction =
+  | { readonly kind: 'open'; readonly id: string; readonly open: boolean }
+  | { readonly kind: 'fold'; readonly groupId: string; readonly collapsed: boolean }
+  | { readonly kind: 'focus'; readonly key: string };
+
+/**
+ * What Right and Left do on a row, as they do in a tree: on a group that is folded, Right unfolds it; on one that is open, Right goes to its first layer
+ * and Left folds it. On a layer that has lines to show, Right opens it and Left closes it; on a layer that is not open, in a group, Left goes to the group.
+ * `undefined` when the key does nothing there (any other key, a group with nothing under it, a layer of the top that is closed).
+ */
+export function keyAction(
+  items: readonly TreeItem[],
+  item: TreeItem,
+  key: string,
+): KeyAction | undefined {
+  if (key !== 'ArrowRight' && key !== 'ArrowLeft') {
+    return undefined;
+  }
+  if (item.kind === 'group') {
+    if (key === 'ArrowRight' && item.collapsed) {
+      return { kind: 'fold', groupId: item.id, collapsed: false };
+    }
+    if (key === 'ArrowRight') {
+      const at = items.findIndex((other) => itemKey(other) === itemKey(item));
+      const first = items[at + 1];
+      return first?.kind === 'layer' && first.parent === item.id
+        ? { kind: 'focus', key: itemKey(first) }
+        : undefined;
+    }
+    return item.collapsed ? undefined : { kind: 'fold', groupId: item.id, collapsed: true };
+  }
+  const expanded = expansionFor(item, key);
+  if (expanded !== undefined) {
+    return { kind: 'open', id: item.id, open: expanded };
+  }
+  return key === 'ArrowLeft' && item.parent !== null
+    ? { kind: 'focus', key: `group:${item.parent}` }
+    : undefined;
 }

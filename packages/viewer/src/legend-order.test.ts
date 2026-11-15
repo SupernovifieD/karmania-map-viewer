@@ -1,7 +1,14 @@
 import { createSceneStore, legendModel } from '@karmania/scene';
 import type { NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
-import { announceMove, placeOf, stepMove } from './legend-order.js';
+import {
+  announceDelete,
+  announceMove,
+  nestMove,
+  newGroup,
+  placeOf,
+  stepMove,
+} from './legend-order.js';
 
 const dataset = (id: number, name: string): NewDataset => ({
   id,
@@ -178,5 +185,84 @@ describe('what is said, and where the scene puts the row', () => {
       'Topography',
       'Assays',
     ]);
+  });
+});
+
+describe('nestMove', () => {
+  it('takes a layer of the top into the group right above it, as its last layer, and says so', () => {
+    // Assays is right under Samples: it goes in after Geology and Drillholes.
+    expect(nestMove(model(), 'layer-2', 'in')).toEqual({
+      move: { id: 'layer-2', to: { parent: 'group-1', index: 2 } },
+      say: 'Moved Assays into Samples',
+    });
+  });
+
+  it('says why a layer cannot go in: no group right above, in a group already, or a group', () => {
+    // Topography is under Assays, which is a layer.
+    expect(nestMove(model(), 'layer-1', 'in')).toEqual({
+      say: 'Topography has no group right above it to go into',
+    });
+    expect(nestMove(model(), 'layer-3', 'in')).toEqual({ say: 'Geology is in Samples already' });
+    expect(nestMove(model(), 'group-1', 'in')).toEqual({
+      say: 'Samples is a group, and a group cannot be in a group',
+    });
+  });
+
+  it('takes a layer out of its group to just under it, and says so', () => {
+    expect(nestMove(model(), 'layer-3', 'out')).toEqual({
+      move: { id: 'layer-3', to: { parent: null, index: 1 } },
+      say: 'Moved Geology out of Samples',
+    });
+  });
+
+  it('says a layer of the top, or a group, is not in a group, and nothing that is not there is moved', () => {
+    expect(nestMove(model(), 'layer-2', 'out')).toEqual({ say: 'Assays is not in a group' });
+    expect(nestMove(model(), 'group-1', 'out')).toEqual({ say: 'Samples is not in a group' });
+    expect(nestMove(model(), 'layer-9', 'in')).toEqual({ say: 'layer-9 cannot be moved.' });
+  });
+
+  it('puts the layer where the scene puts it: out is just under the group and in is the last of the group above', () => {
+    for (const [id, direction] of [
+      ['layer-2', 'in'],
+      ['layer-3', 'out'],
+      ['layer-4', 'out'],
+    ] as const) {
+      const store = scene();
+      const step = nestMove(legendModel(store.getState()), id, direction);
+      expect(step.move, `${id} ${direction}`).toBeDefined();
+      if (step.move === undefined) {
+        continue;
+      }
+      store.dispatch({ type: 'moveNode', id, to: step.move.to });
+      expect(placeOf(legendModel(store.getState()), id)).toMatchObject(step.move.to);
+    }
+  });
+});
+
+describe('announceDelete', () => {
+  it('says the group is deleted and how many layers are in the legend where it was', () => {
+    expect(announceDelete(model(), 'group-1')).toBe(
+      'Deleted group Samples; its 2 layers are in the legend',
+    );
+  });
+
+  it('says one layer in the singular, and none at all for an empty group', () => {
+    const store = scene();
+    store.dispatch({ type: 'moveNode', id: 'layer-4', to: { parent: null, index: 0 } });
+    expect(announceDelete(legendModel(store.getState()), 'group-1')).toBe(
+      'Deleted group Samples; its 1 layer is in the legend',
+    );
+    store.dispatch({ type: 'moveNode', id: 'layer-3', to: { parent: null, index: 0 } });
+    expect(announceDelete(legendModel(store.getState()), 'group-1')).toBe('Deleted group Samples');
+  });
+});
+
+describe('newGroup', () => {
+  it('finds the group that was made, and none when nothing was', () => {
+    const store = scene();
+    const before = legendModel(store.getState());
+    expect(newGroup(before, before)).toBeUndefined();
+    store.dispatch({ type: 'createGroup', name: 'New group' });
+    expect(newGroup(before, legendModel(store.getState()))).toBe('group-2');
   });
 });
