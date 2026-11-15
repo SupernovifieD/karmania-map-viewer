@@ -631,6 +631,8 @@ or releasing, and whenever the brief says to stop.
   expanded row).
 - [ ] 19.10 Long content and quantity: 50 layers, 12 classes, names of 120
   characters, 10 million as a count; screenshots; axe.
+- [ ] 19.F The fixes (what CI and the review of the gate found)
+  - [x] 19.F1 The gallery's picture of the icons is taken again for the two icons that were added (CI found it red).
 - [ ] 19.G Gate.
 
 ## M20: Contours
