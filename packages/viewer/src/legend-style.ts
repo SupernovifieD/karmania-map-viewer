@@ -128,6 +128,15 @@ export function methodOptions(column: ColumnInfo | undefined): SelectOption[] {
   }));
 }
 
+/** The method that a choice of "Method" is: `undefined` for a value that is not a method, and for one that the column cannot have (it is not offered). */
+export function methodChoice(
+  value: string,
+  column: ColumnInfo | undefined,
+): ClassMethod | undefined {
+  const offered = methodOptions(column).find((option) => option.value === value);
+  return METHODS.find((method) => method.value === value && offered?.disabled !== true)?.value;
+}
+
 /** The fewest and the most classes the editor asks for (the scene accepts 2 to 20: a layer that has another number keeps it, and is shown with it). */
 export const FEWEST_CLASSES = 3;
 export const MOST_CLASSES = 12;
@@ -142,6 +151,11 @@ export function classCountOptions(current: number): SelectOption[] {
   return [...counts]
     .sort((a, b) => a - b)
     .map((count) => ({ value: String(count), label: String(count) }));
+}
+
+/** The number of classes that a choice of "Classes" is: `undefined` for text that is not a whole number. */
+export function classCountChoice(value: string): number | undefined {
+  return /^\d+$/.test(value) ? Number(value) : undefined;
 }
 
 /** A ramp as the picker lists it: its id, its name, what kind it is and its colours. */
