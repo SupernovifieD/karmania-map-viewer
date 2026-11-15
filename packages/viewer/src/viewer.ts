@@ -33,7 +33,7 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import type { ContoursTurnOn, LegendCommand } from './legend-tab.js';
-import { selectionAfterChange, selectionAfterRemoving } from './datasets.js';
+import { selectionAfterChange, selectionAfterRemoved } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
@@ -877,11 +877,12 @@ export class KarmaniaViewer extends LitElement {
       return;
     }
     const { id } = event.detail;
-    const next = selectionAfterRemoving(this.datasets, id, this.selected);
+    const before = this.datasets;
     await engine.remove(id);
     this.datasets = engine.datasets();
     syncDatasets(this.store, this.datasets);
-    this.selected = next;
+    // What is selected is what it is now, and not what it was when the removal was asked for.
+    this.selected = selectionAfterRemoved(before, this.datasets, id, this.selected);
   };
 
   private changePanel(change: PanelChange): void {
