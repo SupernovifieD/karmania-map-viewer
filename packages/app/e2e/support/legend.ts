@@ -22,15 +22,23 @@ export const groupRow = (page: Page, id: string): Locator =>
 export const showLegend = (page: Page): Promise<void> =>
   page.getByRole('tab', { name: 'Legend', exact: true }).click();
 
-/** A grid of 4 by 4 cells with the values 1 to 16: its layer is coloured by classes of them, as a grid's is at first. Waits until `count` layers are drawn. */
-export async function loadGrid(page: Page, name: string, count: number): Promise<void> {
+/**
+ * A grid of 4 by 4 cells with the values 1 to 16 (or `values`, a NaN being a cell with no value): its layer is coloured by classes of them, as a grid's is
+ * at first. Waits until `count` layers are drawn.
+ */
+export async function loadGrid(
+  page: Page,
+  name: string,
+  count: number,
+  values: readonly number[] = Array.from({ length: 16 }, (_, i) => i + 1),
+): Promise<void> {
   await loadLattice(page, 'grid', {
     name,
     crs: { kind: 'epsg', code: 32640 },
     origin: [EAST, NORTH, 0],
     spacing: [10, 10, 1],
     dims: [4, 4, 1],
-    values: Array.from({ length: 16 }, (_, i) => i + 1),
+    values,
   });
   await expect.poll(async () => (await layerStatuses(page)).length).toBe(count);
   await expect
