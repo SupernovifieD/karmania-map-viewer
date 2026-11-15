@@ -141,7 +141,12 @@ export class LegendDrag implements ReactiveController {
     }
   };
 
-  private readonly onCancel = (): void => {
+  /** The pointer that was pressed was cancelled, or the tab lost it. Another pointer's cancel (a second finger, anywhere in the window) is not this press's. */
+  private readonly onCancel = (event: PointerEvent): void => {
+    const pressed = this.pressed;
+    if (pressed !== undefined && event.pointerId !== pressed.pointerId) {
+      return;
+    }
     this.end();
   };
 

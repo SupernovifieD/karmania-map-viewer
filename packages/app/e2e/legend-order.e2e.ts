@@ -360,6 +360,28 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     expect(await order(page)).toEqual(START);
   });
 
+  test('goes on with a drag when another pointer is cancelled (a second finger, anywhere in the window): only the cancel of the pointer that is dragging ends it', async ({
+    page,
+  }) => {
+    await open(page);
+    const target = await layerRow(page, 'layer-4').boundingBox();
+    await dragTo(page, handleOf(page, 'layer-1'), (target?.x ?? 0) + 60, (target?.y ?? 0) + 2);
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointercancel', { isPrimary: false, pointerId: 2, pointerType: 'touch' }),
+      );
+    });
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await expect(legend(page).locator('.drop-line')).toHaveCount(1);
+    await page.mouse.up();
+    // The drag was not ended: the row is where the line was.
+    await expect
+      .poll(() => order(page))
+      .toEqual(['group-2:layer-5', 'group-1:layer-3,layer-1,layer-4', 'layer-2']);
+    expect(await said(page)).toBe('Moved Topography into Samples');
+  });
+
   test('hears the release of a press that is let go outside the tab before it has been over the tab by four pixels, and a press that is made outside and dragged into the tab drags nothing', async ({
     page,
   }) => {
