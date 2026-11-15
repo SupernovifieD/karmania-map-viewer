@@ -16,6 +16,7 @@ pub mod blocks;
 pub mod choice;
 pub mod class_index;
 pub mod classify;
+pub mod contour_levels;
 pub mod drawable;
 pub mod frame;
 pub mod grid;
@@ -41,6 +42,7 @@ pub use classify::{
     ClassBreaks, MAX_CATEGORIES, MAX_CLASSES, Method, class_of, classify, classify_dataset,
     classify_rows, drawn_rows,
 };
+pub use contour_levels::{Levels, LevelsError, MAX_LEVELS};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use grid::{
