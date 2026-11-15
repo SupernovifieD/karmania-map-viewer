@@ -535,6 +535,11 @@ export class KarmaniaLegendTab extends LitElement {
     return rows;
   }
 
+  /** The part of the panel that scrolls the tab, which a drag scrolls at its edges (`DragHost`). */
+  scrollRegion(): HTMLElement | null {
+    return this.closest<HTMLElement>('[data-scroll-region]');
+  }
+
   /** How far in the layers of a group are, for the drag (`DragHost`). */
   indent(): number {
     return Number.parseFloat(getComputedStyle(this).getPropertyValue('--k-space-24')) || 0;

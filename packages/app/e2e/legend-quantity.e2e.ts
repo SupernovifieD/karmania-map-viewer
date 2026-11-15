@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { assertAligned, assertNoOverflow } from './support/layout.js';
-import { layerRow, legend, loadGrid, loadMany, showLegend } from './support/legend.js';
+import { assertAligned, assertNoOverflow, boxOf } from './support/layout.js';
+import { groupRow, layerRow, legend, loadGrid, loadMany, showLegend } from './support/legend.js';
 import { dispatch } from './support/render.js';
 
 /**
@@ -191,5 +191,101 @@ test.describe('the Legend tab with a lot in it', () => {
     await twelve(page, 'layer-50', 12);
     await withBigCounts(page);
     await expectNoSeriousViolations(page);
+  });
+});
+
+test.describe('scrolling the Legend tab while a row is dragged, and by touch', () => {
+  const scrolled = (page: Page): Promise<number> =>
+    region(page).evaluate((element) => element.scrollTop);
+
+  test('scrolls the panel while a row is dragged near its bottom edge, and back near its top edge, with the line following, and Escape ends the drag and moves nothing', async ({
+    page,
+  }) => {
+    test.slow(true, 'it loads 50 layers');
+    await page.goto('/?theme=light');
+    await loadMany(page, 50);
+    await showLegend(page);
+    const area = await boxOf(region(page), 'the part of the panel that scrolls');
+    const handle = await boxOf(layerRow(page, 'layer-50').locator('.handle'), 'the handle');
+    const from = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
+    expect(await scrolled(page)).toBe(0);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    // Near the bottom edge, and held there: the panel goes on scrolling without the pointer moving.
+    await page.mouse.move(from.x, area.y + area.height - 12, { steps: 6 });
+    await expect.poll(() => scrolled(page)).toBeGreaterThan(300);
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await expect(legend(page).locator('.drop-line')).toHaveCount(1);
+    // Near the top edge, it scrolls back.
+    const low = await scrolled(page);
+    await page.mouse.move(from.x, area.y + 12, { steps: 6 });
+    await expect.poll(() => scrolled(page)).toBeLessThan(low - 150);
+    // Away from the edges it stays where it is.
+    await page.mouse.move(from.x, area.y + area.height / 2, { steps: 4 });
+    const still = await scrolled(page);
+    await page.waitForTimeout(300);
+    expect(await scrolled(page)).toBe(still);
+    await page.keyboard.press('Escape');
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    await page.mouse.up();
+    // Nothing was moved: the layer loaded last is still the first row.
+    await expect(legend(page).locator('.row').first()).toHaveAttribute('data-layer', 'layer-50');
+  });
+
+  test.describe('with a finger', () => {
+    test.use({ hasTouch: true });
+
+    /** A scroll of the page by a finger, from a point, by `by` pixels (down): what a person does, with touch events, as the browser would receive them. */
+    async function swipe(page: Page, x: number, y: number, by: number): Promise<void> {
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.synthesizeScrollGesture', {
+        x,
+        y,
+        yDistance: -by,
+        gestureSourceType: 'touch',
+        speed: 1500,
+      });
+    }
+
+    const middleOf = async (page: Page, target: ReturnType<typeof layerRow>) => {
+      const box = await boxOf(target, 'the row');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    test('scrolls the panel with a finger that starts on a layer, and on a group, and does not drag the group', async ({
+      page,
+    }) => {
+      test.slow(true, 'it loads 50 layers');
+      await page.goto('/?theme=light');
+      await loadMany(page, 50);
+      await dispatch(page, { type: 'createGroup', name: 'Samples' });
+      await showLegend(page);
+      // Any drag that starts is seen, even one that is ended at once.
+      await legend(page).evaluate((tab) => {
+        const seen = window as unknown as { dragged: boolean };
+        seen.dragged = false;
+        new MutationObserver(() => {
+          if (tab.hasAttribute('data-dragging')) {
+            seen.dragged = true;
+          }
+        }).observe(tab, { attributes: true, attributeFilter: ['data-dragging'] });
+      });
+      // A finger on the name of a layer.
+      const layer = await middleOf(page, layerRow(page, 'layer-48').locator('.name'));
+      await swipe(page, layer.x, layer.y, 400);
+      await expect.poll(() => scrolled(page)).toBeGreaterThan(200);
+      // Back to the top, and a finger on the row of the group, which is the first.
+      await region(page).evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      const group = await middleOf(page, groupRow(page, 'group-1').locator('.name'));
+      await swipe(page, group.x, group.y, 400);
+      await expect.poll(() => scrolled(page)).toBeGreaterThan(200);
+      expect(await page.evaluate(() => (window as unknown as { dragged: boolean }).dragged)).toBe(
+        false,
+      );
+      // And nothing was moved: the group is still the first row.
+      await expect(legend(page).locator('.row').first()).toHaveAttribute('data-group', 'group-1');
+    });
   });
 });
