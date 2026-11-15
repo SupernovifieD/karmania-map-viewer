@@ -15,6 +15,12 @@ export interface LegendInputs {
   readonly breaks?: Readonly<Record<LayerId, ClassBreaks>>;
   /** `FrameChoice.drawable`: one entry for each dataset, with whether it is drawn and why not. */
   readonly drawable?: readonly DrawableEntry[];
+  /**
+   * The layers that are not on the map for a reason that the frame's verdict does not give, by layer id, each with its words: what preparing it failed
+   * with, a kind of data that is not drawn, or classes that could not be worked out. A layer with one is not drawn (it has a notice and no lines), and
+   * the frame's verdict, if it has one, is what is said.
+   */
+  readonly problems?: Readonly<Record<LayerId, LayerNotice>>;
 }
 
 /** Why a layer is not on the map, and what to do, in the engine's words. */
@@ -81,8 +87,9 @@ function mainFinding(findings: readonly Finding[]): Finding | undefined {
   );
 }
 
-function noticeFor(entry: DrawableEntry): LayerNotice {
-  const finding = mainFinding(entry.findings);
+/** The words for some findings that say why a layer is not drawn: the one that says it best, and its hint; a reason is never missing. */
+export function noticeOfFindings(findings: readonly Finding[]): LayerNotice {
+  const finding = mainFinding(findings);
   if (finding === undefined) {
     return { message: NOT_DRAWN_MESSAGE };
   }
@@ -93,7 +100,13 @@ function noticeFor(entry: DrawableEntry): LayerNotice {
 
 function layerEntry(layer: Layer, inputs: LegendInputs): LegendLayerEntry {
   const drawable = inputs.drawable?.find((entry) => entry.id === layer.datasetId);
-  const drawn = drawable?.status !== 'not_drawn';
+  const problem =
+    inputs.problems !== undefined && Object.hasOwn(inputs.problems, layer.id)
+      ? inputs.problems[layer.id]
+      : undefined;
+  // The frame's verdict says why, if it says; and a layer that has a problem is not drawn.
+  const notice = drawable?.status === 'not_drawn' ? noticeOfFindings(drawable.findings) : problem;
+  const drawn = notice === undefined;
   const breaks =
     inputs.breaks !== undefined && Object.hasOwn(inputs.breaks, layer.id)
       ? inputs.breaks[layer.id]
@@ -122,7 +135,7 @@ function layerEntry(layer: Layer, inputs: LegendInputs): LegendLayerEntry {
     swatch,
     classes,
   };
-  return drawable !== undefined && !drawn ? { ...entry, notice: noticeFor(drawable) } : entry;
+  return notice === undefined ? entry : { ...entry, notice };
 }
 
 function visibilityOf(layers: readonly LegendLayerEntry[]): GroupVisibility {
@@ -134,8 +147,8 @@ function visibilityOf(layers: readonly LegendLayerEntry[]): GroupVisibility {
 }
 
 /**
- * The legend of a scene. A layer is not drawn if `inputs.drawable` has an entry for its dataset that says so, and
- * then it has a notice (the engine's own words: an error first, then a warning, then anything) and no lines under
+ * The legend of a scene. A layer is not drawn if `inputs.drawable` has an entry for its dataset that says so, or `inputs.problems` has one for
+ * it, and then it has a notice (the engine's own words: an error first, then a warning, then anything) and no lines under
  * it; a dataset that is not mentioned is taken to be drawn. A layer coloured by classes has its lines when its breaks
  * are given, and until then shows the ramp it will be coloured with. A mistake of the document (a layer in the legend
  * that is not in the layers, which `validateScene` refuses) is left out.

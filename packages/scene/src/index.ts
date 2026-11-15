@@ -45,7 +45,7 @@ export type {
 } from './scale-bar.js';
 export { northArrow } from './north-arrow.js';
 export type { NorthArrow } from './north-arrow.js';
-export { legendModel } from './legend-model.js';
+export { legendModel, noticeOfFindings } from './legend-model.js';
 export type {
   GroupVisibility,
   LayerNotice,

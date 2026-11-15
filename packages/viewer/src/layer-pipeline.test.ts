@@ -1969,6 +1969,35 @@ describe('LayerPipeline: what the legend is given', () => {
     expect(t.pipeline.legendInputs().drawable).toEqual([]);
   });
 
+  it('gives the words for a layer that failed or whose classes were refused, and none for one that is drawn', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(t.pipeline.legendInputs().problems).toEqual({});
+    t.state.classify = () => Promise.reject(new Error('the worker stopped'));
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, classes: 5 } as never },
+    });
+    await t.pipeline.idle();
+    const problems = t.pipeline.legendInputs().problems ?? {};
+    expect(Object.keys(problems)).toEqual(['layer-1']);
+    expect(problems['layer-1']?.message).toBe(
+      'Not drawn: preparing this dataset for the map failed.',
+    );
+    expect(problems['layer-1']?.hint).toContain('the worker stopped');
+    // Taken away when the layer is drawn again, with a colour that needs no classes.
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#e69f00' } },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.legendInputs().problems).toEqual({});
+  });
+
   it('gives the breaks of a layer that is coloured by classes, and none for a layer that is not', async () => {
     const t = gridSetup();
     t.drawable([0, true], [1, true]);
