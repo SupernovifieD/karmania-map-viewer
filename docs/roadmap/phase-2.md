@@ -621,7 +621,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 19.5 Groups: create, rename, delete, collapse, move layers in and out (drag
   and Alt + Right/Left).
   - [x] 19.5a What Right, Left and Alt with them do to a row, the sentence for a delete and the new group's id, as functions.
-  - [ ] 19.5b The `New group` button and renaming a group in place (F2, double click, Enter, Escape).
+  - [x] 19.5b The `New group` button and renaming a group in place (F2, double click, Enter, Escape); browser proofs; the states photographed again.
   - [ ] 19.5c Fold and unfold (chevron, Right and Left), delete (button and key), Alt + Right and Left; browser proofs.
   - [ ] 19.5d The states photographed.
 - [ ] 19.6 Style editor 1: colour by; single colour swatches and hex field.
