@@ -10,7 +10,10 @@ import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
-import { stepMove } from './legend-order.js';
+import { LegendDrag } from './legend-drag.js';
+import type { DropRow } from './legend-drop.js';
+import { announceMove, placeOf, stepMove } from './legend-order.js';
+import type { Move } from './legend-order.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
 import {
   expansionFor,
@@ -113,9 +116,31 @@ export class KarmaniaLegendTab extends LitElement {
         padding: 0;
       }
 
+      .tree {
+        position: relative;
+      }
+
+      /* Where the row that is dragged will land: a line of 2 over the rows, in the accent, which takes no room and no pointer. */
+      .drop-line {
+        background: var(--k-accent);
+        height: var(--k-focus-width);
+        pointer-events: none;
+        position: absolute;
+        transform: translateY(-50%);
+      }
+
+      :host([data-dragging]) {
+        cursor: grabbing;
+      }
+
+      .row[data-dragging] {
+        background: var(--k-surface-raised);
+      }
+
       .row {
         align-items: center;
         border-radius: var(--k-radius-sm);
+        user-select: none;
         display: grid;
         gap: 0 var(--k-space-8);
         height: var(--k-control-height);
@@ -224,6 +249,31 @@ export class KarmaniaLegendTab extends LitElement {
         text-align: right;
       }
 
+      /* The handle that a layer is dragged by, in the room of 16 that is kept on every layer: seen when the row is pointed at or has the keyboard, and, where there is no pointer to point with, always. */
+      .handle {
+        align-items: center;
+        color: var(--k-text-muted);
+        cursor: grab;
+        display: flex;
+        height: 100%;
+        justify-content: center;
+        opacity: 0;
+        touch-action: none;
+        transition: opacity var(--k-motion-duration) var(--k-motion-easing);
+      }
+
+      .row:hover .handle,
+      .row:focus-within .handle,
+      :host([data-dragging]) .handle {
+        opacity: 1;
+      }
+
+      @media (hover: none) {
+        .handle {
+          opacity: 1;
+        }
+      }
+
       /* The button that opens a layer, in the room of 28 that is kept for it on every layer: for the pointer, and not a stop for Tab (Right and Left do it from the row). */
       .open {
         align-items: center;
@@ -299,6 +349,10 @@ export class KarmaniaLegendTab extends LitElement {
   declare private announcement: string;
   /** The key of a row that was moved, which has the keyboard again once the legend that has it in its new place comes. */
   private refocus: string | undefined;
+  /** Dragging a row with the pointer. */
+  private readonly drag = new LegendDrag(this, (move) => {
+    this.dropped(move);
+  });
   /** Said twice in a row, a sentence is not read twice: a space that is not a break comes and goes at its end. */
   private spaced = false;
 
@@ -315,7 +369,76 @@ export class KarmaniaLegendTab extends LitElement {
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('model') && this.model !== undefined) {
       this.open = stillThere(this.open, this.model);
+      const dragged = this.drag.dragging;
+      if (dragged !== undefined && placeOf(this.model, dragged.id) === undefined) {
+        this.drag.cancel();
+      }
     }
+  }
+
+  /** The rows that are shown, measured now, for the drag (`DragHost`). */
+  measureRows(): readonly DropRow[] {
+    const model = this.model;
+    const rows: DropRow[] = [];
+    if (model === undefined) {
+      return rows;
+    }
+    for (const row of this.renderRoot.querySelectorAll<HTMLElement>('.row')) {
+      const group = row.dataset['group'];
+      const id = group ?? row.dataset['layer'];
+      const place = id === undefined ? undefined : placeOf(model, id);
+      if (id === undefined || place === undefined) {
+        continue;
+      }
+      const box = row.getBoundingClientRect();
+      rows.push({
+        id,
+        kind: group === undefined ? 'layer' : 'group',
+        parent: place.parent,
+        index: place.index,
+        collapsed: row.hasAttribute('data-collapsed'),
+        top: box.top,
+        bottom: box.bottom,
+        blockBottom: row.closest('li')?.getBoundingClientRect().bottom ?? box.bottom,
+        left: box.left,
+      });
+    }
+    return rows;
+  }
+
+  /** How far in the layers of a group are, for the drag (`DragHost`). */
+  indent(): number {
+    return Number.parseFloat(getComputedStyle(this).getPropertyValue('--k-space-24')) || 0;
+  }
+
+  /** A press on the handle of a layer, or on the row of a group: it is a drag if the pointer goes on. */
+  private press(event: PointerEvent, item: TreeItem): void {
+    this.focusRow(itemKey(item));
+    this.drag.press(event, item.id, item.kind);
+  }
+
+  /** A row was dropped: it is moved, and the move is said. */
+  private dropped(move: Move): void {
+    const model = this.model;
+    if (model === undefined) {
+      return;
+    }
+    this.say(announceMove(model, move.id, move.to));
+    this.refocus = model.entries.some((entry) => entry.type === 'group' && entry.id === move.id)
+      ? `group:${move.id}`
+      : `layer:${move.id}`;
+    this.ask({ type: 'moveNode', id: move.id, to: move.to });
+  }
+
+  /** The line where the dragged row will land, over the rows: nothing when there is no drag or no place for it. */
+  private dropLine() {
+    const drop = this.drag.drop;
+    const tree = this.renderRoot.querySelector('.tree')?.getBoundingClientRect();
+    if (drop === undefined || tree === undefined) {
+      return nothing;
+    }
+    const style = `top: ${String(drop.y - tree.top)}px; left: ${String(drop.left - tree.left)}px; width: ${String(tree.right - drop.left)}px`;
+    return html`<div class="drop-line" aria-hidden="true" style=${style}></div>`;
   }
 
   /** A row that was moved is in its new place now, and has the keyboard again (moving it in the page took it away). */
@@ -370,6 +493,12 @@ export class KarmaniaLegendTab extends LitElement {
   }
 
   private onKeyDown(event: KeyboardEvent, item: TreeItem): void {
+    // Escape in a drag puts the row back: nothing is moved.
+    if (event.key === 'Escape' && this.drag.active) {
+      event.preventDefault();
+      this.drag.cancel();
+      return;
+    }
     // A key with Control or Command is the browser's, and so is one with Alt, but for Alt and Up or Down, which move the row.
     if (event.ctrlKey || event.metaKey) {
       return;
@@ -462,7 +591,7 @@ export class KarmaniaLegendTab extends LitElement {
     </div>`;
   }
 
-  private layer(layer: LegendLayerEntry, level: 1 | 2, view: View) {
+  private layer(layer: LegendLayerEntry, level: 1 | 2, view: View, parent: string | null) {
     const key = `layer:${layer.id}`;
     const item = view.items.get(key);
     if (item?.kind !== 'layer') {
@@ -481,7 +610,9 @@ export class KarmaniaLegendTab extends LitElement {
           tabindex=${key === view.stop ? '0' : '-1'}
           data-level=${String(level)}
           data-layer=${layer.id}
+          data-parent=${parent ?? nothing}
           data-key=${key}
+          ?data-dragging=${this.drag.dragging?.id === layer.id}
           @focus=${() => {
             this.current = key;
           }}
@@ -489,7 +620,14 @@ export class KarmaniaLegendTab extends LitElement {
             this.onKeyDown(event, item);
           }}
         >
-          <span class="handle"></span>
+          <span
+            class="handle"
+            aria-hidden="true"
+            @pointerdown=${(event: PointerEvent) => {
+              this.press(event, item);
+            }}
+            ><k-icon name="grip-vertical" size="16"></k-icon
+          ></span>
           ${this.switch(item, layer.visible ? 'checked' : 'unchecked')} ${this.swatch(layer)}
           <span class="name" data-truncate title=${layer.name}>${layer.name}</span>
           <span class="notice"></span>
@@ -537,6 +675,13 @@ export class KarmaniaLegendTab extends LitElement {
           data-group=${group.id}
           data-key=${key}
           ?data-collapsed=${group.collapsed}
+          ?data-dragging=${this.drag.dragging?.id === group.id}
+          @pointerdown=${(event: PointerEvent) => {
+            // A group is dragged by its row (it has no handle), but not by its chevron or its switch, which are for a press.
+            if (!(event.target as Element).closest('.switch, .chevron')) {
+              this.press(event, item);
+            }
+          }}
           @focus=${() => {
             this.current = key;
           }}
@@ -556,7 +701,7 @@ export class KarmaniaLegendTab extends LitElement {
                 ${repeat(
                   group.layers,
                   (layer) => layer.id,
-                  (layer) => this.layer(layer, 2, view),
+                  (layer) => this.layer(layer, 2, view, group.id),
                 )}
               </ul>`
         }
@@ -579,14 +724,17 @@ export class KarmaniaLegendTab extends LitElement {
       <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
         ${this.announcement}
       </div>
-      <ul role="tree" aria-label="Layers">
-        ${repeat(
-          model.entries,
-          (entry) => `${entry.type}:${entry.id}`,
-          (entry) =>
-            entry.type === 'group' ? this.group(entry, view) : this.layer(entry, 1, view),
-        )}
-      </ul>
+      <div class="tree">
+        <ul role="tree" aria-label="Layers">
+          ${repeat(
+            model.entries,
+            (entry) => `${entry.type}:${entry.id}`,
+            (entry) =>
+              entry.type === 'group' ? this.group(entry, view) : this.layer(entry, 1, view, null),
+          )}
+        </ul>
+        ${this.dropLine()}
+      </div>
     `;
   }
 }

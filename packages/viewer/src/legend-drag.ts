@@ -1,0 +1,136 @@
+import type { ReactiveController, ReactiveControllerHost } from 'lit';
+import { dropCandidates, pickDrop } from './legend-drop.js';
+import type { DropCandidate, DropRow } from './legend-drop.js';
+import type { Move } from './legend-order.js';
+
+/** How far the pointer goes, in pixels, from where it was pressed before the press is a drag and not a click. */
+const DRAG_START = 4;
+
+/** What the Legend tab gives the drag: its own element, which has the pointer, and the rows as they are on the page now. */
+export interface DragHost extends ReactiveControllerHost, HTMLElement {
+  /** The rows that are shown, measured now (the panel may have scrolled since the drag began). */
+  measureRows(): readonly DropRow[];
+  /** How far in the layers of a group are, in pixels. */
+  indent(): number;
+}
+
+/** A row that is being dragged, or pressed and not dragged yet. */
+interface Pressed {
+  readonly id: string;
+  readonly kind: 'group' | 'layer';
+  readonly pointerId: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Dragging a row of the Legend tab with the pointer: a press on a row's handle (or on a group's row), a move of more than a few pixels, and a release, with
+ * the gap the row would land in found at each move (`pickDrop`) for the tab to draw its line at. The tab's element has the pointer from the press to the end of
+ * the drag, wherever it goes, and the drag ends at the release (the row is moved), at Escape or when the pointer is taken away (nothing is moved).
+ *
+ * It says what was dropped (`onDrop`) and what is dragged and where it would land (`dragging`, `drop`) for the tab to draw.
+ */
+export class LegendDrag implements ReactiveController {
+  /** The row that is being dragged, once the press has become a drag. */
+  dragging: { readonly id: string; readonly kind: 'group' | 'layer' } | undefined;
+  /** The gap it would land in now, if there is one. */
+  drop: DropCandidate | undefined;
+
+  private pressed: Pressed | undefined;
+
+  constructor(
+    private readonly host: DragHost,
+    private readonly onDrop: (move: Move) => void,
+  ) {
+    host.addController(this);
+  }
+
+  hostDisconnected(): void {
+    this.end();
+  }
+
+  /** A press on a row, which is a drag when the pointer goes on. */
+  press(event: PointerEvent, id: string, kind: 'group' | 'layer'): void {
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+    this.end();
+    this.pressed = { id, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    this.host.setPointerCapture(event.pointerId);
+    this.host.addEventListener('pointermove', this.onMove);
+    this.host.addEventListener('pointerup', this.onUp);
+    this.host.addEventListener('pointercancel', this.onCancel);
+    this.host.addEventListener('lostpointercapture', this.onCancel);
+  }
+
+  /** Whether a row is being dragged (and not only pressed). */
+  get active(): boolean {
+    return this.dragging !== undefined;
+  }
+
+  /** Ends the drag, or the press, and moves nothing. */
+  cancel(): void {
+    this.end();
+  }
+
+  private readonly onMove = (event: PointerEvent): void => {
+    const pressed = this.pressed;
+    if (pressed === undefined || event.pointerId !== pressed.pointerId) {
+      return;
+    }
+    if (this.dragging === undefined) {
+      if (Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) < DRAG_START) {
+        return;
+      }
+      this.dragging = { id: pressed.id, kind: pressed.kind };
+      this.host.toggleAttribute('data-dragging', true);
+    }
+    const rows = this.host.measureRows();
+    const indent = this.host.indent();
+    const base = Math.min(
+      ...rows.filter((row) => row.parent === null).map((row) => row.left),
+      Infinity,
+    );
+    this.drop = pickDrop(
+      dropCandidates(rows, this.dragging, indent),
+      { x: event.clientX, y: event.clientY },
+      base + indent,
+    );
+    this.host.requestUpdate();
+  };
+
+  private readonly onUp = (event: PointerEvent): void => {
+    const pressed = this.pressed;
+    if (pressed === undefined || event.pointerId !== pressed.pointerId) {
+      return;
+    }
+    const dropped = this.dragging !== undefined ? this.drop : undefined;
+    const id = pressed.id;
+    this.end();
+    if (dropped !== undefined) {
+      this.onDrop({ id, to: dropped.place });
+    }
+  };
+
+  private readonly onCancel = (): void => {
+    this.end();
+  };
+
+  private end(): void {
+    const pressed = this.pressed;
+    this.pressed = undefined;
+    this.host.removeEventListener('pointermove', this.onMove);
+    this.host.removeEventListener('pointerup', this.onUp);
+    this.host.removeEventListener('pointercancel', this.onCancel);
+    this.host.removeEventListener('lostpointercapture', this.onCancel);
+    if (pressed !== undefined && this.host.hasPointerCapture(pressed.pointerId)) {
+      this.host.releasePointerCapture(pressed.pointerId);
+    }
+    if (this.dragging !== undefined || this.drop !== undefined) {
+      this.dragging = undefined;
+      this.drop = undefined;
+      this.host.toggleAttribute('data-dragging', false);
+      this.host.requestUpdate();
+    }
+  }
+}
