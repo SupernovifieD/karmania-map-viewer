@@ -1,9 +1,10 @@
-import type { ClassColour, StylePatch } from '@karmania/scene';
+import type { ClassColour, LayerContours, StylePatch } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import type { CheckboxChange, SelectChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import {
+  CONTOUR_FIELDS,
   SWATCHES,
   classCountChoice,
   classCountOptions,
@@ -12,6 +13,13 @@ import {
   colourByValue,
   colourFor,
   colourFromText,
+  contourColumnOptions,
+  contourColumnValue,
+  contourFromText,
+  contourText,
+  contoursProblem,
+  contoursWith,
+  contoursWithColumn,
   methodChoice,
   methodOptions,
   numberFields,
@@ -23,7 +31,13 @@ import {
   numberText,
   rampOptions,
 } from './legend-style.js';
-import type { NumberField, NumberKey, StyleInfo } from './legend-style.js';
+import type {
+  ContourKey,
+  ContoursInfo,
+  NumberField,
+  NumberKey,
+  StyleInfo,
+} from './legend-style.js';
 import './ramp-select.js';
 import type { RampChange } from './ramp-select.js';
 
@@ -34,6 +48,16 @@ export const STYLE_CHANGE = 'karmania-style-change';
 export interface StyleChange {
   readonly patch: StylePatch;
 }
+
+/** The name of the event the editor sends when a person changes the contours of the layer it is for. */
+export const CONTOURS_CHANGE = 'karmania-contours-change';
+
+/**
+ * What the editor sends about contours: that they are to be turned on (the settings they start with are the engine's to say, so the viewer asks for them),
+ * or the settings they are to have (the whole of them, `setContours`'s).
+ */
+export type ContoursChange =
+  { readonly kind: 'turn-on' } | { readonly kind: 'set'; readonly contours: LayerContours };
 
 /**
  * The fields of the style of one layer, stacked, a label above each and 12 between them, each the whole width (section 10.3 of the brief): **Colour by** (a
@@ -55,6 +79,8 @@ export class KarmaniaStyleEditor extends LitElement {
     hexError: { state: true },
     numbers: { state: true },
     numberErrors: { state: true },
+    contourTexts: { state: true },
+    contourErrors: { state: true },
   };
 
   static override styles = [
@@ -69,6 +95,33 @@ export class KarmaniaStyleEditor extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--k-space-12);
+      }
+
+      /* The contours of a layer: a group of fields like the others, under a caption. */
+      .contours {
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-space-12);
+      }
+
+      .contours .caption {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-caption);
+        line-height: var(--k-line-height-caption);
+        margin: var(--k-space-4) 0 0;
+      }
+
+      /* Why they were not made, or that they are being made: one line of words in the room of its own. */
+      .contours .status {
+        color: var(--k-text-muted);
+        font-size: var(--k-font-size-secondary);
+        line-height: var(--k-line-height-secondary);
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .contours .status[role='alert'] {
+        color: var(--k-danger);
       }
 
       .group-label {
@@ -139,6 +192,10 @@ export class KarmaniaStyleEditor extends LitElement {
   declare private numbers: Partial<Record<NumberKey, string>>;
   /** What is wrong with the text in each field of numbers, in words. */
   declare private numberErrors: Partial<Record<NumberKey, string>>;
+  /** What is in each field of the settings of contours, which is what a person typed until the number is taken. */
+  declare private contourTexts: Partial<Record<ContourKey, string>>;
+  /** What is wrong with the text in each of those fields, in words. */
+  declare private contourErrors: Partial<Record<ContourKey, string>>;
 
   constructor() {
     super();
@@ -147,6 +204,8 @@ export class KarmaniaStyleEditor extends LitElement {
     this.hexError = '';
     this.numbers = {};
     this.numberErrors = {};
+    this.contourTexts = {};
+    this.contourErrors = {};
   }
 
   /** The field shows the colour the layer has, again, whenever that changes. */
@@ -161,7 +220,147 @@ export class KarmaniaStyleEditor extends LitElement {
         }
       }
       this.showNumbers(changed.get('info'));
+      this.showContours(changed.get('info'));
     }
+  }
+
+  /** Each field of the settings of contours shows the number the layer has, again, whenever that changes. */
+  private showContours(before: StyleInfo | undefined): void {
+    const settings = this.info?.contours?.settings;
+    if (settings === undefined) {
+      return;
+    }
+    for (const field of CONTOUR_FIELDS) {
+      const text = contourText(field.key, settings);
+      const was = before?.contours?.settings;
+      if (was === undefined || contourText(field.key, was) !== text) {
+        this.contourTexts = { ...this.contourTexts, [field.key]: text };
+        this.contourErrors = { ...this.contourErrors, [field.key]: '' };
+      }
+    }
+  }
+
+  private changeContours(change: ContoursChange): void {
+    this.dispatchEvent(
+      new CustomEvent<ContoursChange>(CONTOURS_CHANGE, {
+        detail: change,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /** Takes the number that is typed in a field of the settings of contours, if it is one: the settings change if it is not the number they have. */
+  private commitContour(key: ContourKey): void {
+    const settings = this.info?.contours?.settings;
+    if (settings === undefined) {
+      return;
+    }
+    const typed = contourFromText(key, this.contourTexts[key] ?? '');
+    if ('error' in typed) {
+      this.contourErrors = { ...this.contourErrors, [key]: typed.error };
+      return;
+    }
+    this.contourTexts = { ...this.contourTexts, [key]: String(typed.value) };
+    this.contourErrors = { ...this.contourErrors, [key]: '' };
+    const next = contoursWith(settings, key, typed.value);
+    if (next !== undefined) {
+      this.changeContours({ kind: 'set', contours: next });
+    }
+  }
+
+  /** Enter takes the number, and Escape puts back the number the layer has. */
+  private onContourKey(event: KeyboardEvent, key: ContourKey): void {
+    const settings = this.info?.contours?.settings;
+    if (settings === undefined || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.commitContour(key);
+    } else if (event.key === 'Escape') {
+      this.contourTexts = { ...this.contourTexts, [key]: contourText(key, settings) };
+      this.contourErrors = { ...this.contourErrors, [key]: '' };
+    }
+  }
+
+  private contourInput(key: ContourKey, label: string, settings: LayerContours) {
+    return html`
+      <k-input
+        label=${label}
+        inputmode="decimal"
+        reserve
+        .value=${this.contourTexts[key] ?? contourText(key, settings)}
+        .error=${this.contourErrors[key] ?? ''}
+        @k-input-change=${(event: CustomEvent<{ value: string }>) => {
+          this.contourTexts = { ...this.contourTexts, [key]: event.detail.value };
+          this.contourErrors = { ...this.contourErrors, [key]: '' };
+        }}
+        @keydown=${(event: KeyboardEvent) => {
+          this.onContourKey(event, key);
+        }}
+        @focusout=${() => {
+          if (this.contourTexts[key] !== contourText(key, settings)) {
+            this.commitContour(key);
+          }
+        }}
+      ></k-input>
+    `;
+  }
+
+  /**
+   * The contours of a grid or a mesh: **Show contours**, and, once they are on, the column of a grid (its columns of numbers), the **Interval**, the **Base**
+   * and **Index line every**, and a line that says that they are being made or why they were not.
+   */
+  private contoursSection(info: StyleInfo, contours: ContoursInfo) {
+    const { settings, state } = contours;
+    const problem = contoursProblem(state);
+    return html`
+      <div class="contours" role="group" aria-label="Contours">
+        <p class="caption" aria-hidden="true">Contours</p>
+        <k-checkbox
+          .checked=${settings?.visible === true}
+          @k-checkbox-change=${(event: CustomEvent<CheckboxChange>) => {
+            if (settings === undefined) {
+              this.changeContours({ kind: 'turn-on' });
+            } else if (settings.visible !== event.detail.checked) {
+              this.changeContours({
+                kind: 'set',
+                contours: { ...settings, visible: event.detail.checked },
+              });
+            }
+          }}
+          >Show contours</k-checkbox
+        >
+        ${
+          settings === undefined
+            ? nothing
+            : html`${
+                info.kind === 'grid'
+                  ? html`<k-select
+                      label="Contour column"
+                      .options=${contourColumnOptions(info.columns)}
+                      .value=${contourColumnValue(settings, info.columns) ?? ''}
+                      @k-select-change=${(event: CustomEvent<SelectChange>) => {
+                        const next = contoursWithColumn(settings, event.detail.value, info.columns);
+                        if (next !== undefined) {
+                          this.changeContours({ kind: 'set', contours: next });
+                        }
+                      }}
+                    ></k-select>`
+                  : nothing
+              }
+              ${CONTOUR_FIELDS.map((field) => this.contourInput(field.key, field.label, settings))}`
+        }
+        ${
+          state.status === 'making'
+            ? html`<p class="status" role="status">Making the contour lines…</p>`
+            : problem === undefined
+              ? nothing
+              : html`<p class="status" role="alert">${problem}</p>`
+        }
+      </div>
+    `;
   }
 
   /** Each field of numbers shows the number the layer has, again, whenever that changes (and whatever the person was typing in it goes). */
@@ -448,6 +647,7 @@ export class KarmaniaStyleEditor extends LitElement {
             : this.classes(info, colour)
         }
         ${numberFields(info.kind).map((field) => this.numberInput(field, info.style))}
+        ${info.contours === undefined ? nothing : this.contoursSection(info, info.contours)}
       </div>
     `;
   }
@@ -462,5 +662,6 @@ declare global {
 
   interface HTMLElementEventMap {
     [STYLE_CHANGE]: CustomEvent<StyleChange>;
+    [CONTOURS_CHANGE]: CustomEvent<ContoursChange>;
   }
 }

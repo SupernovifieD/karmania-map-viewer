@@ -17,12 +17,14 @@ import {
 import type {
   ClassColour,
   LayerColour,
+  LayerContours,
   LayerStyle,
   Ramp,
   SceneDocument,
   StylePatch,
 } from '@karmania/scene';
 import type { SelectOption } from '@karmania/ui';
+import type { ContoursState } from './contours-manager.js';
 import { safeColour } from './legend-swatch.js';
 
 /** The twelve colours of the swatches that a single colour is chosen from: the ramp `Paired` (ColorBrewer), which is twelve colours that can be told apart. */
@@ -36,30 +38,139 @@ const COLUMN = 'column:';
 /** A column of a dataset, as far as the editor needs it. */
 export type ColumnInfo = Pick<Summary['columns'][number], 'name' | 'type'>;
 
-/** What the editor of one layer is given: what its dataset is (a kind and columns) and the style it has now. */
+/** The contours of a layer, as the editor is given them: the settings it has (none until they are turned on) and where making them is. */
+export interface ContoursInfo {
+  readonly settings: LayerContours | undefined;
+  readonly state: ContoursState;
+}
+
+/**
+ * What the editor of one layer is given: what its dataset is (a kind and columns), the style it has now, and, for a layer that can have contour lines (a grid
+ * or a mesh that is not itself made from another layer), its contours.
+ */
 export interface StyleInfo {
   readonly kind: Summary['kind'];
   readonly columns: readonly ColumnInfo[];
   readonly style: LayerStyle;
+  readonly contours?: ContoursInfo;
 }
 
 /** The styles of the layers of a scene, with what their datasets are, by layer id; a layer whose dataset is not known is left out. */
 export function styleInfos(
   doc: SceneDocument,
   datasets: readonly Summary[],
+  contoursState: (layerId: string) => ContoursState = () => ({ status: 'idle' }),
 ): Readonly<Record<string, StyleInfo>> {
   const found: Record<string, StyleInfo> = {};
   for (const layer of Object.values(doc.layers)) {
     const dataset = datasets.find((candidate) => candidate.id === layer.datasetId);
     if (dataset !== undefined) {
+      // Contour lines are made of a grid or a mesh, and not of lines that are contours already.
+      const contourable =
+        layer.derived === undefined && (dataset.kind === 'grid' || dataset.kind === 'mesh');
       found[layer.id] = {
         kind: dataset.kind,
         columns: dataset.columns.map(({ name, type }) => ({ name, type })),
         style: layer.style,
+        ...(contourable
+          ? { contours: { settings: layer.contours, state: contoursState(layer.id) } }
+          : {}),
       };
     }
   }
   return found;
+}
+
+/** The columns of numbers, which are the ones that heights can be in. */
+export function numericColumns(columns: readonly ColumnInfo[]): readonly ColumnInfo[] {
+  return columns.filter((column) => column.type === 'float' || column.type === 'int');
+}
+
+/** The choices of the column that the contours of a grid are made from: its columns of numbers. */
+export function contourColumnOptions(columns: readonly ColumnInfo[]): SelectOption[] {
+  return numericColumns(columns).map((column) => ({ value: column.name, label: column.name }));
+}
+
+/** The column that the contours of a grid are made from, as the editor shows it: the one the settings name, or, with none named, the first of numbers. */
+export function contourColumnValue(
+  settings: LayerContours,
+  columns: readonly ColumnInfo[],
+): string | undefined {
+  return settings.column ?? numericColumns(columns)[0]?.name;
+}
+
+/** The numbers of the settings of contours that the editor has a field for. */
+export type ContourKey = 'interval' | 'base' | 'indexEvery';
+
+/** A field of the settings of contours: what it is called. */
+export interface ContourField {
+  readonly key: ContourKey;
+  readonly label: string;
+}
+
+/** The fields of the settings of contours, in the order the brief lists them: the interval, the base and how often there is an index line. */
+export const CONTOUR_FIELDS: readonly ContourField[] = [
+  { key: 'interval', label: 'Interval' },
+  { key: 'base', label: 'Base' },
+  { key: 'indexEvery', label: 'Index line every' },
+];
+
+/** What a field of the settings shows: the number the settings have. */
+export function contourText(key: ContourKey, settings: LayerContours): string {
+  return String(settings[key]);
+}
+
+/**
+ * The number that some text typed in a field of the settings of contours is, or what is wrong with it, in words: the interval is a number above 0, the
+ * base is a number, and an index line comes every so many lines, a whole number of 1 or more.
+ */
+export function contourFromText(
+  key: ContourKey,
+  text: string,
+): { readonly value: number } | { readonly error: string } {
+  const value = text.trim() === '' ? Number.NaN : Number(text.trim());
+  if (!Number.isFinite(value)) {
+    return { error: key === 'interval' ? 'Enter a number above 0.' : 'Enter a number.' };
+  }
+  if (key === 'interval' && !(value > 0)) {
+    return { error: 'Enter a number above 0.' };
+  }
+  if (key === 'indexEvery' && (!Number.isInteger(value) || value < 1)) {
+    return { error: 'Enter a whole number, 1 or more.' };
+  }
+  return { value };
+}
+
+/** The settings with one number changed, or `undefined` when it is the number they have. */
+export function contoursWith(
+  settings: LayerContours,
+  key: ContourKey,
+  value: number,
+): LayerContours | undefined {
+  return settings[key] === value ? undefined : { ...settings, [key]: value };
+}
+
+/** The settings with another column, or `undefined` when it is the one they have (or they have none and it is the first of numbers). */
+export function contoursWithColumn(
+  settings: LayerContours,
+  column: string,
+  columns: readonly ColumnInfo[],
+): LayerContours | undefined {
+  return contourColumnValue(settings, columns) === column ? undefined : { ...settings, column };
+}
+
+/** What to tell a person who has contours that were not made: the engine's words (what is wrong and what to do), or, for a fault of the engine, that it could not and what it said. */
+export function contoursProblem(state: ContoursState): string | undefined {
+  if (state.status !== 'failed') {
+    return undefined;
+  }
+  const [first] = state.findings;
+  if (first !== undefined) {
+    return first.hint === undefined || first.hint === ''
+      ? first.message
+      : `${first.message} ${first.hint}`;
+  }
+  return `The contour lines could not be made.${state.fault === undefined ? '' : ` ${state.fault}`}`;
 }
 
 /** The choices of "Colour by": a single colour, or each column of the dataset. */
