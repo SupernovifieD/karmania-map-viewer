@@ -93,8 +93,8 @@ export function stillThere(open: ReadonlySet<string>, model: LegendModel): Reado
 }
 
 /**
- * What a key does to whether a row is open: Right opens a layer that can be opened and is closed, Left closes one that is open. `undefined` when the
- * key does nothing to this row (any other key, a group, a layer with nothing to show, or one that is so already).
+ * What a key does to whether a row is open: Right opens a layer that is closed (every layer opens: its style is behind its row), Left closes one that is
+ * open. `undefined` when the key does nothing to this row (any other key, a group, or a layer that is so already).
  */
 export function expansionFor(item: TreeItem, key: string): boolean | undefined {
   if (item.kind !== 'layer') {
@@ -160,7 +160,7 @@ export type KeyAction =
 
 /**
  * What Right and Left do on a row, as they do in a tree: on a group that is folded, Right unfolds it; on one that is open, Right goes to its first layer
- * and Left folds it. On a layer that has lines to show, Right opens it and Left closes it; on a layer that is not open, in a group, Left goes to the group.
+ * and Left folds it. On a layer, Right opens it and Left closes it; on a layer that is not open, in a group, Left goes to the group.
  * `undefined` when the key does nothing there (any other key, a group with nothing under it, a layer of the top that is closed).
  */
 export function keyAction(
