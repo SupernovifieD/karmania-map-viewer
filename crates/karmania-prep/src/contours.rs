@@ -12,7 +12,7 @@ pub use karmania_core::ContourParams;
 use karmania_core::text::format_count;
 use karmania_core::{
     Column, ColumnData, ColumnType, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings,
-    Geometry, GridZ, Kind, Lines, Mesh, Positions, Table, Value,
+    Geometry, GridZ, Kind, Lattice, Lines, Mesh, Positions, Table, Value,
 };
 
 /// Every this many lines is an index line unless the settings say otherwise.
@@ -214,21 +214,21 @@ fn numbers_of(column: &Column, cells: usize) -> Vec<f64> {
 }
 
 /// What a grid is contoured from: the values of one column for the cells of its first layer, and the heights of the cells.
-struct GridValues {
+pub(crate) struct GridValues {
     across: usize,
     up: usize,
     /// The name of the column of the values.
-    column: String,
+    pub(crate) column: String,
     /// The value of each cell, `NaN` for a cell with none (no value, or no height).
     values: Vec<f64>,
     /// The height of each cell if the grid has an elevation column.
-    heights: Option<Vec<f64>>,
+    pub(crate) heights: Option<Vec<f64>>,
     /// The elevation of a grid that has no elevation column: 0 if it has none that is a number.
-    plane: f64,
+    pub(crate) plane: f64,
 }
 
 impl GridValues {
-    fn of(dataset: &Dataset, column: Option<&str>) -> Result<Self, ContourError> {
+    pub(crate) fn of(dataset: &Dataset, column: Option<&str>) -> Result<Self, ContourError> {
         let Geometry::Grid(grid) = &dataset.geometry else {
             return Err(ContourError::Kind(dataset.kind()));
         };
@@ -269,7 +269,7 @@ impl GridValues {
         })
     }
 
-    fn field(&self) -> Result<Field<'_>, ContourError> {
+    pub(crate) fn field(&self) -> Result<Field<'_>, ContourError> {
         let field = Field::new(self.across, self.up, &self.values).ok_or(ContourError::NoLines)?;
         match &self.heights {
             Some(heights) => field.with_heights(heights).ok_or(ContourError::NoLines),
@@ -278,7 +278,7 @@ impl GridValues {
     }
 
     /// The lowest and the highest value of the cells that have one.
-    fn range(&self, field: &Field<'_>) -> Result<(f64, f64), ContourError> {
+    pub(crate) fn range(&self, field: &Field<'_>) -> Result<(f64, f64), ContourError> {
         field
             .range()
             .ok_or_else(|| ContourError::NoValues(self.column.clone()))
@@ -286,7 +286,7 @@ impl GridValues {
 }
 
 /// The surface of a mesh and the lowest and the highest height of its triangles.
-fn surface_of(mesh: &Mesh) -> Result<(Surface<'_>, f64, f64), ContourError> {
+pub(crate) fn surface_of(mesh: &Mesh) -> Result<(Surface<'_>, f64, f64), ContourError> {
     if !mesh.positions.has_z() {
         return Err(ContourError::NoHeights);
     }
@@ -317,19 +317,32 @@ pub fn contour_grid(
     let levels = Levels::for_range(low, high, params.base, params.interval, params.index_every)
         .map_err(ContourError::Levels)?;
     let contours = contour_field(&field, &levels);
-    let [dx, dy, _] = lattice.spacing;
-    // A vertex of the index space `(x, y)` is at `((x + 0.5) dx, (y + 0.5) dy)` in the lattice's own axes (the centre of cell `(i, j)` is
-    // at `((i + 0.5) dx, (j + 0.5) dy)`), which the lattice puts in the world.
     let (has_heights, plane) = (input.heights.is_some(), input.plane);
-    let place = |vertex: &Vertex| {
+    lines_of(
+        &contours,
+        &levels,
+        has_heights || plane != 0.0,
+        grid_places(lattice, has_heights, plane),
+    )
+}
+
+/// Where a vertex of a grid's contours is in the world: a vertex of the index space `(x, y)` is at `((x + 0.5) dx, (y + 0.5) dy)` in the
+/// lattice's own axes (the centre of cell `(i, j)` is at `((i + 0.5) dx, (j + 0.5) dy)`), which the lattice puts in the world; its height is
+/// its own if the grid has an elevation column and the elevation of the plane if it has not.
+pub(crate) fn grid_places(
+    lattice: &Lattice,
+    has_heights: bool,
+    plane: f64,
+) -> impl Fn(&Vertex) -> [f64; 3] + '_ {
+    let [dx, dy, _] = lattice.spacing;
+    move |vertex: &Vertex| {
         let world = lattice.local_to_world([(vertex.x + 0.5) * dx, (vertex.y + 0.5) * dy, 0.0]);
         [
             world[0],
             world[1],
             if has_heights { vertex.z } else { plane },
         ]
-    };
-    lines_of(&contours, &levels, has_heights || plane != 0.0, place)
+    }
 }
 
 /// The contour lines of a mesh by the heights of its vertices: the settings' `column` is not used (a mesh has one height). The lines
@@ -403,7 +416,7 @@ pub fn contours_of(
 }
 
 /// The lines as vertices in the world, with the level of each and whether it is an index line; `place` puts a vertex of the kernel.
-fn lines_of(
+pub(crate) fn lines_of(
     contours: &[Contour],
     levels: &Levels,
     has_z: bool,

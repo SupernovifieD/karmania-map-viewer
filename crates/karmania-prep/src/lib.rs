@@ -17,6 +17,7 @@ pub mod choice;
 pub mod class_index;
 pub mod classify;
 pub mod contour_grid;
+pub mod contour_job;
 pub mod contour_levels;
 pub mod contour_mesh;
 pub mod contours;
@@ -46,6 +47,7 @@ pub use classify::{
     classify_rows, drawn_rows,
 };
 pub use contour_grid::{Contour, Field, Scan, Vertex, contour_field};
+pub use contour_job::{ContourJob, ContourStep, Contourer};
 pub use contour_levels::{Levels, LevelsError, MAX_LEVELS};
 pub use contour_mesh::{MeshScan, Surface, contour_surface};
 pub use contours::{
