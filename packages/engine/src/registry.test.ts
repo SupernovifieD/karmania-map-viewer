@@ -160,3 +160,38 @@ describe('clearing', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('replacing datasets in one change', () => {
+  it('takes out some and puts others after the rest, and tells the listeners once, with both done', () => {
+    const registry = createRegistry();
+    registry.add([summary(1), summary(2), summary(3)]);
+    const heard: number[][] = [];
+    registry.subscribe((list) => heard.push(ids(list)));
+    registry.update([2, 99], [summary(4)]);
+    expect(ids(registry.summaries())).toEqual([1, 3, 4]);
+    expect(heard).toEqual([[1, 3, 4]]);
+  });
+
+  it('can only take out, or only add, and says nothing when nothing changes', () => {
+    const registry = createRegistry();
+    registry.add([summary(1), summary(2)]);
+    const heard: number[][] = [];
+    registry.subscribe((list) => heard.push(ids(list)));
+    registry.update([1], []);
+    registry.update([], [summary(3)]);
+    const before = registry.summaries();
+    registry.update([], []);
+    registry.update([42], []);
+    expect(heard).toEqual([[2], [2, 3]]);
+    expect(registry.summaries()).toBe(before);
+  });
+
+  it('does not change a list it has given out', () => {
+    const registry = createRegistry();
+    registry.add([summary(1), summary(2)]);
+    const before = registry.summaries();
+    registry.update([1], [summary(3)]);
+    expect(ids(before)).toEqual([1, 2]);
+    expect(ids(registry.summaries())).toEqual([2, 3]);
+  });
+});

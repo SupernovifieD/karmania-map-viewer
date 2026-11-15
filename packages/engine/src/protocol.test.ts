@@ -31,6 +31,8 @@ describe('the types of messages', () => {
         case 'prepare':
         case 'classify':
         case 'classIndex':
+        case 'contours':
+        case 'contourDefaults':
         case 'cancel':
           return message.type;
         default:
@@ -43,6 +45,7 @@ describe('the types of messages', () => {
           return message.request;
         case 'progress':
         case 'prepareProgress':
+        case 'contoursProgress':
         case 'error':
         case 'cancelled':
           return message.type;
@@ -76,6 +79,8 @@ describe('what the worker accepts', () => {
       dataset: 1,
       breaks: { kind: 'ranges', column: 'g', bounds: [0, 1], counts: [1], nulls: 0 },
     },
+    contours: { dataset: 1, params: { interval: 5, base: 0, indexEvery: 5 } },
+    contourDefaults: { dataset: 1 },
   };
 
   it('takes each type of request with its id and parameters', () => {
@@ -116,6 +121,7 @@ describe('what the main thread accepts', () => {
       { type: 'result', id: 1, request: 'remove', result: true },
       { type: 'progress', id: 1, progress: { phase: 'reading', fraction: 0.5 } },
       { type: 'prepareProgress', id: 1, progress: { fraction: 0.5 } },
+      { type: 'contoursProgress', id: 1, progress: { fraction: 0.5 } },
       { type: 'error', id: 1, error: { name: 'Error', message: 'no' } },
       { type: 'error', id: 1, error: { name: 'Error', message: 'no', stack: 'at x' } },
       { type: 'cancelled', id: 1 },
@@ -140,6 +146,10 @@ describe('what the main thread accepts', () => {
       { type: 'prepareProgress', id: 1, progress: { fraction: '0.5' } },
       { type: 'prepareProgress', id: 1, progress: { fraction: 1.5 } },
       { type: 'prepareProgress', id: 1, progress: { fraction: -0.1 } },
+      { type: 'contoursProgress', id: 1 },
+      { type: 'contoursProgress', id: 1, progress: { fraction: '0.5' } },
+      { type: 'contoursProgress', id: 1, progress: { fraction: 1.5 } },
+      { type: 'contoursProgress', id: 1, progress: { fraction: -0.1 } },
       { type: 'error', id: 1, error: { name: 'Error' } },
       { type: 'error', id: 1, error: 'no' },
       { type: 'hello', id: 1 },
