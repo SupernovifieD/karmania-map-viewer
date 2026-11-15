@@ -4,8 +4,11 @@
 # Playwright's server, and the tests run here and drive it over a websocket. The pages are
 # served from this machine (the container reaches it as host.docker.internal).
 #
-#   scripts/visual-tests                 compare the screenshots with the ones in the repository
-#   scripts/visual-tests --update        take them again (review the images before committing)
+#   scripts/visual-tests                 compare the screenshots with the ones on this machine
+#   scripts/visual-tests --update        take them again (review the images)
+#
+# The reference pictures (packages/app/e2e/screenshots) are not in git: on a machine that has none, the first run
+# fails for each state and writes the picture, and a second run compares with it; `--update` takes them at once.
 #   scripts/visual-tests -g "tabs"       any other arguments go to `playwright test`
 #
 # Needs Docker running. The first run pulls the image (about 2 GB).

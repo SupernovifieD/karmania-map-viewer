@@ -8,10 +8,13 @@ import type { NewDataset, SceneStore } from '@karmania/scene';
 /**
  * Makes the layers of `scene` match `datasets`, with the commands of the scene: the layers of a dataset that is no longer
  * in the list are removed, and a layer is added, in its default style and on top, for each dataset that has none. Layers that
- * stay are not touched (their style, their visibility and their place in the legend are the person's). Calling it again
- * with the same datasets changes nothing.
+ * stay are not touched (their style, their visibility and their place in the legend are the person's). A dataset that is made from another
+ * (its summary says `derivedFrom`) is not given a layer. Calling it again with the same datasets changes nothing.
  */
-export function syncDatasets(scene: SceneStore, datasets: readonly NewDataset[]): void {
+export function syncDatasets(
+  scene: SceneStore,
+  datasets: readonly (NewDataset & { readonly derivedFrom?: unknown })[],
+): void {
   const loaded = new Set(datasets.map((dataset) => dataset.id));
   const layered = new Set(Object.values(scene.getState().layers).map((layer) => layer.datasetId));
   for (const id of layered) {
@@ -19,9 +22,12 @@ export function syncDatasets(scene: SceneStore, datasets: readonly NewDataset[])
       scene.dispatch({ type: 'removeLayersOfDataset', datasetId: id });
     }
   }
-  // Nothing to add is the same document, which tells no one.
+  // Nothing to add is the same document, which tells no one. A dataset that is made from another (contour lines) gets no layer here: its layer is
+  // the one that `setContoursLayer` makes above its source's, with a style of its own that stays when the lines are made again.
   scene.dispatch({
     type: 'addLayers',
-    datasets: datasets.filter((dataset) => !layered.has(dataset.id)),
+    datasets: datasets.filter(
+      (dataset) => !layered.has(dataset.id) && dataset.derivedFrom === undefined,
+    ),
   });
 }

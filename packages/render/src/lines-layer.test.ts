@@ -256,6 +256,60 @@ describe('createLinesLayer', () => {
       expect(second?.[2]).toBe((SEGMENTS_PER_PART / 2 + 1) % 197);
     });
 
+    it('gives the lines of a class the width of the layer times its own, one for a class that has none or none above 0, and one again when the classes go', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      const scales = (): number[] => Array.from(uniforms(layer)['uScales']?.value as Float32Array);
+      expect(scales()).toHaveLength(MAX_CLASSES);
+      expect(scales().every((scale) => scale === 1)).toBe(true);
+      layer.setClasses?.({
+        indices: Uint8Array.of(0, 1),
+        colours: colours(4),
+        widths: [1, 2.5, 0, Number.NaN],
+      });
+      expect(scales().slice(0, 5)).toEqual([1, 2.5, 1, 1, 1]);
+      // Widths of classes that there are no colours for are not used.
+      layer.setClasses?.({
+        indices: Uint8Array.of(0, 1),
+        colours: colours(2),
+        widths: [1, 3, 4, 5],
+      });
+      expect(scales().slice(0, 4)).toEqual([1, 3, 1, 1]);
+      // A negative width is not one.
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2), widths: [-2, 2] });
+      expect(scales().slice(0, 2)).toEqual([1, 2]);
+      // Classes without widths, and no classes, have every line the width of the layer again.
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2) });
+      expect(scales().every((scale) => scale === 1)).toBe(true);
+      layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2), widths: [1, 2] });
+      layer.setClasses?.(undefined);
+      expect(scales().every((scale) => scale === 1)).toBe(true);
+      expect(uniforms(layer)['uClassed']?.value).toBe(0);
+    });
+
+    it('changes the widths of the same classes, which are not sent to the card again, since only a uniform changes', () => {
+      const layer = createLinesLayer(twoEach(4), LOOK);
+      const indices = Uint8Array.of(0, 1);
+      layer.setClasses?.({ indices, colours: colours(2), widths: [1, 2] });
+      const attribute = classOf(parts(layer)[0]);
+      const version = versionOf(attribute);
+      layer.setClasses?.({ indices, colours: colours(2), widths: [1, 4] });
+      expect(Array.from(uniforms(layer)['uScales']?.value as Float32Array).slice(0, 2)).toEqual([
+        1, 4,
+      ]);
+      expect(classOf(parts(layer)[0])).toBe(attribute);
+      expect(versionOf(attribute)).toBe(version);
+    });
+
+    it('makes each segment as wide as its class says in the vertex shader, and draws it by that width in the fragment shader', () => {
+      const material = parts(createLinesLayer(twoEach(2), LOOK))[0]?.material as ShaderMaterial;
+      // The box of the segment, which has to hold the width, and the distance that is inside the line, both use the width of the segment and not the layer's.
+      expect(material.vertexShader).toContain('uScales[int(line)]');
+      expect(material.vertexShader).toContain('vWidth = width;');
+      expect(material.vertexShader).toContain('float reach = width * 0.5 + 1.0;');
+      expect(material.fragmentShader).toContain('vWidth * 0.5');
+      expect(material.fragmentShader).not.toContain('uWidth');
+    });
+
     it('is in the colour of the layer for classes that stop short of a line that has segments, and covers lines that have none', () => {
       const layer = createLinesLayer(twoEach(4), LOOK);
       layer.setClasses?.({ indices: Uint8Array.of(0, 1), colours: colours(2) });

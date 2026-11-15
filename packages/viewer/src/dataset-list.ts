@@ -2,7 +2,7 @@ import type { Summary } from '@karmania/engine';
 import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
-import { describeWarnings, warningCount } from './datasets.js';
+import { describeWarnings, listedDatasets, madeFrom, warningCount } from './datasets.js';
 import { describeSize, formatCount, KIND_ICONS } from './import-files.js';
 
 /** The name of the event the list sends when a person chooses a dataset. */
@@ -19,10 +19,13 @@ export interface DatasetChoice {
 /**
  * The loaded datasets, one to a row of 40: the icon of its kind, its name (cut with an ellipsis if
  * long), how many elements it has, a badge with the number of warnings if there are any, and a button
- * that removes it. The button is only seen while the row is pointed at or has the keyboard, but its
+ * that removes it. A dataset made from another (contour lines) is listed directly under its source,
+ * indented 24, with an icon of its own and no button: it goes with its source, or when the contours
+ * are turned off in the legend (brief 10.4). The button is only seen while the row is pointed at or has the keyboard, but its
  * room is always kept, so that nothing moves when it appears, and so is the badge's. Choosing a row
  * selects its dataset, which says so by more than a colour: a bar at its edge, a tint and bold type.
- * Removing asks first, in a dialog that says what will be removed and that the file is left alone.
+ * Removing asks first, in a dialog that says what will be removed, naming the datasets made from it, and
+ * that the file is left alone.
  *
  * The list does not choose or remove anything itself: it says what a person did (`karmania-dataset-select`,
  * `karmania-dataset-remove`) and shows what it is given.
@@ -59,6 +62,11 @@ export class KarmaniaDatasetList extends LitElement {
         grid-template-columns: minmax(0, 1fr) var(--k-hit-target);
         height: var(--k-list-row-height);
         position: relative;
+      }
+
+      /* A dataset made from another is indented by 24 from the others, so that its icon is under the name of its source's. */
+      li[data-derived] .choose {
+        padding-left: calc(var(--k-space-16) + var(--k-space-24));
       }
 
       li:hover,
@@ -154,6 +162,12 @@ export class KarmaniaDatasetList extends LitElement {
         color: var(--k-text-muted);
         margin-top: var(--k-space-8);
       }
+
+      /* What is removed with the dataset, a line each, a little in from the sentence above them. */
+      .confirm .made {
+        margin-left: var(--k-space-16);
+        margin-top: var(--k-space-4);
+      }
     `,
   ];
 
@@ -196,7 +210,9 @@ export class KarmaniaDatasetList extends LitElement {
     const removing = this.removing;
     this.removing = undefined;
     if (removing !== undefined) {
-      this.removedAt = this.datasets.findIndex((dataset) => dataset.id === removing.id);
+      this.removedAt = listedDatasets(this.datasets).findIndex(
+        (dataset) => dataset.id === removing.id,
+      );
       this.tell(DATASET_REMOVE, removing.id);
     }
   };
@@ -209,8 +225,15 @@ export class KarmaniaDatasetList extends LitElement {
     const warnings = warningCount(dataset);
     const selected = dataset.id === this.selected;
     const noun = describeSize(dataset).replace(/^[\d,]+ /, '');
+    const derived = dataset.derivedFrom !== undefined;
+    const source = this.datasets.find((each) => each.id === dataset.derivedFrom?.id);
     return html`
-      <li data-dataset=${dataset.name} data-id=${String(dataset.id)} ?data-selected=${selected}>
+      <li
+        data-dataset=${dataset.name}
+        data-id=${String(dataset.id)}
+        ?data-selected=${selected}
+        ?data-derived=${derived}
+      >
         <button
           type="button"
           class="choose"
@@ -219,7 +242,11 @@ export class KarmaniaDatasetList extends LitElement {
             this.tell(DATASET_SELECT, dataset.id);
           }}
         >
-          <k-icon class="icon" name=${KIND_ICONS[dataset.kind]} size="16"></k-icon>
+          <k-icon
+            class="icon"
+            name=${derived ? 'mountain' : KIND_ICONS[dataset.kind]}
+            size="16"
+          ></k-icon>
           <span class="name" data-truncate title=${dataset.name}>${dataset.name}</span>
           <span class="count">${formatCount(dataset.elementCount)}</span>
           <span
@@ -235,18 +262,22 @@ export class KarmaniaDatasetList extends LitElement {
           </span>
           <!-- What the numbers count, and what the badge is, for those who cannot see them. -->
           <span class="visually-hidden"
-            >${noun}${warnings > 0 ? `, ${describeWarnings(warnings)}` : ''}</span
+            >${noun}${source === undefined ? '' : `, made from ${source.name}`}${warnings > 0 ? `, ${describeWarnings(warnings)}` : ''}</span
           >
         </button>
         <span class="remove">
-          ${kButton({
-            icon: 'trash-2',
-            label: `Remove ${dataset.name}`,
-            variant: 'ghost',
-            onClick: () => {
-              this.removing = dataset;
-            },
-          })}
+          ${
+            derived
+              ? nothing
+              : kButton({
+                  icon: 'trash-2',
+                  label: `Remove ${dataset.name}`,
+                  variant: 'ghost',
+                  onClick: () => {
+                    this.removing = dataset;
+                  },
+                })
+          }
         </span>
       </li>
     `;
@@ -254,9 +285,10 @@ export class KarmaniaDatasetList extends LitElement {
 
   override render() {
     const removing = this.removing;
+    const alongside = removing === undefined ? [] : madeFrom(this.datasets, removing.id);
     return html`
       <ul aria-label="Datasets" data-scroll-region>
-        ${this.datasets.map((dataset) => this.row(dataset))}
+        ${listedDatasets(this.datasets).map((dataset) => this.row(dataset))}
       </ul>
       <k-dialog
         heading="Remove dataset?"
@@ -270,6 +302,17 @@ export class KarmaniaDatasetList extends LitElement {
                 <p>
                   <strong>${removing.name}</strong> (${describeSize(removing)}) will be removed.
                 </p>
+                ${
+                  alongside.length === 0
+                    ? nothing
+                    : html`<p class="detail">The datasets made from it are removed with it:</p>
+                        ${alongside.map(
+                          (each) =>
+                            html`<p class="made">
+                              <strong>${each.name}</strong> (${describeSize(each)})
+                            </p>`,
+                        )}`
+                }
                 <p class="detail">The file it came from is not changed.</p>
               </div>`
         }

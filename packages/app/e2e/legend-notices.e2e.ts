@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { boxOf } from './support/layout.js';
-import { layerRow, legend, showLegend } from './support/legend.js';
-import { layerStatuses, withData } from './support/render.js';
+import { layerRow, legend, loadGrid, showLegend } from './support/legend.js';
+import { dispatch, layerStatuses, withData } from './support/render.js';
 import { importAsLocalGrid } from './support/wizard.js';
 
 /**
@@ -157,6 +157,81 @@ test.describe('the notice of a layer that is not drawn in the Legend tab', () =>
     await expectNoSeriousViolations(page);
     await layerRow(page, 'layer-2').locator('.open').click();
     await expect(reason(page, 'layer-2')).toBeVisible();
+    await expectNoSeriousViolations(page);
+  });
+});
+
+test.describe('the notice of a layer whose classes cannot be worked out', () => {
+  const COLUMN_MISSING =
+    'Not drawn: The dataset has no column named nope, so nothing can be coloured by it.';
+  const HINT_MISSING = 'Colour by a column the dataset has, or draw the layer in a single colour.';
+
+  test('has the icon, the tooltip and the reason for a layer coloured by a column that the dataset does not have, in the engine’s words, and loses them when the layer is coloured by one it has', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadGrid(page, 'Assays', 1);
+    await showLegend(page);
+    await expect(icon(page, 'layer-1')).toHaveCount(0);
+    // A style from an embedder's document, or one made before the dataset changed: the column is not there.
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'nope',
+          method: 'equal',
+          classes: 5,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await expect.poll(() => statuses(page)).toEqual(['not_drawn']);
+    await expect(icon(page, 'layer-1')).toHaveCount(1);
+    await expect(layerRow(page, 'layer-1')).toHaveAccessibleName(/not drawn/i);
+    await icon(page, 'layer-1').hover();
+    await expect(tip(page).first()).toHaveText(`${COLUMN_MISSING} ${HINT_MISSING}`);
+    await page.mouse.move(0, 0);
+    await layerRow(page, 'layer-1').locator('.open').click();
+    await expect(reason(page, 'layer-1').locator('.said')).toHaveText(COLUMN_MISSING);
+    await expect(reason(page, 'layer-1').locator('.hint')).toHaveText(HINT_MISSING);
+    // It has no class lines (it is not drawn) and keeps its style fields, so that the person can mend it.
+    await expect(legend(page).locator('#legend-classes-layer-1')).toHaveCount(0);
+    await expect(legend(page).locator('#legend-style-layer-1')).toBeVisible();
+    // Coloured by a column that it has, it is drawn, and the notice goes.
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#e69f00' } },
+    });
+    await expect.poll(() => statuses(page)).toEqual(['drawn']);
+    await expect(icon(page, 'layer-1')).toHaveCount(0);
+    await expect(reason(page, 'layer-1')).toHaveCount(0);
+  });
+
+  test('has no serious accessibility violation with such a layer open', async ({ page }) => {
+    await page.goto('/?theme=light');
+    await loadGrid(page, 'Assays', 1);
+    await showLegend(page);
+    await dispatch(page, {
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'nope',
+          method: 'equal',
+          classes: 5,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await expect(icon(page, 'layer-1')).toHaveCount(1);
+    await layerRow(page, 'layer-1').locator('.open').click();
+    await expect(reason(page, 'layer-1')).toBeVisible();
     await expectNoSeriousViolations(page);
   });
 });

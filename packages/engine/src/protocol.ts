@@ -20,7 +20,16 @@ import type {
   PrepareProgress,
   PrepareResult,
 } from './display.js';
-import type { CrsInfo, CrsRef, ImportMapping, LoadResult, Page, Preview } from './types.js';
+import type {
+  ContourDefaultsResult,
+  ContourParams,
+  CrsInfo,
+  CrsRef,
+  ImportMapping,
+  LoadResult,
+  Page,
+  Preview,
+} from './types.js';
 
 /** A data file to look at, with the sidecar files that belong to it. */
 export interface PreviewGroup {
@@ -118,6 +127,20 @@ export interface Requests {
     readonly params: { readonly dataset: number; readonly breaks: ClassBreaks };
     readonly result: Uint8Array;
   };
+  /**
+   * Makes the contour lines of a dataset, with `contoursProgress` replies on the way. The result is what a load gives: the new lines
+   * (one dataset, which replaced those made before from the same dataset), or the findings that say why there are none (the lines made
+   * before are gone then too).
+   */
+  readonly contours: {
+    readonly params: { readonly dataset: number; readonly params: ContourParams };
+    readonly result: LoadResult;
+  };
+  /** The settings a set of contours of a dataset starts with, or why there are none. */
+  readonly contourDefaults: {
+    readonly params: { readonly dataset: number; readonly column?: string };
+    readonly result: ContourDefaultsResult;
+  };
 }
 
 /** Every type of request. */
@@ -135,6 +158,8 @@ export const REQUEST_TYPES = [
   'prepare',
   'classify',
   'classIndex',
+  'contours',
+  'contourDefaults',
 ] as const;
 
 /** The type of a request. */
@@ -184,6 +209,13 @@ export interface PrepareProgressMessage {
   readonly progress: PrepareProgress;
 }
 
+/** How far making contours has got. Any number of these come before its result. */
+export interface ContoursProgressMessage {
+  readonly type: 'contoursProgress';
+  readonly id: number;
+  readonly progress: PrepareProgress;
+}
+
 /** The request failed: it was misuse, or the worker could not do it. */
 export interface ErrorMessage {
   readonly type: 'error';
@@ -199,7 +231,12 @@ export interface CancelledMessage {
 
 /** Everything the worker sends. */
 export type FromWorker =
-  ResultMessage | ProgressMessage | PrepareProgressMessage | ErrorMessage | CancelledMessage;
+  | ResultMessage
+  | ProgressMessage
+  | PrepareProgressMessage
+  | ContoursProgressMessage
+  | ErrorMessage
+  | CancelledMessage;
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
@@ -265,13 +302,14 @@ export function parseFromWorker(data: unknown): FromWorker | undefined {
           }
         : undefined;
     }
-    case 'prepareProgress': {
+    case 'prepareProgress':
+    case 'contoursProgress': {
       const progress = data['progress'];
       return isRecord(progress) &&
         typeof progress['fraction'] === 'number' &&
         progress['fraction'] >= 0 &&
         progress['fraction'] <= 1
-        ? { type: 'prepareProgress', id, progress: { fraction: progress['fraction'] } }
+        ? { type: data['type'], id, progress: { fraction: progress['fraction'] } }
         : undefined;
     }
     case 'error': {

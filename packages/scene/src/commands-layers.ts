@@ -132,6 +132,14 @@ export function removeLayersOfDataset(doc: SceneDocument, datasetId: number): Sc
       }
     }
   }
+  return withoutLayers(doc, gone);
+}
+
+/**
+ * The document without the layers `gone`: out of the layers and out of the legend, a group staying where it is even if it is left
+ * empty, and the selection cleared if it was in one of them.
+ */
+export function withoutLayers(doc: SceneDocument, gone: ReadonlySet<string>): SceneDocument {
   const layers = Object.fromEntries(Object.entries(doc.layers).filter(([id]) => !gone.has(id)));
   const legend = doc.legend.flatMap((node): LegendNode[] => {
     if (node.type === 'layer') {

@@ -63,6 +63,8 @@ export interface RequestOptions {
   readonly onProgress?: (progress: ImportProgress) => void;
   /** Called with how far a prepare has got, for a request that is one. */
   readonly onPrepareProgress?: (progress: PrepareProgress) => void;
+  /** Called with how far making contours has got, for a request that is one. */
+  readonly onContoursProgress?: (progress: PrepareProgress) => void;
 }
 
 /** Sends requests to a worker and returns its answers. */
@@ -103,6 +105,7 @@ interface Pending {
   readonly fail: (error: Error) => void;
   readonly progress: (progress: ImportProgress) => void;
   readonly prepareProgress: (progress: PrepareProgress) => void;
+  readonly contoursProgress: (progress: PrepareProgress) => void;
   readonly cancelled: () => void;
 }
 
@@ -148,6 +151,9 @@ export function createKernelClient(port: ClientPort): KernelClient {
       case 'prepareProgress':
         waiting.prepareProgress(reply.progress);
         return;
+      case 'contoursProgress':
+        waiting.contoursProgress(reply.progress);
+        return;
     }
   });
 
@@ -164,7 +170,13 @@ export function createKernelClient(port: ClientPort): KernelClient {
       options: RequestOptions = {},
     ) =>
       new Promise<Requests[T]['result']>((resolve, reject) => {
-        const { signal, transfer = [], onProgress, onPrepareProgress } = options;
+        const {
+          signal,
+          transfer = [],
+          onProgress,
+          onPrepareProgress,
+          onContoursProgress,
+        } = options;
         if (unusable !== undefined) {
           reject(unusable);
           return;
@@ -203,6 +215,9 @@ export function createKernelClient(port: ClientPort): KernelClient {
           },
           prepareProgress: (progress) => {
             onPrepareProgress?.(progress);
+          },
+          contoursProgress: (progress) => {
+            onContoursProgress?.(progress);
           },
           cancelled: () => {
             finish();

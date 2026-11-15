@@ -73,6 +73,10 @@ export interface TestKernelInstance {
     classes: number,
   ) => unknown;
   readonly classIndex: (datasetId: number, breaks: unknown) => Uint8Array;
+  readonly startContours: (datasetId: number, params: unknown) => number;
+  readonly stepContours: (jobId: number, budget: number) => unknown;
+  readonly cancelContours: (jobId: number) => boolean;
+  readonly contourDefaults: (datasetId: number, column?: string) => unknown;
   readonly free: () => void;
 }
 
@@ -98,6 +102,10 @@ export function createKernel(): TestKernelInstance {
     classify: (datasetId, column, method, classes) =>
       kernel.classify(datasetId, column, method, classes) as unknown,
     classIndex: (datasetId, breaks) => kernel.classIndex(datasetId, breaks),
+    startContours: (datasetId, params) => kernel.startContours(datasetId, params),
+    stepContours: (jobId, budget) => kernel.stepContours(jobId, budget) as unknown,
+    cancelContours: (jobId) => kernel.cancelContours(jobId),
+    contourDefaults: (datasetId, column) => kernel.contourDefaults(datasetId, column) as unknown,
     free: () => {
       kernel.free();
     },
@@ -138,6 +146,10 @@ export function wrapKernel(kernel: KernelApi): { -readonly [K in keyof KernelApi
     classify: (dataset, column, method, classes) =>
       kernel.classify(dataset, column, method, classes),
     classIndex: (dataset, breaks) => kernel.classIndex(dataset, breaks),
+    startContours: (dataset, params) => kernel.startContours(dataset, params),
+    stepContours: (job, budget) => kernel.stepContours(job, budget),
+    cancelContours: (job) => kernel.cancelContours(job),
+    contourDefaults: (dataset, column) => kernel.contourDefaults(dataset, column),
     free: () => {
       kernel.free();
     },

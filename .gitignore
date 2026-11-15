@@ -26,3 +26,13 @@ blob-report/
 
 # macOS
 .DS_Store
+
+# The reference pictures of the screenshot tests are kept on each machine (scripts/visual-tests --update takes them), not in git
+/packages/app/e2e/screenshots/
+
+# The project's working notes (the decisions log, the roadmap, the conventions, the measurements) are kept on the maintainer's machine, not in git.
+# What the build or a test reads, and the notices that have to be shipped, are still in the repository.
+/docs/*
+!/docs/validation-codes.md
+!/docs/design-tokens.md
+!/docs/dependencies.md

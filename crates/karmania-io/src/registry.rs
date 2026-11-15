@@ -8,8 +8,8 @@
 use std::collections::BTreeMap;
 
 use karmania_core::{
-    CrsKinds, Dataset, DatasetId, Findings, Severity, Summary, ValidationReport, Wgs84Only,
-    validate_with,
+    CrsKinds, Dataset, DatasetId, Derivation, DerivedFrom, Findings, Severity, Summary,
+    ValidationReport, Wgs84Only, validate_with,
 };
 use serde::Serialize;
 
@@ -117,6 +117,63 @@ impl Registry {
         LoadResult::Loaded { summaries }
     }
 
+    /// Loads a dataset that was made from another one that is loaded (contour lines), under a new identifier. It is validated like any
+    /// other, and its summary says what it was made from (`derived_from`). Datasets that were made from the same source in the same way
+    /// are not touched: [`Registry::remove_derived`] takes them out first when the new one replaces them. `None` if the source is not
+    /// loaded (it was removed while the dataset was being made): nothing is loaded.
+    pub fn load_derived(
+        &mut self,
+        dataset: Dataset,
+        from: DerivedFrom,
+        kinds: &dyn CrsKinds,
+    ) -> Option<LoadResult> {
+        if !self.loaded.contains_key(&from.id.0) {
+            return None;
+        }
+        let report = validate_with(&dataset, kinds);
+        Some(
+            match self.load_validated(vec![(dataset, report)], Findings::new()) {
+                LoadResult::Loaded { mut summaries } => {
+                    for summary in &mut summaries {
+                        summary.derived_from = Some(from.clone());
+                        if let Some(loaded) = self.loaded.get_mut(&summary.id.0) {
+                            loaded.summary.derived_from = Some(from.clone());
+                        }
+                    }
+                    LoadResult::Loaded { summaries }
+                }
+                blocked @ LoadResult::Blocked { .. } => blocked,
+            },
+        )
+    }
+
+    /// The datasets that were made from `source` in the way `like` says (the same kind of derivation, whatever its settings), in the
+    /// order they were loaded.
+    #[must_use]
+    pub fn derived_of(&self, source: DatasetId, like: &Derivation) -> Vec<DatasetId> {
+        self.loaded
+            .values()
+            .filter(|loaded| {
+                loaded.summary.derived_from.as_ref().is_some_and(|from| {
+                    from.id == source
+                        && std::mem::discriminant(&from.how) == std::mem::discriminant(like)
+                })
+            })
+            .map(|loaded| loaded.summary.id)
+            .collect()
+    }
+
+    /// Unloads the datasets that were made from `source` in the way `like` says, and returns their identifiers. A new call that makes
+    /// one for the same source in the same way replaces the old one, and so does a call that fails: what is shown is never made with
+    /// settings other than those asked for.
+    pub fn remove_derived(&mut self, source: DatasetId, like: &Derivation) -> Vec<DatasetId> {
+        let found = self.derived_of(source, like);
+        for id in &found {
+            self.loaded.remove(&id.0);
+        }
+        found
+    }
+
     /// The summaries of every loaded dataset, in the order they were loaded.
     #[must_use]
     pub fn summaries(&self) -> Vec<Summary> {
@@ -141,9 +198,40 @@ impl Registry {
         self.loaded.values().map(|l| &l.dataset).collect()
     }
 
-    /// Unloads a dataset. Returns whether there was one with that identifier.
+    /// Unloads a dataset, and the datasets that were made from it. Returns whether there was one with that identifier.
     pub fn remove(&mut self, id: DatasetId) -> bool {
-        self.loaded.remove(&id.0).is_some()
+        !self.remove_with_derived(id).is_empty()
+    }
+
+    /// Unloads a dataset and every dataset that was made from it (and from those), and returns their identifiers, the dataset's first:
+    /// none if there is no dataset with that identifier.
+    pub fn remove_with_derived(&mut self, id: DatasetId) -> Vec<DatasetId> {
+        if !self.loaded.contains_key(&id.0) {
+            return Vec::new();
+        }
+        // A dataset is made after its source, so its identifier is higher and no dataset is its own source: each one is found once.
+        let mut removed = vec![id];
+        let mut at = 0;
+        while let Some(&parent) = removed.get(at) {
+            let children: Vec<DatasetId> = self
+                .loaded
+                .values()
+                .filter(|loaded| {
+                    loaded
+                        .summary
+                        .derived_from
+                        .as_ref()
+                        .is_some_and(|from| from.id == parent)
+                })
+                .map(|loaded| loaded.summary.id)
+                .collect();
+            removed.extend(children);
+            at += 1;
+        }
+        for gone in &removed {
+            self.loaded.remove(&gone.0);
+        }
+        removed
     }
 
     /// How many datasets are loaded.
@@ -356,5 +444,141 @@ mod tests {
         assert_eq!(names(&registry), ["a", "b", "c"]);
         registry.remove(registry.datasets()[1].id);
         assert_eq!(names(&registry), ["a", "c"]);
+    }
+
+    fn from(source: u64, interval: f64) -> DerivedFrom {
+        DerivedFrom {
+            id: DatasetId(source),
+            how: Derivation::Contours {
+                params: karmania_core::ContourParams {
+                    column: None,
+                    interval,
+                    base: 0.0,
+                    index_every: 5,
+                },
+            },
+        }
+    }
+
+    fn contours() -> Derivation {
+        from(0, 1.0).how
+    }
+
+    fn load_derived(registry: &mut Registry, name: &str, from: DerivedFrom) -> Option<LoadResult> {
+        registry.load_derived(good(name), from, &Wgs84Only)
+    }
+
+    fn one_id(result: Option<LoadResult>) -> DatasetId {
+        let Some(LoadResult::Loaded { summaries }) = result else {
+            panic!("expected Loaded")
+        };
+        summaries[0].id
+    }
+
+    #[test]
+    fn a_derived_dataset_is_loaded_under_a_new_identifier_and_its_summary_says_what_it_came_from() {
+        let mut registry = Registry::new();
+        let source = one_id(Some(registry.load(vec![good("Surface")], Findings::new())));
+        let Some(LoadResult::Loaded { summaries }) =
+            load_derived(&mut registry, "Contours", from(source.0, 2.5))
+        else {
+            panic!("expected Loaded")
+        };
+        assert_eq!(
+            (summaries[0].id, summaries[0].name.as_str()),
+            (DatasetId(2), "Contours")
+        );
+        assert_eq!(summaries[0].derived_from, Some(from(1, 2.5)));
+        // What is stored says it too, and the source does not.
+        assert_eq!(registry.summary(DatasetId(2)), Some(&summaries[0]));
+        assert_eq!(registry.summary(source).unwrap().derived_from, None);
+        assert_eq!(registry.dataset(DatasetId(2)).unwrap().id, DatasetId(2));
+        assert_eq!(registry.derived_of(source, &contours()), [DatasetId(2)]);
+    }
+
+    #[test]
+    fn a_derived_dataset_of_a_source_that_is_not_loaded_is_not_loaded_and_one_with_an_error_is_blocked()
+     {
+        let mut registry = Registry::new();
+        assert_eq!(load_derived(&mut registry, "Orphan", from(7, 1.0)), None);
+        assert!(registry.is_empty());
+        let source = one_id(Some(registry.load(vec![good("Surface")], Findings::new())));
+        let bad = points("No CRS", &[(1.0, 2.0)], None);
+        let blocked = registry.load_derived(bad, from(source.0, 1.0), &Wgs84Only);
+        let Some(LoadResult::Blocked { findings }) = blocked else {
+            panic!("expected Blocked")
+        };
+        assert_eq!(codes(&findings), ["crs.missing"]);
+        assert_eq!(registry.len(), 1, "nothing was stored");
+        // No identifier was used up by either.
+        assert_eq!(
+            one_id(load_derived(&mut registry, "Fine", from(source.0, 1.0))),
+            DatasetId(2)
+        );
+    }
+
+    #[test]
+    fn removing_a_source_removes_what_was_made_from_it_and_removing_the_derived_one_leaves_the_source()
+     {
+        let mut registry = Registry::new();
+        let a = one_id(Some(registry.load(vec![good("A")], Findings::new())));
+        let b = one_id(Some(registry.load(vec![good("B")], Findings::new())));
+        let of_a = one_id(load_derived(&mut registry, "A's lines", from(a.0, 1.0)));
+        let of_b = one_id(load_derived(&mut registry, "B's lines", from(b.0, 1.0)));
+        // Lines of lines (a later kind of derivation) go with their source's source.
+        let of_of_a = one_id(load_derived(
+            &mut registry,
+            "Lines of A's lines",
+            from(of_a.0, 1.0),
+        ));
+        assert_eq!(registry.remove_with_derived(DatasetId(99)), []);
+        assert!(!registry.remove(DatasetId(99)));
+        assert_eq!(registry.remove_with_derived(of_of_a), [of_of_a]);
+        let of_of_a = one_id(load_derived(&mut registry, "Again", from(of_a.0, 1.0)));
+        assert_eq!(registry.remove_with_derived(a), [a, of_a, of_of_a]);
+        let names: Vec<String> = registry
+            .summaries()
+            .iter()
+            .map(|s| s.name.clone())
+            .collect();
+        assert_eq!(names, ["B", "B's lines"]);
+        assert!(registry.remove(of_b));
+        assert_eq!(
+            registry
+                .summaries()
+                .iter()
+                .map(|s| s.id)
+                .collect::<Vec<_>>(),
+            [b]
+        );
+        // Identifiers are not reused.
+        assert_eq!(
+            one_id(load_derived(&mut registry, "New", from(b.0, 1.0))).0,
+            of_of_a.0 + 1
+        );
+        // `remove`, which the engine calls, takes what was made from the dataset with it, and says so.
+        assert!(registry.remove(b));
+        assert!(registry.is_empty());
+    }
+
+    #[test]
+    fn a_new_set_of_contours_replaces_the_old_one_of_the_same_source_and_no_other() {
+        let mut registry = Registry::new();
+        let a = one_id(Some(registry.load(vec![good("A")], Findings::new())));
+        let b = one_id(Some(registry.load(vec![good("B")], Findings::new())));
+        let old_a = one_id(load_derived(&mut registry, "Old", from(a.0, 1.0)));
+        let of_b = one_id(load_derived(&mut registry, "Of B", from(b.0, 1.0)));
+        assert_eq!(registry.remove_derived(a, &contours()), [old_a]);
+        let new_a = one_id(load_derived(&mut registry, "New", from(a.0, 5.0)));
+        assert_eq!(registry.derived_of(a, &contours()), [new_a]);
+        assert_eq!(
+            registry.summary(new_a).unwrap().derived_from,
+            Some(from(a.0, 5.0))
+        );
+        // The others are as they were, and removing what is not there removes nothing.
+        let ids: Vec<DatasetId> = registry.summaries().iter().map(|s| s.id).collect();
+        assert_eq!(ids, [a, b, of_b, new_a]);
+        assert_eq!(registry.remove_derived(a, &contours()), [new_a]);
+        assert_eq!(registry.remove_derived(a, &contours()), []);
     }
 }

@@ -172,6 +172,26 @@ finding_codes! {
     ClassesColumnNotNumeric => "classes.column.not_numeric", Warning, None;
     /// The column has too many different values to be shown as categories.
     ClassesColumnTooManyValues => "classes.column.too_many_values", Warning, None;
+    /// The values are so many intervals from the base that the levels of the contour lines cannot be worked out.
+    ContoursBaseTooFar => "contours.base.too_far", Error, None;
+    /// The dataset has no column of the name given, so no contour lines can be made from it.
+    ContoursColumnMissing => "contours.column.missing", Warning, None;
+    /// A grid has no column of numbers to make contour lines from.
+    ContoursColumnNoNumbers => "contours.column.no_numbers", Warning, None;
+    /// The column to make contour lines from has no number that can be used.
+    ContoursColumnNoValues => "contours.column.no_values", Warning, None;
+    /// The column to make contour lines from is not made of numbers.
+    ContoursColumnNotNumeric => "contours.column.not_numeric", Warning, None;
+    /// A mesh has no heights to make contour lines from.
+    ContoursHeightsNone => "contours.heights.none", Warning, None;
+    /// The interval, the base or the index lines of a set of contour lines are not usable.
+    ContoursIntervalInvalid => "contours.interval.invalid", Error, None;
+    /// Contour lines are made from grids and meshes, and the dataset is another shape.
+    ContoursKindUnsupported => "contours.kind.unsupported", Warning, None;
+    /// No contour line crosses the values of the dataset.
+    ContoursLevelsNone => "contours.levels.none", Warning, None;
+    /// The interval makes more contour lines than the most there may be.
+    ContoursLevelsTooMany => "contours.levels.too_many", Error, None;
     /// The EPSG code is not one of the coordinate systems Karmania knows.
     CrsCodeUnknown => "crs.code.unknown", Warning, Some(WizardStep::Crs);
     /// The dataset has no coordinate reference system.

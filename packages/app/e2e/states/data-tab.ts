@@ -155,6 +155,37 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    // The contour lines of a grid are listed under it, indented, with an icon of their own, and selected: their summary says how they
+    // were made (the dataset, the interval, the base, the index lines and the column), and their table has a level and an index for each.
+    name: 'data-tab-derived',
+    show: async (page) => {
+      await load(page, fixture('grid.asc'), projectionFor('grid.prj'));
+      await page.locator('karmania-viewer').evaluate(async (element) => {
+        const viewer = element as unknown as {
+          engine: {
+            datasets: () => { id: number }[];
+            contourDefaults: (id: number) => Promise<{ status: string; params?: object }>;
+            contours: (id: number, params: object) => Promise<{ status: string }>;
+          };
+          datasets: unknown[];
+          selected: number | undefined;
+          updateComplete: Promise<boolean>;
+        };
+        const [source] = viewer.engine.datasets();
+        if (source === undefined) throw new Error('nothing loaded');
+        const defaults = await viewer.engine.contourDefaults(source.id);
+        if (defaults.params === undefined) throw new Error('no settings');
+        await viewer.engine.contours(source.id, defaults.params);
+        viewer.datasets = viewer.engine.datasets();
+        viewer.selected = viewer.datasets.length;
+        await viewer.updateComplete;
+      });
+      await page.locator('karmania-dataset-summary dt:text-is("Made from")').waitFor();
+      await table(page).locator('.rows [role="row"]').first().waitFor();
+      return rest(page);
+    },
+  },
+  {
     // The keyboard in the table, in the app: the ring is on a cell, and the list and summary above
     // have none.
     name: 'data-tab-table-focus',

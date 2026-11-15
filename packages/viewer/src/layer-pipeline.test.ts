@@ -13,7 +13,13 @@ import { OTHER_COLOUR, createSceneStore, fitCamera2d, fitCamera3d } from '@karma
 import type { NewDataset, SceneStore } from '@karmania/scene';
 import { describe, expect, it, vi } from 'vitest';
 import { POSITIONS_PER_TURN } from './extent.js';
-import { FIT_PADDING, LayerPipeline, ZOOM_IN_LIMIT, ZOOM_OUT_LIMIT } from './layer-pipeline.js';
+import {
+  FIT_PADDING,
+  INDEX_LINE_WIDTH,
+  LayerPipeline,
+  ZOOM_IN_LIMIT,
+  ZOOM_OUT_LIMIT,
+} from './layer-pipeline.js';
 import type { LayerSink } from './layer-pipeline.js';
 
 const frame = (
@@ -1969,6 +1975,35 @@ describe('LayerPipeline: what the legend is given', () => {
     expect(t.pipeline.legendInputs().drawable).toEqual([]);
   });
 
+  it('gives the words for a layer that failed or whose classes were refused, and none for one that is drawn', async () => {
+    const t = gridSetup();
+    t.drawable([0, true]);
+    await t.addGrid(0);
+    expect(t.pipeline.legendInputs().problems).toEqual({});
+    t.state.classify = () => Promise.reject(new Error('the worker stopped'));
+    const style = t.scene.getState().layers['layer-1']?.style.colour as object;
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { ...style, classes: 5 } as never },
+    });
+    await t.pipeline.idle();
+    const problems = t.pipeline.legendInputs().problems ?? {};
+    expect(Object.keys(problems)).toEqual(['layer-1']);
+    expect(problems['layer-1']?.message).toBe(
+      'Not drawn: preparing this dataset for the map failed.',
+    );
+    expect(problems['layer-1']?.hint).toContain('the worker stopped');
+    // Taken away when the layer is drawn again, with a colour that needs no classes.
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: { colour: { mode: 'single', value: '#e69f00' } },
+    });
+    await t.pipeline.idle();
+    expect(t.pipeline.legendInputs().problems).toEqual({});
+  });
+
   it('gives the breaks of a layer that is coloured by classes, and none for a layer that is not', async () => {
     const t = gridSetup();
     t.drawable([0, true], [1, true]);
@@ -2039,5 +2074,143 @@ describe('LayerPipeline: what the legend is given', () => {
     t.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 0 });
     await t.pipeline.idle();
     expect(t.pipeline.legendInputs().breaks).toEqual({});
+  });
+});
+
+/** The lines of a derived layer of contours, in the colour of its layer, and what the engine says of the `index` column. */
+function contoursSetup(values: boolean[]) {
+  const t = setup();
+  const lines = (): RenderBuffers => ({
+    kind: 'lines',
+    positions: Float32Array.of(0, 0, 0, 10, 0, 0, 0, 5, 0, 10, 5, 0),
+    segments: Uint32Array.of(0, 1, 2, 3),
+    segmentLine: Uint32Array.of(0, 1),
+  });
+  t.state.prepare = (call) =>
+    Promise.resolve({
+      status: 'drawn',
+      buffers: call.id === 7 || call.id === 8 ? lines() : gridBuffers(),
+      findings: [],
+    });
+  t.state.classify = (_id, column) =>
+    Promise.resolve({
+      status: 'classified',
+      breaks: { kind: 'categories', column, values, counts: values.map(() => 1), nulls: 0 },
+    });
+  t.drawable([0, true], [7, true], [8, true]);
+  const start = async (): Promise<void> => {
+    t.scene.dispatch({ type: 'addLayers', datasets: [{ ...gridDataset(0) }] });
+    t.scene.dispatch({ type: 'setContoursLayer', sourceLayer: 'layer-1', datasetId: 7 });
+    await t.pipeline.idle();
+  };
+  const classesOf = (layer: string) =>
+    t.sink.setLayerClasses.mock.calls.filter(([id]) => id === layer).map(([, classes]) => classes);
+  return { ...t, start, classesOf };
+}
+
+describe('LayerPipeline: a layer that is given another dataset', () => {
+  it('is prepared afresh for it and its old buffers are taken off the card, as the layer of contours is when the lines are made again', async () => {
+    const t = contoursSetup([false, true]);
+    await t.start();
+    expect(t.prepareCalls.map((call) => call.id)).toEqual([0, 7]);
+    t.sink.removeLayer.mockClear();
+    t.scene.dispatch({ type: 'setContoursLayer', sourceLayer: 'layer-1', datasetId: 8 });
+    await t.pipeline.idle();
+    expect(t.sink.removeLayer).toHaveBeenCalledWith('layer-2');
+    expect(t.prepareCalls.map((call) => call.id)).toEqual([0, 7, 8]);
+    // The classes are asked of the new dataset, and given to the layer that is put in place of the old.
+    expect(t.classifyCalls.filter(([id]) => id === 8)).toEqual([[8, 'index', 'categories', 2]]);
+    expect(t.classesOf('layer-2')).toHaveLength(2);
+    // The layer that was not given another dataset is left alone.
+    expect(t.prepareCalls.filter((call) => call.id === 0)).toHaveLength(1);
+  });
+});
+
+describe('LayerPipeline: the index lines of contours', () => {
+  it('asks the engine for the classes of the index column, ordinary and index, and gives the renderer one colour for both with the index lines wider', async () => {
+    const t = contoursSetup([false, true]);
+    await t.start();
+    expect(t.classifyCalls.filter(([id]) => id === 7)).toEqual([[7, 'index', 'categories', 2]]);
+    const [classes] = t.classesOf('layer-2');
+    expect(classes?.colours).toEqual(['#a0713f', '#a0713f']);
+    expect(classes?.widths).toEqual([1, INDEX_LINE_WIDTH]);
+    expect(classes?.indices).toEqual(Uint8Array.of(0, 1));
+    expect(statuses(t.pipeline)).toEqual([
+      ['layer-1', 'drawn'],
+      ['layer-2', 'drawn'],
+    ]);
+  });
+
+  it('puts the width on the class that is the index lines, whichever the engine lists first (the more common one is first)', async () => {
+    const t = contoursSetup([true, false]);
+    await t.start();
+    expect(t.classesOf('layer-2')[0]?.widths).toEqual([INDEX_LINE_WIDTH, 1]);
+  });
+
+  it('has one class and no wider lines when there are no index lines (the interval is so large that none is made)', async () => {
+    const t = contoursSetup([false]);
+    await t.start();
+    const [classes] = t.classesOf('layer-2');
+    expect(classes?.colours).toEqual(['#a0713f']);
+    expect(classes?.widths).toEqual([1]);
+  });
+
+  it('gives the new colour of the layer to both classes without asking the engine again', async () => {
+    const t = contoursSetup([false, true]);
+    await t.start();
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-2',
+      patch: { colour: { mode: 'single', value: '#112233' } },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls.filter(([id]) => id === 7)).toHaveLength(1);
+    expect(t.classesOf('layer-2').at(-1)?.colours).toEqual(['#112233', '#112233']);
+    expect(t.classesOf('layer-2').at(-1)?.widths).toEqual([1, INDEX_LINE_WIDTH]);
+  });
+
+  it('colours the lines by the classes the style names when the person chose to, with every line of one width', async () => {
+    const t = contoursSetup([false, true]);
+    await t.start();
+    t.scene.dispatch({
+      type: 'setStyle',
+      layerId: 'layer-2',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'level',
+          method: 'equal',
+          classes: 5,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls.filter(([id]) => id === 7).at(-1)).toEqual([7, 'level', 'equal', 5]);
+    expect(t.classesOf('layer-2').at(-1)?.widths).toBeUndefined();
+  });
+
+  it('does not give the layer of a grid, or of lines that are not contours, any wider class', async () => {
+    const t = setup();
+    t.state.prepare = () =>
+      Promise.resolve({
+        status: 'drawn',
+        buffers: {
+          kind: 'lines',
+          positions: Float32Array.of(0, 0, 0, 10, 0, 0),
+          segments: Uint32Array.of(0, 1),
+          segmentLine: Uint32Array.of(0),
+        },
+        findings: [],
+      });
+    t.drawable([0, true]);
+    t.scene.dispatch({
+      type: 'addLayers',
+      datasets: [{ id: 0, name: 'Faults', kind: 'lines', elementCount: 1, columns: [] }],
+    });
+    await t.pipeline.idle();
+    expect(t.classifyCalls).toEqual([]);
+    expect(t.sink.setLayerClasses).not.toHaveBeenCalled();
   });
 });
