@@ -17,7 +17,7 @@
 
 use std::ops::Range;
 
-use crate::contour_levels::Levels;
+use crate::contour_levels::{Levels, fraction};
 
 /// A field of values at the points of a lattice, and optionally the height of each point.
 #[derive(Debug, Clone, Copy)]
@@ -115,11 +115,7 @@ impl<'a> Field<'a> {
             (index % self.nx, index / self.nx, (0, 1))
         };
         let (a, b) = (self.value(i, j), self.value(i + step.0, j + step.1));
-        let t = if b == a {
-            0.5
-        } else {
-            ((level - a) / (b - a)).clamp(0.0, 1.0)
-        };
+        let t = fraction(level, a, b);
         let (ha, hb) = (self.height(i, j), self.height(i + step.0, j + step.1));
         #[allow(clippy::cast_precision_loss)]
         let (x, y) = (i as f64 + t * step.0 as f64, j as f64 + t * step.1 as f64);
@@ -758,6 +754,27 @@ mod tests {
         assert_eq!(at_level.len(), 2);
         assert!(at_level.contains(&vec![(0, 4), (4, 0)]), "{at_level:?}");
         assert!(at_level.contains(&vec![(6, 10), (10, 6)]), "{at_level:?}");
+    }
+
+    #[test]
+    fn a_vertex_between_values_of_1e308_and_minus_1e308_is_where_the_level_is_between_them() {
+        // Each row goes from -1e308 to 1e308: the level 0 is in the middle of every horizontal edge, and 5e307 is three quarters along.
+        let values = [-1.0e308, 1.0e308, -1.0e308, 1.0e308];
+        let field = Field::new(2, 2, &values).unwrap();
+        let levels = Levels::for_range(-1.0e308, 1.0e308, 0.0, 5.0e307, 5).unwrap();
+        let lines = contour_field(&field, &levels);
+        for (level, x) in [(0.0, 0.5), (5.0e307, 0.75), (-5.0e307, 0.25)] {
+            let at: Vec<&Contour> = lines
+                .iter()
+                .filter(|line| levels.height(line.level) == Some(level))
+                .collect();
+            assert_eq!(at.len(), 1, "level {level}");
+            assert!(
+                at[0].vertices.iter().all(|v| v.x == x),
+                "level {level}: {:?}",
+                at[0].vertices
+            );
+        }
     }
 
     #[test]

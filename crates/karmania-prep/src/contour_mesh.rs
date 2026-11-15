@@ -10,7 +10,7 @@
 use std::ops::Range;
 
 use crate::contour_grid::{Contour, Vertex, chain, tidy};
-use crate::contour_levels::Levels;
+use crate::contour_levels::{Levels, fraction};
 
 /// An edge of a mesh: its two vertices, the lower number first, so that the two triangles that share it name it the same way.
 type Edge = (u32, u32);
@@ -85,11 +85,7 @@ impl<'a> Surface<'a> {
     /// Where a line at `level` crosses the edge `(a, b)` (`a` is the lower number): on the edge, at the height `level`.
     fn crossing(&self, (a, b): Edge, level: f64) -> Option<Vertex> {
         let (pa, pb) = (self.point(a)?, self.point(b)?);
-        let t = if pb[2] == pa[2] {
-            0.5
-        } else {
-            ((level - pa[2]) / (pb[2] - pa[2])).clamp(0.0, 1.0)
-        };
+        let t = fraction(level, pa[2], pb[2]);
         Some(Vertex {
             // (Not `pa + t * (pb - pa)`: the difference of coordinates of 1e308 and -1e308 is not a number a float holds.)
             x: pa[0] * (1.0 - t) + pb[0] * t,
@@ -435,6 +431,22 @@ mod tests {
         let mut xs: Vec<f64> = lines[0].vertices.iter().map(|v| v.x).collect();
         xs.sort_by(f64::total_cmp);
         assert_eq!(xs, [-5.0e307, 0.0]);
+    }
+
+    #[test]
+    fn a_vertex_on_an_edge_between_heights_of_1e308_and_minus_1e308_is_where_the_level_is_between_them()
+     {
+        // The heights are -1e308, 1e308 and 1e308: the level 0 is halfway along both edges that leave the first vertex.
+        let xyz = [0.0, 0.0, -1.0e308, 1.0, 0.0, 1.0e308, 0.0, 1.0, 1.0e308];
+        let levels = Levels::for_range(-1.0e308, 1.0e308, 0.0, 1.0e308, 5).unwrap();
+        let lines: Vec<Contour> = contours(&xyz, &[0, 1, 2], &levels)
+            .into_iter()
+            .filter(|line| levels.height(line.level) == Some(0.0))
+            .collect();
+        assert_eq!(lines.len(), 1);
+        let mut points: Vec<[f64; 3]> = lines[0].vertices.iter().map(|v| [v.x, v.y, v.z]).collect();
+        points.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        assert_eq!(points, [[0.0, 0.5, 0.0], [0.5, 0.0, 0.0]]);
     }
 
     #[test]
