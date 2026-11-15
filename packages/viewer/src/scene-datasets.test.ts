@@ -83,4 +83,26 @@ describe('syncDatasets', () => {
     // The old layer is gone before the new one is made, so its number (the highest there was) is free again.
     expect(listed(scene)).toEqual([['layer-1', 1, 'New']]);
   });
+
+  it('gives no layer to a dataset that is made from another, and takes away the layer of one that is gone', () => {
+    const scene = createSceneStore();
+    const lines = {
+      ...dataset(5, 'Contours of Wells (every 2)'),
+      kind: 'lines' as const,
+      derivedFrom: { id: 0, kind: 'contours', params: { interval: 2, base: 0, indexEvery: 5 } },
+    };
+    syncDatasets(scene, [dataset(0, 'Wells'), lines]);
+    expect(listed(scene)).toEqual([['layer-1', 0, 'Wells']]);
+    // Its layer is the one the scene makes under its source's, and it stays while the dataset is loaded.
+    scene.dispatch({ type: 'setContoursLayer', sourceLayer: 'layer-1', datasetId: 5 });
+    expect(listed(scene)).toEqual([
+      ['layer-1', 0, 'Wells'],
+      ['layer-2', 5, 'Contours of Wells'],
+    ]);
+    syncDatasets(scene, [dataset(0, 'Wells'), lines]);
+    expect(listed(scene).map(([id]) => id)).toEqual(['layer-1', 'layer-2']);
+    // The lines are gone from the engine: their layer goes, and the source's stays.
+    syncDatasets(scene, [dataset(0, 'Wells')]);
+    expect(listed(scene)).toEqual([['layer-1', 0, 'Wells']]);
+  });
 });

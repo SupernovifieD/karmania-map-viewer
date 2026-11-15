@@ -4,6 +4,7 @@
  * to do. Each kind is the command function of the same name, with its arguments in the fields.
  */
 import type { Frame } from '@karmania/engine/display';
+import { setContoursLayer } from './commands-contours.js';
 import { setFrame, setSelection } from './commands-frame.js';
 import {
   addLayers,
@@ -54,6 +55,12 @@ export type Command =
       readonly layerId: LayerId;
       readonly contours: (ContourParams & { readonly visible: boolean }) | null;
     }
+  | {
+      readonly type: 'setContoursLayer';
+      readonly sourceLayer: LayerId;
+      readonly datasetId: number | null;
+      readonly name?: string;
+    }
   | { readonly type: 'setViewMode'; readonly mode: ViewMode }
   | { readonly type: 'setVerticalExaggeration'; readonly factor: VerticalExaggeration }
   | { readonly type: 'setCamera'; readonly patch: CameraPatch }
@@ -73,6 +80,7 @@ export const COMMAND_TYPES = [
   'setGroupCollapsed',
   'setStyle',
   'setContours',
+  'setContoursLayer',
   'setViewMode',
   'setVerticalExaggeration',
   'setCamera',
@@ -110,6 +118,8 @@ export function applyCommand(doc: SceneDocument, command: Command): SceneDocumen
       return setStyle(doc, command.layerId, command.patch);
     case 'setContours':
       return setContours(doc, command.layerId, command.contours);
+    case 'setContoursLayer':
+      return setContoursLayer(doc, command.sourceLayer, command.datasetId, command.name);
     case 'setViewMode':
       return setViewMode(doc, command.mode);
     case 'setVerticalExaggeration':
