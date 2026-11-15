@@ -273,6 +273,29 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     await expect(layerRow(page, 'layer-1')).toBeFocused();
   });
 
+  test('puts a layer first into a group that is folded when the pointer is under the group, in the indent, says that it is folded, and gives the keyboard to the group', async ({
+    page,
+  }) => {
+    await open(page);
+    await dispatch(page, { type: 'setGroupCollapsed', groupId: 'group-1', collapsed: true });
+    await expect(layerRow(page, 'layer-3')).toHaveCount(0);
+    const group = await groupRow(page, 'group-1').boundingBox();
+    await dragTo(
+      page,
+      handleOf(page, 'layer-1'),
+      (group?.x ?? 0) + 60,
+      (group?.y ?? 0) + (group?.height ?? 0) + 1,
+    );
+    await page.mouse.up();
+    await expect
+      .poll(() => order(page))
+      .toEqual(['group-2:layer-5', 'group-1:layer-1,layer-3,layer-4', 'layer-2']);
+    expect(await said(page)).toBe('Moved Topography into Samples, which is folded');
+    // The layer is in the group and the group is folded: the keyboard is on the group, and not nowhere.
+    await expect(layerRow(page, 'layer-1')).toHaveCount(0);
+    await expect(groupRow(page, 'group-1')).toBeFocused();
+  });
+
   test('puts a layer into a group when the pointer is where its layers are, and takes it out where they are not', async ({
     page,
   }) => {

@@ -22,14 +22,20 @@ interface Lists {
   readonly top: readonly string[];
   readonly groups: ReadonlyMap<string, readonly string[]>;
   readonly names: ReadonlyMap<string, string>;
+  /** The groups that are folded: their layers are not shown. */
+  readonly folded: ReadonlySet<string>;
 }
 
 function listsOf(model: LegendModel): Lists {
   const groups = new Map<string, readonly string[]>();
   const names = new Map<string, string>();
+  const folded = new Set<string>();
   for (const entry of model.entries) {
     names.set(entry.id, entry.name);
     if (entry.type === 'group') {
+      if (entry.collapsed) {
+        folded.add(entry.id);
+      }
       groups.set(
         entry.id,
         entry.layers.map((layer) => layer.id),
@@ -39,7 +45,7 @@ function listsOf(model: LegendModel): Lists {
       }
     }
   }
-  return { top: model.entries.map((entry) => entry.id), groups, names };
+  return { top: model.entries.map((entry) => entry.id), groups, names, folded };
 }
 
 /** The ids of the list that `parent` names. */
@@ -67,8 +73,8 @@ export function placeOf(
 }
 
 /**
- * What is said when `id` has been moved to `to`, worked out from the legend as it is before the move: into a group, or out of the one it was in, or,
- * within its list, above the one that is under it now, or below the one that is over it (`Moved Assays above Topography`). A node that is the only one
+ * What is said when `id` has been moved to `to`, worked out from the legend as it is before the move: into a group (and that it is folded, if it is), or out of
+ * the one it was in, or, within its list, above the one that is under it now, or below the one that is over it (`Moved Assays above Topography`). A node that is the only one
  * of its list is not moved, and that is what is said.
  */
 export function announceMove(model: LegendModel, id: string, to: Place): string {
@@ -79,9 +85,11 @@ export function announceMove(model: LegendModel, id: string, to: Place): string 
     return `${name} cannot be moved.`;
   }
   if (from.parent !== to.parent) {
-    return to.parent === null
-      ? `Moved ${name} out of ${lists.names.get(from.parent ?? '') ?? 'its group'}`
-      : `Moved ${name} into ${lists.names.get(to.parent) ?? 'a group'}`;
+    if (to.parent === null) {
+      return `Moved ${name} out of ${lists.names.get(from.parent ?? '') ?? 'its group'}`;
+    }
+    // A layer that goes into a folded group is not shown any more, and that is what a person who cannot see the list has to be told.
+    return `Moved ${name} into ${lists.names.get(to.parent) ?? 'a group'}${lists.folded.has(to.parent) ? ', which is folded' : ''}`;
   }
   const after = listOf(lists, to.parent).filter((other) => other !== id);
   const at = Math.min(Math.max(to.index, 0), after.length);

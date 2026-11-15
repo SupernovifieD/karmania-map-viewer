@@ -313,6 +313,27 @@ test.describe('folding, deleting and moving layers in and out of groups in the L
     expect(await said(page)).toBe('Moved Geology out of Samples');
   });
 
+  test('puts the keyboard on the group, and says that it is folded, when Alt and Right take a layer into a group that is folded: the layer is not shown there', async ({
+    page,
+  }) => {
+    await open(page);
+    await dispatch(page, { type: 'setGroupCollapsed', groupId: 'group-1', collapsed: true });
+    await expect(layerRow(page, 'layer-3')).toHaveCount(0);
+    await layerRow(page, 'layer-2').focus();
+    await page.keyboard.press('Alt+ArrowRight');
+    await expect
+      .poll(() => order(page))
+      .toEqual(['group-2:layer-5', 'group-1:layer-3,layer-4,layer-2', 'layer-1']);
+    expect(await said(page)).toBe('Moved Assays into Samples, which is folded');
+    // The layer is not on the page (its group is folded), so the keyboard is where it can be: on the group, which has one more.
+    await expect(layerRow(page, 'layer-2')).toHaveCount(0);
+    await expect(groupRow(page, 'group-1')).toBeFocused();
+    await expect(groupRow(page, 'group-1').locator('.count')).toHaveText('3');
+    // And the keyboard goes on from there: Right unfolds, and the layer is there.
+    await page.keyboard.press('ArrowRight');
+    await expect(layerRow(page, 'layer-2')).toBeVisible();
+  });
+
   test('says why a layer does not go in or out, and moves nothing: no group above, in a group already, a group, not in a group', async ({
     page,
   }) => {
