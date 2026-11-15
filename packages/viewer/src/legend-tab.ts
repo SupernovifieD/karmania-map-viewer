@@ -10,6 +10,7 @@ import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
+import { stepMove } from './legend-order.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
 import {
   expansionFor,
@@ -74,6 +75,7 @@ export class KarmaniaLegendTab extends LitElement {
     model: { attribute: false },
     current: { state: true },
     open: { state: true },
+    announcement: { state: true },
   };
 
   static override styles = [
@@ -293,18 +295,54 @@ export class KarmaniaLegendTab extends LitElement {
   declare private current: string | undefined;
   /** The ids of the layers that a person has opened (a layer is open only if it has lines to show: `treeItems`). */
   declare private open: ReadonlySet<string>;
+  /** What the polite live region says: the last move, or why a row was not moved. */
+  declare private announcement: string;
+  /** The key of a row that was moved, which has the keyboard again once the legend that has it in its new place comes. */
+  private refocus: string | undefined;
+  /** Said twice in a row, a sentence is not read twice: a space that is not a break comes and goes at its end. */
+  private spaced = false;
 
   constructor() {
     super();
     this.model = undefined;
     this.current = undefined;
     this.open = new Set();
+    this.announcement = '';
+    this.refocus = undefined;
   }
 
   /** A layer that has gone is not kept open for another that is given its id. */
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('model') && this.model !== undefined) {
       this.open = stillThere(this.open, this.model);
+    }
+  }
+
+  /** A row that was moved is in its new place now, and has the keyboard again (moving it in the page took it away). */
+  protected override updated(changed: PropertyValues<this>): void {
+    if (changed.has('model') && this.refocus !== undefined) {
+      const key = this.refocus;
+      this.refocus = undefined;
+      this.focusRow(key);
+    }
+  }
+
+  /** Says something in the live region. */
+  private say(text: string): void {
+    this.spaced = !this.spaced;
+    this.announcement = this.spaced ? `${text}\u00a0` : text;
+  }
+
+  /** Moves a row by one place of its list, and says where it went or why it did not. */
+  private moveRow(item: TreeItem, direction: 'up' | 'down'): void {
+    if (this.model === undefined) {
+      return;
+    }
+    const step = stepMove(this.model, item.id, direction);
+    this.say(step.say);
+    if (step.move !== undefined) {
+      this.refocus = itemKey(item);
+      this.ask({ type: 'moveNode', id: step.move.id, to: step.move.to });
     }
   }
 
@@ -332,8 +370,15 @@ export class KarmaniaLegendTab extends LitElement {
   }
 
   private onKeyDown(event: KeyboardEvent, item: TreeItem): void {
-    // A key with Alt, Control or Command is the browser's, or another step's, and is left alone.
-    if (event.altKey || event.ctrlKey || event.metaKey) {
+    // A key with Control or Command is the browser's, and so is one with Alt, but for Alt and Up or Down, which move the row.
+    if (event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (event.altKey) {
+      if (!event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        this.moveRow(item, event.key === 'ArrowUp' ? 'up' : 'down');
+      }
       return;
     }
     if (isMove(event.key)) {
@@ -531,6 +576,9 @@ export class KarmaniaLegendTab extends LitElement {
     };
     return html`
       <div class="top"><span>${model.layerCountLabel}</span></div>
+      <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        ${this.announcement}
+      </div>
       <ul role="tree" aria-label="Layers">
         ${repeat(
           model.entries,
