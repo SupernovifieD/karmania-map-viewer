@@ -27,7 +27,8 @@ async function open(page: Page): Promise<void> {
     patch: { colour: { mode: 'single', value: '#e69f00' } },
   });
   await showLegend(page);
-  // The button is there once the engine has given the classes.
+  // The rows are there. (The classes come from the engine a little after the layers are drawn, and every row has its button, so that nothing here waits for
+  // them: a test that reads the lines of a layer waits for the lines first.)
   await expect(layerRow(page, 'layer-1')).toHaveAttribute('aria-expanded', 'false');
   await expect(layerRow(page, 'layer-2')).toHaveAttribute('aria-expanded', 'false');
 }
@@ -72,8 +73,10 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await expect(page.getByRole('group', { name: 'Classes of Topography' })).toHaveCount(1);
     await expect(layerRow(page, 'layer-1')).toHaveAttribute('aria-owns', 'legend-classes-layer-1');
     const all = lines(page, 'layer-1');
+    // The 16 cells in the 7 classes that a layer has at first, once the engine has given them.
+    await expect(all).toHaveCount(7);
     const labels = await all.locator('.label').allTextContents();
-    expect(labels.length).toBeGreaterThanOrEqual(2);
+    expect(labels).toHaveLength(7);
     // The classes are of the 16 cells, so their counts add up to 16, and there is no "No value" line, as every cell has one.
     expect((await counts(page, 'layer-1')).reduce((sum, n) => sum + n, 0)).toBe(16);
     expect(labels).not.toContain('No value');
@@ -171,8 +174,7 @@ test.describe('the class lines of a layer in the Legend tab', () => {
   }) => {
     await open(page);
     await opener(layerRow(page, 'layer-1')).click();
-    const before = await lines(page, 'layer-1').count();
-    expect(before).toBeGreaterThan(3);
+    await expect(lines(page, 'layer-1')).toHaveCount(7);
     const style = (classesWanted: number) => ({
       type: 'setStyle',
       layerId: 'layer-1',

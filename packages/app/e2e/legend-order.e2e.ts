@@ -258,8 +258,16 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     expect(Math.abs((box?.y ?? 0) + 1 - (target?.y ?? 0))).toBeLessThanOrEqual(1);
     expect(box?.x).toBe(target?.x);
     // The line is in the accent, and the dragged row says it is dragged.
-    expect(await line.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
-      'rgba(0, 0, 0, 0)',
+    const accent = await legend(page).evaluate((tab) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--k-accent)';
+      tab.shadowRoot?.append(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    });
+    expect(await line.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+      accent,
     );
     await expect(layerRow(page, 'layer-1')).toHaveAttribute('data-dragging', '');
     expect(await order(page)).toEqual(START);

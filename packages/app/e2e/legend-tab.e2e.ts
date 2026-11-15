@@ -140,6 +140,64 @@ test.describe('the Legend tab', () => {
     );
   });
 
+  /** What `token` is in the colours of the page, as the browser writes a colour: found by painting a probe with it, so that no value is copied into a test. */
+  const tokenColour = (page: Page, token: string): Promise<string> =>
+    legend(page).evaluate((tab, name) => {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${name})`;
+      tab.shadowRoot?.append(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    }, token);
+
+  test('has the parts of 10.3 as it says them: padding 16, the caption muted, a ghost button with the folder-plus icon, a group name of weight 500 with its count muted, a swatch with a radius of 4, and a polite live region', async ({
+    page,
+  }) => {
+    await loadLegend(page);
+    const area = page.locator('karmania-panel [data-scroll-region][slot="legend"]');
+    await expect(area).toHaveCSS('padding', '16px');
+    const muted = await tokenColour(page, '--k-text-muted');
+    const text = await tokenColour(page, '--k-text');
+    expect(muted).not.toBe(text);
+    // The caption, at the left of the top row, is muted.
+    await expect(legend(page).locator('.top span').first()).toHaveCSS('color', muted);
+    await expect(legend(page).locator('.top span').first()).toHaveText('5 layers');
+    // The button, at its right, is a ghost button with the folder-plus icon, and says what it does.
+    const button = legend(page).locator('.top k-button');
+    await expect(button).toHaveAttribute('variant', 'ghost');
+    await expect(button.locator('k-icon')).toHaveAttribute('name', 'folder-plus');
+    await expect(legend(page).getByRole('button', { name: 'New group' })).toBeVisible();
+    // A group's name is of weight 500 and its count is muted; a layer's name is not of that weight.
+    await expect(groupName(page, 'group-1')).toHaveCSS('font-weight', '500');
+    await expect(groupRow(page, 'group-1').locator('.count')).toHaveCSS('color', muted);
+    await expect(layerName(page, 'layer-1')).not.toHaveCSS('font-weight', '500');
+    // A swatch has a radius of 4.
+    await expect(layerRow(page, 'layer-1').locator('.swatch')).toHaveCSS('border-radius', '4px');
+    // The announcements are in a region that is polite, whole, and not seen.
+    const region = legend(page).locator('[role="status"]');
+    await expect(region).toHaveAttribute('aria-live', 'polite');
+    await expect(region).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  test("has the lines of a layer's classes in the type of 10.3: 13 on 20, with numbers of one width, the count muted", async ({
+    page,
+  }) => {
+    await loadLegend(page);
+    await layerRow(page, 'layer-2').locator('.open').click();
+    const line = legend(page).locator('#legend-classes-layer-2 .entry').first();
+    await expect(line).toBeVisible();
+    await expect(line).toHaveCSS('font-size', '13px');
+    await expect(line).toHaveCSS('line-height', '20px');
+    expect(await line.evaluate((one) => getComputedStyle(one).fontVariantNumeric)).toContain(
+      'tabular-nums',
+    );
+    await expect(line.locator('.figure')).toHaveCSS(
+      'color',
+      await tokenColour(page, '--k-text-muted'),
+    );
+  });
+
   test('shows a layer in one colour as a swatch of 16 by 16 in that colour, and a layer by classes as its classes side by side, 24 by 12, in a room of 24', async ({
     page,
   }) => {

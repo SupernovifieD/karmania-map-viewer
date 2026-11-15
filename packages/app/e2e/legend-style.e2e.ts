@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
+import { boxOf } from './support/layout.js';
 import { layerRow, legend, loadLegendScene, showLegend } from './support/legend.js';
 import { around, bytes, distance, dispatch, drawn, mapColour } from './support/render.js';
 import { projectionFor } from './support/fixtures.js';
@@ -330,9 +331,9 @@ test.describe('the style editor: colour by, and a single colour', () => {
     expect(select?.width).toBe(whole?.width);
     expect(field?.width).toBe(whole?.width);
     // Label above the control: the select's label is over its box.
-    const label = await colourBy(page, 'layer-1').locator('label').boundingBox();
-    const box = await colourBy(page, 'layer-1').locator('select').boundingBox();
-    expect((label?.y ?? 0) + (label?.height ?? 0)).toBeLessThanOrEqual(box?.y ?? 0);
+    const label = await boxOf(colourBy(page, 'layer-1').locator('label'), 'the label of Colour by');
+    const box = await boxOf(colourBy(page, 'layer-1').locator('select'), 'the select of Colour by');
+    expect(label.y + label.height).toBeLessThanOrEqual(box.y);
     // 12 between the fields: from the select to the Colour label, and from the swatches to the hex code's label.
     const colourLabel = await editor(page, 'layer-1').locator('.group-label').boundingBox();
     expect((colourLabel?.y ?? 0) - ((select?.y ?? 0) + (select?.height ?? 0))).toBe(12);
@@ -535,6 +536,8 @@ test.describe('the style editor: the classes of a column', () => {
     // Under the list, and not over the checkbox, with the list's 4 above it and the 12 below it as they were.
     expect((checkbox?.y ?? 0) - ((list?.y ?? 0) + (list?.height ?? 0))).toBe(12);
     expect(await gap()).toBe(closed + (list?.height ?? 0) + 4);
+    // Six choices of 32 and the border: more than five of them, and not more than six, since the rest scrolls.
+    expect(list?.height).toBeGreaterThan(5 * 32);
     expect(list?.height).toBeLessThanOrEqual(6 * 32 + 2);
     expect(
       await rampList(page, 'layer-2').evaluate((one) => one.scrollHeight > one.clientHeight),
@@ -585,11 +588,10 @@ test.describe('the style editor: the classes of a column', () => {
     await page.keyboard.press('End');
     await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-14');
     // The choice the arrows are at is in sight in the list that scrolls.
-    const list = await rampList(page, 'layer-2').boundingBox();
-    const last = await rampChoices(page, 'layer-2').nth(14).boundingBox();
-    expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(
-      (list?.y ?? 0) + (list?.height ?? 0),
-    );
+    const list = await boxOf(rampList(page, 'layer-2'), 'the list of ramps');
+    const last = await boxOf(rampChoices(page, 'layer-2').nth(14), 'the last ramp');
+    expect(last.y + last.height).toBeLessThanOrEqual(list.y + list.height);
+    expect(last.y).toBeGreaterThanOrEqual(list.y);
     await page.keyboard.press('ArrowDown');
     await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-14');
     await page.keyboard.press('Home');
@@ -697,7 +699,7 @@ test.describe('the style editor: the classes of a column', () => {
     await expect(firstDot(page, 'layer-2')).toHaveCSS('background-color', 'rgb(68, 1, 84)');
   });
 
-  test('keeps the method, the classes, the ramp and its direction when the column is changed, and offers only Categories for a column of text', async ({
+  test('gives a column of text one class for each value and offers it only Categories, a column of numbers all four methods, and keeps the number of classes and the direction of the ramp when another column is chosen', async ({
     page,
   }) => {
     await page.goto('/?theme=light');
@@ -746,6 +748,43 @@ test.describe('the style editor: the classes of a column', () => {
         .locator('option')
         .evaluateAll((all) => all.map((option) => (option as HTMLOptionElement).disabled)),
     ).toEqual([false, false, false, false]);
+    // The number of classes and the direction of the ramp are the layer's, and are kept when another column is chosen; the method and the ramp are the new
+    // column's (a column of numbers is by equal intervals from viridis, one of text by categories from Okabe-Ito).
+    await field(page, 'layer-1', 'Classes').locator('select').selectOption('5');
+    await reverse(page, 'layer-1').getByText('Reverse ramp').click();
+    await field(page, 'layer-1', 'Method').locator('select').selectOption('quantile');
+    await expect
+      .poll(() => styleOf(page, 'layer-1'))
+      .toEqual({
+        mode: 'classes',
+        column: 'Au_ppm',
+        method: 'quantile',
+        classes: 5,
+        ramp: 'viridis',
+        reverse: true,
+      });
+    await colourBy(page, 'layer-1').locator('select').selectOption('column:Rock');
+    await expect
+      .poll(() => styleOf(page, 'layer-1'))
+      .toEqual({
+        mode: 'classes',
+        column: 'Rock',
+        method: 'categories',
+        classes: 5,
+        ramp: 'okabe-ito',
+        reverse: true,
+      });
+    await colourBy(page, 'layer-1').locator('select').selectOption('column:Au_ppm');
+    await expect
+      .poll(() => styleOf(page, 'layer-1'))
+      .toEqual({
+        mode: 'classes',
+        column: 'Au_ppm',
+        method: 'equal',
+        classes: 5,
+        ramp: 'viridis',
+        reverse: true,
+      });
   });
 
   test('has no serious accessibility violation with the ramp list open, and with a ramp of the list focused', async ({
@@ -806,12 +845,12 @@ test.describe('the style editor: opacity, point size and line width', () => {
     const background = await mapColour(page);
     const half = solid.map((channel, i) => Math.round((channel + (background[i] ?? 0)) / 2));
     await expect.poll(async () => distance(await centre(page), half)).toBeLessThanOrEqual(3);
-    // A tenth is drawn nearer the background than a half.
+    // A tenth is drawn as a tenth: its own blend with the background (and not only nearer to it than a half, which the middle already was on the way there).
     await numberInput(page, 'layer-1', 'Opacity (%)').fill('10');
     await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
-    await expect
-      .poll(async () => distance(await centre(page), background))
-      .toBeLessThan(distance(half, background));
+    const tenth = solid.map((channel, i) => Math.round(channel * 0.1 + (background[i] ?? 0) * 0.9));
+    await expect.poll(async () => distance(await centre(page), tenth)).toBeLessThanOrEqual(3);
+    expect(distance(half, tenth)).toBeGreaterThan(3);
   });
 
   test('takes a number when the field is left, with its unit if it is typed, and keeps decimals to the hundredth of a percent', async ({
@@ -953,16 +992,20 @@ test.describe('the style editor: opacity, point size and line width', () => {
         .evaluateAll((all) => all.map((one) => one.getAttribute('label'))),
     ).toEqual(['Hex code', 'Opacity (%)', 'Point size (px)']);
     await expect(numberInput(page, 'layer-1', 'Point size (px)')).toHaveValue('6');
+    // What is drawn at the size of 6 that the layer has: the 2 is drawn when it is less than that (and not when the scene says 2, which is before the map).
+    const usual = await painted(page);
+    expect(usual).toBeGreaterThan(0);
     await numberInput(page, 'layer-1', 'Point size (px)').fill('2');
     await numberInput(page, 'layer-1', 'Point size (px)').press('Enter');
     await expect.poll(() => numberOfStyle(page, 'layer-1', 'pointSize')).toBe(2);
-    let small = 0;
+    let small = usual;
     await expect
       .poll(async () => {
         small = await painted(page);
         return small;
       })
-      .toBeGreaterThan(0);
+      .toBeLessThan(usual);
+    expect(small).toBeGreaterThan(0);
     await numberInput(page, 'layer-1', 'Point size (px)').fill('12');
     await numberInput(page, 'layer-1', 'Point size (px)').press('Enter');
     await expect.poll(() => numberOfStyle(page, 'layer-1', 'pointSize')).toBe(12);
@@ -992,16 +1035,20 @@ test.describe('the style editor: opacity, point size and line width', () => {
         .evaluateAll((all) => all.map((one) => one.getAttribute('label'))),
     ).toEqual(['Hex code', 'Opacity (%)', 'Line width (px)']);
     await expect(numberInput(page, 'layer-1', 'Line width (px)')).toHaveValue('2');
+    // What is drawn at the width of 2 that the layer has: the 1 is drawn when it is less than that.
+    const usual = await painted(page);
+    expect(usual).toBeGreaterThan(0);
     await numberInput(page, 'layer-1', 'Line width (px)').fill('1');
     await numberInput(page, 'layer-1', 'Line width (px)').press('Enter');
     await expect.poll(() => numberOfStyle(page, 'layer-1', 'lineWidth')).toBe(1);
-    let thin = 0;
+    let thin = usual;
     await expect
       .poll(async () => {
         thin = await painted(page);
         return thin;
       })
-      .toBeGreaterThan(0);
+      .toBeLessThan(usual);
+    expect(thin).toBeGreaterThan(0);
     await numberInput(page, 'layer-1', 'Line width (px)').fill('8');
     await numberInput(page, 'layer-1', 'Line width (px)').press('Enter');
     await expect.poll(() => numberOfStyle(page, 'layer-1', 'lineWidth')).toBe(8);

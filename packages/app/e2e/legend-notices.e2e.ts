@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
+import { boxOf } from './support/layout.js';
 import { layerRow, legend, showLegend } from './support/legend.js';
 import { layerStatuses, withData } from './support/render.js';
 import { importAsLocalGrid } from './support/wizard.js';
@@ -113,11 +114,11 @@ test.describe('the notice of a layer that is not drawn in the Legend tab', () =>
     await expect(reason(page, 'layer-2')).toHaveAttribute('role', 'treeitem');
     await expect(reason(page, 'layer-2')).toHaveAttribute('aria-level', '2');
     // The message is above what to do, and both are above the fields, which are still there: a layer that is not drawn keeps its style.
-    const said = await reason(page, 'layer-2').locator('.said').boundingBox();
-    const hint = await reason(page, 'layer-2').locator('.hint').boundingBox();
-    const style = await legend(page).locator('#legend-style-layer-2').boundingBox();
-    expect((said?.y ?? 0) + (said?.height ?? 0)).toBeLessThanOrEqual(hint?.y ?? 0);
-    expect((hint?.y ?? 0) + (hint?.height ?? 0)).toBeLessThanOrEqual(style?.y ?? 0);
+    const said = await boxOf(reason(page, 'layer-2').locator('.said'), 'the message');
+    const hint = await boxOf(reason(page, 'layer-2').locator('.hint'), 'what to do');
+    const style = await boxOf(legend(page).locator('#legend-style-layer-2'), 'the style fields');
+    expect(said.y + said.height).toBeLessThanOrEqual(hint.y);
+    expect(hint.y + hint.height).toBeLessThanOrEqual(style.y);
     // And the icon is at the left of the lines, under the swatch of the layer.
     await expect(reason(page, 'layer-2').locator('k-icon')).toHaveAttribute(
       'name',
