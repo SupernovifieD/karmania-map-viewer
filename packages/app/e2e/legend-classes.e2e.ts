@@ -45,19 +45,20 @@ const counts = (page: Page, id: string): Promise<number[]> =>
     .then((texts) => texts.map((text) => Number(text.replace(/,/g, ''))));
 
 test.describe('the class lines of a layer in the Legend tab', () => {
-  test('has the button on a layer that has classes and on no other: one in one colour has nothing to open', async ({
+  test('has the button on every layer, with classes or without (its style is behind it), 28 wide, and says whether it is open', async ({
     page,
   }) => {
     await open(page);
-    for (const id of ['layer-1', 'layer-2']) {
-      await expect(opener(layerRow(page, id)).locator('k-icon')).toHaveCount(1);
-    }
-    await expect(opener(layerRow(page, 'layer-3')).locator('k-icon')).toHaveCount(0);
-    await expect(layerRow(page, 'layer-3')).not.toHaveAttribute('aria-expanded', /.*/);
-    // The room for it is there all the same, so that nothing moves: 28 wide on every layer.
     for (const id of ['layer-1', 'layer-2', 'layer-3']) {
+      await expect(opener(layerRow(page, id)).locator('k-icon'), id).toHaveCount(1);
+      await expect(layerRow(page, id), id).toHaveAttribute('aria-expanded', 'false');
       expect((await opener(layerRow(page, id)).boundingBox())?.width, id).toBe(28);
     }
+    // A layer in one colour has no class lines to show when it is opened, only its style.
+    await opener(layerRow(page, 'layer-3')).click();
+    await expect(layerRow(page, 'layer-3')).toHaveAttribute('aria-expanded', 'true');
+    await expect(classes(page, 'layer-3')).toHaveCount(0);
+    await expect(legend(page).locator('#legend-style-layer-3')).toBeVisible();
   });
 
   test('opens a layer with the pointer, and shows a line for each class: its colour, its label with an en dash between its bounds, and its count', async ({
@@ -121,7 +122,7 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await expect(last.locator('.dot')).toHaveCSS('border-top-style', 'solid');
   });
 
-  test('opens a layer with Right and closes it with Left, keeps the keyboard on the row, and does nothing on a layer with nothing to show', async ({
+  test('opens a layer with Right and closes it with Left, keeps the keyboard on the row, on a layer in one colour as on one with classes', async ({
     page,
   }) => {
     await open(page);
@@ -139,12 +140,15 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await expect(classes(page, 'layer-1')).toHaveCount(0);
     await page.keyboard.press('ArrowLeft');
     await expect(row).toHaveAttribute('aria-expanded', 'false');
-    // A layer with nothing to show has nothing to open or close.
+    // A layer in one colour opens too, to its style and no class lines.
     const single = layerRow(page, 'layer-3');
     await single.focus();
     await page.keyboard.press('ArrowRight');
-    await expect(single).not.toHaveAttribute('aria-expanded', /.*/);
+    await expect(single).toHaveAttribute('aria-expanded', 'true');
+    await expect(classes(page, 'layer-3')).toHaveCount(0);
     await expect(single).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(single).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('puts the lines of a layer in a group 24 in, as its row is', async ({ page }) => {
@@ -162,7 +166,7 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await expect(groupRow(page, 'group-1')).toBeVisible();
   });
 
-  test('keeps a layer open while its classes are worked out again, and closes it when it has none: opened again with classes, it is open', async ({
+  test('keeps a layer open while its classes are worked out again and when it has none (its style is still behind it), and has its lines again with classes', async ({
     page,
   }) => {
     await open(page);
@@ -186,14 +190,15 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await dispatch(page, style(3));
     await expect.poll(() => lines(page, 'layer-1').count()).toBe(3);
     await expect(layerRow(page, 'layer-1')).toHaveAttribute('aria-expanded', 'true');
-    // In one colour it has no lines, and nothing to open.
+    // In one colour it has no lines, and is open all the same: its style is what is behind it.
     await dispatch(page, {
       type: 'setStyle',
       layerId: 'layer-1',
       patch: { colour: { mode: 'single', value: '#0072b2' } },
     });
-    await expect(layerRow(page, 'layer-1')).not.toHaveAttribute('aria-expanded', /.*/);
     await expect(classes(page, 'layer-1')).toHaveCount(0);
+    await expect(layerRow(page, 'layer-1')).toHaveAttribute('aria-expanded', 'true');
+    await expect(legend(page).locator('#legend-style-layer-1')).toBeVisible();
     // By classes again: it is open, as it was left.
     await dispatch(page, style(5));
     await expect.poll(() => lines(page, 'layer-1').count()).toBe(5);

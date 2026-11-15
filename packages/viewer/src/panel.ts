@@ -1,5 +1,6 @@
 import type { Summary } from '@karmania/engine';
 import type { LegendModel } from '@karmania/scene';
+import type { StyleInfo } from './legend-style.js';
 import { kButton, sharedStyles } from '@karmania/ui';
 import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
@@ -39,6 +40,7 @@ export class KarmaniaPanel extends LitElement {
     tab: { type: String, reflect: true },
     collapsed: { type: Boolean, reflect: true },
     legend: { attribute: false },
+    styles: { attribute: false },
     datasets: { attribute: false },
     selected: { attribute: false },
     rows: { attribute: false },
@@ -137,6 +139,8 @@ export class KarmaniaPanel extends LitElement {
   declare collapsed: boolean;
   /** The legend, which the Legend tab shows: its layers and groups. */
   declare legend: LegendModel | undefined;
+  /** What the style editors of the Legend tab are given, by layer. */
+  declare styles: Readonly<Record<string, StyleInfo>> | undefined;
   /** The datasets that are loaded, which the Data tab shows. */
   declare datasets: readonly Summary[];
   /** The `id` of the dataset that is selected. */
@@ -160,6 +164,7 @@ export class KarmaniaPanel extends LitElement {
     this.tab = 'legend';
     this.collapsed = false;
     this.legend = undefined;
+    this.styles = undefined;
     this.datasets = [];
     this.selected = undefined;
     this.rows = undefined;
@@ -250,7 +255,10 @@ export class KarmaniaPanel extends LitElement {
               })}
             </k-tooltip>
             <div slot="legend" class="body" data-scroll-region>
-              <karmania-legend-tab .model=${this.legend}></karmania-legend-tab>
+              <karmania-legend-tab
+                .model=${this.legend}
+                .styles=${this.styles}
+              ></karmania-legend-tab>
             </div>
             <div slot="data" class="body flush" data-scroll-region>
               <karmania-data-tab

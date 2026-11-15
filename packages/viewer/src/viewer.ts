@@ -56,6 +56,8 @@ import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
 import { layerLook } from './layer-look.js';
 import { LayerPipeline } from './layer-pipeline.js';
+import { styleInfos } from './legend-style.js';
+import type { StyleInfo } from './legend-style.js';
 import type { LayerSink, LayerState } from './layer-pipeline.js';
 import { drawOrder } from './draw-order.js';
 import { furnitureOf, sameFurniture } from './furniture.js';
@@ -517,6 +519,20 @@ export class KarmaniaViewer extends LitElement {
   /** The legend the Legend tab shows, and the text it was made into, so that the same legend is the same object (a turn of the map draws the viewer again). */
   private legend: LegendModel | undefined;
   private legendKey = '';
+  /** What the style editors are given, and the text of it, kept the same while it is the same (as the legend is). */
+  private styles: Readonly<Record<string, StyleInfo>> | undefined;
+  private stylesKey = '';
+
+  /** What the style editors need now: the style of each layer, and the kind and columns of its dataset. */
+  private currentStyles(): Readonly<Record<string, StyleInfo>> {
+    const next = styleInfos(this.store.getState(), this.datasets);
+    const key = JSON.stringify(next);
+    if (this.styles === undefined || key !== this.stylesKey) {
+      this.styles = next;
+      this.stylesKey = key;
+    }
+    return this.styles;
+  }
 
   /** The legend of the scene now: the layers and groups, with the classes the engine has given and why a layer is not drawn. */
   private currentLegend(): LegendModel {
@@ -897,6 +913,7 @@ export class KarmaniaViewer extends LitElement {
     }
     const notices = this.notices;
     const legend = this.currentLegend();
+    const styles = this.currentStyles();
     return html`
       <div
         class="workspace"
@@ -930,6 +947,7 @@ export class KarmaniaViewer extends LitElement {
           .reset=${PANEL_WIDTH.default}
           .tab=${this.panel.tab}
           .legend=${legend}
+          .styles=${styles}
           .datasets=${this.datasets}
           .selected=${this.selected}
           .rows=${this.rows}

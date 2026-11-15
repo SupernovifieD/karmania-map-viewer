@@ -203,21 +203,27 @@ function classified() {
 }
 
 describe('treeItems with layers that can be opened', () => {
-  it('says a layer can be opened when it has lines to show: its classes, and not before the engine has given them or in one colour', () => {
+  it('has every layer closed to begin with, those that have classes and those that have none, and says the level and the group of each', () => {
     const items = treeItems(classified());
-    const by = (id: string) => items.find((item) => item.kind === 'layer' && item.id === id);
-    expect(by('layer-1')).toMatchObject({ expandable: true, expanded: false });
-    expect(by('layer-4')).toMatchObject({ expandable: true, level: 2 });
-    expect(by('layer-2')).toMatchObject({ expandable: false });
-    expect(by('layer-3')).toMatchObject({ expandable: false });
+    const layers = items.filter((item) => item.kind === 'layer');
+    expect(layers.map((item) => item.id).sort()).toEqual([
+      'layer-1',
+      'layer-2',
+      'layer-3',
+      'layer-4',
+    ]);
+    expect(layers.every((item) => !item.expanded)).toBe(true);
+    expect(layers.find((item) => item.id === 'layer-4')).toMatchObject({
+      level: 2,
+      parent: 'group-1',
+    });
+    expect(layers.find((item) => item.id === 'layer-1')).toMatchObject({ level: 1, parent: null });
   });
 
-  it('says a layer is open when it has been opened and can be, and not for one that has nothing to show', () => {
-    const items = treeItems(classified(), new Set(['layer-1', 'layer-2', 'layer-3']));
-    const by = (id: string) => items.find((item) => item.kind === 'layer' && item.id === id);
-    expect(by('layer-1')).toMatchObject({ expanded: true });
-    expect(by('layer-2')).toMatchObject({ expandable: false, expanded: false });
-    expect(by('layer-3')).toMatchObject({ expanded: false });
+  it('says a layer is open when it has been opened, and only that one: the others stay closed, and an id that is not a layer opens nothing', () => {
+    const items = treeItems(classified(), new Set(['layer-1', 'layer-3', 'group-1', 'layer-9']));
+    const open = items.flatMap((item) => (item.kind === 'layer' && item.expanded ? [item.id] : []));
+    expect(open.sort()).toEqual(['layer-1', 'layer-3']);
   });
 });
 
@@ -263,11 +269,14 @@ describe('expansionFor', () => {
     expect(expansionFor(row('layer', 'layer-4'), 'ArrowLeft')).toBe(false);
   });
 
-  it('does nothing when the layer is so already, has nothing to show, is a group, or the key is another', () => {
+  it('opens a layer that has no classes too, with Right: its style is behind it', () => {
+    expect(expansionFor(row('layer', 'layer-3'), 'ArrowRight')).toBe(true);
+    expect(expansionFor(row('layer', 'layer-2'), 'ArrowRight')).toBe(true);
+  });
+
+  it('does nothing when the layer is so already, is a group, or the key is another', () => {
     expect(expansionFor(row('layer', 'layer-1'), 'ArrowLeft')).toBeUndefined();
     expect(expansionFor(row('layer', 'layer-4'), 'ArrowRight')).toBeUndefined();
-    expect(expansionFor(row('layer', 'layer-3'), 'ArrowRight')).toBeUndefined();
-    expect(expansionFor(row('layer', 'layer-2'), 'ArrowRight')).toBeUndefined();
     expect(expansionFor(row('group', 'group-1'), 'ArrowRight')).toBeUndefined();
     expect(expansionFor(row('layer', 'layer-1'), 'Enter')).toBeUndefined();
   });
@@ -341,11 +350,15 @@ describe('keyAction', () => {
     });
   });
 
-  it('does nothing on a layer of the top that is closed or has nothing to show, and for any other key', () => {
+  it('does nothing on a layer of the top that is closed, with Left, and for any other key', () => {
     const items = treeItems(model);
     expect(keyAction(items, row(items, 'layer:layer-1'), 'ArrowLeft')).toBeUndefined();
-    expect(keyAction(items, row(items, 'layer:layer-3'), 'ArrowRight')).toBeUndefined();
     expect(keyAction(items, row(items, 'layer:layer-3'), 'ArrowLeft')).toBeUndefined();
+    expect(keyAction(items, row(items, 'layer:layer-3'), 'ArrowRight')).toEqual({
+      kind: 'open',
+      id: 'layer-3',
+      open: true,
+    });
     expect(keyAction(items, row(items, 'group:group-1'), 'Enter')).toBeUndefined();
     expect(keyAction(items, row(items, 'layer:layer-4'), 'ArrowDown')).toBeUndefined();
   });

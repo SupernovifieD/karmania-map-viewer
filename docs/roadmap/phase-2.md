@@ -624,9 +624,9 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.5b The `New group` button and renaming a group in place (F2, double click, Enter, Escape); browser proofs; the states photographed again.
   - [x] 19.5c Fold and unfold (chevron, Right and Left), delete (button and key), Alt + Right and Left; browser proofs.
   - [x] 19.5d The states photographed (a group being renamed, a group pointed at); the others taken again.
-- [ ] 19.6 Style editor 1: colour by; single colour swatches and hex field.
+- [x] 19.6 Style editor 1: colour by; single colour swatches and hex field.
   - [x] 19.6a What the style editor does with a style, as functions: the choices of Colour by, what a choice makes of the colour, a typed hex code, the twelve swatches.
-  - [ ] 19.6b The style editor behind every layer's row: Colour by, the swatches and the hex code; browser proofs; the states photographed.
+  - [x] 19.6b The style editor behind every layer's row: Colour by, the swatches and the hex code; browser proofs; the states photographed.
 - [ ] 19.7 Style editor 2: method, classes, ramp with previews, reverse.
 - [ ] 19.8 Style editor 3: opacity, point size, line width.
 - [ ] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the

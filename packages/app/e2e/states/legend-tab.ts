@@ -115,6 +115,21 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    // A layer opened on its style, in one colour: Colour by, the twelve swatches with one chosen (a ring round it), and the hex code.
+    name: 'legend-tab-style',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await dispatch(page, {
+        type: 'setStyle',
+        layerId: 'layer-1',
+        patch: { colour: { mode: 'single', value: '#b2df8a' } },
+      });
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+      await page.locator('karmania-legend-tab #legend-style-layer-1 .swatch').first().waitFor();
+      return rest(page);
+    },
+  },
+  {
     // A group is renamed in place: a field in the place of its name, with its ring, and the rest of the row as it is.
     name: 'legend-tab-rename',
     show: async (page) => {

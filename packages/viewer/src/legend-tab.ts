@@ -11,6 +11,9 @@ import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { LegendDrag } from './legend-drag.js';
+import './style-editor.js';
+import type { StyleChange } from './style-editor.js';
+import type { StyleInfo } from './legend-style.js';
 import type { DropRow } from './legend-drop.js';
 import {
   announceDelete,
@@ -83,6 +86,7 @@ function isMove(key: string): key is MoveKey {
 export class KarmaniaLegendTab extends LitElement {
   static override properties = {
     model: { attribute: false },
+    styles: { attribute: false },
     current: { state: true },
     open: { state: true },
     announcement: { state: true },
@@ -360,6 +364,12 @@ export class KarmaniaLegendTab extends LitElement {
         margin-left: var(--k-space-24);
       }
 
+      /* The style editor is the whole width that is left of the room under the layer's swatch, with 12 under the lines above it. */
+      .style {
+        padding-bottom: var(--k-space-12);
+        padding-top: var(--k-space-8);
+      }
+
       .entry {
         align-items: center;
         display: grid;
@@ -403,6 +413,8 @@ export class KarmaniaLegendTab extends LitElement {
 
   /** The legend to draw, or `undefined` before there is one. */
   declare model: LegendModel | undefined;
+  /** What the style editor of each layer is given: its style, and the kind and columns of its dataset. */
+  declare styles: Readonly<Record<string, StyleInfo>> | undefined;
   /** The key of the row that last had the keyboard, which is the row with the stop for Tab if it is still a row. */
   declare private current: string | undefined;
   /** The ids of the layers that a person has opened (a layer is open only if it has lines to show: `treeItems`). */
@@ -425,6 +437,7 @@ export class KarmaniaLegendTab extends LitElement {
   constructor() {
     super();
     this.model = undefined;
+    this.styles = undefined;
     this.current = undefined;
     this.open = new Set();
     this.announcement = '';
@@ -735,7 +748,7 @@ export class KarmaniaLegendTab extends LitElement {
 
   /** The button that opens a layer, or the room that is kept for it if the layer has nothing to show. */
   private opener(item: TreeItem) {
-    if (item.kind !== 'layer' || !item.expandable) {
+    if (item.kind !== 'layer') {
       return html`<span class="open"></span>`;
     }
     return html`<span
@@ -770,6 +783,8 @@ export class KarmaniaLegendTab extends LitElement {
       return nothing;
     }
     const classes = `legend-classes-${layer.id}`;
+    const style = `legend-style-${layer.id}`;
+    const info = this.styles?.[layer.id];
     return html`
       <li role="none">
         <div
@@ -777,8 +792,8 @@ export class KarmaniaLegendTab extends LitElement {
           role="treeitem"
           aria-level=${String(level)}
           aria-checked=${layer.visible ? 'true' : 'false'}
-          aria-expanded=${item.expandable ? String(item.expanded) : nothing}
-          aria-owns=${item.expanded ? classes : nothing}
+          aria-expanded=${String(item.expanded)}
+          aria-owns=${item.expanded && layer.classes.length > 0 ? classes : nothing}
           tabindex=${key === view.stop ? '0' : '-1'}
           data-level=${String(level)}
           data-layer=${layer.id}
@@ -806,7 +821,7 @@ export class KarmaniaLegendTab extends LitElement {
           ${this.opener(item)}
         </div>
         ${
-          item.expanded
+          item.expanded && layer.classes.length > 0
             ? html`<div
                 class="classes"
                 role="group"
@@ -815,6 +830,24 @@ export class KarmaniaLegendTab extends LitElement {
                 data-level=${String(level)}
               >
                 ${layer.classes.map((entry) => this.entry(entry))}
+              </div>`
+            : nothing
+        }
+        ${
+          item.expanded && info !== undefined
+            ? html`<div
+                class="classes style"
+                role="treeitem"
+                id=${style}
+                aria-level=${String(level + 1)}
+                data-level=${String(level)}
+              >
+                <karmania-style-editor
+                  .info=${info}
+                  @karmania-style-change=${(event: CustomEvent<StyleChange>) => {
+                    this.ask({ type: 'setStyle', layerId: layer.id, patch: event.detail.patch });
+                  }}
+                ></karmania-style-editor>
               </div>`
             : nothing
         }
