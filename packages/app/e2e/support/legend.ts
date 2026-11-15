@@ -38,9 +38,9 @@ function gridSpec(
   };
 }
 
-/** Waits until `count` layers are on the map and all of them are drawn: 5 seconds, and half a second more for each layer, since each is prepared by the engine. */
+/** Waits until `count` layers are on the map and all of them are drawn: 5 seconds, and 2 more for each layer, since each is prepared by the engine (and the machine may be busy). */
 async function untilDrawn(page: Page, count: number): Promise<void> {
-  const timeout = 5_000 + count * 500;
+  const timeout = 5_000 + count * 2_000;
   await expect.poll(async () => (await layerStatuses(page)).length, { timeout }).toBe(count);
   await expect
     .poll(async () => (await layerStatuses(page)).every(([, status]) => status === 'drawn'), {
@@ -64,17 +64,15 @@ export async function loadGrid(
 }
 
 /**
- * `count` grids, named `Layer 01`, `Layer 02` and so on, loaded one after the other, and waited for until they are all in the scene (and so in the legend). They
- * are not waited for until they are drawn: 50 layers are prepared and drawn after the last of them is loaded, which takes as long as the machine is busy, and the
- * rows of the legend, which is what is looked at with so many, do not need it. (A test that reads their classes waits for those.)
+ * `count` grids, named `Layer 01`, `Layer 02` and so on, loaded one after the other and waited for until they are all drawn. The rows of the legend are there
+ * when the layers are in the scene, but the page is not still while 50 layers are being prepared and drawn, and a picture of it is not taken in five seconds
+ * of that (the first idea, not to wait, made the pictures fail on a busy machine instead of the wait): the wait is as long as a busy machine needs.
  */
 export async function loadMany(page: Page, count: number): Promise<void> {
   for (let at = 1; at <= count; at += 1) {
     await loadLattice(page, 'grid', gridSpec(`Layer ${String(at).padStart(2, '0')}`));
   }
-  await expect
-    .poll(async () => (await layerStatuses(page)).length, { timeout: 5_000 + count * 500 })
-    .toBe(count);
+  await untilDrawn(page, count);
 }
 
 /** The names of the five layers of `loadLegendScene`, in the order they are loaded. */
