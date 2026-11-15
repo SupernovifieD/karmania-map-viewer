@@ -103,6 +103,33 @@ test.describe('making and renaming groups in the Legend tab', () => {
     await expect(field(page)).toHaveCount(0);
   });
 
+  test('keeps the name and leaves the keyboard where the person went when the field is left for another field or a row, and does not take it back', async ({
+    page,
+  }) => {
+    await open(page);
+    await layerRow(page, 'layer-2').locator('.open').click();
+    const opacity = legend(page).locator(
+      '#legend-style-layer-2 k-input[label="Opacity (%)"] input',
+    );
+    await expect(opacity).toBeVisible();
+    await groupRow(page, 'group-2').focus();
+    await page.keyboard.press('F2');
+    await page.keyboard.type('Boreholes');
+    await opacity.click();
+    await expect.poll(() => groups(page)).toEqual(['Boreholes', 'Samples']);
+    await expect(field(page)).toHaveCount(0);
+    // The click gave the keyboard to the field of the style, and it is still there after the tab has drawn the new name.
+    await expect(opacity).toBeFocused();
+    await expect(groupRow(page, 'group-2')).not.toBeFocused();
+    // And a click on a row does the same.
+    await groupRow(page, 'group-1').focus();
+    await page.keyboard.press('F2');
+    await page.keyboard.type('Cores');
+    await layerRow(page, 'layer-1').click();
+    await expect.poll(() => groups(page)).toEqual(['Boreholes', 'Cores']);
+    await expect(layerRow(page, 'layer-1')).toBeFocused();
+  });
+
   test('keeps the old name when the new one is only space, as the scene does', async ({ page }) => {
     await open(page);
     await groupRow(page, 'group-1').focus();

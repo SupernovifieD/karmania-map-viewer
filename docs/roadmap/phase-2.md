@@ -642,6 +642,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F1 The gallery's picture of the icons is taken again for the two icons that were added (CI found it red).
   - [x] 19.F2 (review) A layer moved into a group that is folded keeps the keyboard (on the group) and the move says that the group is folded.
   - [x] 19.F3 (review) A press whose release is lost is not a drag later; a drag that the pointer being taken away ends is proved.
+  - [x] 19.F4 (review) Leaving the field of a group's name for another field or row does not take the keyboard back to the group.
 - [ ] 19.G Gate.
 
 ## M20: Contours

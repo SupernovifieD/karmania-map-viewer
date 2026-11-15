@@ -637,8 +637,12 @@ export class KarmaniaLegendTab extends LitElement {
     this.ask({ type: 'createGroup', name: 'New group' });
   }
 
-  /** Ends the rename of a group: the name in the field is kept (a name that is only space is no name, and the old one stays) or it is not. */
-  private endRename(keep: boolean): void {
+  /**
+   * Ends the rename of a group: the name in the field is kept (a name that is only space is no name, and the old one stays) or it is not. The keyboard goes
+   * back to the row of the group, unless the field was left for something else that has it now (`away`: a click on a field or a row): that is where the
+   * person went, and it is not taken from them.
+   */
+  private endRename(keep: boolean, away = false): void {
     const id = this.renaming;
     if (id === undefined) {
       return;
@@ -655,9 +659,11 @@ export class KarmaniaLegendTab extends LitElement {
       }
     }
     this.refocus = undefined;
-    void this.updateComplete.then(() => {
-      this.focusRow(`group:${id}`);
-    });
+    if (!away) {
+      void this.updateComplete.then(() => {
+        this.focusRow(`group:${id}`);
+      });
+    }
   }
 
   /** Says something in the live region. */
@@ -1010,8 +1016,8 @@ export class KarmaniaLegendTab extends LitElement {
                       this.endRename(false);
                     }
                   }}
-                  @blur=${() => {
-                    this.endRename(true);
+                  @blur=${(event: FocusEvent) => {
+                    this.endRename(true, event.relatedTarget !== null);
                   }}
                 />`
               : html`<span
