@@ -1177,4 +1177,77 @@ mod tests {
             Err(ContourError::NoLines)
         );
     }
+
+    /// Run when asked for, in release: `cargo test --release -p karmania-prep contours::tests::timing_of_the_grid_of_the_perf_fixture -- --ignored --nocapture`.
+    /// The grid of `scripts/generate-fixtures` (2,000 by 2,000 cells, a sawtooth: 64,000 lines and three million vertices at 20 levels), by the phases.
+    #[test]
+    #[ignore = "a timing, for a machine that is not busy"]
+    fn timing_of_the_grid_of_the_perf_fixture() {
+        use std::time::Instant;
+        let (columns, rows) = (2000_u32, 2000_u32);
+        let values: Vec<f64> = (0..rows * columns)
+            .map(|cell| {
+                let (row, column) = (cell / columns, cell % columns);
+                if (cell + 1) % 97 == 0 {
+                    f64::NAN
+                } else {
+                    f64::from((row * 7 + column * 13) % 1000) / 10.0
+                }
+            })
+            .collect();
+        let dataset = grid_with(
+            Lattice {
+                origin: [500_000.0, 2_765_000.0, 0.0],
+                spacing: [10.0, 10.0, 1.0],
+                dims: [columns, rows, 1],
+                rotation: 0.0,
+            },
+            GridZ::Flat { elevation: 0.0 },
+            vec![Column::without_nulls("value", ColumnData::Float64(values))],
+        );
+        let params = params(5.0, 0.0);
+        {
+            // The kernel's two parts: the scan of the squares, and the joining of the pieces of each level into lines.
+            let input = GridValues::of(&dataset, None).unwrap();
+            let field = input.field().unwrap();
+            let (low, high) = input.range(&field).unwrap();
+            let levels = Levels::for_range(low, high, 0.0, 5.0, 5).unwrap();
+            let mut scan = crate::contour_grid::Scan::new(&levels);
+            let started = Instant::now();
+            scan.scan_rows(&field, &levels, 0..field.ny() - 1);
+            let scanned = started.elapsed();
+            let started = Instant::now();
+            let vertices: usize = (0..levels.len())
+                .map(|level| {
+                    scan.lines(&field, &levels, level)
+                        .iter()
+                        .map(|line| line.vertices.len())
+                        .sum::<usize>()
+                })
+                .sum();
+            println!(
+                "scan {scanned:?} ({} pieces), joined {:?} ({vertices} vertices)",
+                scan.piece_count(),
+                started.elapsed()
+            );
+        }
+        let started = Instant::now();
+        let lines = contours_of(&dataset, &params).unwrap();
+        let made = started.elapsed();
+        let (count, vertices) = (lines.line_count(), lines.positions.len() / 3);
+        let started = Instant::now();
+        let made_dataset = lines.into_dataset("Contours", dataset.crs).unwrap();
+        let into = started.elapsed();
+        let started = Instant::now();
+        let report = validate(&made_dataset);
+        let checked = started.elapsed();
+        let started = Instant::now();
+        let summary = made_dataset.summary(Findings::new());
+        let summarised = started.elapsed();
+        println!(
+            "{count} lines, {vertices} vertices: lines {made:?}, dataset {into:?}, validate {checked:?} ({} findings), summary {summarised:?} ({:?})",
+            report.findings().count(),
+            summary.vertex_count
+        );
+    }
 }
