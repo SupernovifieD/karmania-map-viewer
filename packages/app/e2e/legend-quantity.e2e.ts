@@ -45,7 +45,10 @@ async function twelve(page: Page, id: string, lines: number): Promise<void> {
     },
   });
   await layerRow(page, id).locator('.open').click();
-  await expect(legend(page).locator(`#legend-classes-${id} .entry`)).toHaveCount(lines);
+  // The classes come from the engine once the layer is drawn, which with 50 layers to prepare is not at once.
+  await expect(legend(page).locator(`#legend-classes-${id} .entry`)).toHaveCount(lines, {
+    timeout: 60_000,
+  });
 }
 
 /** Gives the tab a legend whose lines have the counts of `BIG` (the engine's own counts are those of a grid of 16 cells). */

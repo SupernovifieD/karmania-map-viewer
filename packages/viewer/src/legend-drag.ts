@@ -29,7 +29,8 @@ interface Pressed {
  * to its end, wherever it goes (and not before, so that a click is a click), and the drag ends at the release (the row is moved), at Escape or when the
  * pointer is taken away (nothing is moved).
  *
- * A press whose release is lost (the pointer was let go outside the tab) is not a drag later: a move with no button down, or a press that is not it, ends it.
+ * The release is heard in the window, wherever it is; a press whose release is lost all the same (the window lost the pointer) is not a drag later: a move with no
+ * button down, or a press that is not it, ends it.
  *
  * It says what was dropped (`onDrop`) and what is dragged and where it would land (`dragging`, `drop`) for the tab to draw.
  */
@@ -67,8 +68,10 @@ export class LegendDrag implements ReactiveController {
     this.pressed = { id, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     // The pointer is not taken yet: a press that is a click (or half a double click) has to reach what was pressed, and a capture would give the click to the tab.
     this.host.addEventListener('pointermove', this.onMove);
-    this.host.addEventListener('pointerup', this.onUp);
-    this.host.addEventListener('pointercancel', this.onCancel);
+    // The release and the cancel are listened for in the window: a release outside the tab, before the pointer has gone far enough to be a drag (when the tab does not
+    // have the pointer yet), is a release all the same, and a press that never heard of it would be armed for the next time the pointer comes over the tab.
+    window.addEventListener('pointerup', this.onUp);
+    window.addEventListener('pointercancel', this.onCancel);
   }
 
   /** Whether a row is being dragged (and not only pressed). */
@@ -146,8 +149,8 @@ export class LegendDrag implements ReactiveController {
     const pressed = this.pressed;
     this.pressed = undefined;
     this.host.removeEventListener('pointermove', this.onMove);
-    this.host.removeEventListener('pointerup', this.onUp);
-    this.host.removeEventListener('pointercancel', this.onCancel);
+    window.removeEventListener('pointerup', this.onUp);
+    window.removeEventListener('pointercancel', this.onCancel);
     this.host.removeEventListener('lostpointercapture', this.onCancel);
     if (pressed !== undefined && this.host.hasPointerCapture(pressed.pointerId)) {
       this.host.releasePointerCapture(pressed.pointerId);
