@@ -111,6 +111,78 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Hint: Divide the column into ranges instead.
 - Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
 
+## `contours.column.missing`
+
+- Severity: warning
+- Step: none
+- Message: The dataset has no column named {name}, so contour lines cannot be made from it.
+- Hint: Make contour lines from a column the dataset has.
+- Example: The dataset has no column named elevation, so contour lines cannot be made from it.
+
+## `contours.column.no_numbers`
+
+- Severity: warning
+- Step: none
+- Message: The dataset has no column of numbers to make contour lines from.
+- Hint: Add a column of numbers, such as heights, and make contour lines from it.
+- Example: The dataset has no column of numbers to make contour lines from.
+
+## `contours.column.no_values`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} has no value that contour lines can be made from: every entry is empty or not a finite number.
+- Hint: Make contour lines from another column.
+- Example: The column elevation has no value that contour lines can be made from: every entry is empty or not a finite number.
+
+## `contours.column.not_numeric`
+
+- Severity: warning
+- Step: none
+- Message: The column {name} is {type}, not numbers, so contour lines cannot be made from it.
+- Hint: Make contour lines from a column of numbers.
+- Example: The column rock is text, not numbers, so contour lines cannot be made from it.
+
+## `contours.heights.none`
+
+- Severity: warning
+- Step: none
+- Message: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+- Hint: Make contour lines from a mesh whose points have heights, or from a grid.
+- Example: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+
+## `contours.interval.invalid`
+
+- Severity: error
+- Step: none
+- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
+- Hint: Give an interval above 0, and an index line at least every line.
+- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
+
+## `contours.kind.unsupported`
+
+- Severity: warning
+- Step: none
+- Message: Contour lines can only be made from a grid or a mesh, and this dataset is made of {shape}.
+- Hint: Make contour lines from a grid or a mesh.
+- Example: Contour lines can only be made from a grid or a mesh, and this dataset is made of points.
+
+## `contours.levels.none`
+
+- Severity: warning
+- Step: none
+- Message: No contour line was made, because the values never cross a level of these settings.
+- Hint: Try a smaller interval, or another base.
+- Example: No contour line was made, because the values never cross a level of these settings.
+
+## `contours.levels.too_many`
+
+- Severity: error
+- Step: none
+- Message: These settings make about {count} contour lines, and the most is {limit}.
+- Hint: Use a larger interval.
+- Example: These settings make about 12,500 contour lines, and the most is 1,000.
+
 ## `crs.code.unknown`
 
 - Severity: warning
