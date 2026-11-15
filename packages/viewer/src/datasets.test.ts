@@ -11,6 +11,7 @@ import {
   listedDatasets,
   madeFrom,
   selectionAfterChange,
+  selectionAfterRemoved,
   selectionAfterRemoving,
   warningCount,
 } from './datasets.js';
@@ -140,6 +141,33 @@ describe('what is selected once a dataset and what was made from it are removed'
   });
 });
 
+describe('what is selected once a removal that was waited for is over', () => {
+  const before = [dataset(1), contoursOf(2, 1), dataset(3), contoursOf(4, 3)];
+  const after = [dataset(3), contoursOf(4, 3)];
+
+  it('is what is selected now when that is still there, whatever was selected when the removal was asked for', () => {
+    // Asked for the removal of 1 with 1 selected; while it was waited for, the person chose 4 (or lines that were made came to be 5).
+    expect(selectionAfterRemoved(before, after, 1, 4)).toBe(4);
+    expect(selectionAfterRemoved(before, [...after, contoursOf(5, 3)], 1, 5)).toBe(5);
+    expect(selectionAfterRemoved(before, after, 1, undefined)).toBeUndefined();
+    // And when the removal changed nothing (there was no such dataset in the engine), what is selected is still there and stays.
+    expect(selectionAfterRemoved(before, before, 1, 1)).toBe(1);
+  });
+
+  it('is the dataset that takes the place of what was removed when the selection is among it, as when nothing was waited for', () => {
+    expect(selectionAfterRemoved(before, after, 1, 1)).toBe(3);
+    expect(selectionAfterRemoved(before, after, 1, 2)).toBe(3);
+    expect(selectionAfterRemoved(before, [dataset(1), contoursOf(2, 1)], 3, 4)).toBe(2);
+  });
+
+  it('is the first dataset listed when the one that would take its place is gone too, and nothing when nothing is left', () => {
+    // Waited for, 3 was removed as well, or the selection is lines of the dataset that are gone now.
+    expect(selectionAfterRemoved(before, [dataset(7)], 1, 2)).toBe(7);
+    expect(selectionAfterRemoved(before, [], 1, 1)).toBeUndefined();
+    expect(selectionAfterRemoved([dataset(1)], [], 1, 1)).toBeUndefined();
+  });
+});
+
 describe('what is selected when the datasets change under it', () => {
   const before = [dataset(1), dataset(2), contoursOf(3, 1), contoursOf(4, 2)];
 
@@ -197,6 +225,17 @@ describe('how a derived dataset says it was made', () => {
     expect(said(13)).toBe('every 13th line');
     expect(said(21)).toBe('every 21st line');
     expect(said(112)).toBe('every 112th line');
+  });
+
+  it('says the digits of an interval or a base that mean something, and none of the noise of floats', () => {
+    const said = (interval: number, base: number): string | undefined =>
+      derivedRows(contoursOf(2, 1, { interval, base }), 'x').find((r) => r.label === 'Contours')
+        ?.text;
+    expect(said(1e-7, 0)).toBe('every 1e-7, counted from 0');
+    expect(said(0.00001234, -0.00005)).toBe('every 0.00001234, counted from -0.00005');
+    expect(said(0.1 + 0.2, 100 * 1.1)).toBe('every 0.3, counted from 110');
+    expect(said(2500000, -1e21)).toBe('every 2500000, counted from -1e+21');
+    expect(said(5, -0)).toBe('every 5, counted from 0');
   });
 
   it('says nothing for a dataset that was not made from another', () => {

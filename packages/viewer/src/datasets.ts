@@ -72,6 +72,26 @@ export function selectionAfterRemoving(
 }
 
 /**
+ * The dataset to select once `removed` (and what was made from it) is gone from `before`, which left `after`, when `selected` is what is selected
+ * now (the removal is waited for, and what is selected can change meanwhile: contour lines made again, or another dataset chosen): the selection
+ * is left alone if it is still there, and if not it is as `selectionAfterRemoving` says, or the first dataset listed when that one is gone too.
+ */
+export function selectionAfterRemoved(
+  before: readonly Summary[],
+  after: readonly Summary[],
+  removed: number,
+  selected: number | undefined,
+): number | undefined {
+  if (selected === undefined || after.some((dataset) => dataset.id === selected)) {
+    return selected;
+  }
+  const next = selectionAfterRemoving(before, removed, selected);
+  return next !== undefined && after.some((dataset) => dataset.id === next)
+    ? next
+    : listedDatasets(after)[0]?.id;
+}
+
+/**
  * The dataset to select when the engine's datasets changed from `before` to `after` (contour lines were made again, or taken away): the one that was
  * selected if it is still there; otherwise, for lines that were replaced, the lines that replaced them (made from the same dataset), or the dataset they
  * were made from if the lines are gone; otherwise the first dataset listed, or none.
@@ -193,7 +213,7 @@ export function derivedRows(
     { label: 'Made from', text: sourceName ?? `dataset ${String(from.id)}` },
     {
       label: 'Contours',
-      text: `every ${formatCoordinate(params.interval)}, counted from ${formatCoordinate(params.base)}`,
+      text: `every ${contoursNumber(params.interval)}, counted from ${contoursNumber(params.base)}`,
     },
     {
       label: 'Index lines',
@@ -201,6 +221,14 @@ export function derivedRows(
     },
     ...(params.column === undefined ? [] : [{ label: 'Column', text: params.column }]),
   ];
+}
+
+/**
+ * A number of the settings of contours as it is said: the digits that mean something (the interval of 0.0000001 is that, and not 0, as
+ * `formatCoordinate` would say), without the noise of a sum of floats (0.30000000000000004 is 0.3).
+ */
+function contoursNumber(value: number): string {
+  return String(Number(value.toPrecision(12)));
 }
 
 /** `2nd`, `5th`, `11th`, `21st`: the number as a person says it of lines. */
