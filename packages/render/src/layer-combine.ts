@@ -41,6 +41,19 @@ export function combineLayers(combination: Combination): LayerObject {
         part.dispose();
       }
     },
+    // A layer is picked as its parts are: those that can be, and each as the layer.
+    ...(parts.every((part) => part.pick === undefined)
+      ? {}
+      : {
+          pick(rank: number) {
+            const backs = parts.flatMap((part) => part.pick?.(rank) ?? []);
+            return () => {
+              for (const back of backs) {
+                back();
+              }
+            };
+          },
+        }),
     // The classes go to the parts that take them (a layer of parts that none takes is not coloured by classes).
     ...(colourable.length === 0
       ? {}
