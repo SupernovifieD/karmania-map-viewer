@@ -183,14 +183,14 @@ test.describe('visibility in the Legend tab', () => {
     await expect(groupRow(page, 'group-1')).toHaveAttribute('aria-checked', 'mixed');
   });
 
-  test('leaves the keys with Alt, Control or Command to the browser: they do not move or switch, and are not stopped', async ({
+  test('leaves the keys with Alt, Control or Command to the browser (but Alt with Up and Down, which move the row): they do not move or switch, and are not stopped', async ({
     page,
   }) => {
     await open(page);
     await groupRow(page, 'group-2').focus();
     const outcome = await groupRow(page, 'group-2').evaluate((row) =>
       [
-        { key: 'ArrowDown', altKey: true },
+        { key: 'Home', altKey: true },
         { key: 'ArrowDown', ctrlKey: true },
         { key: ' ', metaKey: true },
         { key: ' ', altKey: true },
