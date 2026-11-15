@@ -628,6 +628,8 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.6a What the style editor does with a style, as functions: the choices of Colour by, what a choice makes of the colour, a typed hex code, the twelve swatches.
   - [x] 19.6b The style editor behind every layer's row: Colour by, the swatches and the hex code; browser proofs; the states photographed.
 - [ ] 19.7 Style editor 2: method, classes, ramp with previews, reverse.
+  - [x] 19.7a The methods and which suit a column, the numbers of classes, the ramps and their previews, and what a change makes of the classes, as functions.
+  - [ ] 19.7b The ramp picker (a select with previews) and the fields of a layer by classes; browser proofs; the states photographed.
 - [ ] 19.8 Style editor 3: opacity, point size, line width.
 - [ ] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the
   expanded row).
