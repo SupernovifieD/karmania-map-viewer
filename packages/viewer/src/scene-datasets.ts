@@ -23,7 +23,7 @@ export function syncDatasets(
     }
   }
   // Nothing to add is the same document, which tells no one. A dataset that is made from another (contour lines) gets no layer here: its layer is
-  // the one that `setContoursLayer` makes under its source's, with a style of its own that stays when the lines are made again.
+  // the one that `setContoursLayer` makes above its source's, with a style of its own that stays when the lines are made again.
   scene.dispatch({
     type: 'addLayers',
     datasets: datasets.filter(

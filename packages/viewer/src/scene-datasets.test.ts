@@ -93,14 +93,14 @@ describe('syncDatasets', () => {
     };
     syncDatasets(scene, [dataset(0, 'Wells'), lines]);
     expect(listed(scene)).toEqual([['layer-1', 0, 'Wells']]);
-    // Its layer is the one the scene makes under its source's, and it stays while the dataset is loaded.
+    // Its layer is the one the scene makes above its source's, and it stays while the dataset is loaded.
     scene.dispatch({ type: 'setContoursLayer', sourceLayer: 'layer-1', datasetId: 5 });
     expect(listed(scene)).toEqual([
-      ['layer-1', 0, 'Wells'],
       ['layer-2', 5, 'Contours of Wells'],
+      ['layer-1', 0, 'Wells'],
     ]);
     syncDatasets(scene, [dataset(0, 'Wells'), lines]);
-    expect(listed(scene).map(([id]) => id)).toEqual(['layer-1', 'layer-2']);
+    expect(listed(scene).map(([id]) => id)).toEqual(['layer-2', 'layer-1']);
     // The lines are gone from the engine: their layer goes, and the source's stays.
     syncDatasets(scene, [dataset(0, 'Wells')]);
     expect(listed(scene)).toEqual([['layer-1', 0, 'Wells']]);
