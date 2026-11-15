@@ -15,14 +15,16 @@ import {
 import type { ContourDefaultsResult, LoadResult } from './types.js';
 
 /**
- * What a step of making contours answered: progress, the end, or that the job is gone. The end is what a load
+ * What a step of making contours answered: progress, the end, or that the job is gone (the dataset was removed, or a newer job
+ * for the same dataset was started). The end is what a load
  * gives: the new lines (one summary, of lines, that says it came from a dataset) or the findings that say why
  * there are none, which may be warnings (a dataset that cannot be contoured is not an error of the data).
  */
 export type CheckedContourStep =
   | { readonly status: 'progress'; readonly fraction: number }
   | { readonly status: 'done'; readonly result: LoadResult }
-  | { readonly status: 'cancelled' };
+  | { readonly status: 'cancelled' }
+  | { readonly status: 'superseded' };
 
 function checkedContourResult(value: unknown, path: string): LoadResult {
   const status = checkedObject(value, path, ['status'], ['summaries', 'findings'])['status'];
@@ -67,7 +69,11 @@ export function checkedContourStep(value: unknown, path = 'contourStep'): Checke
     checkedObject(value, path, ['status']);
     return { status: 'cancelled' };
   }
-  throw new ContractError(`${path}.status`, 'expected progress, done or cancelled');
+  if (status === 'superseded') {
+    checkedObject(value, path, ['status']);
+    return { status: 'superseded' };
+  }
+  throw new ContractError(`${path}.status`, 'expected progress, done, cancelled or superseded');
 }
 
 export function checkedContourDefaults(

@@ -183,6 +183,39 @@ describe('contours', () => {
     expect(errorMessage(await finished)).toMatch(/removed while its contours were being made/);
   });
 
+  it('ends a call that is under way with an error that says so when a newer one is made for the same dataset, and gives the lines of the newer', async () => {
+    const harness = await ready();
+    const dataset = await loadCone(harness, 800, 500);
+    const older = id();
+    const olderFinished = harness.settle({
+      type: 'contours',
+      id: older,
+      params: { dataset, params: params(10) },
+    });
+    while (progressOf(harness, older).length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+    const newer = await harness.settle({
+      type: 'contours',
+      id: id(),
+      params: { dataset, params: params(40) },
+    });
+    const result = resultOf(newer, 'contours');
+    if (result.status !== 'loaded') throw new Error('blocked');
+    expect(result.summaries[0]?.name).toBe('Contours of Cone (every 40)');
+    expect(errorMessage(await olderFinished)).toMatch(/superseded by a newer call/);
+    // Only the lines of the newer are in the kernel: the next call for the dataset takes them out, and nothing else.
+    const again = resultOf(
+      await harness.settle({
+        type: 'contours',
+        id: id(),
+        params: { dataset, params: params(20) },
+      }),
+      'contours',
+    );
+    expect(again.status).toBe('loaded');
+  });
+
   it('is misuse, an error and not a finding, for a dataset that is not a whole number or not there and for settings that cannot be used', async () => {
     const harness = await ready();
     const dataset = await loadCone(harness, 40, 30);

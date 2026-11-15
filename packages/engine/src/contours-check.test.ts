@@ -92,12 +92,13 @@ describe('what a dataset was made from', () => {
 });
 
 describe('a step of making contours', () => {
-  it('is progress from 0 to 1, the end, or that the dataset is gone', () => {
+  it('is progress from 0 to 1, the end, or that the job is gone (the dataset was removed, or a newer job took its place)', () => {
     expect(checkedContourStep({ status: 'progress', fraction: 0.25 })).toEqual({
       status: 'progress',
       fraction: 0.25,
     });
     expect(checkedContourStep({ status: 'cancelled' })).toEqual({ status: 'cancelled' });
+    expect(checkedContourStep({ status: 'superseded' })).toEqual({ status: 'superseded' });
     const loaded = { status: 'done', result: { status: 'loaded', summaries: [lines] } };
     expect(checkedContourStep(loaded)).toEqual(loaded);
   });
@@ -113,6 +114,7 @@ describe('a step of making contours', () => {
       { status: 'progress', fraction: 1.5 },
       { status: 'progress', fraction: -0.1 },
       { status: 'cancelled', fraction: 0 },
+      { status: 'superseded', result: {} },
       { status: 'done' },
       { status: 'done', result: { status: 'loaded', summaries: [] } },
       { status: 'done', result: { status: 'loaded', summaries: [lines, lines] } },

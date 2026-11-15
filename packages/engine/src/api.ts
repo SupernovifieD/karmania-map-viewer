@@ -210,8 +210,9 @@ export interface Engine {
    * `derivedFrom` in its summary. The work is done in steps in the worker, so that the page stays responsive and the call can be
    * stopped. **A call for a dataset replaces the lines made before from it, and so does a call that finds nothing to make** (a column that
    * is not numbers, more than 1,000 levels, no level that the values cross): then it resolves with `status: "blocked"` and the reasons, and
-   * the old lines are gone, so that what is shown is never the lines of other settings. Removing the dataset removes its lines. Settings
-   * that are not of the right shape (an interval that is not above 0) are misuse and reject.
+   * the old lines are gone, so that what is shown is never the lines of other settings. **A call that is still under way when a newer one is made
+   * for the same dataset rejects** (it is superseded: the lines to keep are the newer call's, whichever of the two would have ended first).
+   * Removing the dataset removes its lines. Settings that are not of the right shape (an interval that is not above 0) are misuse and reject.
    */
   contours(id: number, params: ContourParams, options?: ContoursOptions): Promise<LoadResult>;
 
