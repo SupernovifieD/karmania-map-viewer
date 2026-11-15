@@ -10,6 +10,7 @@ import {
   formatCoordinate,
   listedDatasets,
   madeFrom,
+  selectionAfterChange,
   selectionAfterRemoving,
   warningCount,
 } from './datasets.js';
@@ -136,6 +137,31 @@ describe('what is selected once a dataset and what was made from it are removed'
   it('is the source when only the lines are removed and they were selected', () => {
     expect(selectionAfterRemoving(loaded, 2, 2)).toBe(3);
     expect(selectionAfterRemoving([dataset(1), contoursOf(2, 1)], 2, 2)).toBe(1);
+  });
+});
+
+describe('what is selected when the datasets change under it', () => {
+  const before = [dataset(1), dataset(2), contoursOf(3, 1), contoursOf(4, 2)];
+
+  it('stays when it is still there, or when nothing is selected', () => {
+    expect(selectionAfterChange(before, [...before, contoursOf(9, 9)], 3)).toBe(3);
+    expect(selectionAfterChange(before, before, undefined)).toBeUndefined();
+  });
+
+  it('is the lines that replaced the selected lines, made from the same dataset', () => {
+    const after = [dataset(1), dataset(2), contoursOf(5, 1), contoursOf(4, 2)];
+    expect(selectionAfterChange(before, after, 3)).toBe(5);
+  });
+
+  it('is the dataset the selected lines were made from when they are gone', () => {
+    const after = [dataset(1), dataset(2), contoursOf(4, 2)];
+    expect(selectionAfterChange(before, after, 3)).toBe(1);
+  });
+
+  it('is the first dataset listed when what was selected is gone and was not lines of one that is there', () => {
+    expect(selectionAfterChange(before, [dataset(2), contoursOf(4, 2)], 1)).toBe(2);
+    expect(selectionAfterChange(before, [dataset(2)], 3)).toBe(2);
+    expect(selectionAfterChange(before, [], 3)).toBeUndefined();
   });
 });
 

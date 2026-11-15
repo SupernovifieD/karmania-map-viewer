@@ -33,7 +33,7 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import type { LegendCommand } from './legend-tab.js';
-import { selectionAfterRemoving } from './datasets.js';
+import { selectionAfterChange, selectionAfterRemoving } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
@@ -55,6 +55,8 @@ import {
 import type { PanelState } from './panel-state.js';
 import type { ResizeRequest } from './resize-handle.js';
 import { layerLook } from './layer-look.js';
+import { ContoursManager } from './contours-manager.js';
+import type { ContoursState } from './contours-manager.js';
 import { LayerPipeline } from './layer-pipeline.js';
 import { styleInfos } from './legend-style.js';
 import type { StyleInfo } from './legend-style.js';
@@ -475,6 +477,34 @@ export class KarmaniaViewer extends LitElement {
     return this.pipeline;
   }
 
+  /**
+   * What keeps the contour lines of the layers, and their layers, to what the scene says: it asks the engine for them, replaces them when their settings
+   * change and takes them away when the layer has none. It needs the engine, so it is made with it and stopped with the pipeline.
+   */
+  private contours: ContoursManager | undefined;
+
+  private contoursFor(engine: Engine): ContoursManager {
+    this.contours ??= new ContoursManager({
+      engine,
+      scene: this.store,
+      adopt: (list) => {
+        const before = this.datasets;
+        this.datasets = list;
+        syncDatasets(this.store, this.datasets);
+        this.selected = selectionAfterChange(before, list, this.selected);
+      },
+      onChange: () => {
+        this.layerChanges += 1;
+      },
+    });
+    return this.contours;
+  }
+
+  /** Whether the contours of a layer are being made, are there, or could not be made (and why), for the style editor. */
+  contoursState(layerId: string): ContoursState {
+    return this.contours?.state(layerId) ?? { status: 'idle' };
+  }
+
   /** The renderer, as what the pipeline gives buffers to; `undefined` while there is none. */
   private sink(): LayerSink | undefined {
     const renderer = this.renderer;
@@ -554,6 +584,7 @@ export class KarmaniaViewer extends LitElement {
   private readonly onScene = (state: SceneDocument, previous: SceneDocument): void => {
     if (this.engine !== undefined) {
       this.pipelineFor(this.engine).update();
+      this.contoursFor(this.engine).update();
     }
     if (
       state.viewMode !== previous.viewMode ||
@@ -644,6 +675,8 @@ export class KarmaniaViewer extends LitElement {
     this.sizeWatch = undefined;
     this.pipeline?.dispose();
     this.pipeline = undefined;
+    this.contours?.dispose();
+    this.contours = undefined;
     this.controller?.dispose();
     this.controller = undefined;
     const area = this.renderRoot.querySelector('karmania-map-area');
