@@ -57,10 +57,10 @@ pnpm test:axe     # an accessibility check of every screenshot state, in both th
 pnpm perf         # how long the large files take, in a browser (writes them first)
 ```
 
-- `pnpm check` is what runs before every commit, and in the continuous integration on GitHub, which also runs the browser, screenshot and accessibility tests.
-- The screenshot tests use the browser in the official Playwright Docker image, so the pictures are the same on every machine. `pnpm test:visual:update` takes them again; look at the new pictures before committing them.
-- `pnpm perf` needs a quiet machine. It uses two large files that `scripts/generate-fixtures` writes into `fixtures/generated/` (not committed). The results are in [`docs/perf.md`](docs/perf.md).
-- A few timing tests for the Rust code only run when asked for; `docs/perf.md` says how.
+- `pnpm check` is what runs before every commit, and in the continuous integration on GitHub, which also runs the browser and accessibility tests.
+- The screenshot tests use the browser in the official Playwright Docker image, so the pictures are the same on every machine. Their reference pictures are not in git (they would make the repository large): `pnpm test:visual:update` takes them on a machine that has none, and `pnpm test:visual` then compares with them. Look at new pictures before relying on them. The continuous integration does not run them.
+- `pnpm perf` needs a quiet machine. It uses two large files that `scripts/generate-fixtures` writes into `fixtures/generated/` (not committed). The maintainer keeps the results in `docs/perf.md` (not in git).
+- A few timing tests for the Rust code only run when asked for (see the tests' own comments).
 
 ## How it is built
 
@@ -102,11 +102,7 @@ A few principles run through all of it: data problems are findings and never cra
 
 | | |
 | --- | --- |
-| [`docs/roadmap/phase-1.md`](docs/roadmap/phase-1.md) | The steps of Phase 1. |
-| [`docs/decisions.md`](docs/decisions.md) | Every decision made along the way, and why. |
 | [`docs/validation-codes.md`](docs/validation-codes.md) | Every finding: its message, its hint, and an example. |
-| [`docs/perf.md`](docs/perf.md) | How fast it is, measured. |
-| [`docs/conventions.md`](docs/conventions.md) | The rules for changing the code. |
 | [`docs/design-tokens.md`](docs/design-tokens.md) | The colours, sizes and spacing the interface is made from. |
 | [`docs/dependencies.md`](docs/dependencies.md) | What it depends on, and the licence of each. |
 

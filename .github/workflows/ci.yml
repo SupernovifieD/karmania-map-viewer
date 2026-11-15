@@ -69,9 +69,8 @@ jobs:
       - name: Install the browser for the end-to-end tests
         run: pnpm --filter @karmania/engine exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      # The screenshot tests use the browser in the official Playwright Docker image, so the pixels
-      # are the same as on a developer's machine. The script starts the container and stops it.
-      - run: pnpm test:visual
+      # The screenshot tests (`pnpm test:visual`) are not run here: their reference pictures are kept on each
+      # developer's machine and not in git, so there is nothing in a fresh clone to compare with.
       # What a failed browser test leaves behind: the HTML report with the traces, and for a screenshot
       # test the expected, actual and diff pictures. Nothing is kept when the job passes. A step that
       # fails stops the ones after it, so these are the files of the step that failed; they can also
