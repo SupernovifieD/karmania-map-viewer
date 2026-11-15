@@ -225,6 +225,81 @@ describe('the contours of a layer', () => {
     const current = await w.finish(1);
     expect(w.derived()?.datasetId).toBe(current.id);
     expect(w.derived()?.datasetId).not.toBe(late.id);
+    // Another job was under way, which replaces the late lines in the engine: they are not taken out by hand.
+    expect(w.removed).toEqual([]);
+  });
+
+  it('take out of the engine the lines of an answer that came after the contours were turned off, or the layer was removed, when nothing else is being made', async () => {
+    const w = world('grid', false);
+    w.contours();
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.pending[0]?.signal?.aborted).toBe(true);
+    const late = await w.finish(0);
+    expect(w.derived()).toBeUndefined();
+    expect(w.removed).toEqual([late.id]);
+    expect(w.datasets().map((dataset) => dataset.id)).toEqual([1]);
+    expect(w.adopted.at(-1)).toEqual([1]);
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
+    // The same when the layer itself is gone (and no answer that is a refusal is taken for lines).
+    w.contours();
+    w.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 1 });
+    const gone = await w.finish(1);
+    expect(w.removed).toEqual([late.id, gone.id]);
+    w.contours();
+    await settle();
+    expect(w.pending).toHaveLength(2);
+  });
+
+  it('do not take anything out of the engine for a stopped job whose answer is that there are no lines', async () => {
+    const w = world('grid', false);
+    w.contours();
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    await w.refuse(0, finding('contours.levels.too_many'));
+    expect(w.removed).toEqual([]);
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
+  });
+
+  it('keep the style of the layer of the lines when it is taken away with the lines, and give it to the next one', async () => {
+    const w = world();
+    w.contours();
+    await w.finish(0);
+    const style = {
+      colour: { mode: 'single', value: '#112233' },
+      opacity: 0.4,
+      lineWidth: 3,
+    } as const;
+    w.scene.dispatch({ type: 'setStyle', layerId: w.derived()?.id ?? '', patch: style });
+    // The lines cannot be made: the layer goes, and when they can again, the new layer has the person's style.
+    w.contours({ interval: 0.001 });
+    await w.refuse(1, finding('contours.levels.too_many'));
+    expect(w.derived()).toBeUndefined();
+    w.contours({ interval: 2 });
+    await w.finish(2);
+    expect(w.derived()?.style).toEqual(style);
+    // The same when the contours are turned off and on again, with a style changed in between.
+    const changed = { ...style, opacity: 0.7 };
+    w.scene.dispatch({ type: 'setStyle', layerId: w.derived()?.id ?? '', patch: { opacity: 0.7 } });
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.derived()).toBeUndefined();
+    w.contours({ interval: 3 });
+    await w.finish(3);
+    expect(w.derived()?.style).toEqual(changed);
+    // A layer of lines that was never taken away is not given a style twice: the one it has is the person's.
+    w.scene.dispatch({ type: 'setStyle', layerId: w.derived()?.id ?? '', patch: { opacity: 0.2 } });
+    w.contours({ interval: 4 });
+    await w.finish(4);
+    expect(w.derived()?.style).toEqual({ ...style, opacity: 0.2 });
+  });
+
+  it('start with the style of a new layer of lines when none was kept', async () => {
+    const w = world();
+    w.contours();
+    await w.finish(0);
+    expect(w.derived()?.style).toEqual({
+      colour: { mode: 'single', value: '#a0713f' },
+      opacity: 1,
+      lineWidth: 1,
+    });
   });
 
   it('go, with the layer of the lines and the dataset, when the layer has no contours any more, and stop what is under way', async () => {
@@ -268,6 +343,30 @@ describe('the contours of a layer', () => {
     await w.finish(2);
     expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
     expect(w.derived()).toBeDefined();
+  });
+
+  it('forget why they were not made when the contours are turned off, and why they could not be turned on when they are turned on', async () => {
+    const w = world();
+    w.contours({ interval: 0.001 });
+    await w.refuse(0, finding('contours.levels.too_many'));
+    expect(w.manager.state('layer-1').status).toBe('failed');
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
+    // A reason that the contours could not be turned on stays until they are, and then it is gone with the first thing that is made.
+    w.defaults.mockResolvedValueOnce({
+      status: 'not_available',
+      findings: [finding('contours.column.missing')],
+    });
+    await w.manager.turnOn('layer-1');
+    expect(w.manager.state('layer-1').status).toBe('failed');
+    w.defaults.mockResolvedValueOnce({
+      status: 'defaults',
+      params: { column: 'height', interval: 2.5, base: 0, indexEvery: 5 },
+    });
+    await w.manager.turnOn('layer-1');
+    expect(w.manager.state('layer-1')).toEqual({ status: 'making' });
+    await w.finish(1);
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
   });
 
   it('say that the engine could not, as a fault and not a finding, unless the dataset was removed or the work stopped', async () => {
@@ -358,6 +457,9 @@ describe('the contours of a layer', () => {
     expect(other.scene.getState().layers['layer-1']?.contours).toBeUndefined();
     const state = other.manager.state('layer-1');
     expect(state.status === 'failed' && state.findings[0]?.code).toBe('contours.kind.unsupported');
+    // The reason stays through changes of the scene that have nothing to do with it (the layer has no contours, and the manager looks at it again).
+    other.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    expect(other.manager.state('layer-1')).toEqual(state);
     other.defaults.mockRejectedValueOnce(new Error('No worker.'));
     await other.manager.turnOn('layer-1');
     expect(other.manager.state('layer-1')).toMatchObject({ status: 'failed', fault: 'No worker.' });
