@@ -6,15 +6,25 @@
  * above its source in the legend (which is also drawn over it), by the scene's `setContoursLayer`. **When the settings change the engine makes them again, which replaces the old lines
  * (and the new dataset has a new number, so the layer that shows them is given it and keeps its style); when the settings go, the lines and their layer go; when
  * the lines cannot be made (a column that is not numbers, more than 1,000 levels, no level that the values cross) the old ones are gone too, and the layer says
- * why.** A request that a newer one has made useless (the settings changed again, the contours were turned off) is aborted.
+ * why.** A request that a newer one has made useless (the settings changed again, the contours were turned off) is aborted, and if the
+ * engine answers it all the same (it had finished when it was stopped) its lines are not the layer's: they are taken out of the engine
+ * when nothing else is being made for the layer. The style a person gave the layer of the lines is kept when the layer goes with the lines
+ * (they could not be made, or the contours were turned off) and given to the layer that comes after.
  *
  * Whether the lines are shown is the layer's own visibility, which follows the `visible` of the contours when that is changed (a person may hide the layer
  * of the lines in the legend all the same, and show the contours again to show it). Nothing here is a time: the same scene and the same answers of the engine
  * give the same calls in the same order.
  */
 import type { Engine } from '@karmania/engine';
-import type { Finding, Summary } from '@karmania/engine/types';
-import type { ContourParams, Layer, LayerId, SceneDocument, SceneStore } from '@karmania/scene';
+import type { Finding, LoadResult, Summary } from '@karmania/engine/types';
+import type {
+  ContourParams,
+  Layer,
+  LayerId,
+  LayerStyle,
+  SceneDocument,
+  SceneStore,
+} from '@karmania/scene';
 
 /** Where the contours of a layer are. */
 export type ContoursState =
@@ -82,6 +92,8 @@ export class ContoursManager {
   >();
   /** Whether the contours of each layer were shown the last time they were looked at, so that the layer of the lines follows a change and not a person's choice. */
   private readonly shown = new Map<LayerId, boolean>();
+  /** The style of the layer of the lines of each layer, from when that layer was taken away, for the one that is made next. */
+  private readonly styles = new Map<LayerId, LayerStyle>();
   private disposed = false;
 
   constructor(private readonly options: ContoursOptions) {}
@@ -168,6 +180,7 @@ export class ContoursManager {
     this.made.clear();
     this.failed.clear();
     this.shown.clear();
+    this.styles.clear();
   }
 
   /** The layer has contours: the lines are made if they are not what they ask for, and the layer of the lines follows whether they are shown. */
@@ -209,7 +222,11 @@ export class ContoursManager {
       const result = await this.options.engine.contours(datasetId, params, {
         signal: job.controller.signal,
       });
-      if (this.disposed || this.jobs.get(layerId) !== job) {
+      if (this.disposed) {
+        return;
+      }
+      if (this.jobs.get(layerId) !== job) {
+        this.dropStray(layerId, result);
         return;
       }
       this.jobs.delete(layerId);
@@ -224,6 +241,13 @@ export class ContoursManager {
           datasetId: lines.id,
           name: lines.name,
         });
+        // A layer that is new has the style of the one that was taken away, if there was one (and a layer that is not new is not given it again).
+        const style = this.styles.get(layerId);
+        const layer = this.linesLayerOf(scene.getState(), layerId);
+        if (style !== undefined && layer !== undefined) {
+          scene.dispatch({ type: 'setStyle', layerId: layer.id, patch: style });
+        }
+        this.styles.delete(layerId);
       } else {
         // The engine took the lines made before out too: so does the scene.
         this.made.delete(layerId);
@@ -231,7 +255,7 @@ export class ContoursManager {
           key,
           findings: result.status === 'blocked' ? result.findings : [],
         });
-        scene.dispatch({ type: 'setContoursLayer', sourceLayer: layerId, datasetId: null });
+        this.takeAwayLinesLayer(scene.getState(), layerId);
       }
       this.options.adopt(engine.datasets());
       this.followVisibility(scene.getState(), scene.getState().layers[layerId]);
@@ -254,32 +278,67 @@ export class ContoursManager {
 
   /** The contours of the layer are not wanted: what is under way is stopped, and the lines and their layer go. */
   private withdraw(doc: SceneDocument, layerId: LayerId): void {
-    const hadState = this.jobs.has(layerId) || this.failed.has(layerId);
+    // Why the contours could not be turned on (the failure of no settings) stays, until they are turned on: it is what says why there are none.
+    const failure = this.failed.get(layerId);
+    const forgetsFailure = failure !== undefined && failure.key !== '';
+    const hadState = this.jobs.has(layerId) || forgetsFailure;
     this.jobs.get(layerId)?.controller.abort();
     this.jobs.delete(layerId);
-    this.failed.delete(layerId);
+    if (forgetsFailure) {
+      this.failed.delete(layerId);
+    }
     this.made.delete(layerId);
     this.shown.delete(layerId);
-    const lines = Object.values(doc.layers).find(
+    const lines = this.takeAwayLinesLayer(doc, layerId);
+    if (lines !== undefined) {
+      this.removeFromEngine(lines.datasetId);
+    }
+    if (hadState) {
+      this.changed();
+    }
+  }
+
+  /** The layer that shows the lines of `layerId`, if it has one. */
+  private linesLayerOf(doc: SceneDocument, layerId: LayerId): Layer | undefined {
+    return Object.values(doc.layers).find(
       (layer) => layer.derived?.kind === 'contours' && layer.derived.sourceLayer === layerId,
     );
+  }
+
+  /** Takes the layer of the lines of `layerId` out of the scene, keeping its style for the next one. Gives the layer, or nothing if there was none. */
+  private takeAwayLinesLayer(doc: SceneDocument, layerId: LayerId): Layer | undefined {
+    const lines = this.linesLayerOf(doc, layerId);
     if (lines !== undefined) {
+      this.styles.set(layerId, lines.style);
       this.options.scene.dispatch({
         type: 'setContoursLayer',
         sourceLayer: layerId,
         datasetId: null,
       });
-      void this.options.engine.remove(lines.datasetId).then(
-        () => {
-          if (!this.disposed) {
-            this.options.adopt(this.options.engine.datasets());
-          }
-        },
-        () => undefined,
-      );
     }
-    if (hadState) {
-      this.changed();
+    return lines;
+  }
+
+  /** Takes a dataset of lines out of the engine, and brings the layers to what is left. */
+  private removeFromEngine(datasetId: number): void {
+    void this.options.engine.remove(datasetId).then(
+      () => {
+        if (!this.disposed) {
+          this.options.adopt(this.options.engine.datasets());
+        }
+      },
+      () => undefined,
+    );
+  }
+
+  /**
+   * The engine answered a job that was stopped all the same (it had finished when it was told to stop): the lines it made are not the layer's.
+   * When another job is under way for the layer its lines replace them; when none is, nothing wants them, and they are taken out.
+   */
+  private dropStray(layerId: LayerId, result: LoadResult): void {
+    const lines = result.status === 'loaded' ? result.summaries[0] : undefined;
+    if (lines !== undefined && !this.jobs.has(layerId)) {
+      this.removeFromEngine(lines.id);
     }
   }
 
@@ -313,6 +372,7 @@ export class ContoursManager {
     this.made.delete(layerId);
     this.failed.delete(layerId);
     this.shown.delete(layerId);
+    this.styles.delete(layerId);
   }
 
   private changed(): void {
