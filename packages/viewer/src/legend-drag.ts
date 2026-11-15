@@ -1,5 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
-import { dropCandidates, pickDrop } from './legend-drop.js';
+import { dropCandidates, edgeStep, pickDrop } from './legend-drop.js';
 import type { DropCandidate, DropRow } from './legend-drop.js';
 import type { Move } from './legend-order.js';
 
@@ -12,6 +12,8 @@ export interface DragHost extends ReactiveControllerHost, HTMLElement {
   measureRows(): readonly DropRow[];
   /** How far in the layers of a group are, in pixels. */
   indent(): number;
+  /** The part of the page that scrolls the tab, which a drag scrolls at its edges, if there is one. */
+  scrollRegion(): HTMLElement | null;
 }
 
 /** A row that is being dragged, or pressed and not dragged yet. */
@@ -29,6 +31,9 @@ interface Pressed {
  * to its end, wherever it goes (and not before, so that a click is a click), and the drag ends at the release (the row is moved), at Escape or when the
  * pointer is taken away (nothing is moved).
  *
+ * While the pointer is near the top or the bottom of the part of the page that scrolls the tab, that part scrolls, a frame at a time (`edgeStep`), so that a row can be
+ * dragged to where it is not in sight. A finger on a group's row scrolls the panel and does not drag the group.
+ *
  * The release is heard in the window, wherever it is; a press whose release is lost all the same (the window lost the pointer) is not a drag later: a move with no
  * button down, or a new press of the same pointer anywhere in the page, ends it. What is heard of other pointers (a finger, while the mouse drags) is not this one's.
  *
@@ -41,6 +46,9 @@ export class LegendDrag implements ReactiveController {
   drop: DropCandidate | undefined;
 
   private pressed: Pressed | undefined;
+  /** Where the pointer is, in the window, while a row is dragged; and the frame that is asked for to scroll the panel. */
+  private pointer: { readonly x: number; readonly y: number } | undefined;
+  private frame: number | undefined;
 
   constructor(
     private readonly host: DragHost,
@@ -59,6 +67,10 @@ export class LegendDrag implements ReactiveController {
       return;
     }
     this.end();
+    // A finger on a group's row is a finger that scrolls the panel: a group is dragged with a mouse or a pen (a layer, by its handle, which is not scrolled by a finger).
+    if (event.pointerType === 'touch' && kind === 'group') {
+      return;
+    }
     this.pressed = { id, kind, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     // The pointer is not taken yet: a press that is a click (or half a double click) has to reach what was pressed, and a capture would give the click to the tab.
     this.host.addEventListener('pointermove', this.onMove);
@@ -112,19 +124,54 @@ export class LegendDrag implements ReactiveController {
       this.host.addEventListener('lostpointercapture', this.onCancel);
       this.host.toggleAttribute('data-dragging', true);
     }
+    this.pointer = { x: event.clientX, y: event.clientY };
+    this.pick();
+    this.scroll();
+  };
+
+  /** The gap that the dragged row would land in at the pointer, as the rows are now. */
+  private pick(): void {
+    const dragging = this.dragging;
+    const at = this.pointer;
+    if (dragging === undefined || at === undefined) {
+      return;
+    }
     const rows = this.host.measureRows();
     const indent = this.host.indent();
     const base = Math.min(
       ...rows.filter((row) => row.parent === null).map((row) => row.left),
       Infinity,
     );
-    this.drop = pickDrop(
-      dropCandidates(rows, this.dragging, indent),
-      { x: event.clientX, y: event.clientY },
-      base + indent,
-    );
+    this.drop = pickDrop(dropCandidates(rows, dragging, indent), at, base + indent);
     this.host.requestUpdate();
-  };
+  }
+
+  /** While the pointer is near the top or the bottom of the part that scrolls, a frame at a time, that part scrolls, and the gap is found again (the rows moved under the pointer). */
+  private scroll(): void {
+    if (this.frame !== undefined) {
+      return;
+    }
+    this.frame = requestAnimationFrame(() => {
+      this.frame = undefined;
+      const region = this.host.scrollRegion();
+      const at = this.pointer;
+      if (this.dragging === undefined || region === null || at === undefined) {
+        return;
+      }
+      const box = region.getBoundingClientRect();
+      const step = edgeStep(at.y, box.top, box.bottom);
+      if (step === 0) {
+        // Away from the edges: nothing more until the pointer moves again.
+        return;
+      }
+      const before = region.scrollTop;
+      region.scrollTop += step;
+      if (region.scrollTop !== before) {
+        this.pick();
+      }
+      this.scroll();
+    });
+  }
 
   private readonly onUp = (event: PointerEvent): void => {
     const pressed = this.pressed;
@@ -156,6 +203,11 @@ export class LegendDrag implements ReactiveController {
     window.removeEventListener('pointercancel', this.onCancel);
     window.removeEventListener('pointerdown', this.onAnyDown, true);
     this.host.removeEventListener('lostpointercapture', this.onCancel);
+    if (this.frame !== undefined) {
+      cancelAnimationFrame(this.frame);
+      this.frame = undefined;
+    }
+    this.pointer = undefined;
     if (pressed !== undefined && this.host.hasPointerCapture(pressed.pointerId)) {
       this.host.releasePointerCapture(pressed.pointerId);
     }
