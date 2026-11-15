@@ -1,16 +1,24 @@
-import type { StylePatch } from '@karmania/scene';
+import type { ClassColour, StylePatch } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
-import type { SelectChange } from '@karmania/ui';
+import type { CheckboxChange, SelectChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import {
   SWATCHES,
+  classCountChoice,
+  classCountOptions,
+  classesWith,
   colourByOptions,
   colourByValue,
   colourFor,
   colourFromText,
+  methodChoice,
+  methodOptions,
+  rampOptions,
 } from './legend-style.js';
 import type { StyleInfo } from './legend-style.js';
+import './ramp-select.js';
+import type { RampChange } from './ramp-select.js';
 
 /** The name of the event the editor sends when a person changes the style of the layer it is for. */
 export const STYLE_CHANGE = 'karmania-style-change';
@@ -22,8 +30,9 @@ export interface StyleChange {
 
 /**
  * The fields of the style of one layer, stacked, a label above each and 12 between them, each the whole width (section 10.3 of the brief): **Colour by** (a
- * single colour, or a column of the dataset) and, for a single colour, a row of twelve swatches and a field for the hex code. It shows the style it is given
- * (`info`) and says what a person changed (`karmania-style-change`, with a patch); it does not change the scene.
+ * single colour, or a column of the dataset) and, for a single colour, a row of twelve swatches and a field for the hex code, and, for a column, **Method**,
+ * **Classes**, **Ramp** (a picker whose choices are drawn) and **Reverse ramp**. It shows the style it is given (`info`) and says what a person changed
+ * (`karmania-style-change`, with a patch); it does not change the scene.
  *
  * The swatches are a group of radio buttons with one stop for Tab (the one that is chosen, or the first), moved by the arrow keys, which choose as they go. The
  * hex code is taken when Enter is pressed or the field is left: six digits or three, with or without the `#`; text that is not a colour is said not to be one,
@@ -139,6 +148,20 @@ export class KarmaniaStyleEditor extends LitElement {
     }
   };
 
+  /** Says what a person changed of the classes of the layer, if it changes anything. */
+  private changeClasses(
+    change: Partial<Pick<ClassColour, 'method' | 'classes' | 'ramp' | 'reverse'>>,
+  ): void {
+    const colour = this.info?.style.colour;
+    if (colour?.mode !== 'classes') {
+      return;
+    }
+    const next = classesWith(colour, change);
+    if (next !== undefined) {
+      this.change({ colour: next });
+    }
+  }
+
   private choose(colour: string): void {
     this.hex = colour;
     this.hexError = '';
@@ -222,6 +245,51 @@ export class KarmaniaStyleEditor extends LitElement {
     `;
   }
 
+  /** The fields of a layer that is coloured by the classes of a column. */
+  private classes(info: StyleInfo, colour: ClassColour) {
+    const column = info.columns.find((candidate) => candidate.name === colour.column);
+    return html`
+      <k-select
+        label="Method"
+        .options=${methodOptions(column)}
+        .value=${colour.method}
+        @k-select-change=${(event: CustomEvent<SelectChange>) => {
+          const method = methodChoice(event.detail.value, column);
+          if (method !== undefined) {
+            this.changeClasses({ method });
+          }
+        }}
+      ></k-select>
+      <k-select
+        label="Classes"
+        .options=${classCountOptions(colour.classes)}
+        .value=${String(colour.classes)}
+        @k-select-change=${(event: CustomEvent<SelectChange>) => {
+          const classes = classCountChoice(event.detail.value);
+          if (classes !== undefined) {
+            this.changeClasses({ classes });
+          }
+        }}
+      ></k-select>
+      <karmania-ramp-select
+        label="Ramp"
+        .options=${rampOptions()}
+        .value=${colour.ramp}
+        .reverse=${colour.reverse}
+        @karmania-ramp-change=${(event: CustomEvent<RampChange>) => {
+          this.changeClasses({ ramp: event.detail.id });
+        }}
+      ></karmania-ramp-select>
+      <k-checkbox
+        .checked=${colour.reverse}
+        @k-checkbox-change=${(event: CustomEvent<CheckboxChange>) => {
+          this.changeClasses({ reverse: event.detail.checked });
+        }}
+        >Reverse ramp</k-checkbox
+      >
+    `;
+  }
+
   override render() {
     const info = this.info;
     if (info === undefined) {
@@ -257,7 +325,7 @@ export class KarmaniaStyleEditor extends LitElement {
                     }
                   }}
                 ></k-input>`
-            : nothing
+            : this.classes(info, colour)
         }
       </div>
     `;

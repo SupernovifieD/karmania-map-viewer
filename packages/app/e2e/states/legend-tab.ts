@@ -130,6 +130,39 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    // A layer opened on its style, by the classes of a column: the class lines, then Colour by, Method, Classes, the ramp with its strip, and Reverse ramp.
+    name: 'legend-tab-style-classes',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-2 karmania-ramp-select')
+        .waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // The list of the ramps opened with the keyboard: every ramp with its strip and name, the one the layer has ticked, and a ring on the one the arrows are at.
+    name: 'legend-tab-ramps',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      const face = page.locator(
+        'karmania-legend-tab #legend-style-layer-2 karmania-ramp-select [role="combobox"]',
+      );
+      await face.focus();
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowDown');
+      const list = page.locator('karmania-legend-tab #legend-style-layer-2 [role="listbox"]');
+      await list.waitFor();
+      // The panel is scrolled so that the whole list is in the picture, as a person who opened it near the bottom would scroll.
+      await list.evaluate((one) => {
+        one.scrollIntoView({ block: 'end' });
+      });
+      return restWithFocus(page);
+    },
+  },
+  {
     // A group is renamed in place: a field in the place of its name, with its ring, and the rest of the row as it is.
     name: 'legend-tab-rename',
     show: async (page) => {

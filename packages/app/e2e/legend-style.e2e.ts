@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { layerRow, legend, loadLegendScene } from './support/legend.js';
+import { layerRow, legend, loadLegendScene, showLegend } from './support/legend.js';
 import { around, bytes, distance, dispatch, drawn } from './support/render.js';
+import { importAndLoad } from './support/wizard.js';
 
 /**
  * The style editor of a layer in the Legend tab (steps 19.6 to 19.8): the fields behind a layer's row, stacked, a label above each, 12 between them. Here: Colour by
- * (a single colour or a column), and, for a single colour, twelve swatches and a hex code.
+ * (a single colour or a column), for a single colour twelve swatches and a hex code, and for a column its method, the number of classes, the ramp and its direction.
  */
 
 /** The twelve swatches: the colours of the ramp Paired. */
@@ -27,10 +28,61 @@ const PAIRED = [
 
 const editor = (page: Page, id: string): Locator =>
   legend(page).locator(`#legend-style-${id} karmania-style-editor`);
-const colourBy = (page: Page, id: string): Locator => editor(page, id).locator('k-select');
+const colourBy = (page: Page, id: string): Locator =>
+  editor(page, id).locator('k-select[label="Colour by"]');
 const swatches = (page: Page, id: string): Locator => editor(page, id).locator('.swatch');
 const hex = (page: Page, id: string): Locator => editor(page, id).locator('k-input');
 const hexInput = (page: Page, id: string): Locator => hex(page, id).locator('input');
+/** The field of the classes of a layer that is named `label`: Method or Classes. */
+const field = (page: Page, id: string, label: string): Locator =>
+  editor(page, id).locator(`k-select[label="${label}"]`);
+const ramp = (page: Page, id: string): Locator => editor(page, id).locator('karmania-ramp-select');
+const face = (page: Page, id: string): Locator => ramp(page, id).getByRole('combobox');
+const rampList = (page: Page, id: string): Locator => ramp(page, id).getByRole('listbox');
+const rampChoices = (page: Page, id: string): Locator => rampList(page, id).getByRole('option');
+const reverse = (page: Page, id: string): Locator => editor(page, id).locator('k-checkbox');
+/** The colour of the first line of a layer's classes (the lowest class, or the highest if the ramp is reversed). */
+const firstDot = (page: Page, id: string): Locator =>
+  legend(page).locator(`#legend-classes-${id} .dot`).first();
+
+/** The names of the ramps, in the order of the scene's list. */
+const RAMP_NAMES = [
+  'Viridis',
+  'Magma',
+  'Cividis',
+  'Blues',
+  'Greens',
+  'Oranges',
+  'Reds',
+  'Purples',
+  'Yellow-green-blue',
+  'Yellow-orange-red',
+  'Red-blue',
+  'Purple-orange',
+  'Brown-blue-green',
+  'Okabe-Ito',
+  'Paired',
+];
+
+/** How many times an event of the editor (`karmania-style-change`, or the picker's `karmania-ramp-change`) has been sent since this was called. */
+async function countChanges(
+  page: Page,
+  name: 'karmania-style-change' | 'karmania-ramp-change' = 'karmania-style-change',
+): Promise<() => Promise<number>> {
+  const key = `changes:${name}`;
+  await page.evaluate(
+    ([event, counter]) => {
+      const counted = window as unknown as Record<string, number>;
+      counted[counter] = 0;
+      document.addEventListener(event, () => {
+        counted[counter] = (counted[counter] ?? 0) + 1;
+      });
+    },
+    [name, key] as const,
+  );
+  return () =>
+    page.evaluate((counter) => (window as unknown as Record<string, number>)[counter] ?? 0, key);
+}
 
 /** The style of a layer in the scene. */
 const styleOf = (page: Page, id: string): Promise<Record<string, unknown> | undefined> =>
@@ -267,6 +319,387 @@ test.describe('the style editor: colour by, and a single colour', () => {
     await open(page, 'layer-1', 'layer-2');
     await hexInput(page, 'layer-1').fill('x');
     await hexInput(page, 'layer-1').press('Enter');
+    await expectNoSeriousViolations(page);
+  });
+});
+
+test.describe('the style editor: the classes of a column', () => {
+  test('has Method, Classes, Ramp and Reverse ramp under Colour by, in that order, named, showing what the layer has, and no swatches', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    expect(
+      await editor(page, 'layer-2')
+        .locator('.fields')
+        .evaluate((fields) =>
+          [...fields.children].map(
+            (child) => child.getAttribute('label') ?? child.textContent.trim(),
+          ),
+        ),
+    ).toEqual(['Colour by', 'Method', 'Classes', 'Ramp', 'Reverse ramp']);
+    await expect(field(page, 'layer-2', 'Method').locator('select')).toHaveValue('equal');
+    await expect(field(page, 'layer-2', 'Classes').locator('select')).toHaveValue('7');
+    await expect(face(page, 'layer-2')).toHaveAccessibleName('Ramp Viridis');
+    await expect(reverse(page, 'layer-2').locator('input')).not.toBeChecked();
+    await expect(swatches(page, 'layer-2')).toHaveCount(0);
+    await expect(hex(page, 'layer-2')).toHaveCount(0);
+  });
+
+  test('stacks them with 12 between the fields, each the width of the editor', async ({ page }) => {
+    await open(page, 'layer-2');
+    const whole = await editor(page, 'layer-2').boundingBox();
+    const boxes = [
+      await colourBy(page, 'layer-2').boundingBox(),
+      await field(page, 'layer-2', 'Method').boundingBox(),
+      await field(page, 'layer-2', 'Classes').boundingBox(),
+      await ramp(page, 'layer-2').boundingBox(),
+      await reverse(page, 'layer-2').boundingBox(),
+    ];
+    for (const box of boxes) {
+      expect(box?.width).toBe(whole?.width);
+    }
+    for (let at = 1; at < boxes.length; at += 1) {
+      const above = boxes[at - 1];
+      expect(
+        (boxes[at]?.y ?? 0) - ((above?.y ?? 0) + (above?.height ?? 0)),
+        `field ${String(at)}`,
+      ).toBe(12);
+    }
+    // The ramp has its label above its face, and the face is as high as the other controls.
+    const label = await ramp(page, 'layer-2').locator('.label').boundingBox();
+    const box = await face(page, 'layer-2').boundingBox();
+    expect(label?.y).toBeLessThan(box?.y ?? 0);
+    expect(box?.height).toBe(32);
+    expect(box?.width).toBe(whole?.width);
+  });
+
+  test('changes the method: the scene has it, the rest of the style is kept, and the lines are worked out again', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    expect(
+      await field(page, 'layer-2', 'Method')
+        .locator('option')
+        .evaluateAll((all) =>
+          all.map((option) => [
+            option.getAttribute('value'),
+            option.textContent.trim(),
+            (option as HTMLOptionElement).disabled,
+          ]),
+        ),
+    ).toEqual([
+      ['equal', 'Equal intervals', false],
+      ['quantile', 'Quantiles', false],
+      ['jenks', 'Natural breaks', false],
+      ['categories', 'Categories', false],
+    ]);
+    await field(page, 'layer-2', 'Method').locator('select').selectOption('quantile');
+    await expect
+      .poll(() => styleOf(page, 'layer-2'))
+      .toEqual({
+        mode: 'classes',
+        column: 'value',
+        method: 'quantile',
+        classes: 7,
+        ramp: 'viridis',
+        reverse: false,
+      });
+    await field(page, 'layer-2', 'Method').locator('select').selectOption('jenks');
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ method: 'jenks' });
+    await expect(field(page, 'layer-2', 'Method').locator('select')).toHaveValue('jenks');
+    await expect(legend(page).locator('#legend-classes-layer-2 .entry').first()).toBeVisible();
+  });
+
+  test('changes the number of classes, 3 to 12: the scene has it and the lines are that many', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    expect(
+      await field(page, 'layer-2', 'Classes')
+        .locator('option')
+        .evaluateAll((all) => all.map((option) => option.textContent.trim())),
+    ).toEqual(['3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+    const lines = legend(page).locator('#legend-classes-layer-2 .entry');
+    await field(page, 'layer-2', 'Classes').locator('select').selectOption('5');
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ classes: 5 });
+    await expect(lines).toHaveCount(5);
+    await field(page, 'layer-2', 'Classes').locator('select').selectOption('12');
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ classes: 12 });
+    await expect(lines).toHaveCount(12);
+    await field(page, 'layer-2', 'Classes').locator('select').selectOption('3');
+    await expect(lines).toHaveCount(3);
+  });
+
+  test('has a ramp picker that is a combobox with a list of every ramp, a strip and a name each, the chosen one marked and ticked', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-expanded', 'false');
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    // The face shows the ramp that is chosen: a strip of 48 by 12 and its name.
+    const strip = face(page, 'layer-2').locator('.strip');
+    expect((await strip.boundingBox())?.width).toBe(48);
+    expect((await strip.boundingBox())?.height).toBe(12);
+    await expect(face(page, 'layer-2').locator('.name')).toHaveText('Viridis');
+    await face(page, 'layer-2').click();
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-expanded', 'true');
+    await expect(rampList(page, 'layer-2')).toHaveAccessibleName('Ramp');
+    await expect(rampChoices(page, 'layer-2')).toHaveCount(15);
+    expect(
+      await rampChoices(page, 'layer-2').evaluateAll((all) =>
+        all.map((option) => option.querySelector('.name')?.textContent.trim()),
+      ),
+    ).toEqual(RAMP_NAMES);
+    // A strip in each, drawn from the colours of the ramp and not the same as another's.
+    const strips = await rampChoices(page, 'layer-2')
+      .locator('.strip')
+      .evaluateAll((all) => all.map((one) => getComputedStyle(one).backgroundImage));
+    expect(strips).toHaveLength(15);
+    expect(new Set(strips).size).toBe(15);
+    // The one that is chosen is marked for those who cannot see, and has a tick for those who can.
+    await expect(rampChoices(page, 'layer-2').nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(rampChoices(page, 'layer-2').nth(1)).toHaveAttribute('aria-selected', 'false');
+    await expect(rampChoices(page, 'layer-2').nth(0).locator('k-icon')).toHaveCount(1);
+    await expect(rampList(page, 'layer-2').locator('k-icon')).toHaveCount(1);
+  });
+
+  test('has the list in the page, pushing what is under it away and not covering it, six choices high and scrolling the rest', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    // Measured from the face, since opening the list can scroll the panel to show the choice that the arrows are at.
+    const gap = async (): Promise<number> => {
+      const above = await face(page, 'layer-2').boundingBox();
+      const below = await reverse(page, 'layer-2').boundingBox();
+      return (below?.y ?? 0) - ((above?.y ?? 0) + (above?.height ?? 0));
+    };
+    const closed = await gap();
+    await face(page, 'layer-2').click();
+    const list = await rampList(page, 'layer-2').boundingBox();
+    const checkbox = await reverse(page, 'layer-2').boundingBox();
+    // Under the list, and not over the checkbox, with the list's 4 above it and the 12 below it as they were.
+    expect((checkbox?.y ?? 0) - ((list?.y ?? 0) + (list?.height ?? 0))).toBe(12);
+    expect(await gap()).toBe(closed + (list?.height ?? 0) + 4);
+    expect(list?.height).toBeLessThanOrEqual(6 * 32 + 2);
+    expect(
+      await rampList(page, 'layer-2').evaluate((one) => one.scrollHeight > one.clientHeight),
+    ).toBe(true);
+    await face(page, 'layer-2').click();
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    expect(await gap()).toBe(closed);
+  });
+
+  test('chooses a ramp with the pointer: the scene has it, the list closes, the face shows it, the keyboard stays on the face, and the lines have its colours', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    await face(page, 'layer-2').click();
+    await rampChoices(page, 'layer-2').nth(1).click();
+    await expect
+      .poll(() => styleOf(page, 'layer-2'))
+      .toEqual({
+        mode: 'classes',
+        column: 'value',
+        method: 'equal',
+        classes: 7,
+        ramp: 'magma',
+        reverse: false,
+      });
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    await expect(face(page, 'layer-2')).toHaveAccessibleName('Ramp Magma');
+    await expect(face(page, 'layer-2')).toBeFocused();
+    // The lowest class is the first stop of magma, which is black.
+    await expect(firstDot(page, 'layer-2')).toHaveCSS('background-color', 'rgb(0, 0, 4)');
+  });
+
+  test('chooses a ramp with the keyboard: Enter, Space or Down opens, the arrows, Home and End move over the choices, Enter or Space chooses, Escape closes and chooses nothing', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    const changes = await countChanges(page);
+    await face(page, 'layer-2').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-expanded', 'true');
+    // The choice that is chosen is the one the arrows start from.
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-0');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-2');
+    await page.keyboard.press('ArrowUp');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-1');
+    await page.keyboard.press('End');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-14');
+    // The choice the arrows are at is in sight in the list that scrolls.
+    const list = await rampList(page, 'layer-2').boundingBox();
+    const last = await rampChoices(page, 'layer-2').nth(14).boundingBox();
+    expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(
+      (list?.y ?? 0) + (list?.height ?? 0),
+    );
+    await page.keyboard.press('ArrowDown');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-14');
+    await page.keyboard.press('Home');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-0');
+    await page.keyboard.press('ArrowUp');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-0');
+    // Escape closes it and chooses nothing, even where the arrows went.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Escape');
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    await expect(face(page, 'layer-2')).toBeFocused();
+    expect(await changes()).toBe(0);
+    expect(await styleOf(page, 'layer-2')).toMatchObject({ ramp: 'viridis' });
+    // Enter chooses.
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ ramp: 'magma' });
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    await expect(face(page, 'layer-2')).toBeFocused();
+    // Space opens and chooses too.
+    await page.keyboard.press('Space');
+    await expect(face(page, 'layer-2')).toHaveAttribute('aria-activedescendant', 'option-1');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ ramp: 'cividis' });
+    expect(await changes()).toBe(2);
+  });
+
+  test('says nothing when the ramp that is chosen is chosen again, and closes the list when the face is left', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    const changes = await countChanges(page);
+    const picked = await countChanges(page, 'karmania-ramp-change');
+    await face(page, 'layer-2').click();
+    await rampChoices(page, 'layer-2').nth(0).click();
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    expect(await picked()).toBe(0);
+    expect(await changes()).toBe(0);
+    await face(page, 'layer-2').click();
+    await expect(rampList(page, 'layer-2')).toHaveCount(1);
+    await page.keyboard.press('Tab');
+    await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    await expect(reverse(page, 'layer-2').locator('input')).toBeFocused();
+    expect(await changes()).toBe(0);
+  });
+
+  test('closes the list, and chooses nothing, when a person presses on another field or on text that is not a control', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    const picked = await countChanges(page, 'karmania-ramp-change');
+    for (const away of [
+      field(page, 'layer-2', 'Method').locator('select'),
+      legend(page).locator('.top span').first(),
+    ]) {
+      await face(page, 'layer-2').click();
+      await expect(rampList(page, 'layer-2')).toHaveCount(1);
+      await away.click();
+      await expect(rampList(page, 'layer-2')).toHaveCount(0);
+    }
+    expect(await picked()).toBe(0);
+  });
+
+  test('has one stop each for Colour by, Method, Classes, the ramp and Reverse ramp, in that order', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    await colourBy(page, 'layer-2').locator('select').focus();
+    await page.keyboard.press('Tab');
+    await expect(field(page, 'layer-2', 'Method').locator('select')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(field(page, 'layer-2', 'Classes').locator('select')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(face(page, 'layer-2')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(reverse(page, 'layer-2').locator('input')).toBeFocused();
+  });
+
+  test('reverses the ramp: the scene has it, the strips go the other way, the lines are coloured from the other end, and it is put back', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    const strip = face(page, 'layer-2').locator('.strip');
+    const forward = await strip.evaluate((one) => getComputedStyle(one).backgroundImage);
+    await expect(firstDot(page, 'layer-2')).toHaveCSS('background-color', 'rgb(68, 1, 84)');
+    await reverse(page, 'layer-2').getByText('Reverse ramp').click();
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ reverse: true });
+    await expect(reverse(page, 'layer-2').locator('input')).toBeChecked();
+    expect(await strip.evaluate((one) => getComputedStyle(one).backgroundImage)).not.toBe(forward);
+    // The lowest class is now the last stop of viridis, which is yellow.
+    await expect(firstDot(page, 'layer-2')).toHaveCSS('background-color', 'rgb(253, 231, 37)');
+    // The choices of the list are drawn the way the layer has them.
+    await face(page, 'layer-2').click();
+    const first = await rampChoices(page, 'layer-2')
+      .nth(0)
+      .locator('.strip')
+      .evaluate((one) => getComputedStyle(one).backgroundImage);
+    expect(first).toBe(await strip.evaluate((one) => getComputedStyle(one).backgroundImage));
+    await page.keyboard.press('Escape');
+    await reverse(page, 'layer-2').getByText('Reverse ramp').click();
+    await expect.poll(() => styleOf(page, 'layer-2')).toMatchObject({ reverse: false });
+    expect(await strip.evaluate((one) => getComputedStyle(one).backgroundImage)).toBe(forward);
+    await expect(firstDot(page, 'layer-2')).toHaveCSS('background-color', 'rgb(68, 1, 84)');
+  });
+
+  test('keeps the method, the classes, the ramp and its direction when the column is changed, and offers only Categories for a column of text', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, 'points.csv', 'points.prj');
+    await showLegend(page);
+    await layerRow(page, 'layer-1').locator('.open').click();
+    await expect(editor(page, 'layer-1')).toBeVisible();
+    await colourBy(page, 'layer-1').locator('select').selectOption('column:Rock');
+    // Text is one class for each value, from the colours that tell values apart.
+    await expect
+      .poll(() => styleOf(page, 'layer-1'))
+      .toEqual({
+        mode: 'classes',
+        column: 'Rock',
+        method: 'categories',
+        classes: 7,
+        ramp: 'okabe-ito',
+        reverse: false,
+      });
+    expect(
+      await field(page, 'layer-1', 'Method')
+        .locator('option')
+        .evaluateAll((all) =>
+          all.map((option) => [
+            option.getAttribute('value'),
+            (option as HTMLOptionElement).disabled,
+          ]),
+        ),
+    ).toEqual([
+      ['equal', true],
+      ['quantile', true],
+      ['jenks', true],
+      ['categories', false],
+    ]);
+    await expect(field(page, 'layer-1', 'Method').locator('select')).toHaveValue('categories');
+    await expect(face(page, 'layer-1')).toHaveAccessibleName('Ramp Okabe-Ito');
+    // The strip of a categorical ramp is stripes of its eight colours with hard edges.
+    expect(await face(page, 'layer-1').locator('.strip').getAttribute('style')).toContain('12.5%');
+    // A column of numbers has all of them.
+    await colourBy(page, 'layer-1').locator('select').selectOption('column:Au_ppm');
+    await expect
+      .poll(() => styleOf(page, 'layer-1'))
+      .toMatchObject({ column: 'Au_ppm', method: 'equal' });
+    expect(
+      await field(page, 'layer-1', 'Method')
+        .locator('option')
+        .evaluateAll((all) => all.map((option) => (option as HTMLOptionElement).disabled)),
+    ).toEqual([false, false, false, false]);
+  });
+
+  test('has no serious accessibility violation with the ramp list open, and with a ramp of the list focused', async ({
+    page,
+  }) => {
+    await open(page, 'layer-2');
+    await face(page, 'layer-2').click();
+    await page.keyboard.press('ArrowDown');
+    await expect(rampList(page, 'layer-2')).toHaveCount(1);
     await expectNoSeriousViolations(page);
   });
 });
