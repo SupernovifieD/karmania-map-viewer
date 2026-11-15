@@ -4,7 +4,7 @@
  */
 import type { Command, GroupVisibility, LegendLayerEntry, LegendModel } from '@karmania/scene';
 
-/** A row of the tree that is shown (a layer of a group that is folded away is not). A layer can be opened if it has lines to show, and `expanded` says it is. */
+/** A row of the tree that is shown (a layer of a group that is folded away is not). A layer can be opened (it has its style behind its row), and `expanded` says it is. */
 export type TreeItem =
   | {
       readonly kind: 'group';
@@ -20,7 +20,6 @@ export type TreeItem =
       /** The group the layer is in, or `null` for a layer of the top of the legend. */
       readonly parent: string | null;
       readonly visible: boolean;
-      readonly expandable: boolean;
       readonly expanded: boolean;
     };
 
@@ -30,23 +29,21 @@ export function itemKey(item: Pick<TreeItem, 'kind' | 'id'>): string {
 }
 
 /**
- * The rows that are shown, from the top: each group, and under it its layers if it is open. `open` is the ids of the layers that a person has opened: a
- * layer is open only if it has lines to show (its classes), so one that loses them is closed, and open again if it has them again.
+ * The rows that are shown, from the top: each group, and under it its layers if it is open. `open` is the ids of the layers that a person has opened (every
+ * layer can be: behind its row are its style, and its classes if it has them).
  */
 export function treeItems(
   model: LegendModel,
   open: ReadonlySet<string> = new Set(),
 ): readonly TreeItem[] {
   const layerItem = (layer: LegendLayerEntry, level: 1 | 2, parent: string | null): TreeItem => {
-    const expandable = layer.classes.length > 0;
     return {
       kind: 'layer',
       id: layer.id,
       level,
       parent,
       visible: layer.visible,
-      expandable,
-      expanded: expandable && open.has(layer.id),
+      expanded: open.has(layer.id),
     };
   };
   return model.entries.flatMap((entry): TreeItem[] => {
@@ -100,7 +97,7 @@ export function stillThere(open: ReadonlySet<string>, model: LegendModel): Reado
  * key does nothing to this row (any other key, a group, a layer with nothing to show, or one that is so already).
  */
 export function expansionFor(item: TreeItem, key: string): boolean | undefined {
-  if (item.kind !== 'layer' || !item.expandable) {
+  if (item.kind !== 'layer') {
     return undefined;
   }
   if (key === 'ArrowRight' && !item.expanded) {
