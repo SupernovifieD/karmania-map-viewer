@@ -198,7 +198,14 @@ impl Levels {
     fn height_of(&self, k: i64) -> f64 {
         #[allow(clippy::cast_precision_loss)]
         let steps = k as f64;
-        self.base + steps * self.interval
+        let height = self.base + steps * self.interval;
+        if height.is_finite() {
+            height
+        } else {
+            // A step of 1e308 from a base of 1e308 passes through a number that is not one a float holds (-2e308) on its way to one that is
+            // (-1e308): on the halves it does not. (Halving is exact, so this is the same number wherever the first is a number.)
+            (self.base / 2.0 + steps * (self.interval / 2.0)) * 2.0
+        }
     }
 }
 
@@ -212,10 +219,15 @@ impl Levels {
 #[must_use]
 pub fn default_interval(low: f64, high: f64) -> Option<f64> {
     let span = high - low;
-    if !(low.is_finite() && high.is_finite() && span.is_finite() && span > 0.0) {
+    // (A range that is wider than a float, 1e308 to -1e308, has a tenth that is one: five times the difference of the halves.)
+    let target = if span.is_finite() {
+        span / 10.0
+    } else {
+        (high / 2.0 - low / 2.0) / 5.0
+    };
+    if !(low.is_finite() && high.is_finite() && target > 0.0) {
         return None;
     }
-    let target = span / 10.0;
     #[allow(clippy::cast_possible_truncation)]
     let exponent = target.log10().floor() as i32;
     // The power of ten of the target and the one below it, in case the target is just under a power (the logarithm is not exact).
@@ -248,6 +260,23 @@ fn steps_between(value: f64, from: f64, interval: f64) -> f64 {
     } else {
         value / interval - from / interval
     }
+}
+
+/// How far `level` is from `from` towards `to`, from 0 (at `from`) to 1 (at `to`), where it is `0.5` if the two are the same: the place on an
+/// edge whose ends have those values where a line of that level crosses it. Where the differences are too large for a float (1e308 and -1e308) it
+/// is worked out on the halves, which is the same number.
+pub(crate) fn fraction(level: f64, from: f64, to: f64) -> f64 {
+    if to == from {
+        return 0.5;
+    }
+    let width = to - from;
+    // (A level so far off that `level - from` is not a number is a fraction that is clamped all the same.)
+    let t = if width.is_finite() {
+        (level - from) / width
+    } else {
+        (level / 2.0 - from / 2.0) / (to / 2.0 - from / 2.0)
+    };
+    t.clamp(0.0, 1.0)
 }
 
 /// A whole number of intervals as an `i64`; the caller has kept it within `MAX_REACH`.
@@ -480,7 +509,6 @@ mod tests {
         assert_eq!(default_interval(5.0, 1.0), None);
         assert_eq!(default_interval(f64::NAN, 1.0), None);
         assert_eq!(default_interval(0.0, f64::INFINITY), None);
-        assert_eq!(default_interval(f64::MIN, f64::MAX), None);
         // A span of a hair: still a nice number, and no more than a thousand levels.
         assert!(default_interval(1.0, 1.0 + f64::EPSILON).is_some_and(|d| d > 0.0));
     }
@@ -494,6 +522,60 @@ mod tests {
                 assert_eq!(nice(mantissa, power), written, "{mantissa}e{power}");
             }
         }
+    }
+
+    #[test]
+    fn the_fraction_of_an_edge_is_where_the_level_is_between_its_ends_and_is_a_number_for_ends_of_1e308()
+     {
+        assert_eq!(fraction(0.25, 0.0, 1.0), 0.25);
+        assert_eq!(fraction(15.0, 10.0, 20.0), 0.5);
+        // The same ends and a level that is not between them: the middle, and the nearer end.
+        assert_eq!(fraction(3.0, 2.0, 2.0), 0.5);
+        assert_eq!(fraction(-5.0, 0.0, 1.0), 0.0);
+        assert_eq!(fraction(9.0, 0.0, 1.0), 1.0);
+        // Falling edges count the same.
+        assert_eq!(fraction(0.25, 1.0, 0.0), 0.75);
+        // The differences of these are not numbers a float holds, and the fractions are what they are on paper.
+        assert_eq!(fraction(0.0, -1.0e308, 1.0e308), 0.5);
+        assert_eq!(fraction(-1.0e308, -1.0e308, 1.0e308), 0.0);
+        assert_eq!(fraction(1.0e308, -1.0e308, 1.0e308), 1.0);
+        assert_eq!(fraction(5.0e307, -1.0e308, 1.0e308), 0.75);
+        assert_eq!(fraction(1.0e308, 1.0e308, -1.0e308), 0.0);
+        // Two numbers as close as floats go do not make a fraction that is not a number.
+        let (a, b) = (0.0, 5.0e-324);
+        assert!(fraction(5.0e-324, a, b).is_finite());
+        assert_eq!(fraction(5.0e-324, a, b), 1.0);
+    }
+
+    #[test]
+    fn a_level_that_is_a_number_is_found_through_a_step_that_is_not_one() {
+        // From 1e308, two steps of 1e308 down is -1e308, but one of the two steps (-2e308) is not a number.
+        let levels = Levels::for_range(-1.1e308, -0.9e308, 1.0e308, 1.0e308, 5).unwrap();
+        assert_eq!(heights(&levels), [-1.0e308]);
+        // The same from the other side.
+        let levels = Levels::for_range(0.9e308, 1.1e308, -1.0e308, 1.0e308, 5).unwrap();
+        assert_eq!(heights(&levels), [1.0e308]);
+    }
+
+    #[test]
+    fn the_default_interval_of_a_range_wider_than_a_float_is_a_tenth_of_it_or_a_bit_less() {
+        let interval = default_interval(-1.0e308, 1.0e308).unwrap();
+        assert!(
+            interval.is_finite() && interval > 1.0e307 && interval <= 2.0e307 * 1.000_000_1,
+            "{interval}"
+        );
+        let levels = Levels::for_range(-1.0e308, 1.0e308, 0.0, interval, 5).unwrap();
+        assert!((10..=21).contains(&levels.len()), "{} levels", levels.len());
+        // The same as for a range that does fit, far from 1e308: no change.
+        assert_eq!(default_interval(0.0, 25.0), Some(2.5));
+        // The widest range there is has one too (it was said to have none, with the span as the difference that is not a number).
+        let widest = default_interval(f64::MIN, f64::MAX).unwrap();
+        let levels = Levels::for_range(f64::MIN, f64::MAX, 0.0, widest, 5).unwrap();
+        assert!((10..=21).contains(&levels.len()), "{} levels", levels.len());
+        // Ends that are not numbers, or the same, have none, as before.
+        assert_eq!(default_interval(-1.0e308, f64::INFINITY), None);
+        assert_eq!(default_interval(f64::NEG_INFINITY, 1.0e308), None);
+        assert_eq!(default_interval(1.0e308, -1.0e308), None);
     }
 
     #[test]
