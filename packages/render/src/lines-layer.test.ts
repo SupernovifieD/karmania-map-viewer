@@ -3,6 +3,7 @@ import { DoubleSide, LessDepth } from 'three';
 import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { MAX_CLASSES } from './look.js';
+import { drawing } from './pick-test-support.js';
 import type { FrameInfo, LayerLook } from './look.js';
 import { SEGMENTS_PER_PART, createLinesLayer, gatherSegments } from './lines-layer.js';
 
@@ -78,10 +79,48 @@ describe('gatherSegments', () => {
 });
 
 describe('createLinesLayer', () => {
+  it('picks with materials of its own, made from the same shaders, that write the line each segment is of and not a colour, and gives its own back', () => {
+    // Four segments of two lines (0, 0, 1, 1), in two parts: the line of a segment is what the pick says, whatever its number among the segments.
+    const buffers = {
+      ...lines(SEGMENTS_PER_PART + 2),
+      segmentLine: new Uint32Array(SEGMENTS_PER_PART + 2),
+    };
+    buffers.segmentLine[SEGMENTS_PER_PART] = 7;
+    buffers.segmentLine[SEGMENTS_PER_PART + 1] = 8;
+    const layer = createLinesLayer(buffers, LOOK);
+    layer.step?.();
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    const back = layer.pick?.(1);
+    const picking = parts(layer).map((part) => part.material as ShaderMaterial);
+    expect(new Set(picking).size).toBe(1);
+    const [using] = picking;
+    expect(using).not.toBe(flat);
+    expect(using?.defines).toHaveProperty('PICK');
+    expect(using?.uniforms).toBe(flat.uniforms);
+    expect(using?.transparent).toBe(false);
+    expect(using?.side).toBe(DoubleSide);
+    expect(using?.fragmentShader).toBe(flat.fragmentShader);
+    expect(using?.vertexShader).toBe(flat.vertexShader);
+    expect(flat.uniforms['uPickLayer']?.value).toBe(2);
+    const numbers = parts(layer).map(
+      (part) => part.geometry.getAttribute('aElement').array as Float32Array,
+    );
+    expect(numbers[0]?.[0]).toBe(0);
+    expect(Array.from(numbers[1] ?? [])).toEqual([7, 8]);
+    back?.();
+    expect(parts(layer).every((part) => part.material === flat)).toBe(true);
+    layer.prepareFrame({ ...INFO, flat: false });
+    layer.pick?.(0);
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid.defines).toHaveProperty('PICK');
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    expect(solid.side).toBe(DoubleSide);
+  });
+
   it('writes the depth of the plane of the ribbon it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
     const layer = createLinesLayer(lines(2), LOOK);
     const flat = parts(layer)[0]?.material as ShaderMaterial;
-    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(drawing(flat.fragmentShader)).not.toContain('gl_FragDepth');
     expect(flat.vertexShader).not.toContain('vStartV');
     layer.prepareFrame({ ...INFO, flat: false });
     const solid = parts(layer)[0]?.material as ShaderMaterial;

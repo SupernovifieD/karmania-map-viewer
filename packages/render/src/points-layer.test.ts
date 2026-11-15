@@ -3,6 +3,7 @@ import { LessDepth } from 'three';
 import type { Points, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { MAX_CLASSES } from './look.js';
+import { drawing } from './pick-test-support.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 import { OUTLINE_WIDTH, POINTS_PER_PART, createPointsLayer } from './points-layer.js';
 
@@ -35,13 +36,6 @@ const parts = (layer: ReturnType<typeof createPointsLayer>): Points[] =>
   layer.object.children as Points[];
 const uniforms = (layer: ReturnType<typeof createPointsLayer>) =>
   (parts(layer)[0]?.material as ShaderMaterial).uniforms;
-
-/** A shader as the material that draws has it: the lines that are only for the material that picks are left out. */
-const drawing = (source: string): string =>
-  source.replace(
-    /#ifdef PICK[\s\S]*?(?:#else([\s\S]*?))?#endif/g,
-    (_all, otherwise?: string) => otherwise ?? '',
-  );
 
 describe('createPointsLayer', () => {
   it('writes the depth of the plane it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {

@@ -12,7 +12,6 @@ import {
   BufferGeometry,
   Group,
   LessDepth,
-  NoBlending,
   NormalBlending,
   Points,
   ShaderMaterial,
@@ -21,7 +20,7 @@ import {
 } from 'three';
 import type { LayerObject } from './layer-set.js';
 import { MAX_CLASSES, colourOf } from './look.js';
-import { PICK_FRAGMENT_GLSL, PICK_MIN_POINT } from './pick.js';
+import { PICK_FRAGMENT_GLSL, PICK_MIN_POINT, pickMaterial } from './pick.js';
 import { PLANE_DEPTH_GLSL } from './plane-depth.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
@@ -144,19 +143,9 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       depthFunc: LessDepth,
       depthWrite: true,
     });
-  /** The same for picking: it writes the number of the point and not a colour, with nothing blended, and the markers are larger. */
+  /** The same for picking: it writes the number of the point and not a colour, and the markers are larger. */
   const pickMaterialFor = (plane: boolean): ShaderMaterial =>
-    new ShaderMaterial({
-      uniforms,
-      defines: { PICK: '' },
-      vertexShader: vertex(plane),
-      fragmentShader: fragment(plane),
-      transparent: false,
-      blending: NoBlending,
-      depthTest: true,
-      depthFunc: LessDepth,
-      depthWrite: true,
-    });
+    pickMaterial({ uniforms, vertexShader: vertex(plane), fragmentShader: fragment(plane) });
   const material = materialFor(false);
   // (Made when first wanted: a layer that is only seen from above does not have it.)
   let material3d: ShaderMaterial | undefined;

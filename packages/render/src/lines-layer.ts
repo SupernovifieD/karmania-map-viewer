@@ -27,6 +27,7 @@ import {
 import type { LayerObject } from './layer-set.js';
 import { classesOfPieces, coversOwners } from './class-map.js';
 import { MAX_CLASSES, colourOf } from './look.js';
+import { PICK_FRAGMENT_GLSL, PICK_MIN_LINE, pickMaterial } from './pick.js';
 import { PLANE_DEPTH_GLSL, RIBBON_GLSL } from './plane-depth.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
@@ -50,6 +51,11 @@ varying vec2 vEnd;
 varying float vClass;
 varying float vWidth;
 ${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
+#ifdef PICK
+uniform float uPickMin;
+attribute float aElement;
+flat varying float vElement;
+#endif
 
 void main() {
   vClass = aClass;
@@ -62,6 +68,11 @@ void main() {
     }
   }
   float width = uWidth * scale;
+#ifdef PICK
+  // What is picked is a little wider than what is drawn.
+  width = max(width, uPickMin);
+  vElement = aElement;
+#endif
   vWidth = width;
   ${plane ? 'vStartV = (modelViewMatrix * vec4(aStart, 1.0)).xyz;\n  vEndV = (modelViewMatrix * vec4(aEnd, 1.0)).xyz;' : ''}
   vec4 a = projectionMatrix * modelViewMatrix * vec4(aStart, 1.0);
@@ -100,6 +111,10 @@ varying float vClass;
 varying float vWidth;
 ${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
 ${plane ? PLANE_DEPTH_GLSL + RIBBON_GLSL : ''}
+#ifdef PICK
+flat varying float vElement;
+${PICK_FRAGMENT_GLSL}
+#endif
 
 void main() {
   ${plane ? 'vec2 plane = planeDepth(vStartV, ribbonNormal(vStartV, vEndV));' : ''}
@@ -120,8 +135,14 @@ void main() {
     }
     colour = uPalette[int(line)];
   }
+#ifdef PICK
+  gl_FragColor = pickColour(vElement);
+  // Where the layer is seen from above the segment nearest the pointer wins; in 3D the depth is the plane's, as it is drawn.
+  ${plane ? 'gl_FragDepth = tiedDepth(plane);' : 'gl_FragDepth = clamp(away / (vWidth * 0.5 + 1.0), 0.0, 1.0);'}
+#else
   gl_FragColor = vec4(colour, inside * uOpacity);
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : ''}
+#endif
 }
 `;
 
@@ -168,6 +189,8 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     uCount: { value: 0 },
     uClassed: { value: 0 },
     uScales: { value: new Float32Array(MAX_CLASSES).fill(1) },
+    uPickLayer: { value: 0 },
+    uPickMin: { value: 0 },
   };
   /** The material for a view; the one for 3D writes the depth of the plane the segments lie in. The two share their uniforms. */
   const materialFor = (plane: boolean): ShaderMaterial =>
@@ -184,9 +207,21 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       // The quad of a segment faces whichever way the segment goes on the screen: it is never a back.
       side: DoubleSide,
     });
+  /** The same for picking: it writes the number of the line and not a colour, and the lines are wider. */
+  const pickMaterialFor = (plane: boolean): ShaderMaterial =>
+    pickMaterial({
+      uniforms,
+      vertexShader: vertex(plane),
+      fragmentShader: fragment(plane),
+      // The quad of a segment faces whichever way the segment goes on the screen: it is never a back.
+      side: DoubleSide,
+    });
   const material = materialFor(false);
   // (Made when first wanted: a layer that is only seen from above does not have it.)
   let material3d: ShaderMaterial | undefined;
+  let pickMaterial2d: ShaderMaterial | undefined;
+  let pickMaterial3d: ShaderMaterial | undefined;
+  let flat = true;
   let current = material;
   const group = new Group();
   const parts: { geometry: InstancedBufferGeometry; first: number; count: number }[] = [];
@@ -218,6 +253,23 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       return;
     }
     part.geometry.setAttribute('aClass', new InstancedBufferAttribute(kinds, 1));
+  }
+
+  /** Gives a part the line that each of its segments is of, for picking: made when the first pick wants it, and kept. */
+  function elementsOf(part: {
+    geometry: InstancedBufferGeometry;
+    first: number;
+    count: number;
+  }): void {
+    if (
+      (part.geometry.getAttribute('aElement') as InstancedBufferAttribute | undefined) === undefined
+    ) {
+      const numbers = new Float32Array(part.count);
+      for (let i = 0; i < part.count; i += 1) {
+        numbers[i] = buffers.segmentLine[part.first + i] ?? 0;
+      }
+      part.geometry.setAttribute('aElement', new InstancedBufferAttribute(numbers, 1));
+    }
   }
 
   /** Puts the next part of the segments on the card. `true` if there are more to come. */
@@ -259,7 +311,26 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       uniforms.uWidth.value = width * ratio;
       group.visible = next.visible;
     },
+    pick(rank: number) {
+      uniforms.uPickLayer.value = rank + 1;
+      uniforms.uPickMin.value = PICK_MIN_LINE * ratio;
+      for (const part of parts) {
+        elementsOf(part);
+      }
+      const using = flat
+        ? (pickMaterial2d ??= pickMaterialFor(false))
+        : (pickMaterial3d ??= pickMaterialFor(true));
+      for (const part of group.children) {
+        (part as Mesh).material = using;
+      }
+      return () => {
+        for (const part of group.children) {
+          (part as Mesh).material = current;
+        }
+      };
+    },
     prepareFrame(info: FrameInfo) {
+      flat = info.flat;
       ratio = info.pixelRatio;
       uniforms.uWidth.value = width * ratio;
       uniforms.uViewport.value.set(info.viewport[0], info.viewport[1]);
@@ -314,6 +385,8 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       }
       material.dispose();
       material3d?.dispose();
+      pickMaterial2d?.dispose();
+      pickMaterial3d?.dispose();
     },
   };
   layer.setLook(look);

@@ -6,8 +6,18 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { fixture, projectionFor } from './support/fixtures.js';
 import { fixturePath } from './support/picker.js';
-import { camera, dispatch, drawn, pickAt, pixels, withData } from './support/render.js';
+import {
+  camera,
+  dispatch,
+  drawn,
+  layerStatuses,
+  pickAt,
+  pixels,
+  withData,
+} from './support/render.js';
+import { importAndLoad } from './support/wizard.js';
 
 /** The points of `points.csv`: easting and northing in the file's own coordinates (EPSG:32640), in the order of the file (element 0 first). */
 const POINTS = readFileSync(fixturePath('points.csv'), 'utf8')
@@ -217,5 +227,101 @@ test.describe('picking points', () => {
     });
     const back = await place(page, 4);
     await expect.poll(async () => (await pickAt(page, back.x, back.y))?.element).toBe(4);
+  });
+});
+
+/** The two lines of `lines.csv` (EPSG:32640): A has the vertices 0, 1 and 2, B the vertices 3 and 4; A is element 0 and B element 1. */
+const A = [
+  [500000, 2765000],
+  [500050, 2765040],
+  [500100, 2765100],
+] as const;
+const B = [
+  [500200, 2765000],
+  [500260, 2765060],
+] as const;
+
+test.describe('picking lines', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, fixture('lines.csv'), projectionFor('lines.prj'));
+    await drawn(page);
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+  });
+
+  /**
+   * Looks at the map point `at` with it in the middle of the map at `scale` and `heading`, and says what is picked `right` pixels to the right
+   * of and `up` pixels above it.
+   */
+  async function pickNear(
+    page: Page,
+    at: readonly [number, number],
+    offset: { right?: number; up?: number; scale?: number; heading?: number } = {},
+  ): Promise<{ layerId: string; element: number } | null> {
+    const { right = 0, up = 0, scale = 1, heading = 0 } = offset;
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera2d: { centre: [at[0], at[1]], unitsPerPixel: scale, heading } },
+    });
+    const now = await drawn(page);
+    await expect
+      .poll(async () => Math.abs((await camera(page)).unitsPerPixel - scale))
+      .toBeLessThan(1e-9);
+    return pickAt(page, now.cssWidth / 2 + right, now.cssHeight / 2 - up);
+  }
+
+  const middle = (a: readonly [number, number], b: readonly [number, number]): [number, number] => [
+    (a[0] + b[0]) / 2,
+    (a[1] + b[1]) / 2,
+  ];
+
+  test('says which line is under the pointer, whichever of its segments, and at a vertex where two of them meet', async ({
+    page,
+  }) => {
+    expect(await pickNear(page, middle(A[0], A[1]))).toEqual({ layerId: 'layer-1', element: 0 });
+    expect(await pickNear(page, middle(A[1], A[2]))).toEqual({ layerId: 'layer-1', element: 0 });
+    expect(await pickNear(page, A[1])).toEqual({ layerId: 'layer-1', element: 0 });
+    expect(await pickNear(page, middle(B[0], B[1]))).toEqual({ layerId: 'layer-1', element: 1 });
+    expect(await pickNear(page, B[1])).toEqual({ layerId: 'layer-1', element: 1 });
+  });
+
+  test('is a little wider than the line: a few pixels off it still picks it, and further off picks nothing', async ({
+    page,
+  }) => {
+    // The first segment of A goes 50 east and 40 north, so its normal (to the left) is (-40, 50) / 64: the middle of the line seen from 3 pixels
+    // to the left of it is on the line, and from 12 pixels is not.
+    const from = middle(A[0], A[1]);
+    const unit = [-40 / Math.hypot(40, 50), 50 / Math.hypot(40, 50)] as const;
+    const off = (pixels: number): [number, number] => [
+      from[0] - unit[0] * pixels,
+      from[1] - unit[1] * pixels,
+    ];
+    // (The map is looked at from `off`, so the line is `pixels` away on the side of the normal: the pointer is in the middle of the map.)
+    expect((await pickNear(page, off(3)))?.element).toBe(0);
+    expect(await pickNear(page, off(8))).toBeNull();
+    expect(await pickNear(page, off(-8))).toBeNull();
+    expect((await pickNear(page, off(-3)))?.element).toBe(0);
+  });
+
+  test('is where the line is drawn when the map is turned', async ({ page }) => {
+    // Turned a quarter: east is up. A point of B's segment 100 pixels east of the middle of the view, at scale 1, is 100 pixels above it.
+    const at: [number, number] = [middle(B[0], B[1])[0] - 100, middle(B[0], B[1])[1]];
+    expect((await pickNear(page, at, { up: 100, heading: 90 }))?.element).toBe(1);
+    expect(await pickNear(page, at, { right: 100, heading: 90 })).toBeNull();
+  });
+
+  test('is the line nearer the pointer where two are within reach of it', async ({ page }) => {
+    // A starts at (500000, 2765000) and B at (500200, 2765000): at 60 metres a pixel they are 3.3 pixels apart, within each other's reach. A pixel
+    // to the right of the first and a pixel to the left of the second is nearer the first, and the other way round.
+    const centre: [number, number] = [A[0][0], A[0][1]];
+    expect((await pickNear(page, centre, { scale: 60, right: 1 }))?.element).toBe(0);
+    expect((await pickNear(page, centre, { scale: 60, right: 2.4 }))?.element).toBe(1);
+  });
+
+  test('does not pick a layer that is hidden', async ({ page }) => {
+    expect((await pickNear(page, middle(A[0], A[1])))?.element).toBe(0);
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
+    expect(await pickNear(page, middle(A[0], A[1]))).toBeNull();
   });
 });
