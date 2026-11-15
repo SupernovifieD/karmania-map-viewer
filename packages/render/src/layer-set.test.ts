@@ -319,4 +319,33 @@ describe('LayerSet: a layer that makes more of itself when its classes come', ()
     expect(set.step()).toBe(false);
     expect(calls).toEqual(['step', 'step', 'step']);
   });
+
+  it("puts the picking materials of a layer in place with the number of its place in the drawing order, and gives back what puts the layer's own back", () => {
+    const calls: string[] = [];
+    const set = new LayerSet({ add: () => undefined, remove: () => undefined }, () => ({
+      object: new Group(),
+      dispose: () => undefined,
+      setLook: () => undefined,
+      prepareFrame: () => undefined,
+      pick: (rank: number) => {
+        calls.push(`pick ${String(rank)}`);
+        return () => {
+          calls.push(`back ${String(rank)}`);
+        };
+      },
+    }));
+    set.set('layer-1', points, LOOK);
+    const back = set.pick('layer-1', 3);
+    expect(calls).toEqual(['pick 3']);
+    back?.();
+    expect(calls).toEqual(['pick 3', 'back 3']);
+    // No such layer: nothing to pick.
+    expect(set.pick('layer-9', 0)).toBeUndefined();
+  });
+
+  it('has nothing to pick in a layer that has no picking materials', () => {
+    const { set } = setup();
+    set.set('layer-1', points, LOOK);
+    expect(set.pick('layer-1', 0)).toBeUndefined();
+  });
 });

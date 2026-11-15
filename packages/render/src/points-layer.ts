@@ -12,6 +12,7 @@ import {
   BufferGeometry,
   Group,
   LessDepth,
+  NoBlending,
   NormalBlending,
   Points,
   ShaderMaterial,
@@ -20,6 +21,7 @@ import {
 } from 'three';
 import type { LayerObject } from './layer-set.js';
 import { MAX_CLASSES, colourOf } from './look.js';
+import { PICK_FRAGMENT_GLSL, PICK_MIN_POINT } from './pick.js';
 import { PLANE_DEPTH_GLSL } from './plane-depth.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
@@ -38,13 +40,23 @@ uniform float uDiameter;
 attribute float aClass;
 varying float vClass;
 ${plane ? 'varying vec3 vCentre;' : ''}
+#ifdef PICK
+uniform float uPickMin;
+attribute float aElement;
+flat varying float vElement;
+#endif
 
 void main() {
   vClass = aClass;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   ${plane ? 'vCentre = (modelViewMatrix * vec4(position, 1.0)).xyz;' : ''}
   // A pixel more than the marker, so that the smoothed edge is not cut off by the square.
+#ifdef PICK
+  vElement = aElement;
+  gl_PointSize = max(uDiameter, uPickMin) + 1.0;
+#else
   gl_PointSize = uDiameter + 1.0;
+#endif
 }
 `;
 
@@ -64,9 +76,14 @@ uniform float uClassed;
 varying float vClass;
 ${plane ? 'varying vec3 vCentre;' : ''}
 ${plane ? PLANE_DEPTH_GLSL : ''}
+#ifdef PICK
+flat varying float vElement;
+${PICK_FRAGMENT_GLSL}
+#endif
 
 void main() {
   ${plane ? 'vec2 plane = planeDepth(vCentre, levelUp());' : ''}
+  // (The marker fills the square it is drawn in, a pixel larger than it, and when it is picked the square is larger: uDiameter stays the drawn size.)
   float reach = uDiameter * 0.5;
   float away = length(gl_PointCoord - vec2(0.5)) * (uDiameter + 1.0);
   // How much of the pixel is inside the disc, and inside the fill that the outline leaves.
@@ -83,9 +100,15 @@ void main() {
     }
     colour = uPalette[int(point)];
   }
+#ifdef PICK
+  gl_FragColor = pickColour(vElement);
+  // Where the layer is seen from above the marker whose centre is nearest wins; in 3D the depth is the plane's, as it is drawn.
+  ${plane ? 'gl_FragDepth = tiedDepth(plane);' : 'gl_FragDepth = clamp(length(gl_PointCoord - vec2(0.5)) * 2.0, 0.0, 1.0);'}
+#else
   float fill = clamp(reach - uOutlineWidth - away + 0.5, 0.0, 1.0);
   gl_FragColor = vec4(mix(uOutline, colour, fill), inside * uOpacity);
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : ''}
+#endif
 }
 `;
 
@@ -104,6 +127,8 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
     uPalette: { value: Array.from({ length: MAX_CLASSES }, () => new Vector3()) },
     uCount: { value: 0 },
     uClassed: { value: 0 },
+    uPickLayer: { value: 0 },
+    uPickMin: { value: 0 },
   };
   /** The material for a view; the one for 3D writes the depth of the plane the markers lie in. The two share their uniforms. */
   const materialFor = (plane: boolean): ShaderMaterial =>
@@ -119,9 +144,25 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       depthFunc: LessDepth,
       depthWrite: true,
     });
+  /** The same for picking: it writes the number of the point and not a colour, with nothing blended, and the markers are larger. */
+  const pickMaterialFor = (plane: boolean): ShaderMaterial =>
+    new ShaderMaterial({
+      uniforms,
+      defines: { PICK: '' },
+      vertexShader: vertex(plane),
+      fragmentShader: fragment(plane),
+      transparent: false,
+      blending: NoBlending,
+      depthTest: true,
+      depthFunc: LessDepth,
+      depthWrite: true,
+    });
   const material = materialFor(false);
   // (Made when first wanted: a layer that is only seen from above does not have it.)
   let material3d: ShaderMaterial | undefined;
+  let pickMaterial2d: ShaderMaterial | undefined;
+  let pickMaterial3d: ShaderMaterial | undefined;
+  let flat = true;
   let current = material;
   const group = new Group();
   const geometries: { geometry: BufferGeometry; first: number; count: number }[] = [];
@@ -150,6 +191,17 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       return;
     }
     part.geometry.setAttribute('aClass', new BufferAttribute(view.slice(), 1));
+  }
+
+  /** Gives a part the number of each of its points, for picking: made when the first pick wants it, and kept. */
+  function elementsOf(part: { geometry: BufferGeometry; first: number; count: number }): void {
+    if ((part.geometry.getAttribute('aElement') as BufferAttribute | undefined) === undefined) {
+      const numbers = new Float32Array(part.count);
+      for (let i = 0; i < part.count; i += 1) {
+        numbers[i] = part.first + i;
+      }
+      part.geometry.setAttribute('aElement', new BufferAttribute(numbers, 1));
+    }
   }
 
   /** Puts the next part of the points on the card. `true` if there are more to come. */
@@ -186,7 +238,26 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       uniforms.uDiameter.value = size * ratio;
       group.visible = next.visible;
     },
+    pick(rank: number) {
+      uniforms.uPickLayer.value = rank + 1;
+      uniforms.uPickMin.value = PICK_MIN_POINT * ratio;
+      for (const part of geometries) {
+        elementsOf(part);
+      }
+      const using = flat
+        ? (pickMaterial2d ??= pickMaterialFor(false))
+        : (pickMaterial3d ??= pickMaterialFor(true));
+      for (const part of group.children) {
+        (part as Points).material = using;
+      }
+      return () => {
+        for (const part of group.children) {
+          (part as Points).material = current;
+        }
+      };
+    },
     prepareFrame(info: FrameInfo) {
+      flat = info.flat;
       uniforms.uViewport.value.set(info.viewport[0], info.viewport[1]);
       // The view from above and the view in 3D draw a marker's depth differently, so each has its own material.
       if (info.flat) {
@@ -235,6 +306,8 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       }
       material.dispose();
       material3d?.dispose();
+      pickMaterial2d?.dispose();
+      pickMaterial3d?.dispose();
     },
   };
   layer.setLook(look);
