@@ -132,9 +132,14 @@ test.describe('the Legend tab with a lot in it', () => {
     // The last is the cells with no value; the others are the classes, each with its range.
     await expect(lines.last().locator('.label')).toHaveText('No value');
     const labels = lines.locator('.label');
-    expect(
-      await labels.evaluateAll((all) => all.map((label) => label.getAttribute('title'))),
-    ).toHaveLength(13);
+    // Each label says all of itself in its title, which is what is seen when it is pointed at.
+    const said = await labels.evaluateAll((all) =>
+      all.map((label) => [label.getAttribute('title'), label.textContent.trim()]),
+    );
+    expect(said).toHaveLength(13);
+    for (const [title, text] of said) {
+      expect(title).toBe(text);
+    }
     await expect(labels.first()).toHaveCSS('text-overflow', 'ellipsis');
     // At least one label is longer than its room, and says all of it when it is pointed at.
     expect(
