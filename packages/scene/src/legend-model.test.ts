@@ -5,7 +5,12 @@ import { classColours } from './class-entries.js';
 import { removeLayersOfDataset, setVisible } from './commands-layers.js';
 import { setGroupCollapsed } from './commands-legend.js';
 import { emptyScene } from './empty.js';
-import { legendModel, type LegendGroupEntry, type LegendLayerEntry } from './legend-model.js';
+import {
+  legendModel,
+  noticeOfFindings,
+  type LegendGroupEntry,
+  type LegendLayerEntry,
+} from './legend-model.js';
 import { rampById, sampleRamp, type Ramp } from './ramps.js';
 import { frozen, layerById, sampleScene } from './test-support/documents.js';
 import type { ClassColour, SceneDocument } from './types.js';
@@ -172,6 +177,63 @@ describe('legendModel: the swatch and the lines under a layer', () => {
       legend: [{ type: 'layer', id: 'constructor' }],
     };
     expect(layer(legendModel(odd, { breaks: {} }), 'constructor').classes).toEqual([]);
+  });
+});
+
+describe('noticeOfFindings', () => {
+  it('says the error before the warning before anything else, with its hint, and something when there is no finding', () => {
+    expect(
+      noticeOfFindings([finding('warning', 'w'), finding('error', 'the error', 'Do this.')]),
+    ).toStrictEqual({ message: 'the error', hint: 'Do this.' });
+    expect(noticeOfFindings([finding('info', 'i')])).toStrictEqual({ message: 'i' });
+    expect(noticeOfFindings([]).message).toBe(
+      'This dataset cannot be drawn in the coordinate system of the map.',
+    );
+  });
+});
+
+describe('legendModel: layers that have a problem the frame does not say', () => {
+  const problems = { 'layer-2': { message: 'Not drawn: it failed.', hint: 'Load it again.' } };
+
+  it('has a notice, no lines and no drawing for such a layer, and keeps its swatch and whether it is on', () => {
+    const l = layer(
+      legendModel(sampleScene(), { breaks: { 'layer-2': breaks }, problems }),
+      'layer-2',
+    );
+    expect(l).toMatchObject({
+      drawn: false,
+      notice: { message: 'Not drawn: it failed.', hint: 'Load it again.' },
+      classes: [],
+    });
+    expect(l.visible).toBe(layer(legendModel(sampleScene()), 'layer-2').visible);
+    expect(l.swatch).toStrictEqual(layer(legendModel(sampleScene()), 'layer-2').swatch);
+  });
+
+  it('leaves the others as they are, and a scene with no problems as it was', () => {
+    const model = legendModel(sampleScene(), { problems });
+    expect(layer(model, 'layer-1')).not.toHaveProperty('notice');
+    expect(layer(model, 'layer-3')).toMatchObject({ drawn: true });
+    expect(legendModel(sampleScene(), { problems: {} })).toStrictEqual(legendModel(sampleScene()));
+  });
+
+  it('says what the frame says when it says something, and the problem when it does not', () => {
+    const drawable = [entry(2, 'not_drawn', [finding('error', 'Not in the map’s system.')])];
+    expect(
+      layer(legendModel(sampleScene(), { drawable, problems }), 'layer-2').notice,
+    ).toStrictEqual({
+      message: 'Not in the map’s system.',
+    });
+    expect(
+      layer(legendModel(sampleScene(), { drawable: [entry(2, 'drawn')], problems }), 'layer-2'),
+    ).toMatchObject({ drawn: false, notice: { message: 'Not drawn: it failed.' } });
+  });
+
+  it('is not fooled by a layer id that is a name every object has, and does not change what it is given', () => {
+    const odd = frozen({ problems: { constructor: { message: 'x' }, ...problems } });
+    expect(layer(legendModel(frozen(sampleScene()), odd), 'layer-1')).toMatchObject({
+      drawn: true,
+    });
+    expect(layer(legendModel(sampleScene(), odd), 'layer-2')).toMatchObject({ drawn: false });
   });
 });
 

@@ -30,10 +30,12 @@ import type {
   Camera3d,
   LayerColour,
   LayerId,
+  LayerNotice,
   LegendInputs,
   SceneStore,
 } from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
+import { layerNotice } from './layer-notice.js';
 
 /** Where a layer is. */
 export type LayerState =
@@ -209,7 +211,15 @@ export class LayerPipeline {
         breaks[id] = entry.breaks;
       }
     }
-    return { breaks, drawable: this.choice };
+    // Every layer that is not on the map for a reason of its own (it failed, the renderer does not draw it, its classes were refused) has its words.
+    const problems: Record<LayerId, LayerNotice> = {};
+    for (const [id, entry] of this.entries) {
+      const notice = layerNotice(entry.state);
+      if (notice !== undefined) {
+        problems[id] = notice;
+      }
+    }
+    return { breaks, drawable: this.choice, problems };
   }
 
   /**
