@@ -634,7 +634,7 @@ or releasing, and whenever the brief says to stop.
 - [x] 19.8 Style editor 3: opacity, point size, line width.
   - [x] 19.8a The fields of numbers of a layer by its kind, what a typed number or a step of the arrow keys is, and the patch it makes, as functions.
   - [x] 19.8b The fields in the style editor; browser proofs; the states photographed.
-- [ ] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the
+- [x] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the
   expanded row).
 - [ ] 19.10 Long content and quantity: 50 layers, 12 classes, names of 120
   characters, 10 million as a count; screenshots; axe.
