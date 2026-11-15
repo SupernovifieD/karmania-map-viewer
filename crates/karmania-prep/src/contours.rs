@@ -1,8 +1,9 @@
-//! Contour lines of a dataset (brief 11.5): of a grid (here), and of a mesh (20.2), as lines with the level of each and whether it is an index line.
+//! Contour lines of a dataset (brief 11.5): of a grid, and of a mesh, as lines with the level of each and whether it is an index line.
 //!
 //! A grid is contoured by the values of one column at the centres of its cells, in its first layer (the others are not drawn either); the lines
 //! are put where the lattice puts its cells, rotation included, at the height that the grid has there: the interpolated height of its elevation
-//! column, or the elevation of its plane. A cell with no value, or with no height, breaks the lines that would pass it.
+//! column, or the elevation of its plane. A cell with no value, or with no height, breaks the lines that would pass it. A mesh is contoured
+//! by the heights of its vertices, in its own coordinates; the lines are at their level exactly.
 
 use karmania_core::{
     Column, ColumnData, ColumnType, CrsRef, Dataset, DatasetId, Findings, Geometry, GridZ, Kind,
@@ -10,8 +11,9 @@ use karmania_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::contour_grid::{Field, contour_field};
+use crate::contour_grid::{Contour, Field, Vertex, contour_field};
 use crate::contour_levels::{Levels, LevelsError};
+use crate::contour_mesh::{Surface, contour_surface};
 
 /// The settings of a set of contours. In JSON: `{ "column": .., "interval": .., "base": .., "indexEvery": .. }`; `column` is only for grids and
 /// is left out when it is not given (a grid then uses its first column of numbers).
@@ -47,6 +49,8 @@ pub enum ContourError {
     NoNumericColumn,
     /// The column has no value that is a finite number (in the cells that have a height).
     NoValues(String),
+    /// A mesh has no heights: its vertices have no Z, or no triangle that can be used has a finite one.
+    NoHeights,
     /// The settings do not make levels.
     Levels(LevelsError),
     /// There is no line to draw: no level is crossed by the values.
@@ -199,24 +203,84 @@ pub fn contour_grid(
     let levels = Levels::for_range(low, high, params.base, params.interval, params.index_every)
         .map_err(ContourError::Levels)?;
     let contours = contour_field(&field, &levels);
+    let [dx, dy, _] = lattice.spacing;
+    // A vertex of the index space `(x, y)` is at `((x + 0.5) dx, (y + 0.5) dy)` in the lattice's own axes (the centre of cell `(i, j)` is
+    // at `((i + 0.5) dx, (j + 0.5) dy)`), which the lattice puts in the world.
+    let place = |vertex: &Vertex| {
+        let world = lattice.local_to_world([(vertex.x + 0.5) * dx, (vertex.y + 0.5) * dy, 0.0]);
+        [
+            world[0],
+            world[1],
+            if heights.is_some() { vertex.z } else { plane },
+        ]
+    };
+    lines_of(&contours, &levels, heights.is_some() || plane != 0.0, place)
+}
+
+/// The contour lines of a mesh by the heights of its vertices: the settings' `column` is not used (a mesh has one height). The lines
+/// are in the coordinates of the mesh, and at their level.
+///
+/// # Errors
+///
+/// [`ContourError::Kind`] for a dataset that is not a mesh, [`ContourError::NoHeights`] for a mesh without Z or with no finite one,
+/// [`ContourError::Levels`] for settings that make no levels or too many, and [`ContourError::NoLines`] when no level crosses it.
+pub fn contour_mesh(
+    dataset: &Dataset,
+    params: &ContourParams,
+) -> Result<ContourLines, ContourError> {
+    let Geometry::Mesh(mesh) = &dataset.geometry else {
+        return Err(ContourError::Kind(dataset.kind()));
+    };
+    if !mesh.positions.has_z() {
+        return Err(ContourError::NoHeights);
+    }
+    let surface =
+        Surface::new(mesh.positions.as_slice(), &mesh.indices).ok_or(ContourError::NoLines)?;
+    let (low, high) = surface.range().ok_or(ContourError::NoHeights)?;
+    let levels = Levels::for_range(low, high, params.base, params.interval, params.index_every)
+        .map_err(ContourError::Levels)?;
+    let contours = contour_surface(&surface, &levels);
+    lines_of(&contours, &levels, true, |vertex| {
+        [vertex.x, vertex.y, vertex.z]
+    })
+}
+
+/// The contour lines of a dataset that is a grid or a mesh.
+///
+/// # Errors
+///
+/// [`ContourError::Kind`] for any other dataset, and those of [`contour_grid`] and [`contour_mesh`].
+pub fn contours_of(
+    dataset: &Dataset,
+    params: &ContourParams,
+) -> Result<ContourLines, ContourError> {
+    match dataset.kind() {
+        Kind::Grid => contour_grid(dataset, params),
+        Kind::Mesh => contour_mesh(dataset, params),
+        other => Err(ContourError::Kind(other)),
+    }
+}
+
+/// The lines as vertices in the world, with the level of each and whether it is an index line; `place` puts a vertex of the kernel.
+fn lines_of(
+    contours: &[Contour],
+    levels: &Levels,
+    has_z: bool,
+    place: impl Fn(&Vertex) -> [f64; 3],
+) -> Result<ContourLines, ContourError> {
     if contours.is_empty() {
         return Err(ContourError::NoLines);
     }
-    let [dx, dy, _] = lattice.spacing;
     let mut lines = ContourLines {
         positions: Vec::new(),
         offsets: vec![0],
         levels: Vec::with_capacity(contours.len()),
         index: Vec::with_capacity(contours.len()),
-        has_z: heights.is_some() || plane != 0.0,
+        has_z,
     };
-    for contour in &contours {
+    for contour in contours {
         for vertex in &contour.vertices {
-            // The vertex is in the index space of the cell centres: the centre of cell `(i, j)` is at `((i + 0.5) dx, (j + 0.5) dy)` in the lattice's own
-            // axes, which the lattice puts in the world.
-            let world = lattice.local_to_world([(vertex.x + 0.5) * dx, (vertex.y + 0.5) * dy, 0.0]);
-            let z = if heights.is_some() { vertex.z } else { plane };
-            lines.positions.extend([world[0], world[1], z]);
+            lines.positions.extend(place(vertex));
         }
         lines
             .offsets
@@ -232,7 +296,7 @@ pub fn contour_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use karmania_core::{Grid, Lattice, Validity, validate};
+    use karmania_core::{Grid, Lattice, Mesh, Validity, validate};
 
     fn params(interval: f64, base: f64) -> ContourParams {
         ContourParams {
@@ -636,6 +700,163 @@ mod tests {
                 base: 0.5,
                 index_every: 4
             }
+        );
+    }
+
+    /// A mesh of `nx` by `ny` vertices at 10 by 5 apart from (1000, 2000) with the height `f(i, j)`, two triangles to a square.
+    fn mesh_with(nx: usize, ny: usize, has_z: bool, f: impl Fn(f64, f64) -> f64) -> Dataset {
+        let mut xyz = Vec::new();
+        for j in 0..ny {
+            for i in 0..nx {
+                let (i, j) = (i as f64, j as f64);
+                xyz.extend([1000.0 + 10.0 * i, 2000.0 + 5.0 * j, f(i, j)]);
+            }
+        }
+        let at = |i: usize, j: usize| u32::try_from(j * nx + i).unwrap();
+        let mut indices = Vec::new();
+        for j in 0..ny - 1 {
+            for i in 0..nx - 1 {
+                indices.extend([at(i, j), at(i + 1, j), at(i + 1, j + 1)]);
+                indices.extend([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+            }
+        }
+        Dataset::new(
+            DatasetId(2),
+            "Pit",
+            Some(CrsRef::Epsg { code: 32640 }),
+            Geometry::Mesh(Mesh {
+                positions: Positions::from_interleaved(xyz, has_z),
+                indices,
+            }),
+            Table::empty(),
+        )
+    }
+
+    #[test]
+    fn a_mesh_gives_lines_in_its_own_coordinates_at_their_level_with_the_index_of_each() {
+        let dataset = mesh_with(6, 4, true, |i, _| 3.0 * i);
+        let lines = contour_mesh(
+            &dataset,
+            &ContourParams {
+                index_every: 2,
+                ..params(6.0, 0.0)
+            },
+        )
+        .unwrap();
+        // Heights 0 to 15 in steps of 6: 6 and 12 have lines; counted from 0, 12 is an index line.
+        assert_eq!(lines.levels, [6.0, 12.0]);
+        assert_eq!(lines.index, [false, true]);
+        assert!(lines.has_z);
+        for (line, level) in lines.levels.iter().enumerate() {
+            let points = vertices(&lines, line);
+            // The height `3 i` is the level at `i = level / 3`, which is `1000 + 10 i` across.
+            assert!(
+                points
+                    .iter()
+                    .all(|p| (p[0] - (1000.0 + 10.0 * level / 3.0)).abs() < 1e-9 && p[2] == *level)
+            );
+            let ys: Vec<f64> = points.iter().map(|p| p[1]).collect();
+            assert!(ys.iter().all(|y| (2000.0..=2015.0).contains(y)));
+            assert_eq!(
+                (
+                    ys.iter().copied().fold(f64::INFINITY, f64::min),
+                    ys.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                ),
+                (2000.0, 2015.0)
+            );
+        }
+        // The column of the settings is for grids: a mesh has one height.
+        let named = ContourParams {
+            column: Some("nope".to_string()),
+            ..params(6.0, 0.0)
+        };
+        assert_eq!(contour_mesh(&dataset, &named).unwrap().levels, [6.0, 12.0]);
+    }
+
+    #[test]
+    fn a_mesh_with_no_heights_and_settings_or_data_that_make_no_lines_say_why() {
+        assert_eq!(
+            contour_mesh(&mesh_with(6, 4, false, |_, _| 0.0), &params(6.0, 0.0)),
+            Err(ContourError::NoHeights)
+        );
+        assert_eq!(
+            contour_mesh(&mesh_with(6, 4, true, |_, _| f64::NAN), &params(6.0, 0.0)),
+            Err(ContourError::NoHeights)
+        );
+        let tilted = mesh_with(6, 4, true, |i, _| 3.0 * i);
+        assert_eq!(
+            contour_mesh(&tilted, &params(0.0, 0.0)),
+            Err(ContourError::Levels(LevelsError::Invalid))
+        );
+        assert!(matches!(
+            contour_mesh(&tilted, &params(0.001, 0.0)),
+            Err(ContourError::Levels(LevelsError::TooMany { .. }))
+        ));
+        assert_eq!(
+            contour_mesh(&mesh_with(6, 4, true, |_, _| 5.0), &params(5.0, 0.0)),
+            Err(ContourError::NoLines)
+        );
+    }
+
+    #[test]
+    fn one_entry_point_takes_a_grid_or_a_mesh_and_says_so_of_any_other_dataset() {
+        let grid = grid_with(
+            lattice(10, 6),
+            GridZ::Flat { elevation: 0.0 },
+            vec![floats("value", 10, 6, |i, _| i)],
+        );
+        let mesh = mesh_with(6, 4, true, |i, _| 3.0 * i);
+        let points = crate::testutil::points(
+            Some(CrsRef::Epsg { code: 32640 }),
+            &[(0.0, 0.0), (1.0, 1.0)],
+        );
+        assert_eq!(
+            contours_of(&grid, &params(2.0, 0.0)),
+            contour_grid(&grid, &params(2.0, 0.0))
+        );
+        assert_eq!(
+            contours_of(&mesh, &params(6.0, 0.0)),
+            contour_mesh(&mesh, &params(6.0, 0.0))
+        );
+        assert!(
+            contours_of(&mesh, &params(6.0, 0.0)).is_ok()
+                && contours_of(&grid, &params(2.0, 0.0)).is_ok()
+        );
+        assert_eq!(
+            contours_of(&points, &params(2.0, 0.0)),
+            Err(ContourError::Kind(Kind::Points))
+        );
+        // Each of the two says what it is given when it is given the other.
+        assert_eq!(
+            contour_grid(&mesh, &params(6.0, 0.0)),
+            Err(ContourError::Kind(Kind::Mesh))
+        );
+        assert_eq!(
+            contour_mesh(&grid, &params(2.0, 0.0)),
+            Err(ContourError::Kind(Kind::Grid))
+        );
+    }
+
+    #[test]
+    fn the_lines_of_a_mesh_are_a_valid_dataset_in_its_system() {
+        let mesh = mesh_with(6, 4, true, |i, _| 3.0 * i);
+        let lines = contour_mesh(&mesh, &params(6.0, 0.0)).unwrap();
+        let made = lines
+            .into_dataset(contours_name("Pit", 6.0), mesh.crs)
+            .unwrap();
+        assert_eq!(
+            (made.name.as_str(), made.crs, made.kind()),
+            ("Contours of Pit (every 6)", mesh.crs, Kind::Lines)
+        );
+        assert!(made.has_z());
+        assert_eq!(made.attributes.row_count(), 2);
+        let report = validate(&made);
+        assert!(
+            report
+                .findings()
+                .all(|f| f.severity != karmania_core::Severity::Error),
+            "{:?}",
+            report.findings().collect::<Vec<_>>()
         );
     }
 }
