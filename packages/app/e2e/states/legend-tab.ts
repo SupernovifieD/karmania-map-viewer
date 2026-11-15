@@ -4,9 +4,9 @@
  * (`legend-tab.visual.ts`) and the accessibility pass checks the whole page (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
-import { dispatch } from '../support/render.js';
+import { dispatch, withData } from '../support/render.js';
 import { loadGrid, loadLegendScene, showLegend } from '../support/legend.js';
-import { importAndLoad } from '../support/wizard.js';
+import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 import type { Shot } from '../support/screenshots.js';
 
 const panel = (page: Page): Locator => page.locator('karmania-panel');
@@ -194,6 +194,23 @@ export const SHOTS: Shot[] = [
         one.scrollIntoView({ block: 'end' });
       });
       return restWithFocus(page);
+    },
+  },
+  {
+    // A layer that is not drawn: the warning icon in the room of its notice and, opened, why in the engine's words and what to do, above its fields.
+    name: 'legend-tab-notice',
+    show: async (page) => {
+      await withData(page);
+      await importAsLocalGrid(page, 'ft', {
+        name: 'faults.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('x,y\n1,2\n3,4\n'),
+      });
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .notice k-icon').waitFor();
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      await page.locator('karmania-legend-tab #legend-reason-layer-2').waitFor();
+      return rest(page);
     },
   },
   {

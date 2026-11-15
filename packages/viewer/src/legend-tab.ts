@@ -74,7 +74,8 @@ function isMove(key: string): key is MoveKey {
  *
  * A row is 32 high. A layer's row is, from the left: the room of its drag handle (16), the room of its visibility box (16), its swatch (a colour,
  * 16 by 16, or its classes side by side, 24 by 12, in a room of 24, so that the names of all the layers of a level start at one place), its name, the
- * room of its notice (16) and the room of its button that opens it (28). A group's row is its chevron and the room of its box, which are in the places of
+ * room of its notice (16: a warning icon, with the reason in its tooltip, on a layer that is not drawn) and the room of its button that opens it (28); the
+ * reason is in the words of the engine in the layer's opened part too, before its lines and fields. A group's row is its chevron and the room of its box, which are in the places of
  * a layer's handle and box, then its name, and how many layers it has. The room of a control is kept, whether or not the control is there yet, so that
  * a control that comes later moves nothing. The layers of a group are 24 in from its edge.
  *
@@ -352,6 +353,39 @@ export class KarmaniaLegendTab extends LitElement {
 
       .open k-icon:not([data-open]) {
         transform: rotate(-90deg);
+      }
+
+      /* The notice of a layer that is not drawn, in the room of 16 that is kept for it on every layer: a warning icon, whose tooltip says why. */
+      .notice {
+        align-items: center;
+        color: var(--k-warning);
+        display: flex;
+        justify-content: center;
+      }
+
+      /* Why a layer is not drawn, in its opened part: the icon where the swatches of the lines are, and what is said beside it. */
+      .reason {
+        align-items: start;
+        display: grid;
+        font-size: var(--k-font-size-secondary);
+        gap: 0 var(--k-space-8);
+        grid-template-columns: var(--k-icon-size-sm) minmax(0, 1fr);
+        line-height: var(--k-line-height-secondary);
+      }
+
+      .reason k-icon {
+        color: var(--k-warning);
+        margin-top: calc((var(--k-line-height-secondary) - var(--k-icon-size-sm)) / 2);
+      }
+
+      .reason .said {
+        display: block;
+        font-weight: var(--k-weight-medium);
+      }
+
+      .reason .hint {
+        color: var(--k-text-muted);
+        display: block;
       }
 
       /* The class lines of a layer that is open: their swatches are under the layer's own and their counts at the right edge, where a group's is. */
@@ -776,6 +810,42 @@ export class KarmaniaLegendTab extends LitElement {
     </div>`;
   }
 
+  /** The room of the notice of a layer: empty, or, for a layer that is not drawn, a warning icon that the tooltip explains (the words are in the row's name too). */
+  private notice(layer: LegendLayerEntry) {
+    const notice = layer.notice;
+    if (notice === undefined) {
+      return html`<span class="notice"></span>`;
+    }
+    return html`<span class="notice"
+      ><k-tooltip text=${[notice.message, notice.hint].filter(Boolean).join(' ')}
+        ><span class="icon"
+          ><k-icon name="triangle-alert" size="16" aria-hidden="true"></k-icon></span
+      ></k-tooltip>
+      <span class="visually-hidden">, not drawn</span></span
+    >`;
+  }
+
+  /** Why a layer is not drawn, in the engine's words (they begin `Not drawn:`), as the first of its opened part: a tree item with nothing to do, which the style is too. */
+  private reason(layer: LegendLayerEntry, level: 1 | 2) {
+    const notice = layer.notice;
+    if (notice === undefined) {
+      return nothing;
+    }
+    return html`<div
+      class="classes reason"
+      role="treeitem"
+      id=${`legend-reason-${layer.id}`}
+      aria-level=${String(level + 1)}
+      data-level=${String(level)}
+    >
+      <k-icon name="triangle-alert" size="16" aria-hidden="true"></k-icon>
+      <span>
+        <span class="said">${notice.message}</span>
+        ${notice.hint === undefined ? nothing : html`<span class="hint">${notice.hint}</span>`}
+      </span>
+    </div>`;
+  }
+
   private layer(layer: LegendLayerEntry, level: 1 | 2, view: View, parent: string | null) {
     const key = `layer:${layer.id}`;
     const item = view.items.get(key);
@@ -817,9 +887,9 @@ export class KarmaniaLegendTab extends LitElement {
           ></span>
           ${this.switch(item, layer.visible ? 'checked' : 'unchecked')} ${this.swatch(layer)}
           <span class="name" data-truncate title=${layer.name}>${layer.name}</span>
-          <span class="notice"></span>
-          ${this.opener(item)}
+          ${this.notice(layer)} ${this.opener(item)}
         </div>
+        ${item.expanded ? this.reason(layer, level) : nothing}
         ${
           item.expanded && layer.classes.length > 0
             ? html`<div
