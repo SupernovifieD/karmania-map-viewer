@@ -172,6 +172,8 @@ finding_codes! {
     ClassesColumnNotNumeric => "classes.column.not_numeric", Warning, None;
     /// The column has too many different values to be shown as categories.
     ClassesColumnTooManyValues => "classes.column.too_many_values", Warning, None;
+    /// The values are so many intervals from the base that the levels of the contour lines cannot be worked out.
+    ContoursBaseTooFar => "contours.base.too_far", Error, None;
     /// The dataset has no column of the name given, so no contour lines can be made from it.
     ContoursColumnMissing => "contours.column.missing", Warning, None;
     /// A grid has no column of numbers to make contour lines from.

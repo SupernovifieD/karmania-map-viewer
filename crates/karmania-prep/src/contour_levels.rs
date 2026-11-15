@@ -19,9 +19,11 @@ const FIX_UPS: usize = 4;
 /// Why there are no levels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LevelsError {
-    /// The interval is not a finite number greater than 0, the base is not finite, `index_every` is 0, or the data is so far from the
-    /// base, in intervals, that the levels cannot be counted.
+    /// The interval is not a finite number greater than 0, the base is not finite, or `index_every` is 0.
     Invalid,
+    /// The data is so far from the base, in intervals (more than a thousand million), that the levels cannot be counted: a base nearer the
+    /// values, or a larger interval, makes levels.
+    TooFar,
     /// The range of the data is not a range: a number that is not finite, or the smallest above the largest.
     NoRange,
     /// More than [`MAX_LEVELS`] levels are in the range: `count` is how many (the most that a `u64` holds, if it is more).
@@ -50,7 +52,7 @@ impl Levels {
     ///
     /// [`LevelsError::Invalid`] for an interval that is not finite and greater than 0, a base that is not finite, or `index_every`
     /// of 0; [`LevelsError::NoRange`] for a range that is not finite or is upside down; [`LevelsError::TooMany`] for more than
-    /// [`MAX_LEVELS`].
+    /// [`MAX_LEVELS`]; [`LevelsError::TooFar`] for data more than a thousand million intervals from the base.
     pub fn for_range(
         min: f64,
         max: f64,
@@ -64,7 +66,7 @@ impl Levels {
         if !(min.is_finite() && max.is_finite() && min <= max) {
             return Err(LevelsError::NoRange);
         }
-        let span = (max - min) / interval;
+        let span = steps_between(max, min, interval);
         if !span.is_finite() || span > MAX_LEVELS as f64 + 2.0 {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let count = if span.is_finite() {
@@ -74,11 +76,11 @@ impl Levels {
             };
             return Err(LevelsError::TooMany { count });
         }
-        let reach = ((min - base) / interval)
+        let reach = steps_between(min, base, interval)
             .abs()
-            .max(((max - base) / interval).abs());
+            .max(steps_between(max, base, interval).abs());
         if !reach.is_finite() || reach > MAX_REACH {
-            return Err(LevelsError::Invalid);
+            return Err(LevelsError::TooFar);
         }
         let mut probe = Self {
             base,
@@ -89,7 +91,7 @@ impl Levels {
         };
         // The lowest k whose height is at or above `min`, and the highest whose height is at or below `max`, found from the estimate
         // and then corrected, since the heights are `base + k * interval` as a float.
-        let mut low = whole(((min - base) / interval).ceil());
+        let mut low = whole(steps_between(min, base, interval).ceil());
         for _ in 0..FIX_UPS {
             if probe.height_of(low.saturating_sub(1)) >= min {
                 low = low.saturating_sub(1);
@@ -99,7 +101,7 @@ impl Levels {
                 break;
             }
         }
-        let mut high = whole(((max - base) / interval).floor());
+        let mut high = whole(steps_between(max, base, interval).floor());
         for _ in 0..FIX_UPS {
             if probe.height_of(high.saturating_add(1)) <= max {
                 high = high.saturating_add(1);
@@ -155,8 +157,8 @@ impl Levels {
         // The numbers `k` of the lowest level and one past the highest: the estimates are kept between them, and corrected a few times.
         let bottom = self.first;
         let top = self.k_of(self.count);
-        let mut first =
-            whole(((low - self.base) / self.interval).floor()).clamp(bottom.saturating_sub(1), top);
+        let mut first = whole(steps_between(low, self.base, self.interval).floor())
+            .clamp(bottom.saturating_sub(1), top);
         for _ in 0..FIX_UPS {
             if first < top && self.height_of(first) <= low {
                 first = first.saturating_add(1);
@@ -166,7 +168,7 @@ impl Levels {
                 break;
             }
         }
-        let mut last = whole(((high - self.base) / self.interval).floor())
+        let mut last = whole(steps_between(high, self.base, self.interval).floor())
             .clamp(bottom.saturating_sub(1), top.saturating_sub(1));
         for _ in 0..FIX_UPS {
             if last < top.saturating_sub(1) && self.height_of(last.saturating_add(1)) <= high {
@@ -234,6 +236,17 @@ fn nice(mantissa: f64, power: i32) -> f64 {
         mantissa * 10f64.powi(power)
     } else {
         mantissa / 10f64.powi(power.saturating_neg())
+    }
+}
+
+/// How many intervals `value` is above `from`: `(value - from) / interval`, and, when the difference itself is too large for a float (values of 1e308 and
+/// the opposite sign), the difference of the two quotients, which is the same number without the overflow.
+fn steps_between(value: f64, from: f64, interval: f64) -> f64 {
+    let difference = value - from;
+    if difference.is_finite() {
+        difference / interval
+    } else {
+        value / interval - from / interval
     }
 }
 
@@ -346,10 +359,14 @@ mod tests {
             Levels::for_range(0.0, 1.0, 0.0, 1.0, 0),
             Err(LevelsError::Invalid)
         );
-        // Data so far from the base, in intervals, that the levels are not worked out.
+        // Data so far from the base, in intervals, that the levels are not worked out: not a matter of the interval or the base being numbers.
         assert_eq!(
             Levels::for_range(0.0, 1.0, 1.0e12, 1.0, 5),
-            Err(LevelsError::Invalid)
+            Err(LevelsError::TooFar)
+        );
+        assert_eq!(
+            Levels::for_range(4_000_000.0, 4_000_001.0, 0.0, 0.001, 5),
+            Err(LevelsError::TooFar)
         );
         for (min, max) in [(f64::NAN, 1.0), (0.0, f64::INFINITY), (2.0, 1.0)] {
             assert_eq!(
@@ -477,5 +494,18 @@ mod tests {
                 assert_eq!(nice(mantissa, power), written, "{mantissa}e{power}");
             }
         }
+    }
+
+    #[test]
+    fn a_range_that_is_wider_than_a_float_is_counted_without_the_overflow() {
+        // From -1e308 to 1e308 is 2e308, which a float cannot hold: with an interval of 1e308 it is the three levels -1e308, 0 and 1e308.
+        let levels = Levels::for_range(-1.0e308, 1.0e308, 0.0, 1.0e308, 5).unwrap();
+        assert_eq!(heights(&levels), [-1.0e308, 0.0, 1.0e308]);
+        assert_eq!(levels.crossed_by(-1.0e308, 1.0e308), 1..3);
+        // With a smaller interval it is too many, and says so.
+        assert!(matches!(
+            Levels::for_range(-1.0e308, 1.0e308, 0.0, 1.0e305, 5),
+            Err(LevelsError::TooMany { .. })
+        ));
     }
 }

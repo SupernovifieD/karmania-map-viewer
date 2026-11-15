@@ -169,7 +169,8 @@ impl GridJob {
             };
         }
         let mut vertices = 0;
-        while self.levels_done < self.levels.len() && vertices < budget {
+        // (At least one level, whatever the budget: a budget of 0 is a part of the work, and not none.)
+        while self.levels_done < self.levels.len() && (vertices == 0 || vertices < budget) {
             let lines = self.scan.lines(&field, &self.levels, self.levels_done);
             vertices += lines
                 .iter()
@@ -216,7 +217,8 @@ impl MeshJob {
             };
         }
         let mut vertices = 0;
-        while self.levels_done < self.levels.len() && vertices < budget {
+        // (At least one level, whatever the budget: a budget of 0 is a part of the work, and not none.)
+        while self.levels_done < self.levels.len() && (vertices == 0 || vertices < budget) {
             let lines = self.scan.lines(&surface, &self.levels, self.levels_done);
             vertices += lines
                 .iter()
@@ -432,7 +434,7 @@ mod tests {
             let params = default_params(&dataset, None).unwrap();
             let whole = contours_of(&dataset, &params);
             assert!(whole.is_ok(), "{:?}", whole);
-            for budget in [1, 7, 100, 1_000, usize::MAX] {
+            for budget in [0, 1, 7, 100, 1_000, usize::MAX] {
                 let (_, stepped) = run(&dataset, &params, budget);
                 assert_eq!(stepped, whole, "{} with a budget of {budget}", dataset.name);
             }

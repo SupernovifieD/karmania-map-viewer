@@ -91,8 +91,9 @@ impl<'a> Surface<'a> {
             ((level - pa[2]) / (pb[2] - pa[2])).clamp(0.0, 1.0)
         };
         Some(Vertex {
-            x: pa[0] + t * (pb[0] - pa[0]),
-            y: pa[1] + t * (pb[1] - pa[1]),
+            // (Not `pa + t * (pb - pa)`: the difference of coordinates of 1e308 and -1e308 is not a number a float holds.)
+            x: pa[0] * (1.0 - t) + pb[0] * t,
+            y: pa[1] * (1.0 - t) + pb[1] * t,
             z: level,
         })
     }
@@ -412,5 +413,46 @@ mod tests {
             started.elapsed()
         );
         assert!(!lines.is_empty());
+    }
+
+    #[test]
+    fn a_vertex_on_an_edge_from_x_of_minus_1e308_to_1e308_is_a_number() {
+        let xyz = [-1.0e308, 0.0, 0.0, 1.0e308, 0.0, 1.0, 0.0, 1.0, 1.0];
+        let levels = Levels::for_range(0.0, 1.0, 0.0, 0.5, 5).unwrap();
+        // The level 0.5 crosses the edges from the first vertex (and 1 is the height of the two others, which is a line along their edge).
+        let lines: Vec<Contour> = contours(&xyz, &[0, 1, 2], &levels)
+            .into_iter()
+            .filter(|line| levels.height(line.level) == Some(0.5))
+            .collect();
+        assert_eq!(lines.len(), 1);
+        assert!(
+            lines[0]
+                .vertices
+                .iter()
+                .all(|v| v.x.is_finite() && v.y.is_finite())
+        );
+        // On the edge from -1e308 to 1e308 it is at 0, and on the edge from -1e308 to 0 at -5e307.
+        let mut xs: Vec<f64> = lines[0].vertices.iter().map(|v| v.x).collect();
+        xs.sort_by(f64::total_cmp);
+        assert_eq!(xs, [-5.0e307, 0.0]);
+    }
+
+    #[test]
+    fn two_triangles_that_are_the_same_make_no_line_of_a_segment_traced_twice() {
+        let (xyz, _) = lattice(3, 3, |i, _| i);
+        let levels = Levels::for_range(0.0, 2.0, 0.0, 0.5, 5).unwrap();
+        // One triangle that the level 0.5 cuts has a line, and the same triangle twice does not make a loop of it.
+        let once = contours(&xyz, &[0, 1, 4], &levels);
+        assert!(
+            once.iter().all(|line| !line.closed) && !once.is_empty(),
+            "{once:?}"
+        );
+        let twice = contours(&xyz, &[0, 1, 4, 0, 1, 4], &levels);
+        assert!(
+            twice
+                .iter()
+                .all(|line| !(line.closed && line.vertices.len() < 4)),
+            "{twice:?}"
+        );
     }
 }

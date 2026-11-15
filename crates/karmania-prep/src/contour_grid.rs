@@ -126,7 +126,8 @@ impl<'a> Field<'a> {
         Vertex {
             x,
             y,
-            z: ha + t * (hb - ha),
+            // (Not `ha + t * (hb - ha)`: the difference of heights of 1e308 and -1e308 is not a number a float holds, and `0 * inf` is not one.)
+            z: ha * (1.0 - t) + hb * t,
         }
     }
 }
@@ -290,7 +291,8 @@ fn pieces_of(corners: [f64; 4], level: f64) -> ([(Side, Side); 2], usize) {
         4 => {
             // A saddle: the average of the four values decides which pair of corners is joined through the middle, and the line goes
             // round each of the others (the corners that are not joined are cut off, each by a piece between its two sides).
-            let centre_above = (bl + br + tr + tl) / 4.0 >= level;
+            // (Each corner is divided by four before they are added: the sum of four values of 1e308 is not a number a float holds, and the quarters of them are.)
+            let centre_above = bl / 4.0 + br / 4.0 + tr / 4.0 + tl / 4.0 >= level;
             let cut = |corner: usize| match corner {
                 0 => (Side::Bottom, Side::Left),
                 1 => (Side::Bottom, Side::Right),
@@ -314,12 +316,14 @@ fn pieces_of(corners: [f64; 4], level: f64) -> ([(Side, Side); 2], usize) {
 
 /// The vertices of a line as they are kept. A value that is exactly at the level puts the crossings of its edges on the one point,
 /// and a line through it would have that point twice in a row: once is the line. A line of one point (a peak at the level) is no
-/// line, and nor is a loop of one (a closed line has its first point again at its end, and two points more at least): `None`.
+/// line, and nor is a loop of one or two points (a closed line has its first point again at its end, and three points besides): `None`.
 pub(crate) fn tidy(mut vertices: Vec<Vertex>, closed: bool) -> Option<Vec<Vertex>> {
     vertices.dedup_by(|current, previous| {
         current.x == previous.x && current.y == previous.y && current.z == previous.z
     });
-    (vertices.len() >= if closed { 3 } else { 2 }).then_some(vertices)
+    // A closed line is at least a triangle and the first point again at its end: two points that are joined to each other both ways (the same segment
+    // twice, which two triangles of one mesh that are the same make) are not a loop.
+    (vertices.len() >= if closed { 4 } else { 2 }).then_some(vertices)
 }
 
 /// Joins pieces that end on the same edge: each line as the edges it crosses in order, and whether it is closed (the first edge is
@@ -728,5 +732,49 @@ mod tests {
             levels.len()
         );
         assert!(took.as_secs_f64() < 2.0, "{took:?} for {vertices} vertices");
+    }
+
+    #[test]
+    fn the_saddle_is_resolved_by_the_average_even_when_the_sum_of_the_corners_is_not_a_float() {
+        // Corners of 1e308 at the bottom left and top right, 0 at the others, at the level 6e307 (the average, 5e307, is below it): the two high corners are
+        // cut off each by a line of its own. The sum of the four values is infinity, which would join them through the middle instead.
+        let data = [1.0e308, 0.0, 0.0, 1.0e308];
+        let levels = Levels::for_range(0.0, 1.0e308, 0.0, 2.0e307, 5).unwrap();
+        let lines = lines_of(2, 2, &data, &levels);
+        let at_level: Vec<Vec<(i32, i32)>> = lines
+            .iter()
+            .filter(|line| levels.height(line.level) == Some(6.0e307))
+            .map(|line| {
+                let mut points: Vec<(i32, i32)> = line
+                    .vertices
+                    .iter()
+                    .map(|v| ((v.x * 10.0).round() as i32, (v.y * 10.0).round() as i32))
+                    .collect();
+                points.sort_unstable();
+                points
+            })
+            .collect();
+        // Around the bottom left corner: (0.4, 0) and (0, 0.4); around the top right: (1, 0.6) and (0.6, 1).
+        assert_eq!(at_level.len(), 2);
+        assert!(at_level.contains(&vec![(0, 4), (4, 0)]), "{at_level:?}");
+        assert!(at_level.contains(&vec![(6, 10), (10, 6)]), "{at_level:?}");
+    }
+
+    #[test]
+    fn the_height_of_a_vertex_between_heights_of_1e308_and_minus_1e308_is_a_number() {
+        let values = [0.0, 1.0, 0.0, 1.0];
+        let heights = [-1.0e308, 1.0e308, -1.0e308, 1.0e308];
+        let field = Field::new(2, 2, &values)
+            .unwrap()
+            .with_heights(&heights)
+            .unwrap();
+        let levels = Levels::for_range(0.0, 1.0, 0.0, 0.5, 5).unwrap();
+        let lines = contour_field(&field, &levels);
+        let at_half: Vec<&Contour> = lines
+            .iter()
+            .filter(|line| levels.height(line.level) == Some(0.5))
+            .collect();
+        assert_eq!(at_half.len(), 1);
+        assert!(at_half[0].vertices.iter().all(|v| v.z == 0.0));
     }
 }

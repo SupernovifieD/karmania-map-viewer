@@ -96,6 +96,11 @@ impl ContourError {
                 "The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.".to_string(),
                 "Make contour lines from a mesh whose points have heights, or from a grid.",
             ),
+            Self::Levels(LevelsError::TooFar) => (
+                FindingCode::ContoursBaseTooFar,
+                "The values are too many intervals away from the base for the contour lines to be worked out.".to_string(),
+                "Set the base near the values, or use a larger interval.",
+            ),
             Self::Levels(LevelsError::Invalid) => (
                 FindingCode::ContoursIntervalInvalid,
                 "The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.".to_string(),
@@ -369,7 +374,8 @@ pub fn contour_mesh(
 }
 
 /// The settings that a set of contours starts with (brief 11.5): the column (a grid's: the one named, or its first of numbers; a mesh
-/// has none), the default interval for the range of the values, a base of 0, and an index line every 5.
+/// has none), the default interval for the range of the values, a base of 0 (the multiple of the interval below the values if they are too many intervals
+/// from 0 for levels to be counted), and an index line every 5.
 ///
 /// # Errors
 ///
@@ -391,10 +397,20 @@ pub fn default_params(
         }
         other => return Err(ContourError::Kind(other.kind())),
     };
+    let interval = default_interval(low, high).ok_or(ContourError::NoLines)?;
+    // A base of 0, unless the values are so many intervals from it that no level can be counted (a thousand million: values of ten thousand million
+    // with an interval of 1): then the multiple of the interval at or below the lowest value, so that the settings that are offered work.
+    let base = match Levels::for_range(low, high, 0.0, interval, DEFAULT_INDEX_EVERY) {
+        Err(LevelsError::TooFar) => {
+            let near = (low / interval).floor() * interval;
+            if near.is_finite() { near } else { 0.0 }
+        }
+        _ => 0.0,
+    };
     Ok(ContourParams {
         column,
-        interval: default_interval(low, high).ok_or(ContourError::NoLines)?,
-        base: 0.0,
+        interval,
+        base,
         index_every: DEFAULT_INDEX_EVERY,
     })
 }
@@ -1010,7 +1026,7 @@ mod tests {
 
     #[test]
     fn every_reason_for_no_contours_is_a_finding_that_says_what_the_docs_say() {
-        let cases: [Case; 11] = [
+        let cases: [Case; 12] = [
             (
                 ContourError::Kind(Kind::Points),
                 "contours.kind.unsupported",
@@ -1056,6 +1072,11 @@ mod tests {
             (
                 ContourError::Levels(LevelsError::Invalid),
                 "contours.interval.invalid",
+                &[],
+            ),
+            (
+                ContourError::Levels(LevelsError::TooFar),
+                "contours.base.too_far",
                 &[],
             ),
             (
@@ -1249,5 +1270,38 @@ mod tests {
             report.findings().count(),
             summary.vertex_count
         );
+    }
+
+    #[test]
+    fn the_starting_settings_work_for_values_that_are_far_from_0_by_taking_a_base_near_them() {
+        // Values from 10,000,000,000 to 10,000,000,009: the default interval is 0.5, and a base of 0 is twenty thousand million intervals away.
+        let near = |name: &str| {
+            let data: Vec<f64> = (0..60).map(|k| 1.0e10 + f64::from(k % 10)).collect();
+            grid_with(
+                lattice(10, 6),
+                GridZ::Flat { elevation: 0.0 },
+                vec![Column::without_nulls(name, ColumnData::Float64(data))],
+            )
+        };
+        let dataset = near("value");
+        assert_eq!(
+            contours_of(&dataset, &params(0.5, 0.0)),
+            Err(ContourError::Levels(LevelsError::TooFar))
+        );
+        let found = default_params(&dataset, None).unwrap();
+        assert_eq!((found.interval, found.base), (0.5, 1.0e10));
+        let lines = contours_of(&dataset, &found).unwrap();
+        assert!(
+            (10..=20).contains(&lines.levels.len()),
+            "{:?}",
+            lines.levels
+        );
+        // And a dataset that is not far has a base of 0, as before.
+        let plain = grid_with(
+            lattice(10, 6),
+            GridZ::Flat { elevation: 0.0 },
+            vec![floats("value", 10, 6, |i, _| i)],
+        );
+        assert_eq!(default_params(&plain, None).unwrap().base, 0.0);
     }
 }
