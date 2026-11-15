@@ -5,35 +5,18 @@
 //! column, or the elevation of its plane. A cell with no value, or with no height, breaks the lines that would pass it. A mesh is contoured
 //! by the heights of its vertices, in its own coordinates; the lines are at their level exactly.
 
+use crate::contour_grid::{Contour, Field, Vertex, contour_field};
+use crate::contour_levels::{Levels, LevelsError, MAX_LEVELS, default_interval};
+use crate::contour_mesh::{Surface, contour_surface};
+pub use karmania_core::ContourParams;
 use karmania_core::text::format_count;
 use karmania_core::{
     Column, ColumnData, ColumnType, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings,
     Geometry, GridZ, Kind, Lines, Mesh, Positions, Table, Value,
 };
-use serde::{Deserialize, Serialize};
-
-use crate::contour_grid::{Contour, Field, Vertex, contour_field};
-use crate::contour_levels::{Levels, LevelsError, MAX_LEVELS, default_interval};
-use crate::contour_mesh::{Surface, contour_surface};
 
 /// Every this many lines is an index line unless the settings say otherwise.
 pub const DEFAULT_INDEX_EVERY: u32 = 5;
-
-/// The settings of a set of contours. In JSON: `{ "column": .., "interval": .., "base": .., "indexEvery": .. }`; `column` is only for grids and
-/// is left out when it is not given (a grid then uses its first column of numbers).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ContourParams {
-    /// Grids only: the column the heights are in.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub column: Option<String>,
-    /// The height between two lines, greater than 0.
-    pub interval: f64,
-    /// A height that has a line; the others are `base + k * interval`.
-    pub base: f64,
-    /// Every this many lines is an index line, the base being one; 1 or more.
-    pub index_every: u32,
-}
 
 /// Why no contours were made.
 #[derive(Debug, Clone, PartialEq)]
@@ -835,30 +818,6 @@ mod tests {
             report.findings().collect::<Vec<_>>()
         );
         assert_eq!(contours_name("a", 0.5), "Contours of a (every 0.5)");
-    }
-
-    #[test]
-    fn settings_have_their_names_in_json() {
-        let json = serde_json::to_string(&ContourParams {
-            column: None,
-            interval: 2.5,
-            base: 0.0,
-            index_every: 5,
-        })
-        .unwrap();
-        assert_eq!(json, r#"{"interval":2.5,"base":0.0,"indexEvery":5}"#);
-        let read: ContourParams =
-            serde_json::from_str(r#"{"column":"z","interval":1,"base":0.5,"indexEvery":4}"#)
-                .unwrap();
-        assert_eq!(
-            read,
-            ContourParams {
-                column: Some("z".to_string()),
-                interval: 1.0,
-                base: 0.5,
-                index_every: 4
-            }
-        );
     }
 
     /// A mesh of `nx` by `ny` vertices at 10 by 5 apart from (1000, 2000) with the height `f(i, j)`, two triangles to a square.
