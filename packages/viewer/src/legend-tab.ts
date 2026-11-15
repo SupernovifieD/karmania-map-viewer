@@ -264,7 +264,7 @@ export class KarmaniaLegendTab extends LitElement {
 
       .row:hover .handle,
       .row:focus-within .handle,
-      :host([data-dragging]) .handle {
+      .row[data-dragging] .handle {
         opacity: 1;
       }
 

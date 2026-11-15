@@ -33,6 +33,23 @@ async function restWithFocus(page: Page): Promise<Locator[]> {
   return [panel(page)];
 }
 
+/** The same, but the pointer is left where it is: what is photographed is a row that is pointed at, or a row that is dragged. */
+async function restWithPointer(page: Page): Promise<Locator[]> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  return [panel(page)];
+}
+
+/** The middle of an element, in the window. */
+async function centreOf(locator: Locator): Promise<{ x: number; y: number }> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error('Something to point at is not shown.');
+  }
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
 /** A name of 120 characters that begins with `start`, so that the names that are too long for their rows are told apart by their beginnings. */
 const long = (start: string): string =>
   `${start} of the northern pit, drill holes and trenches, seen from the west and from the south of it all`
@@ -67,6 +84,34 @@ export const SHOTS: Shot[] = [
         { type: 'setVisible', layerId: 'layer-5', visible: false },
       );
       return rest(page);
+    },
+  },
+  {
+    // A row that is pointed at has its handle, and the colour that a pointer gives a row.
+    name: 'legend-tab-hover',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-3"]').hover();
+      return restWithPointer(page);
+    },
+  },
+  {
+    // A layer is dragged by its handle, from the bottom of the legend to between two layers of a group: the line is where it will land, in the group's indent, and the row has the colour of one that is dragged.
+    name: 'legend-tab-drag',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.mouse.up();
+      const handle = await centreOf(
+        page.locator('karmania-legend-tab .row[data-layer="layer-1"] .handle'),
+      );
+      const into = await page
+        .locator('karmania-legend-tab .row[data-layer="layer-4"]')
+        .boundingBox();
+      await page.mouse.move(handle.x, handle.y);
+      await page.mouse.down();
+      await page.mouse.move((into?.x ?? 0) + 60, (into?.y ?? 0) + 2, { steps: 8 });
+      await page.locator('karmania-legend-tab .drop-line').waitFor();
+      return restWithPointer(page);
     },
   },
   {
