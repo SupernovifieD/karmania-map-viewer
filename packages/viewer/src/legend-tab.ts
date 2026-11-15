@@ -12,7 +12,7 @@ import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { LegendDrag } from './legend-drag.js';
 import './style-editor.js';
-import type { StyleChange } from './style-editor.js';
+import type { ContoursChange, StyleChange } from './style-editor.js';
 import type { StyleInfo } from './legend-style.js';
 import type { DropRow } from './legend-drop.js';
 import {
@@ -42,6 +42,17 @@ export const LEGEND_COMMAND = 'karmania-legend-command';
 /** What the tab asks of the scene: a command, which the viewer gives to it. */
 export interface LegendCommand {
   readonly command: Command;
+}
+
+/**
+ * The name of the event the tab sends when a person turns the contours of a layer on for the first time: the settings they start with are the
+ * engine's to say, so the viewer gets them and puts them in the scene.
+ */
+export const CONTOURS_TURN_ON = 'karmania-contours-turn-on';
+
+/** Which layer's contours were turned on. */
+export interface ContoursTurnOn {
+  readonly layerId: string;
 }
 
 /** How a group's box looks, and what the row says of it to a screen reader, for all, some and none of its layers on. */
@@ -698,6 +709,21 @@ export class KarmaniaLegendTab extends LitElement {
     }
   }
 
+  /** A person changed the contours of a layer: turned them on (the viewer says what they start with), or gave them settings. */
+  private onContours(layerId: string, change: ContoursChange): void {
+    if (change.kind === 'turn-on') {
+      this.dispatchEvent(
+        new CustomEvent<ContoursTurnOn>(CONTOURS_TURN_ON, {
+          detail: { layerId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } else {
+      this.ask({ type: 'setContours', layerId, contours: change.contours });
+    }
+  }
+
   /** Asks the scene for something. */
   private ask(command: Command): void {
     this.dispatchEvent(
@@ -948,6 +974,9 @@ export class KarmaniaLegendTab extends LitElement {
                   @karmania-style-change=${(event: CustomEvent<StyleChange>) => {
                     this.ask({ type: 'setStyle', layerId: layer.id, patch: event.detail.patch });
                   }}
+                  @karmania-contours-change=${(event: CustomEvent<ContoursChange>) => {
+                    this.onContours(layer.id, event.detail);
+                  }}
                 ></karmania-style-editor>
               </div>`
             : nothing
@@ -1121,5 +1150,6 @@ declare global {
 
   interface HTMLElementEventMap {
     [LEGEND_COMMAND]: CustomEvent<LegendCommand>;
+    [CONTOURS_TURN_ON]: CustomEvent<ContoursTurnOn>;
   }
 }

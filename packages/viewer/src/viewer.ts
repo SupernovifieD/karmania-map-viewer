@@ -32,7 +32,7 @@ import { CrsNames } from './crs-names.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
-import type { LegendCommand } from './legend-tab.js';
+import type { ContoursTurnOn, LegendCommand } from './legend-tab.js';
 import { selectionAfterChange, selectionAfterRemoving } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
@@ -555,7 +555,9 @@ export class KarmaniaViewer extends LitElement {
 
   /** What the style editors need now: the style of each layer, and the kind and columns of its dataset. */
   private currentStyles(): Readonly<Record<string, StyleInfo>> {
-    const next = styleInfos(this.store.getState(), this.datasets);
+    const next = styleInfos(this.store.getState(), this.datasets, (layerId) =>
+      this.contoursState(layerId),
+    );
     const key = JSON.stringify(next);
     if (this.styles === undefined || key !== this.stylesKey) {
       this.styles = next;
@@ -742,6 +744,13 @@ export class KarmaniaViewer extends LitElement {
   /** Does what a person asked of the panel, and keeps the panel that way. */
   private readonly onPanelChange = (event: CustomEvent<PanelChange>): void => {
     this.changePanel(event.detail);
+  };
+
+  /** The contours of a layer were turned on for the first time: they start at the settings that the engine says for its data. */
+  private readonly onContoursTurnOn = (event: CustomEvent<ContoursTurnOn>): void => {
+    if (this.engine !== undefined) {
+      void this.contoursFor(this.engine).turnOn(event.detail.layerId);
+    }
   };
 
   /** What the Legend tab asked of the scene (to switch, move, group, rename or style a layer) is done by the command it gives. */
@@ -988,6 +997,7 @@ export class KarmaniaViewer extends LitElement {
           .notices=${notices}
           @karmania-import-request=${this.chooseFiles}
           @karmania-legend-command=${this.onLegendCommand}
+          @karmania-contours-turn-on=${this.onContoursTurnOn}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}

@@ -3,8 +3,9 @@
  * names too long for their rows), each with what to do to the page to put it in that state. The screenshot tests photograph the panel
  * (`legend-tab.visual.ts`) and the accessibility pass checks the whole page (`axe-states.axe.ts`).
  */
+import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { dispatch, withData } from '../support/render.js';
+import { dispatch, layerStatuses, withData } from '../support/render.js';
 import { loadGrid, loadLegendScene, loadMany, showLegend } from '../support/legend.js';
 import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 import type { Shot } from '../support/screenshots.js';
@@ -141,6 +142,59 @@ export const SHOTS: Shot[] = [
       });
       await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
       await page.locator('karmania-legend-tab #legend-style-layer-1 .swatch').first().waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // A grid with its contours turned on, opened on its style: the fields under the opacity, then the Contours part (Show contours, the column, the interval,
+    // the base and the index lines), and, under the grid in the list, the layer of the lines.
+    name: 'legend-tab-contours',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      const box = page.locator(
+        'karmania-legend-tab #legend-style-layer-2 [aria-label="Contours"] k-checkbox input',
+      );
+      await box.check();
+      await page.locator('karmania-legend-tab .row[data-layer="layer-6"]').waitFor();
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-2 k-input[label="Interval"] input')
+        .waitFor();
+      await expect
+        .poll(async () => (await layerStatuses(page)).every(([, status]) => status === 'drawn'))
+        .toBe(true);
+      // The panel scrolls: the whole of the Contours part is brought into view, to the last of its fields.
+      await page
+        .locator(
+          'karmania-legend-tab #legend-style-layer-2 k-input[label="Index line every"] input',
+        )
+        .scrollIntoViewIfNeeded();
+      return rest(page);
+    },
+  },
+  {
+    // The Contours part when the engine could not make the lines: more than 1,000 levels, in the engine's words, as an alert under the fields.
+    name: 'legend-tab-contours-error',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      await page
+        .locator(
+          'karmania-legend-tab #legend-style-layer-2 [aria-label="Contours"] k-checkbox input',
+        )
+        .check();
+      const interval = page.locator(
+        'karmania-legend-tab #legend-style-layer-2 k-input[label="Interval"] input',
+      );
+      await interval.waitFor();
+      await interval.fill('0.001');
+      await interval.press('Enter');
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-2 .status[role="alert"]')
+        .waitFor();
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-2 .status[role="alert"]')
+        .scrollIntoViewIfNeeded();
       return rest(page);
     },
   },

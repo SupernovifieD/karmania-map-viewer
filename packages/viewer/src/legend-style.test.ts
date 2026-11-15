@@ -1,7 +1,9 @@
 import { createSceneStore } from '@karmania/scene';
+import type { Summary } from '@karmania/engine';
 import type { LayerColour, LayerStyle, NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
 import {
+  CONTOUR_FIELDS,
   FEWEST_CLASSES,
   MOST_CLASSES,
   SINGLE,
@@ -13,6 +15,13 @@ import {
   colourByValue,
   colourFor,
   colourFromText,
+  contourColumnOptions,
+  contourColumnValue,
+  contourFromText,
+  contourText,
+  contoursProblem,
+  contoursWith,
+  contoursWithColumn,
   methodChoice,
   methodOptions,
   numberFields,
@@ -22,6 +31,7 @@ import {
   numberStep,
   numberTaken,
   numberText,
+  numericColumns,
   rampOptions,
   rampPreview,
   styleInfos,
@@ -505,5 +515,159 @@ describe('numberStep', () => {
     expect(numberStep(OPACITY, 12.3, 1, false)).toBe(13.3);
     expect(numberStep(OPACITY, 0.1, 1, false)).toBe(1.1);
     expect(numberStep(POINT_SIZE, 6.7, -1, false)).toBe(5.7);
+  });
+});
+
+describe('the contours of a layer, in the style editor', () => {
+  const settings = { column: 'Au', interval: 2.5, base: 0, indexEvery: 5, visible: true };
+
+  it('are given for a grid or a mesh that is not made from another layer, and for no other layer', () => {
+    const datasets = ['grid', 'mesh', 'points', 'lines', 'polygons', 'blocks'].map(
+      (kind, id) =>
+        ({
+          id,
+          name: kind,
+          kind,
+          elementCount: 1,
+          hasZ: false,
+          columns: [{ name: 'Au', type: 'float', nullCount: 0 }],
+          findings: [],
+        }) as unknown as Summary,
+    );
+    const scene = createSceneStore();
+    scene.dispatch({
+      type: 'addLayers',
+      datasets: datasets.map((d) => ({
+        id: d.id,
+        name: d.name,
+        kind: d.kind,
+        elementCount: 1,
+        columns: [],
+      })),
+    });
+    const given = styleInfos(scene.getState(), datasets);
+    const has = Object.entries(given).map(([id, info]) => [id, info.contours !== undefined]);
+    expect(has).toEqual([
+      ['layer-1', true],
+      ['layer-2', true],
+      ['layer-3', false],
+      ['layer-4', false],
+      ['layer-5', false],
+      ['layer-6', false],
+    ]);
+    // Not for the layer of the contours of a layer.
+    // (Its dataset is a mesh here, so that only its being derived keeps the contours from it.)
+    scene.dispatch({ type: 'setContoursLayer', sourceLayer: 'layer-1', datasetId: 1 });
+    expect(styleInfos(scene.getState(), datasets)['layer-7']?.contours).toBeUndefined();
+  });
+
+  it('say the settings the layer has, none before they are turned on, and where making them is', () => {
+    const scene = createSceneStore();
+    scene.dispatch({
+      type: 'addLayers',
+      datasets: [
+        {
+          id: 0,
+          name: 'Surface',
+          kind: 'grid',
+          elementCount: 1,
+          columns: [{ name: 'Au', type: 'float', nullCount: 0 }],
+        },
+      ],
+    });
+    const dataset = {
+      id: 0,
+      name: 'Surface',
+      kind: 'grid',
+      elementCount: 1,
+      hasZ: false,
+      columns: [{ name: 'Au', type: 'float', nullCount: 0 }],
+      findings: [],
+    } as unknown as Summary;
+    expect(styleInfos(scene.getState(), [dataset])['layer-1']?.contours).toEqual({
+      settings: undefined,
+      state: { status: 'idle' },
+    });
+    scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: settings });
+    const info = styleInfos(scene.getState(), [dataset], () => ({ status: 'making' }))['layer-1'];
+    expect(info?.contours).toEqual({ settings, state: { status: 'making' } });
+  });
+
+  it('have as choices of the column the columns of numbers, and show the first of them when none is named', () => {
+    expect(numericColumns(COLUMNS).map((c) => c.name)).toEqual(['Au', 'Count']);
+    expect(contourColumnOptions(COLUMNS)).toEqual([
+      { value: 'Au', label: 'Au' },
+      { value: 'Count', label: 'Count' },
+    ]);
+    expect(contourColumnValue(settings, COLUMNS)).toBe('Au');
+    expect(contourColumnValue({ ...settings, column: 'Count' }, COLUMNS)).toBe('Count');
+    const unnamed = { interval: 2.5, base: 0, indexEvery: 5, visible: true };
+    expect(contourColumnValue(unnamed, COLUMNS)).toBe('Au');
+    expect(contourColumnValue(unnamed, [{ name: 'Rock', type: 'category' }])).toBeUndefined();
+  });
+
+  it('have fields for the interval, the base and the index lines, showing the numbers the settings have', () => {
+    expect(CONTOUR_FIELDS.map((f) => f.label)).toEqual(['Interval', 'Base', 'Index line every']);
+    expect(CONTOUR_FIELDS.map((f) => contourText(f.key, settings))).toEqual(['2.5', '0', '5']);
+  });
+
+  it('take a number typed in a field if it is what the field is for, and say in words what is wrong if it is not', () => {
+    expect(contourFromText('interval', ' 0.25 ')).toEqual({ value: 0.25 });
+    expect(contourFromText('interval', '1e-3')).toEqual({ value: 0.001 });
+    expect(contourFromText('base', '-12.5')).toEqual({ value: -12.5 });
+    expect(contourFromText('indexEvery', '4')).toEqual({ value: 4 });
+    for (const text of ['', ' ', 'abc', '1,5', 'Infinity', 'NaN', '0', '-2']) {
+      expect(contourFromText('interval', text), text).toEqual({ error: 'Enter a number above 0.' });
+    }
+    for (const text of ['', 'abc', 'Infinity', '1,5']) {
+      expect(contourFromText('base', text), text).toEqual({ error: 'Enter a number.' });
+    }
+    for (const text of ['0', '-1', '2.5', '1e400']) {
+      const result = contourFromText('indexEvery', text);
+      expect(result, text).toEqual({
+        error: text === '1e400' ? 'Enter a number.' : 'Enter a whole number, 1 or more.',
+      });
+    }
+    expect(contourFromText('base', '0')).toEqual({ value: 0 });
+  });
+
+  it('change one number of the settings, and are no change when it is the number they have', () => {
+    expect(contoursWith(settings, 'interval', 5)).toEqual({ ...settings, interval: 5 });
+    expect(contoursWith(settings, 'base', -1)).toEqual({ ...settings, base: -1 });
+    expect(contoursWith(settings, 'indexEvery', 2)).toEqual({ ...settings, indexEvery: 2 });
+    expect(contoursWith(settings, 'interval', 2.5)).toBeUndefined();
+    expect(contoursWithColumn(settings, 'Count', COLUMNS)).toEqual({
+      ...settings,
+      column: 'Count',
+    });
+    expect(contoursWithColumn(settings, 'Au', COLUMNS)).toBeUndefined();
+    const unnamed = { interval: 2.5, base: 0, indexEvery: 5, visible: true };
+    expect(contoursWithColumn(unnamed, 'Au', COLUMNS)).toBeUndefined();
+    expect(contoursWithColumn(unnamed, 'Count', COLUMNS)).toEqual({ ...unnamed, column: 'Count' });
+  });
+
+  it('say what went wrong in the engine’s words, and for a fault of the engine that it could not and what it said', () => {
+    const finding = {
+      code: 'contours.levels.too_many',
+      severity: 'error',
+      message: 'These settings make about 9,000 contour lines, and the most is 1,000.',
+      hint: 'Use a larger interval.',
+      count: 1,
+      examples: [],
+    } as const;
+    expect(contoursProblem({ status: 'failed', findings: [finding] })).toBe(
+      'These settings make about 9,000 contour lines, and the most is 1,000. Use a larger interval.',
+    );
+    expect(contoursProblem({ status: 'failed', findings: [{ ...finding, hint: '' }] })).toBe(
+      finding.message,
+    );
+    expect(contoursProblem({ status: 'failed', findings: [], fault: 'The worker failed.' })).toBe(
+      'The contour lines could not be made. The worker failed.',
+    );
+    expect(contoursProblem({ status: 'failed', findings: [] })).toBe(
+      'The contour lines could not be made.',
+    );
+    expect(contoursProblem({ status: 'making' })).toBeUndefined();
+    expect(contoursProblem({ status: 'idle' })).toBeUndefined();
   });
 });
