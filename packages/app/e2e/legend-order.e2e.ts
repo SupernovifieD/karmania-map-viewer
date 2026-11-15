@@ -273,6 +273,109 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     await expect(layerRow(page, 'layer-1')).toBeFocused();
   });
 
+  /** A press on the handle of a layer whose release never comes, as when the pointer is let go outside the tab or the window loses it. */
+  async function pressWithoutRelease(page: Page, id: string): Promise<{ x: number; y: number }> {
+    const at = await middle(handleOf(page, id));
+    await handleOf(page, id).evaluate((handle, where) => {
+      handle.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          composed: true,
+          button: 0,
+          buttons: 1,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+          clientX: where.x,
+          clientY: where.y,
+        }),
+      );
+    }, at);
+    return at;
+  }
+
+  test('does not make a drag of a press whose release was lost: the pointer going over the tab with no button down moves nothing, and a click after it is only a click', async ({
+    page,
+  }) => {
+    await open(page);
+    const at = await pressWithoutRelease(page, 'layer-1');
+    await legend(page).evaluate((tab, where) => {
+      tab.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          composed: true,
+          buttons: 0,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+          clientX: where.x + 40,
+          clientY: where.y - 120,
+        }),
+      );
+    }, at);
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    await expect(legend(page).locator('.drop-line')).toHaveCount(0);
+    // A click on a switch, where the release of a drag would be, moves no row.
+    await layerRow(page, 'layer-2').locator('.switch').click();
+    expect(await order(page)).toEqual(START);
+  });
+
+  test('does not make a drag of a press whose release was lost when another press is made: a touch on a row that has no handle, and a move, drag nothing', async ({
+    page,
+  }) => {
+    await open(page);
+    await pressWithoutRelease(page, 'layer-1');
+    // A finger, which makes no moves over the tab before it touches (so nothing is seen of the pointer with no button down), presses on a name and moves.
+    const name = await middle(layerRow(page, 'layer-2').locator('.name'));
+    await layerRow(page, 'layer-2')
+      .locator('.name')
+      .evaluate((element, where) => {
+        const touch = (type: string, dy: number): void => {
+          element.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              composed: true,
+              button: 0,
+              buttons: 1,
+              isPrimary: true,
+              pointerId: 1,
+              pointerType: 'touch',
+              clientX: where.x,
+              clientY: where.y + dy,
+            }),
+          );
+        };
+        touch('pointerdown', 0);
+        touch('pointermove', -90);
+      }, name);
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    expect(await order(page)).toEqual(START);
+  });
+
+  test('ends a drag when the pointer is taken away (pointercancel): nothing is moved and the line is gone', async ({
+    page,
+  }) => {
+    await open(page);
+    const target = await layerRow(page, 'layer-4').boundingBox();
+    await dragTo(page, handleOf(page, 'layer-1'), (target?.x ?? 0) + 60, (target?.y ?? 0) + 2);
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await legend(page).evaluate((tab) => {
+      tab.dispatchEvent(
+        new PointerEvent('pointercancel', {
+          bubbles: true,
+          composed: true,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+        }),
+      );
+    });
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    await expect(legend(page).locator('.drop-line')).toHaveCount(0);
+    await page.mouse.up();
+    expect(await order(page)).toEqual(START);
+  });
+
   test('puts a layer first into a group that is folded when the pointer is under the group, in the indent, says that it is folded, and gives the keyboard to the group', async ({
     page,
   }) => {

@@ -641,6 +641,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 19.F The fixes (what CI and the review of the gate found)
   - [x] 19.F1 The gallery's picture of the icons is taken again for the two icons that were added (CI found it red).
   - [x] 19.F2 (review) A layer moved into a group that is folded keeps the keyboard (on the group) and the move says that the group is folded.
+  - [x] 19.F3 (review) A press whose release is lost is not a drag later; a drag that the pointer being taken away ends is proved.
 - [ ] 19.G Gate.
 
 ## M20: Contours

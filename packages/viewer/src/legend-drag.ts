@@ -29,6 +29,8 @@ interface Pressed {
  * to its end, wherever it goes (and not before, so that a click is a click), and the drag ends at the release (the row is moved), at Escape or when the
  * pointer is taken away (nothing is moved).
  *
+ * A press whose release is lost (the pointer was let go outside the tab) is not a drag later: a move with no button down, or a press that is not it, ends it.
+ *
  * It says what was dropped (`onDrop`) and what is dragged and where it would land (`dragging`, `drop`) for the tab to draw.
  */
 export class LegendDrag implements ReactiveController {
@@ -46,7 +48,13 @@ export class LegendDrag implements ReactiveController {
     host.addController(this);
   }
 
+  hostConnected(): void {
+    // In the capture phase, so that it is before the press that a row is about to make.
+    this.host.addEventListener('pointerdown', this.onAnyDown, true);
+  }
+
   hostDisconnected(): void {
+    this.host.removeEventListener('pointerdown', this.onAnyDown, true);
     this.end();
   }
 
@@ -73,9 +81,24 @@ export class LegendDrag implements ReactiveController {
     this.end();
   }
 
+  /**
+   * A press of the pointer anywhere in the tab, before the row it is on has made its own: if one is armed already, its release never came (it was let go outside
+   * the tab, or the window lost it), and it is over. Left armed, it would make a drag of a row that nobody pressed.
+   */
+  private readonly onAnyDown = (event: PointerEvent): void => {
+    if (event.isPrimary && this.pressed !== undefined) {
+      this.end();
+    }
+  };
+
   private readonly onMove = (event: PointerEvent): void => {
     const pressed = this.pressed;
     if (pressed === undefined || event.pointerId !== pressed.pointerId) {
+      return;
+    }
+    // Nothing is pressed any more, so this press is a stale one (its release was lost): the pointer going over the tab is not a drag.
+    if (event.buttons === 0) {
+      this.end();
       return;
     }
     if (this.dragging === undefined) {
