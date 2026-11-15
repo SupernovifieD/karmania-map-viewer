@@ -9,7 +9,9 @@ import chevronsLeft from 'lucide-static/icons/chevrons-left.svg?raw';
 import chevronsRight from 'lucide-static/icons/chevrons-right.svg?raw';
 import circleAlert from 'lucide-static/icons/circle-alert.svg?raw';
 import file from 'lucide-static/icons/file.svg?raw';
+import folderOpen from 'lucide-static/icons/folder-open.svg?raw';
 import folderPlus from 'lucide-static/icons/folder-plus.svg?raw';
+import folder from 'lucide-static/icons/folder.svg?raw';
 import grid from 'lucide-static/icons/grid-3x3.svg?raw';
 import gripVertical from 'lucide-static/icons/grip-vertical.svg?raw';
 import info from 'lucide-static/icons/info.svg?raw';
@@ -39,6 +41,8 @@ export const ICON_NAMES = [
   'chevrons-right',
   'circle-alert',
   'file',
+  'folder',
+  'folder-open',
   'folder-plus',
   'grid-3x3',
   'grip-vertical',
@@ -72,6 +76,8 @@ const DRAWINGS: Readonly<Record<IconName, string>> = {
   'chevrons-right': chevronsRight,
   'circle-alert': circleAlert,
   file,
+  folder,
+  'folder-open': folderOpen,
   'folder-plus': folderPlus,
   'grid-3x3': grid,
   'grip-vertical': gripVertical,

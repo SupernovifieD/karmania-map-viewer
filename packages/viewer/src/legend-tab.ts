@@ -76,7 +76,7 @@ function isMove(key: string): key is MoveKey {
  * 16 by 16, or its classes side by side, 24 by 12, in a room of 24, so that the names of all the layers of a level start at one place), its name, the
  * room of its notice (16: a warning icon, with the reason in its tooltip, on a layer that is not drawn) and the room of its button that opens it (28); the
  * reason is in the words of the engine in the layer's opened part too, before its lines and fields. A group's row is its chevron and the room of its box, which are in the places of
- * a layer's handle and box, then the room of a swatch, which is empty so that the name starts where the name of a layer at the same level does, and how many
+ * a layer's handle and box, then the room of a swatch, which has the folder of the group so that the name starts where the name of a layer at the same level does, and how many
  * layers it has. The room of a control is kept, whether or not the control is there yet, so that
  * a control that comes later moves nothing. The layers of a group are 24 in from its edge.
  *
@@ -247,11 +247,18 @@ export class KarmaniaLegendTab extends LitElement {
           var(--k-icon-size-sm) var(--k-control-height-compact);
       }
 
-      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), the room of a swatch, which is empty, so that its name starts where the name of a layer at the same level does (the text of every row at one level starts at one x, 10.3), the name, the count, and the room of the button that deletes it (28, where a layer has its button). */
+      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), the room of a swatch, which has the group's folder, so that its name starts where the name of a layer at the same level does (the text of every row at one level starts at one x, 10.3), the name, the count, and the room of the button that deletes it (28, where a layer has its button). */
       .group {
         grid-template-columns:
           var(--k-icon-size-sm) var(--k-space-24) var(--k-space-24) minmax(0, 1fr) auto
           var(--k-control-height-compact);
+      }
+
+      /* The room of a swatch in a group's row has the group's folder (open when the group is, shut when it is folded), at its left as a layer's swatch is, in the muted colour. */
+      .swatch-room {
+        align-items: center;
+        color: var(--k-text-muted);
+        display: flex;
       }
 
       /* The chevron folds and unfolds the group: a room as high as the row, for the pointer. */
@@ -997,7 +1004,9 @@ export class KarmaniaLegendTab extends LitElement {
             ><k-icon class="chevron" name="chevron-down" size="16"></k-icon
           ></span>
           ${this.switch(item, BOX[group.visibility])}
-          <span class="swatch-room" aria-hidden="true"></span>
+          <span class="swatch-room" aria-hidden="true"
+            ><k-icon name=${group.collapsed ? 'folder' : 'folder-open'} size="16"></k-icon
+          ></span>
           ${
             this.renaming === group.id
               ? html`<input

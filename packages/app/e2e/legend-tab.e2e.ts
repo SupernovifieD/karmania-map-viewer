@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { assertAligned, assertNoOverflow, textStartOf } from './support/layout.js';
+import { assertAligned, assertNoOverflow, boxOf, textStartOf } from './support/layout.js';
 import {
   groupRow,
   layerRow,
@@ -178,6 +178,38 @@ test.describe('the Legend tab', () => {
     const region = legend(page).locator('[role="status"]');
     await expect(region).toHaveAttribute('aria-live', 'polite');
     await expect(region).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  test("has the folder of a group in the room of a swatch in its row: open when the group is open, shut when it is folded, 16 by 16 at the swatch's place, in the muted colour", async ({
+    page,
+  }) => {
+    await loadLegend(page);
+    const folder = (id: string): Locator => groupRow(page, id).locator('.swatch-room k-icon');
+    await expect(folder('group-1')).toHaveAttribute('name', 'folder-open');
+    await expect(folder('group-2')).toHaveAttribute('name', 'folder-open');
+    const icon = await boxOf(folder('group-1'), 'the folder of Samples');
+    const swatch = await boxOf(layerRow(page, 'layer-1').locator('.swatch'), 'a swatch');
+    const room = await boxOf(groupRow(page, 'group-1').locator('.swatch-room'), 'the room');
+    expect([icon.width, icon.height]).toEqual([16, 16]);
+    expect(icon.x).toBe(swatch.x);
+    expect(room.width).toBe(24);
+    // In the middle of the row, as the swatch of a layer is.
+    const row = await boxOf(groupRow(page, 'group-1'), 'the row');
+    expect(Math.abs(icon.y + icon.height / 2 - (row.y + row.height / 2))).toBeLessThanOrEqual(1);
+    await expect(groupRow(page, 'group-1').locator('.swatch-room')).toHaveCSS(
+      'color',
+      await tokenColour(page, '--k-text-muted'),
+    );
+    // It is for the eye: the row says whether the group is folded, to those who cannot see.
+    await expect(groupRow(page, 'group-1').locator('.swatch-room')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    await dispatch(page, { type: 'setGroupCollapsed', groupId: 'group-1', collapsed: true });
+    await expect(folder('group-1')).toHaveAttribute('name', 'folder');
+    await expect(folder('group-2')).toHaveAttribute('name', 'folder-open');
+    await dispatch(page, { type: 'setGroupCollapsed', groupId: 'group-1', collapsed: false });
+    await expect(folder('group-1')).toHaveAttribute('name', 'folder-open');
   });
 
   test("has the lines of a layer's classes in the type of 10.3: 13 on 20, with numbers of one width, the count muted", async ({
