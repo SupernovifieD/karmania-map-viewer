@@ -131,12 +131,12 @@ impl<'a> Field<'a> {
     }
 }
 
-/// A vertex of a contour line: where it is in the index space of the field, and its height.
+/// A vertex of a contour line: where it is (in the index space of a field, or the coordinates of a mesh), and its height.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vertex {
-    /// Across, in points (`i`).
+    /// Across: in points (`i`) for a field, in the coordinate system of a mesh for a mesh.
     pub x: f64,
-    /// Up, in points (`j`).
+    /// Up: in points (`j`) for a field, in the coordinate system of a mesh for a mesh.
     pub y: f64,
     /// The height: that of the heights of the field, interpolated, or 0 for a field without.
     pub z: f64,
@@ -226,17 +226,14 @@ impl Scan {
         chain(pieces)
             .into_iter()
             .filter_map(|(edges, closed)| {
-                let mut vertices: Vec<Vertex> = edges
-                    .into_iter()
-                    .map(|edge| field.crossing(edge, height))
-                    .collect();
-                // A value that is exactly at the level puts the crossings of its edges on the one point, and a line through it would have that
-                // point twice in a row: once is the line. A line of one point (a peak at the level) is no line, and nor is a loop of
-                // one (a closed line has its first point again at its end, and two points more at least).
-                vertices.dedup_by(|current, previous| {
-                    current.x == previous.x && current.y == previous.y && current.z == previous.z
-                });
-                (vertices.len() >= if closed { 3 } else { 2 }).then_some(Contour {
+                let vertices = tidy(
+                    edges
+                        .into_iter()
+                        .map(|edge| field.crossing(edge, height))
+                        .collect(),
+                    closed,
+                )?;
+                Some(Contour {
                     level,
                     vertices,
                     closed,
@@ -297,29 +294,38 @@ fn pieces_of(corners: [f64; 4], level: f64) -> Vec<(Side, Side)> {
     }
 }
 
+/// The vertices of a line as they are kept. A value that is exactly at the level puts the crossings of its edges on the one point,
+/// and a line through it would have that point twice in a row: once is the line. A line of one point (a peak at the level) is no
+/// line, and nor is a loop of one (a closed line has its first point again at its end, and two points more at least): `None`.
+pub(crate) fn tidy(mut vertices: Vec<Vertex>, closed: bool) -> Option<Vec<Vertex>> {
+    vertices.dedup_by(|current, previous| {
+        current.x == previous.x && current.y == previous.y && current.z == previous.z
+    });
+    (vertices.len() >= if closed { 3 } else { 2 }).then_some(vertices)
+}
+
 /// Joins pieces that end on the same edge: each line as the edges it crosses in order, and whether it is closed (the first edge is
-/// then the last).
-fn chain(pieces: &[(u32, u32)]) -> Vec<(Vec<u32>, bool)> {
+/// then the last). An edge is any key that is the same for the two sides of it (a number for a grid, the two vertices for a mesh).
+/// An edge has two pieces at most; a third end on it is left as the end of a line.
+pub(crate) fn chain<E: Copy + Ord>(pieces: &[(E, E)]) -> Vec<(Vec<E>, bool)> {
     const NONE: u32 = u32::MAX;
     let count = pieces.len();
-    // An end of a piece is `2 * piece` (its first edge) or `2 * piece + 1` (its second).
-    let edge_of = |end: usize| -> u32 {
-        pieces.get(end / 2).map_or(
-            0,
-            |&(first, second)| if end.is_multiple_of(2) { first } else { second },
-        )
-    };
+    // The edge at every end: `2 * piece` is the first edge of a piece, `2 * piece + 1` its second.
+    let edges: Vec<E> = pieces
+        .iter()
+        .flat_map(|&(first, second)| [first, second])
+        .collect();
     let Ok(ends) = u32::try_from(count * 2) else {
         return Vec::new();
     };
     let mut order: Vec<u32> = (0..ends).collect();
-    order.sort_unstable_by_key(|&end| (edge_of(end as usize), end));
+    order.sort_unstable_by_key(|&end| (edges.get(end as usize).copied(), end));
     // The other end on the same edge, which is in another piece (an edge has two squares at most), or none: the line ends there.
     let mut mate = vec![NONE; count * 2];
     let mut at = 0;
     while at < order.len() {
         match (order.get(at), order.get(at + 1)) {
-            (Some(&a), Some(&b)) if edge_of(a as usize) == edge_of(b as usize) => {
+            (Some(&a), Some(&b)) if edges.get(a as usize) == edges.get(b as usize) => {
                 if let Some(slot) = mate.get_mut(a as usize) {
                     *slot = b;
                 }
@@ -341,14 +347,14 @@ fn chain(pieces: &[(u32, u32)]) -> Vec<(Vec<u32>, bool)> {
         if visited.get(start / 2).copied().unwrap_or(true) {
             continue;
         }
-        let mut path = vec![edge_of(start)];
+        let mut path: Vec<E> = edges.get(start).copied().into_iter().collect();
         let mut end = start;
         let closed = loop {
             if let Some(seen) = visited.get_mut(end / 2) {
                 *seen = true;
             }
             let far = end ^ 1;
-            path.push(edge_of(far));
+            path.extend(edges.get(far).copied());
             let next = mate.get(far).copied().unwrap_or(NONE);
             if next == NONE {
                 break false;
