@@ -10,6 +10,7 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
 import { createClassedTriangles } from './class-triangles.js';
+import { createTrianglePicker } from './triangle-pick.js';
 import type { LayerObject } from './layer-set.js';
 import { AMBIENT } from './light.js';
 import { colourOf } from './look.js';
@@ -109,6 +110,19 @@ export function createMeshLayer(
     },
   });
 
+  // Picking: a triangle of a mesh is an element of its own, and one of a surface is of its cell. The pick triangles write depth as the mesh does.
+  const pickNumber = { value: 0 };
+  const picker = createTrianglePicker(
+    {
+      positions: buffers.positions,
+      triangles: buffers.triangles,
+      ...(buffers.owners === undefined ? {} : { owners: buffers.owners }),
+      parent: triangles.group,
+      depthWrite: true,
+    },
+    pickNumber,
+  );
+
   const layer: LayerObject = {
     object: triangles.group,
     setLook(next) {
@@ -116,6 +130,10 @@ export function createMeshLayer(
       uniforms.uColour.value.set(r, g, b);
       uniforms.uOpacity.value = next.opacity;
       triangles.group.visible = next.visible;
+    },
+    pick(rank) {
+      pickNumber.value = rank + 1;
+      return picker.show(classed.drawn(), triangles.built());
     },
     // The light is the frame's own (straight up in the view from above, the light of the world in 3D); it has no size in pixels and no outline. The
     // triangles by class share this uniform with the layer's own.
@@ -127,6 +145,7 @@ export function createMeshLayer(
       material.visible = !classed.set(next);
     },
     dispose() {
+      picker.dispose();
       classed.dispose();
       triangles.dispose();
       material.dispose();

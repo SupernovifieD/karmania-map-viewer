@@ -20,6 +20,8 @@ export interface TriangleParts {
   readonly group: Group;
   /** The positions of all the parts, as the one attribute that they use: what a layer that draws the same vertices another way shares. */
   readonly positions: BufferAttribute;
+  /** How many triangles are on the card now. */
+  built(): number;
   /** Puts the next part on the card and says whether any is left; there is none when everything was put on at once. */
   readonly step: (() => boolean) | undefined;
   /** Frees the geometries (the material is the layer's, and it frees that). */
@@ -56,6 +58,7 @@ export function createTriangleParts(buffers: TriangleBuffers, material: Material
   return {
     group,
     positions,
+    built: () => Math.min(built, total),
     step: more ? addPart : undefined,
     dispose() {
       group.clear();

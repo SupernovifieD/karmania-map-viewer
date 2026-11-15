@@ -184,4 +184,31 @@ describe('createClassedTriangles', () => {
     expect(classed.set({ indices: new Uint8Array(0), colours: colours(2) })).toBe(true);
     expect(parent.children).toHaveLength(0);
   });
+
+  it('says which triangles it draws and in what order: the classes that have a colour, a class at a time, and in a class the order of the indices', () => {
+    const { classed } = setup();
+    expect(classed.drawn()).toBeUndefined();
+    // Class 1 holds the triangles 0 and 2, class 0 the triangles 1 and 3, class 2 the fifth; the sixth has no value and is not drawn.
+    classed.set({ indices: Uint8Array.of(1, 0, 1, 0, 2, NO_VALUE), colours: colours(3) });
+    expect([...(classed.drawn()?.order ?? [])]).toEqual([1, 3, 0, 2, 4]);
+    // A class with no colour is not drawn, and so is not in the order; the order is a new one, with a new version.
+    const before = classed.drawn();
+    classed.set({ indices: Uint8Array.of(1, 0, 1, 0, 2, NO_VALUE), colours: colours(1) });
+    const after = classed.drawn();
+    expect([...(after?.order ?? [])]).toEqual([1, 3]);
+    expect(after?.version).not.toBe(before?.version);
+    // The same when nothing changed: the same array, as asked again.
+    expect(classed.drawn()?.order).toBe(after?.order);
+    expect(classed.drawn()?.version).toBe(after?.version);
+    // Not by class again: none.
+    classed.set(undefined);
+    expect(classed.drawn()).toBeUndefined();
+  });
+
+  it('says the triangles of the classes of their owners when the classes are of something else', () => {
+    // Two polygons: the triangles 0 to 2 are of the first and 3 to 5 of the second, which is of the class 0 and the first of the class 1.
+    const { classed } = setup(Uint32Array.of(0, 0, 0, 1, 1, 1));
+    classed.set({ indices: Uint8Array.of(1, 0), colours: colours(2) });
+    expect([...(classed.drawn()?.order ?? [])]).toEqual([3, 4, 5, 0, 1, 2]);
+  });
 });
