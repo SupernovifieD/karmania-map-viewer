@@ -106,6 +106,32 @@ describe('announceMove', () => {
   });
 });
 
+describe('announceMove into a folded group', () => {
+  const folded = () => {
+    const store = scene();
+    store.dispatch({ type: 'setGroupCollapsed', groupId: 'group-1', collapsed: true });
+    return legendModel(store.getState());
+  };
+
+  it('says that the group is folded, since the layer is not shown there any more', () => {
+    expect(announceMove(folded(), 'layer-2', { parent: 'group-1', index: 2 })).toBe(
+      'Moved Assays into Samples, which is folded',
+    );
+    expect(nestMove(folded(), 'layer-2', 'in').say).toBe(
+      'Moved Assays into Samples, which is folded',
+    );
+  });
+
+  it('says nothing of it for a group that is open, and nothing for a move out of a folded group or within a list', () => {
+    expect(announceMove(model(), 'layer-2', { parent: 'group-1', index: 2 })).toBe(
+      'Moved Assays into Samples',
+    );
+    expect(announceMove(folded(), 'layer-2', { parent: null, index: 0 })).toBe(
+      'Moved Assays above Samples',
+    );
+  });
+});
+
 describe('stepMove', () => {
   it('moves a row up by one place of its list, and says where it is', () => {
     expect(stepMove(model(), 'layer-2', 'up')).toEqual({

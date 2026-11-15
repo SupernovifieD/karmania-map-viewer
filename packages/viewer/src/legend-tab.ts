@@ -23,7 +23,7 @@ import {
   placeOf,
   stepMove,
 } from './legend-order.js';
-import type { Move } from './legend-order.js';
+import type { Move, Place } from './legend-order.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
 import {
   itemKey,
@@ -545,9 +545,12 @@ export class KarmaniaLegendTab extends LitElement {
       return;
     }
     this.say(announceMove(model, move.id, move.to));
-    this.refocus = model.entries.some((entry) => entry.type === 'group' && entry.id === move.id)
-      ? `group:${move.id}`
-      : `layer:${move.id}`;
+    this.refocus = this.landing(
+      model.entries.some((entry) => entry.type === 'group' && entry.id === move.id)
+        ? `group:${move.id}`
+        : `layer:${move.id}`,
+      move.to,
+    );
     this.ask({ type: 'moveNode', id: move.id, to: move.to });
   }
 
@@ -591,9 +594,18 @@ export class KarmaniaLegendTab extends LitElement {
     const step = nestMove(this.model, item.id, direction);
     this.say(step.say);
     if (step.move !== undefined) {
-      this.refocus = itemKey(item);
+      this.refocus = this.landing(itemKey(item), step.move.to);
       this.ask({ type: 'moveNode', id: step.move.id, to: step.move.to });
     }
+  }
+
+  /** The row that the keyboard goes to when the row `key` is moved to `to`: that row, or, if it goes into a group that is folded and so does not show it, the group's. */
+  private landing(key: string, to: Place): string {
+    const group =
+      to.parent === null
+        ? undefined
+        : this.model?.entries.find((entry) => entry.type === 'group' && entry.id === to.parent);
+    return group?.type === 'group' && group.collapsed ? `group:${group.id}` : key;
   }
 
   /** Deletes a group (its layers stay, where it was), says so, and puts the keyboard on its first layer, or on a row near it. */
