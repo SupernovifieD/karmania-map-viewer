@@ -6,6 +6,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { dispatch } from '../support/render.js';
 import { loadGrid, loadLegendScene, showLegend } from '../support/legend.js';
+import { importAndLoad } from '../support/wizard.js';
 import type { Shot } from '../support/screenshots.js';
 
 const panel = (page: Page): Locator => page.locator('karmania-panel');
@@ -157,6 +158,39 @@ export const SHOTS: Shot[] = [
       await list.waitFor();
       // The panel is scrolled so that the whole list is in the picture, as a person who opened it near the bottom would scroll.
       await list.evaluate((one) => {
+        one.scrollIntoView({ block: 'end' });
+      });
+      return restWithFocus(page);
+    },
+  },
+  {
+    // A layer of points opened on its style: the opacity and the size of its markers, under the colour.
+    name: 'legend-tab-style-points',
+    show: async (page) => {
+      await importAndLoad(page, 'points.csv', 'points.prj');
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-1 k-input[label="Point size (px)"]')
+        .waitFor();
+      return rest(page);
+    },
+  },
+  {
+    // An opacity that is not a number: the message in the room that was kept for it, with its icon, the text kept, and the ring on the field.
+    name: 'legend-tab-style-error',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+      const field = page.locator(
+        'karmania-legend-tab #legend-style-layer-1 k-input[label="Opacity (%)"]',
+      );
+      await field.locator('input').fill('half');
+      await field.locator('input').press('Enter');
+      const message = field.locator('.error');
+      await message.waitFor();
+      // The panel is scrolled so that the message is in the picture at the shortest window too, as a person who typed it would have the field in sight.
+      await message.evaluate((one) => {
         one.scrollIntoView({ block: 'end' });
       });
       return restWithFocus(page);

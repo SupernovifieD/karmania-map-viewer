@@ -14,9 +14,15 @@ import {
   colourFromText,
   methodChoice,
   methodOptions,
+  numberFields,
+  numberFromText,
+  numberOf,
+  numberPatch,
+  numberStep,
+  numberText,
   rampOptions,
 } from './legend-style.js';
-import type { StyleInfo } from './legend-style.js';
+import type { NumberField, NumberKey, StyleInfo } from './legend-style.js';
 import './ramp-select.js';
 import type { RampChange } from './ramp-select.js';
 
@@ -32,7 +38,10 @@ export interface StyleChange {
  * The fields of the style of one layer, stacked, a label above each and 12 between them, each the whole width (section 10.3 of the brief): **Colour by** (a
  * single colour, or a column of the dataset) and, for a single colour, a row of twelve swatches and a field for the hex code, and, for a column, **Method**,
  * **Classes**, **Ramp** (a picker whose choices are drawn) and **Reverse ramp**. It shows the style it is given (`info`) and says what a person changed
- * (`karmania-style-change`, with a patch); it does not change the scene.
+ * (`karmania-style-change`, with a patch); it does not change the scene. Then, for every layer, **Opacity** and, for points, **Point size** or, for lines,
+ * **Line width**, which are fields of numbers: the number is taken when Enter is pressed or the field is left, or at once with the up and down arrows (a step
+ * of 1, of 10 with Shift); a text that is not a number, or is outside what the scene accepts, is said so with the range and the style is left as it is; and
+ * Escape puts back the number the layer has.
  *
  * The swatches are a group of radio buttons with one stop for Tab (the one that is chosen, or the first), moved by the arrow keys, which choose as they go. The
  * hex code is taken when Enter is pressed or the field is left: six digits or three, with or without the `#`; text that is not a colour is said not to be one,
@@ -43,6 +52,8 @@ export class KarmaniaStyleEditor extends LitElement {
     info: { attribute: false },
     hex: { state: true },
     hexError: { state: true },
+    numbers: { state: true },
+    numberErrors: { state: true },
   };
 
   static override styles = [
@@ -105,12 +116,18 @@ export class KarmaniaStyleEditor extends LitElement {
   declare private hex: string;
   /** What is wrong with the text in the field, in words. */
   declare private hexError: string;
+  /** What is in each field of numbers, which is what a person typed until the number is taken. */
+  declare private numbers: Partial<Record<NumberKey, string>>;
+  /** What is wrong with the text in each field of numbers, in words. */
+  declare private numberErrors: Partial<Record<NumberKey, string>>;
 
   constructor() {
     super();
     this.info = undefined;
     this.hex = '';
     this.hexError = '';
+    this.numbers = {};
+    this.numberErrors = {};
   }
 
   /** The field shows the colour the layer has, again, whenever that changes. */
@@ -123,6 +140,22 @@ export class KarmaniaStyleEditor extends LitElement {
           this.hex = colour.value;
           this.hexError = '';
         }
+      }
+      this.showNumbers(changed.get('info'));
+    }
+  }
+
+  /** Each field of numbers shows the number the layer has, again, whenever that changes (and whatever the person was typing in it goes). */
+  private showNumbers(before: StyleInfo | undefined): void {
+    const info = this.info;
+    if (info === undefined) {
+      return;
+    }
+    for (const field of numberFields(info.kind)) {
+      const text = numberText(field, info.style);
+      if (before === undefined || numberText(field, before.style) !== text) {
+        this.numbers = { ...this.numbers, [field.key]: text };
+        this.numberErrors = { ...this.numberErrors, [field.key]: '' };
       }
     }
   }
@@ -189,6 +222,71 @@ export class KarmaniaStyleEditor extends LitElement {
       this.hex = colour?.mode === 'single' ? colour.value : '';
       this.hexError = '';
     }
+  }
+
+  /** Takes the number that is typed in a field of numbers, if it is one: the style is changed if it is not the number the layer has, and the field shows the number. */
+  private commitNumber(field: NumberField): void {
+    const style = this.info?.style;
+    if (style === undefined) {
+      return;
+    }
+    const typed = numberFromText(field, this.numbers[field.key] ?? '');
+    if ('error' in typed) {
+      this.numberErrors = { ...this.numberErrors, [field.key]: typed.error };
+      return;
+    }
+    this.numbers = { ...this.numbers, [field.key]: String(typed.value) };
+    this.numberErrors = { ...this.numberErrors, [field.key]: '' };
+    if (numberOf(field, style) !== typed.value) {
+      this.change(numberPatch(field, typed.value));
+    }
+  }
+
+  /** Enter takes the number, Escape puts back the number the layer has, and the up and down arrows step it (by 10 with Shift) and take it at once. */
+  private onNumberKey(event: KeyboardEvent, field: NumberField): void {
+    const style = this.info?.style;
+    if (style === undefined || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.commitNumber(field);
+    } else if (event.key === 'Escape') {
+      this.numbers = { ...this.numbers, [field.key]: numberText(field, style) };
+      this.numberErrors = { ...this.numberErrors, [field.key]: '' };
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      // A step goes from what is typed, if that is a number, and from what the layer has if it is not.
+      const typed = numberFromText(field, this.numbers[field.key] ?? '');
+      const from = 'value' in typed ? typed.value : numberOf(field, style);
+      const next = numberStep(field, from, event.key === 'ArrowUp' ? 1 : -1, event.shiftKey);
+      this.numbers = { ...this.numbers, [field.key]: String(next) };
+      this.commitNumber(field);
+    }
+  }
+
+  private numberInput(field: NumberField, style: StyleInfo['style']) {
+    return html`
+      <k-input
+        label=${field.label}
+        inputmode="decimal"
+        reserve
+        .value=${this.numbers[field.key] ?? numberText(field, style)}
+        .error=${this.numberErrors[field.key] ?? ''}
+        @k-input-change=${(event: CustomEvent<{ value: string }>) => {
+          this.numbers = { ...this.numbers, [field.key]: event.detail.value };
+          this.numberErrors = { ...this.numberErrors, [field.key]: '' };
+        }}
+        @keydown=${(event: KeyboardEvent) => {
+          this.onNumberKey(event, field);
+        }}
+        @focusout=${() => {
+          if (this.numbers[field.key] !== numberText(field, style)) {
+            this.commitNumber(field);
+          }
+        }}
+      ></k-input>
+    `;
   }
 
   /** The swatches move with the arrows, one stop for Tab, and choose as they go. */
@@ -327,6 +425,7 @@ export class KarmaniaStyleEditor extends LitElement {
                 ></k-input>`
             : this.classes(info, colour)
         }
+        ${numberFields(info.kind).map((field) => this.numberInput(field, info.style))}
       </div>
     `;
   }
