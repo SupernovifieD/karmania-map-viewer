@@ -3,7 +3,8 @@
  * it is given its classes (`setClasses`: a class for each line, which each of its segments takes; a line with no value, or whose class has no
  * colour, is not drawn). Each segment is one instance of
  * a quad that the shader makes as big as the segment and a half width more all round; the fragment shader draws the segment with
- * round ends at the distance of each pixel from it, smoothed over a pixel. The ends being round, a vertex between two segments is
+ * round ends at the distance of each pixel from it, smoothed over a pixel. The lines of a class can be wider than those of the layer
+ * (`widths` of the classes: the index lines of contours). The ends being round, a vertex between two segments is
  * joined as a circle, and in the flat view the segments of a layer are all at one depth, so the depth test (strictly nearer) lets the first
  * of them draw a pixel that two cover and not the second: a half opaque line is not darker at a joint, whatever the heights of its
  * segments are (which, of one colour, could not show).
@@ -41,13 +42,27 @@ attribute float aClass;
 uniform vec2 uViewport;
 uniform float uWidth;
 uniform float uDepthScale;
+uniform float uScales[${String(MAX_CLASSES)}];
+uniform float uCount;
+uniform float uClassed;
 varying vec2 vStart;
 varying vec2 vEnd;
 varying float vClass;
+varying float vWidth;
 ${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
 
 void main() {
   vClass = aClass;
+  // The width of this segment: the layer's, times that of its class when the lines are classed and the class has one.
+  float scale = 1.0;
+  if (uClassed > 0.5) {
+    float line = floor(aClass + 0.5);
+    if (line < uCount) {
+      scale = uScales[int(line)];
+    }
+  }
+  float width = uWidth * scale;
+  vWidth = width;
   ${plane ? 'vStartV = (modelViewMatrix * vec4(aStart, 1.0)).xyz;\n  vEndV = (modelViewMatrix * vec4(aEnd, 1.0)).xyz;' : ''}
   vec4 a = projectionMatrix * modelViewMatrix * vec4(aStart, 1.0);
   vec4 b = projectionMatrix * modelViewMatrix * vec4(aEnd, 1.0);
@@ -59,7 +74,7 @@ void main() {
   vec2 dir = length_ > 0.0 ? along / length_ : vec2(1.0, 0.0);
   vec2 normal = vec2(-dir.y, dir.x);
   // The box of the segment with round ends: half a width, and a pixel for the smoothed edge, beyond it on every side.
-  float reach = uWidth * 0.5 + 1.0;
+  float reach = width * 0.5 + 1.0;
   vec2 pixel = (corner.x < 0.0 ? pa - dir * reach : pb + dir * reach) + normal * corner.y * reach;
   vec4 clip = corner.x < 0.0 ? a : b;
   vStart = pa;
@@ -74,7 +89,6 @@ void main() {
  * pixel of it (`plane-depth.ts`), where the depth of its ends would put it behind the plane of the layers under it over half of its width.
  */
 const fragment = (plane: boolean): string => /* glsl */ `
-uniform float uWidth;
 uniform vec3 uColour;
 uniform float uOpacity;
 uniform vec3 uPalette[${String(MAX_CLASSES)}];
@@ -83,6 +97,7 @@ uniform float uClassed;
 varying vec2 vStart;
 varying vec2 vEnd;
 varying float vClass;
+varying float vWidth;
 ${plane ? 'varying vec3 vStartV;\nvarying vec3 vEndV;' : ''}
 ${plane ? PLANE_DEPTH_GLSL + RIBBON_GLSL : ''}
 
@@ -92,7 +107,7 @@ void main() {
   float length2 = dot(along, along);
   float t = length2 > 0.0 ? clamp(dot(gl_FragCoord.xy - vStart, along) / length2, 0.0, 1.0) : 0.0;
   float away = length(gl_FragCoord.xy - (vStart + along * t));
-  float inside = clamp(uWidth * 0.5 - away + 0.5, 0.0, 1.0);
+  float inside = clamp(vWidth * 0.5 - away + 0.5, 0.0, 1.0);
   if (inside <= 0.0) {
     discard;
   }
@@ -152,6 +167,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     uPalette: { value: Array.from({ length: MAX_CLASSES }, () => new Vector3()) },
     uCount: { value: 0 },
     uClassed: { value: 0 },
+    uScales: { value: new Float32Array(MAX_CLASSES).fill(1) },
   };
   /** The material for a view; the one for 3D writes the depth of the plane the segments lie in. The two share their uniforms. */
   const materialFor = (plane: boolean): ShaderMaterial =>
@@ -268,6 +284,12 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
           const [r, g, b] = colourOf(hex);
           uniforms.uPalette.value[k]?.set(r, g, b);
         });
+        // The width of each class, as a multiple of the layer's (one for a class that has none, or none above 0).
+        const scales = uniforms.uScales.value;
+        scales.fill(1);
+        (next.widths ?? []).slice(0, count).forEach((scale, k) => {
+          scales[k] = Number.isFinite(scale) && scale > 0 ? scale : 1;
+        });
         uniforms.uCount.value = count;
         uniforms.uClassed.value = 1;
         if (same) {
@@ -279,6 +301,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
         classes = undefined;
         uniforms.uClassed.value = 0;
         uniforms.uCount.value = 0;
+        uniforms.uScales.value.fill(1);
       }
       for (const part of parts) {
         classesOf(part);

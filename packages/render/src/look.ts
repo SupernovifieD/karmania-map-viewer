@@ -53,6 +53,11 @@ export interface ClassColouring {
   readonly indices: Uint8Array;
   /** `#rrggbb` for each class, in the order of the classes; at most `MAX_CLASSES`. */
   readonly colours: readonly string[];
+  /**
+   * Lines only: how wide the lines of each class are, as a multiple of the width of the layer (2 is twice as wide), in the order of the classes:
+   * the index lines of contours are drawn heavier this way. A class with no width, or one that is not above 0, has the width of the layer.
+   */
+  readonly widths?: readonly number[];
 }
 
 /** A layer's colour as three numbers from 0 to 1, in sRGB, as the shaders take it. */
