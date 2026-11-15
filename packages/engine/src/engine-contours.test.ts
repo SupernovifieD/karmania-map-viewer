@@ -250,6 +250,26 @@ describe('engine.contours', () => {
     );
   });
 
+  it("is superseded by a newer call for the same dataset that is made while it is under way: it rejects and the lines are the newer call's", async () => {
+    const engine = start();
+    const cone = await loadCone(engine, 800, 500);
+    const heard: number[][] = [];
+    engine.on('datasets', (list) => heard.push(ids(list)));
+    let newer: Promise<LoadResult> | undefined;
+    const older = engine.contours(cone, settings(10), {
+      onProgress: () => {
+        newer ??= engine.contours(cone, settings(40));
+      },
+    });
+    await expect(older).rejects.toThrow(/superseded by a newer call/);
+    if (newer === undefined) throw new Error('the newer call was not made');
+    const lines = linesOf(await newer);
+    expect(lines.name).toBe('Contours of Cone (every 40)');
+    // The list never had the lines of the older call, and has the lines of the newer.
+    expect(ids(engine.datasets())).toStrictEqual([cone, lines.id]);
+    expect(heard).toStrictEqual([[cone, lines.id]]);
+  });
+
   it('is cancelled by the removal of its dataset in the middle, with a message that says so', async () => {
     const engine = start();
     const cone = await loadCone(engine, 800, 500);

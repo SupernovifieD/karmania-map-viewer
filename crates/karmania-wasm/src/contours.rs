@@ -11,8 +11,8 @@ use karmania_prep::{
 };
 use serde::Serialize;
 
-/// What a step of making contours did. In JSON: `{ status: "progress", fraction }`, `{ status: "cancelled" }` or `{ status: "done",
-/// result }`, where `result` is what a load gives: `{ status: "loaded", summaries }` (one summary, of the new lines) or `{ status:
+/// What a step of making contours did. In JSON: `{ status: "progress", fraction }`, `{ status: "cancelled" }`, `{ status: "superseded" }`
+/// or `{ status: "done", result }`, where `result` is what a load gives: `{ status: "loaded", summaries }` (one summary, of the new lines) or `{ status:
 /// "blocked", findings }` (why there are none).
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -24,6 +24,9 @@ pub(crate) enum Stepped {
     },
     /// The dataset was removed, so the job is over and nothing changed.
     Cancelled,
+    /// A newer job was started on the same dataset: this one is over and nothing changed (the lines of the newer one are the ones to keep,
+    /// whichever of the two ends first).
+    Superseded,
     /// The job is over and the datasets are as they are to be.
     Done {
         /// The new lines, or the findings that say why there are none.
@@ -73,6 +76,7 @@ pub(crate) fn step(
     Some(match stepped {
         ContourStep::Progress { fraction } => Stepped::Progress { fraction },
         ContourStep::Cancelled => Stepped::Cancelled,
+        ContourStep::Superseded => Stepped::Superseded,
         ContourStep::Done(result) => finish(kernel, prep, contourer, source, &params, result),
     })
 }
@@ -238,6 +242,17 @@ mod tests {
             }))
         }
 
+        /// One step of a job.
+        fn step_job(&mut self, job: u32, budget: usize) -> Option<Stepped> {
+            step(
+                &mut self.kernel,
+                &mut self.prep,
+                &mut self.contourer,
+                job,
+                budget,
+            )
+        }
+
         fn params(interval: f64) -> ContourParams {
             ContourParams {
                 column: None,
@@ -390,6 +405,90 @@ mod tests {
             ["contours.kind.unsupported"]
         );
         assert_eq!(world.kernel.registry().len(), 2);
+    }
+
+    #[test]
+    fn a_newer_call_for_a_dataset_supersedes_an_older_one_that_is_under_way_whichever_would_end_first()
+     {
+        let mut world = World::new();
+        let (grid, mesh) = (world.grid(), world.mesh());
+        let before = loaded(world.contour(grid, &World::params(1.0)).0);
+        let on_mesh = loaded(world.contour(mesh, &World::params(2.5)).0);
+        let old = start(
+            &world.kernel,
+            &mut world.contourer,
+            grid,
+            &World::params(2.0),
+        )
+        .unwrap();
+        assert!(matches!(
+            world.step_job(old, 10),
+            Some(Stepped::Progress { .. })
+        ));
+        let new = start(
+            &world.kernel,
+            &mut world.contourer,
+            grid,
+            &World::params(5.0),
+        )
+        .unwrap();
+        // The newer ends first, and loads its lines, which take the place of the first call's.
+        let made = loop {
+            match world.step_job(new, 100).unwrap() {
+                Stepped::Progress { .. } => {}
+                done => break loaded(done),
+            }
+        };
+        assert_eq!(made.name, "Contours of Cone (every 5)");
+        // The older one, that was under way, is over and changes nothing: not the lines, and not the registry.
+        assert!(matches!(
+            world.step_job(old, usize::MAX),
+            Some(Stepped::Superseded)
+        ));
+        assert!(world.step_job(old, 10).is_none());
+        let ids: Vec<DatasetId> = world
+            .kernel
+            .registry()
+            .summaries()
+            .iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(ids, [grid, mesh, on_mesh.id, made.id]);
+        assert!(world.kernel.registry().summary(before.id).is_none());
+        // The other way round: the older one is not stepped until the newer is done, and the newer ends the last.
+        let old = start(
+            &world.kernel,
+            &mut world.contourer,
+            grid,
+            &World::params(4.0),
+        )
+        .unwrap();
+        let new = start(
+            &world.kernel,
+            &mut world.contourer,
+            grid,
+            &World::params(10.0),
+        )
+        .unwrap();
+        assert!(matches!(
+            world.step_job(old, usize::MAX),
+            Some(Stepped::Superseded)
+        ));
+        let last = loop {
+            match world.step_job(new, 100).unwrap() {
+                Stepped::Progress { .. } => {}
+                done => break loaded(done),
+            }
+        };
+        assert_eq!(last.name, "Contours of Cone (every 10)");
+        let ids: Vec<DatasetId> = world
+            .kernel
+            .registry()
+            .summaries()
+            .iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(ids, [grid, mesh, on_mesh.id, last.id]);
     }
 
     #[test]
@@ -564,6 +663,10 @@ mod tests {
         assert_eq!(
             json(&Stepped::Cancelled),
             serde_json::json!({"status": "cancelled"})
+        );
+        assert_eq!(
+            json(&Stepped::Superseded),
+            serde_json::json!({"status": "superseded"})
         );
         let done = Stepped::Done {
             result: LoadResult::Blocked {

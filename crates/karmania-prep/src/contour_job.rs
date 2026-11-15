@@ -27,6 +27,9 @@ pub enum ContourStep {
     },
     /// The dataset is gone, so the job is over.
     Cancelled,
+    /// A newer job was started on the same dataset, so this one is over and its answer would be out of date: whichever job were to
+    /// finish last would otherwise decide which lines the dataset has.
+    Superseded,
     /// The job is over: the lines, or why there are none.
     Done(Result<ContourLines, ContourError>),
 }
@@ -239,11 +242,21 @@ impl MeshJob {
     }
 }
 
+/// A job of a [`Contourer`].
+struct Running {
+    /// The dataset it makes contours of.
+    dataset: DatasetId,
+    /// The settings it uses.
+    params: ContourParams,
+    job: ContourJob,
+    /// Whether a newer job was started on the same dataset since: this one is then not to be finished.
+    superseded: bool,
+}
+
 /// The contour jobs of a kernel, by number. They share nothing, like the kernels that hold them.
 #[derive(Default)]
 pub struct Contourer {
-    /// The dataset of each job, the settings it uses, and the job.
-    jobs: BTreeMap<u32, (DatasetId, ContourParams, ContourJob)>,
+    jobs: BTreeMap<u32, Running>,
     /// The identifier the next job gets. Identifiers are never reused.
     next: u32,
 }
@@ -259,29 +272,44 @@ impl Contourer {
     }
 
     /// Starts making contours of `dataset` with `params` and returns the job's identifier. Nothing more is done until
-    /// [`Contourer::step`].
+    /// [`Contourer::step`]. A job that is under way on the same dataset is superseded: its next step says so.
     pub fn start(&mut self, dataset: &Dataset, params: &ContourParams) -> u32 {
         let id = self.next;
         self.next += 1;
         let job = ContourJob::new(dataset, params);
         let used = job.used(params);
-        self.jobs.insert(id, (dataset.id, used, job));
+        for older in self.jobs.values_mut() {
+            older.superseded |= older.dataset == dataset.id;
+        }
+        self.jobs.insert(
+            id,
+            Running {
+                dataset: dataset.id,
+                params: used,
+                job,
+                superseded: false,
+            },
+        );
         id
     }
 
     /// Does the next part of a job. `dataset` is the one it was started on, or `None` if that dataset is gone, which cancels the job.
-    /// A job that is done or cancelled is forgotten with the step that says so. `None` if there is no job with that identifier (it
-    /// never existed, or it is over).
+    /// A job that is done, cancelled or superseded is forgotten with the step that says so. `None` if there is no job with that
+    /// identifier (it never existed, or it is over).
     pub fn step(
         &mut self,
         job: u32,
         dataset: Option<&Dataset>,
         budget: usize,
     ) -> Option<ContourStep> {
-        let (_, _, running) = self.jobs.get_mut(&job)?;
-        let step = match dataset {
-            Some(dataset) => running.step(dataset, budget),
-            None => ContourStep::Cancelled,
+        let running = self.jobs.get_mut(&job)?;
+        let step = if running.superseded {
+            ContourStep::Superseded
+        } else {
+            match dataset {
+                Some(dataset) => running.job.step(dataset, budget),
+                None => ContourStep::Cancelled,
+            }
         };
         if !matches!(step, ContourStep::Progress { .. }) {
             self.jobs.remove(&job);
@@ -292,14 +320,14 @@ impl Contourer {
     /// The dataset a job is making contours of, or `None` if there is no such job.
     #[must_use]
     pub fn dataset_of(&self, job: u32) -> Option<DatasetId> {
-        self.jobs.get(&job).map(|(dataset, _, _)| *dataset)
+        self.jobs.get(&job).map(|running| running.dataset)
     }
 
     /// The settings a job uses (see [`ContourJob`]: the column is the one a grid takes), or `None` if there is no such job. They are
     /// what the dataset that comes of it says it was made with.
     #[must_use]
     pub fn params_of(&self, job: u32) -> Option<&ContourParams> {
-        self.jobs.get(&job).map(|(_, params, _)| params)
+        self.jobs.get(&job).map(|running| &running.params)
     }
 
     /// Stops a job and drops what it has made. Returns whether there was one.
@@ -309,7 +337,7 @@ impl Contourer {
 
     /// Stops the jobs that are making contours of `dataset`, which is being removed.
     pub fn forget_dataset(&mut self, dataset: DatasetId) {
-        self.jobs.retain(|_, (id, _, _)| *id != dataset);
+        self.jobs.retain(|_, running| running.dataset != dataset);
     }
 
     /// How many jobs are under way.
@@ -413,7 +441,8 @@ mod tests {
         let job = contourer.start(dataset, params);
         let mut fractions = Vec::new();
         loop {
-            match contourer.step(job, Some(dataset), budget).unwrap() {
+            let step = contourer.step(job, Some(dataset), budget).unwrap();
+            match step {
                 ContourStep::Progress { fraction } => {
                     fractions.push(fraction);
                     // A job that makes no progress must fail the test, not hang it.
@@ -423,7 +452,7 @@ mod tests {
                     assert_eq!(contourer.jobs(), 0, "a job that is over is forgotten");
                     return (fractions, result);
                 }
-                ContourStep::Cancelled => panic!("cancelled"),
+                ContourStep::Cancelled | ContourStep::Superseded => panic!("{step:?}"),
             }
         }
     }
@@ -602,5 +631,83 @@ mod tests {
             ..good
         };
         assert_eq!(run(&dataset, &one_level, 100).1, Err(ContourError::NoLines));
+    }
+    #[test]
+    fn a_newer_job_on_a_dataset_supersedes_the_older_whichever_ends_first() {
+        let (a, b) = (grid(40, 30, 0.0), mesh(30, 25));
+        let (params_a, params_b) = (
+            default_params(&a, None).unwrap(),
+            default_params(&b, None).unwrap(),
+        );
+        let other = ContourParams {
+            interval: params_a.interval * 2.0,
+            ..params_a.clone()
+        };
+        let mut contourer = Contourer::new();
+        let old = contourer.start(&a, &params_a);
+        let on_b = contourer.start(&b, &params_b);
+        let new = contourer.start(&a, &other);
+        // The older job has made a little progress when the newer starts: its next step is the end of it, with no lines.
+        assert_eq!(contourer.jobs(), 3);
+        assert_eq!(
+            contourer.step(old, Some(&a), usize::MAX),
+            Some(ContourStep::Superseded)
+        );
+        assert_eq!(
+            contourer.jobs(),
+            2,
+            "a superseded job is forgotten with the step that says so"
+        );
+        assert_eq!(contourer.step(old, Some(&a), 10), None);
+        // A job on another dataset is not touched, and the newer one gives what it would have given alone.
+        assert!(matches!(
+            contourer.step(on_b, Some(&b), 10),
+            Some(ContourStep::Progress { .. })
+        ));
+        let mut done = None;
+        for _ in 0..10_000 {
+            match contourer.step(new, Some(&a), 100) {
+                Some(ContourStep::Progress { .. }) => {}
+                other => {
+                    done = other;
+                    break;
+                }
+            }
+        }
+        assert_eq!(done, Some(ContourStep::Done(contours_of(&a, &other))));
+        assert_eq!(contourer.jobs(), 1);
+    }
+
+    #[test]
+    fn an_older_job_stays_superseded_after_the_newer_one_is_over_and_a_later_job_is_not() {
+        let dataset = grid(40, 30, 0.0);
+        let params = default_params(&dataset, None).unwrap();
+        let mut contourer = Contourer::new();
+        let (old, new) = (
+            contourer.start(&dataset, &params),
+            contourer.start(&dataset, &params),
+        );
+        // The newer one ends (here, cancelled): the older one is still not the one that counts.
+        assert!(contourer.cancel(new));
+        assert_eq!(
+            contourer.step(old, Some(&dataset), 10),
+            Some(ContourStep::Superseded)
+        );
+        // Nothing is left over from them: a job started now is the newest, and runs to its end.
+        let (_, lines) = run(&dataset, &params, 100);
+        assert_eq!(lines, contours_of(&dataset, &params));
+        let again = contourer.start(&dataset, &params);
+        assert!(matches!(
+            contourer.step(again, Some(&dataset), 10),
+            Some(ContourStep::Progress { .. })
+        ));
+        // The dataset is removed: its jobs go, and the record of the newest with them.
+        contourer.forget_dataset(dataset.id);
+        assert_eq!(contourer.jobs(), 0);
+        let after = contourer.start(&dataset, &params);
+        assert!(matches!(
+            contourer.step(after, Some(&dataset), 10),
+            Some(ContourStep::Progress { .. })
+        ));
     }
 }

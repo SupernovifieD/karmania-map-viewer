@@ -315,10 +315,11 @@ impl Kernel {
     }
 
     /// Does the next part of making contours: up to `budget` squares, triangles or vertices (at least one part). Returns `{ status:
-    /// "progress", fraction }`, `{ status: "cancelled" }` (the dataset was removed) or `{ status: "done", result }`, where `result` is
+    /// "progress", fraction }`, `{ status: "cancelled" }` (the dataset was removed), `{ status: "superseded" }` (a newer job was started
+    /// on the same dataset, and nothing was changed) or `{ status: "done", result }`, where `result` is
     /// `{ status: "loaded", summaries }` (the new lines, loaded: a summary with `derivedFrom`, which replaced the lines made before from
-    /// the same dataset) or `{ status: "blocked", findings }` (why there are none; the lines made before are gone too). After `done` or
-    /// `cancelled` the job no longer exists.
+    /// the same dataset) or `{ status: "blocked", findings }` (why there are none; the lines made before are gone too). After `done`,
+    /// `cancelled` or `superseded` the job no longer exists.
     ///
     /// # Errors
     ///

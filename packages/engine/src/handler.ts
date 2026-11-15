@@ -338,6 +338,11 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         if (step.status === 'cancelled') {
           throw new Error('The dataset was removed while its contours were being made.');
         }
+        if (step.status === 'superseded') {
+          throw new Error(
+            'These contours were superseded by a newer call for the same dataset, which makes the lines to keep.',
+          );
+        }
         report(step.fraction);
         await yieldToEventLoop();
       }
