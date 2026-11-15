@@ -115,6 +115,26 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    // A group is renamed in place: a field in the place of its name, with its ring, and the rest of the row as it is.
+    name: 'legend-tab-rename',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-group="group-1"]').focus();
+      await page.keyboard.press('F2');
+      await page.locator('karmania-legend-tab input.rename').waitFor();
+      return restWithFocus(page);
+    },
+  },
+  {
+    // A group that is pointed at shows the button that deletes it, in the room at the end of its row.
+    name: 'legend-tab-group-hover',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.locator('karmania-legend-tab .row[data-group="group-1"]').hover();
+      return restWithPointer(page);
+    },
+  },
+  {
     // The row that has the keyboard has its ring inside it, over its hover colour's place.
     name: 'legend-tab-focus',
     show: async (page) => {
