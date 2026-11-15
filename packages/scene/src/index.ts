@@ -45,7 +45,7 @@ export type {
 } from './scale-bar.js';
 export { northArrow } from './north-arrow.js';
 export type { NorthArrow } from './north-arrow.js';
-export { legendModel } from './legend-model.js';
+export { legendModel, noticeOfFindings } from './legend-model.js';
 export type {
   GroupVisibility,
   LayerNotice,
@@ -96,6 +96,7 @@ export { setFrame, setSelection } from './commands-frame.js';
 export { heldElevation, normalHeading } from './angles.js';
 export { setCamera, setVerticalExaggeration, setViewMode } from './commands-view.js';
 export type { CameraPatch } from './commands-view.js';
+export { CONTOURS_COLOUR, setContoursLayer } from './commands-contours.js';
 export { setContours, setStyle } from './commands-style.js';
 export type { StylePatch } from './commands-style.js';
 export { emptyScene } from './empty.js';

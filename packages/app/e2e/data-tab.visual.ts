@@ -13,6 +13,8 @@ test.use({ reducedMotion: 'reduce' });
 
 for (const each of SHOTS) {
   test(`the state "${each.name}", at every window size in both themes`, async ({ page }) => {
+    // Fifty datasets are imported one by one to make the list scroll: 44 seconds on a machine that is not busy, close to the 60 of a test.
+    test.slow(each.name === 'data-tab-many', 'it imports fifty datasets before it photographs');
     await photograph(page, PATH, each);
   });
 }

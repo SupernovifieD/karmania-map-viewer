@@ -12,8 +12,10 @@ import {
   checkedFrameChoice,
   checkedPrepareStep,
 } from './display-check.js';
+import { checkedContourDefaults, checkedContourStep } from './contours-check.js';
 import type { PrepareResult } from './display.js';
 import {
+  checkedContourParams,
   checkedCrsInfo,
   checkedCrsInfoList,
   checkedImportStatus,
@@ -57,6 +59,13 @@ const IMPORT_BUDGET_ROWS = 50_000;
  */
 const PREPARE_BUDGET = 100_000;
 
+/**
+ * How much of making contours is done in one step: squares of a grid, triangles of a mesh, or (when the lines of each level are joined)
+ * vertices. Native, 20 levels of 4,000,000 cells took 0.5 s with the making of the field, so a step of this size is a few tens of
+ * milliseconds in WebAssembly (docs/perf.md). A request to stop, or any other request, is heard between steps.
+ */
+const CONTOURS_BUDGET = 100_000;
+
 /** The largest texture, in cells on a side, a grid is cut for when the page does not say: the one WebGL2 guarantees twice over. */
 const DEFAULT_MAX_TEXTURE_SIZE = 4_096;
 
@@ -74,6 +83,11 @@ function requireWholeNumber(value: unknown, what: string): number {
 /** Whether an error is the kernel's answer to a step of a prepare that no longer exists. */
 function isNoSuchPrepare(error: unknown): boolean {
   return error instanceof Error && /no prepare with that id/.test(error.message);
+}
+
+/** Whether an error is the kernel's answer to a step of contours that no longer exist. */
+function isNoSuchContours(error: unknown): boolean {
+  return error instanceof Error && /no contours job with that id/.test(error.message);
 }
 
 /** Thrown inside a request to unwind it when the main thread asked for it to stop. */
@@ -292,6 +306,57 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
     }
   }
 
+  /** Posts how far making contours is, at most once for each whole percent. */
+  function contoursReporter(id: number): (fraction: number) => void {
+    let lastPercent = -1;
+    return (fraction) => {
+      const percent = Math.floor(Math.min(Math.max(fraction, 0), 1) * 100);
+      if (percent !== lastPercent) {
+        lastPercent = percent;
+        post({ type: 'contoursProgress', id, progress: { fraction: percent / 100 } }, []);
+      }
+    };
+  }
+
+  async function runContours(
+    id: number,
+    params: Requests['contours']['params'],
+  ): Promise<LoadResult> {
+    const { kernel } = await ready();
+    throwIfStopped(id);
+    const dataset = requireWholeNumber(params.dataset, 'The dataset');
+    // Settings that are not usable (an interval of 0, an index line every 0 lines) are misuse of the engine and not a finding.
+    const job = kernel.startContours(dataset, checkedContourParams(params.params, 'The settings'));
+    const report = contoursReporter(id);
+    try {
+      for (;;) {
+        throwIfStopped(id);
+        const step = checkedContourStep(kernel.stepContours(job, CONTOURS_BUDGET));
+        if (step.status === 'done') {
+          return step.result;
+        }
+        if (step.status === 'cancelled') {
+          throw new Error('The dataset was removed while its contours were being made.');
+        }
+        if (step.status === 'superseded') {
+          throw new Error(
+            'These contours were superseded by a newer call for the same dataset, which makes the lines to keep.',
+          );
+        }
+        report(step.fraction);
+        await yieldToEventLoop();
+      }
+    } catch (error) {
+      // As for a prepare: what had been made is dropped, and a job that is gone because the dataset was removed is said in words.
+      if (!kernel.cancelContours(job) && isNoSuchContours(error)) {
+        throw new Error('The dataset was removed while its contours were being made.', {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  }
+
   async function execute(message: RequestMessage): Promise<Outgoing> {
     const { id } = message;
     switch (message.type) {
@@ -417,6 +482,27 @@ export function createWorkerHandler(options: HandlerOptions): WorkerHandler {
         return {
           reply: { type: 'result', id, request: 'classIndex', result: index },
           transfer: index.buffer instanceof ArrayBuffer ? [index.buffer] : [],
+        };
+      }
+      case 'contours': {
+        const result = await runContours(id, message.params);
+        return { reply: { type: 'result', id, request: 'contours', result }, transfer: [] };
+      }
+      case 'contourDefaults': {
+        const { kernel } = await ready();
+        const { dataset, column } = message.params;
+        if (column !== undefined && typeof column !== 'string') {
+          throw new TypeError('The column must be a string.');
+        }
+        const found = kernel.contourDefaults(requireWholeNumber(dataset, 'The dataset'), column);
+        return {
+          reply: {
+            type: 'result',
+            id,
+            request: 'contourDefaults',
+            result: checkedContourDefaults(found),
+          },
+          transfer: [],
         };
       }
       default:

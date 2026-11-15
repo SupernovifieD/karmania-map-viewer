@@ -132,6 +132,9 @@ export class KarmaniaDataTab extends LitElement {
           .summary=${selected}
           .crsInfo=${this.crsInfo}
           .notice=${selected === undefined ? undefined : this.notices.get(selected.id)}
+          .sourceName=${
+            this.datasets.find((dataset) => dataset.id === selected?.derivedFrom?.id)?.name
+          }
         ></karmania-dataset-summary>
         ${
           selected === undefined

@@ -25,9 +25,11 @@ export function classesOfPieces(
 
 /** Whether `classes` has a class for every element that `owners` names (a layer is not coloured by classes that stop short of its pieces). */
 export function coversOwners(classes: Uint8Array, owners: Uint32Array): boolean {
+  // (An indexed loop: the iterator of a typed array is several times slower, and the lines of 4,000,000 cells of contours have three million owners to look at in one task.)
   let highest = -1;
-  for (const owner of owners) {
-    if (owner > highest) {
+  for (let i = 0; i < owners.length; i += 1) {
+    const owner = owners[i];
+    if (owner !== undefined && owner > highest) {
       highest = owner;
     }
   }

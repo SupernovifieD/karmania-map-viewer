@@ -16,6 +16,11 @@ pub mod blocks;
 pub mod choice;
 pub mod class_index;
 pub mod classify;
+pub mod contour_grid;
+pub mod contour_job;
+pub mod contour_levels;
+pub mod contour_mesh;
+pub mod contours;
 pub mod drawable;
 pub mod frame;
 pub mod grid;
@@ -40,6 +45,14 @@ pub use class_index::{NO_VALUE, class_index, class_index_of, class_index_rows};
 pub use classify::{
     ClassBreaks, MAX_CATEGORIES, MAX_CLASSES, Method, class_of, classify, classify_dataset,
     classify_rows, drawn_rows,
+};
+pub use contour_grid::{Contour, Field, Scan, Vertex, contour_field};
+pub use contour_job::{ContourJob, ContourStep, Contourer};
+pub use contour_levels::{Levels, LevelsError, MAX_LEVELS};
+pub use contour_mesh::{MeshScan, Surface, contour_surface};
+pub use contours::{
+    ContourError, ContourLines, ContourParams, DEFAULT_INDEX_EVERY, contour_grid, contour_mesh,
+    contours_name, contours_of, default_params,
 };
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};

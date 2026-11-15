@@ -18,6 +18,11 @@ export interface Registry {
   readonly add: (added: readonly Summary[]) => void;
   /** Takes out a dataset and tells the listeners. Does nothing if there is none with that id. */
   readonly remove: (id: number) => void;
+  /**
+   * Takes out the datasets with these ids (those that are there) and adds `added` after the others, and tells the listeners once, with
+   * the list as it is after both: a listener never sees the one without the other. Does nothing if nothing changes.
+   */
+  readonly update: (removed: readonly number[], added: readonly Summary[]) => void;
   /** Calls `listener` after every change. Returns the function that ends that. */
   readonly subscribe: (listener: Listener) => () => void;
   /** Empties the list and drops the listeners, without telling them. */
@@ -64,19 +69,25 @@ export function createRegistry(reportError: ReportError = throwLater): Registry 
     }
   }
 
+  function change(removed: readonly number[], added: readonly Summary[]): void {
+    const going = current.some((summary) => removed.includes(summary.id));
+    if (!going && added.length === 0) {
+      return;
+    }
+    current = [...current.filter((summary) => !removed.includes(summary.id)), ...added];
+    announce();
+  }
+
   return {
     summaries: () => current,
     add: (added) => {
-      if (added.length > 0) {
-        current = [...current, ...added];
-        announce();
-      }
+      change([], added);
     },
     remove: (id) => {
-      if (current.some((summary) => summary.id === id)) {
-        current = current.filter((summary) => summary.id !== id);
-        announce();
-      }
+      change([id], []);
+    },
+    update: (removed, added) => {
+      change(removed, added);
     },
     subscribe: (listener) => {
       const subscription: Subscription = { listener, told: current };

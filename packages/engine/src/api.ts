@@ -14,6 +14,8 @@ import type {
 import type { DatasetInput } from './inputs.js';
 import { PHASES } from './types.js';
 import type {
+  ContourDefaultsResult,
+  ContourParams,
   CrsInfo,
   CrsRef,
   ImportMapping,
@@ -74,6 +76,14 @@ export interface PrepareOptions {
   /** Aborting stops the prepare, drops what it has made and rejects with the signal's reason. */
   readonly signal?: AbortSignal;
   /** Called, from the main thread, as the prepare advances. */
+  readonly onProgress?: (progress: PrepareProgress) => void;
+}
+
+/** Optional parts of `contours`. */
+export interface ContoursOptions {
+  /** Aborting stops the work, drops what it has made and rejects with the signal's reason; the lines made before stay as they were. */
+  readonly signal?: AbortSignal;
+  /** Called, from the main thread, as the work advances. */
   readonly onProgress?: (progress: PrepareProgress) => void;
 }
 
@@ -193,6 +203,26 @@ export interface Engine {
    * the cells of that layer, and so are those `classify` counts. The array is handed over, not copied.
    */
   classIndex(id: number, breaks: ClassBreaks): Promise<Uint8Array>;
+
+  /**
+   * Makes the contour lines of a grid (by the values of a column, at the centres of its cells) or of a mesh (by height) as a new dataset
+   * of lines with the columns `level` (float) and `index` (true or false), named "Contours of <name> (every <interval>)" and listed with
+   * `derivedFrom` in its summary. The work is done in steps in the worker, so that the page stays responsive and the call can be
+   * stopped. **A call for a dataset replaces the lines made before from it, and so does a call that finds nothing to make** (a column that
+   * is not numbers, more than 1,000 levels, no level that the values cross): then it resolves with `status: "blocked"` and the reasons, and
+   * the old lines are gone, so that what is shown is never the lines of other settings. **A call that is still under way when a newer one is made
+   * for the same dataset rejects** (it is superseded: the lines to keep are the newer call's, whichever of the two would have ended first).
+   * Removing the dataset removes its lines. Settings that are not of the right shape (an interval that is not above 0) are misuse and reject.
+   */
+  contours(id: number, params: ContourParams, options?: ContoursOptions): Promise<LoadResult>;
+
+  /**
+   * The settings a set of contours of a dataset starts with: the column (a grid's: `column`, or its first of numbers), a nice number for
+   * the interval that gives 10 to 20 levels, a base of 0 and an index line every 5. Resolves with `status: "not_available"` and the
+   * reason when the dataset cannot be contoured (another shape, a column that is missing or not numbers, a mesh with no heights, values
+   * that are all one number).
+   */
+  contourDefaults(id: number, column?: string): Promise<ContourDefaultsResult>;
 
   /** Calls `listener` whenever the event happens. Returns the function that stops that. */
   on<E extends EngineEvent>(event: E, listener: (payload: EngineEvents[E]) => void): () => void;

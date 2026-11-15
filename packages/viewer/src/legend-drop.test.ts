@@ -1,7 +1,7 @@
 import { createSceneStore, legendModel } from '@karmania/scene';
 import type { LegendModel, NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
-import { dropCandidates, pickDrop } from './legend-drop.js';
+import { EDGE, MAX_STEP, dropCandidates, edgeStep, pickDrop } from './legend-drop.js';
 import type { DropRow } from './legend-drop.js';
 import { placeOf } from './legend-order.js';
 
@@ -253,5 +253,39 @@ describe('dropCandidates and the scene', () => {
     }
     // Every row had gaps to try: more than 20 in all (6 rows, a few gaps each).
     expect(tried).toBeGreaterThan(20);
+  });
+});
+
+describe('edgeStep', () => {
+  // A part that scrolls from 100 to 600 in the window.
+  const step = (y: number): number => edgeStep(y, 100, 600);
+
+  it('is nothing between the edges, and at the limit of the margin', () => {
+    expect(step(300)).toBe(0);
+    expect(step(100 + EDGE)).toBe(0);
+    expect(step(600 - EDGE)).toBe(0);
+  });
+
+  it('is up (negative) near the top and down (positive) near the bottom, faster the nearer the edge', () => {
+    expect(step(100 + EDGE - 1)).toBeLessThan(0);
+    expect(step(600 - EDGE + 1)).toBeGreaterThan(0);
+    expect(Math.abs(step(110))).toBeGreaterThan(Math.abs(step(130)));
+    expect(step(590)).toBeGreaterThan(step(570));
+  });
+
+  it('is at most MAX_STEP, at the edge and past it (the pointer outside the part, which a drag with the pointer taken can be)', () => {
+    expect(step(100)).toBe(-MAX_STEP);
+    expect(step(-300)).toBe(-MAX_STEP);
+    expect(step(5000)).toBe(MAX_STEP);
+  });
+
+  it('is at least 1 inside the margin, so that a pointer at its edge still scrolls', () => {
+    expect(step(100 + EDGE - 1)).toBe(-1);
+    expect(step(600 - EDGE + 1)).toBe(1);
+  });
+
+  it('goes by the nearer edge for a part that is shorter than two margins', () => {
+    expect(edgeStep(105, 100, 130)).toBeLessThan(0);
+    expect(edgeStep(125, 100, 130)).toBeGreaterThan(0);
   });
 });

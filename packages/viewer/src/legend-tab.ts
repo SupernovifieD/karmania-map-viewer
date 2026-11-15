@@ -12,7 +12,7 @@ import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { LegendDrag } from './legend-drag.js';
 import './style-editor.js';
-import type { StyleChange } from './style-editor.js';
+import type { ContoursChange, StyleChange } from './style-editor.js';
 import type { StyleInfo } from './legend-style.js';
 import type { DropRow } from './legend-drop.js';
 import {
@@ -42,6 +42,17 @@ export const LEGEND_COMMAND = 'karmania-legend-command';
 /** What the tab asks of the scene: a command, which the viewer gives to it. */
 export interface LegendCommand {
   readonly command: Command;
+}
+
+/**
+ * The name of the event the tab sends when a person turns the contours of a layer on for the first time: the settings they start with are the
+ * engine's to say, so the viewer gets them and puts them in the scene.
+ */
+export const CONTOURS_TURN_ON = 'karmania-contours-turn-on';
+
+/** Which layer's contours were turned on. */
+export interface ContoursTurnOn {
+  readonly layerId: string;
 }
 
 /** How a group's box looks, and what the row says of it to a screen reader, for all, some and none of its layers on. */
@@ -76,7 +87,7 @@ function isMove(key: string): key is MoveKey {
  * 16 by 16, or its classes side by side, 24 by 12, in a room of 24, so that the names of all the layers of a level start at one place), its name, the
  * room of its notice (16: a warning icon, with the reason in its tooltip, on a layer that is not drawn) and the room of its button that opens it (28); the
  * reason is in the words of the engine in the layer's opened part too, before its lines and fields. A group's row is its chevron and the room of its box, which are in the places of
- * a layer's handle and box, then the room of a swatch, which is empty so that the name starts where the name of a layer at the same level does, and how many
+ * a layer's handle and box, then the room of a swatch, which has the folder of the group so that the name starts where the name of a layer at the same level does, and how many
  * layers it has. The room of a control is kept, whether or not the control is there yet, so that
  * a control that comes later moves nothing. The layers of a group are 24 in from its edge.
  *
@@ -247,11 +258,18 @@ export class KarmaniaLegendTab extends LitElement {
           var(--k-icon-size-sm) var(--k-control-height-compact);
       }
 
-      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), the room of a swatch, which is empty, so that its name starts where the name of a layer at the same level does (the text of every row at one level starts at one x, 10.3), the name, the count, and the room of the button that deletes it (28, where a layer has its button). */
+      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), the room of a swatch, which has the group's folder, so that its name starts where the name of a layer at the same level does (the text of every row at one level starts at one x, 10.3), the name, the count, and the room of the button that deletes it (28, where a layer has its button). */
       .group {
         grid-template-columns:
           var(--k-icon-size-sm) var(--k-space-24) var(--k-space-24) minmax(0, 1fr) auto
           var(--k-control-height-compact);
+      }
+
+      /* The room of a swatch in a group's row has the group's folder (open when the group is, shut when it is folded), at its left as a layer's swatch is, in the muted colour. */
+      .swatch-room {
+        align-items: center;
+        color: var(--k-text-muted);
+        display: flex;
       }
 
       /* The chevron folds and unfolds the group: a room as high as the row, for the pointer. */
@@ -528,6 +546,11 @@ export class KarmaniaLegendTab extends LitElement {
     return rows;
   }
 
+  /** The part of the panel that scrolls the tab, which a drag scrolls at its edges (`DragHost`). */
+  scrollRegion(): HTMLElement | null {
+    return this.closest<HTMLElement>('[data-scroll-region]');
+  }
+
   /** How far in the layers of a group are, for the drag (`DragHost`). */
   indent(): number {
     return Number.parseFloat(getComputedStyle(this).getPropertyValue('--k-space-24')) || 0;
@@ -683,6 +706,21 @@ export class KarmaniaLegendTab extends LitElement {
     if (step.move !== undefined) {
       this.refocus = itemKey(item);
       this.ask({ type: 'moveNode', id: step.move.id, to: step.move.to });
+    }
+  }
+
+  /** A person changed the contours of a layer: turned them on (the viewer says what they start with), or gave them settings. */
+  private onContours(layerId: string, change: ContoursChange): void {
+    if (change.kind === 'turn-on') {
+      this.dispatchEvent(
+        new CustomEvent<ContoursTurnOn>(CONTOURS_TURN_ON, {
+          detail: { layerId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } else {
+      this.ask({ type: 'setContours', layerId, contours: change.contours });
     }
   }
 
@@ -936,6 +974,9 @@ export class KarmaniaLegendTab extends LitElement {
                   @karmania-style-change=${(event: CustomEvent<StyleChange>) => {
                     this.ask({ type: 'setStyle', layerId: layer.id, patch: event.detail.patch });
                   }}
+                  @karmania-contours-change=${(event: CustomEvent<ContoursChange>) => {
+                    this.onContours(layer.id, event.detail);
+                  }}
                 ></karmania-style-editor>
               </div>`
             : nothing
@@ -997,7 +1038,9 @@ export class KarmaniaLegendTab extends LitElement {
             ><k-icon class="chevron" name="chevron-down" size="16"></k-icon
           ></span>
           ${this.switch(item, BOX[group.visibility])}
-          <span class="swatch-room" aria-hidden="true"></span>
+          <span class="swatch-room" aria-hidden="true"
+            ><k-icon name=${group.collapsed ? 'folder' : 'folder-open'} size="16"></k-icon
+          ></span>
           ${
             this.renaming === group.id
               ? html`<input
@@ -1107,5 +1150,6 @@ declare global {
 
   interface HTMLElementEventMap {
     [LEGEND_COMMAND]: CustomEvent<LegendCommand>;
+    [CONTOURS_TURN_ON]: CustomEvent<ContoursTurnOn>;
   }
 }

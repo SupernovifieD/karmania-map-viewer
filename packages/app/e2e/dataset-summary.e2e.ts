@@ -426,3 +426,102 @@ test.describe('the summary of the selected dataset', () => {
     });
   }
 });
+
+test.describe('the summary of a dataset made from another', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+  });
+
+  const SURFACE = crafted({
+    id: 1,
+    name: 'Surface',
+    kind: 'grid',
+    elementCount: 1200,
+    hasZ: false,
+  });
+  const contours = (params: Record<string, unknown>) =>
+    crafted({
+      id: 2,
+      name: 'Contours of Surface (every 2.5)',
+      kind: 'lines',
+      elementCount: 31,
+      vertexCount: 480,
+      hasZ: true,
+      columns: [
+        { name: 'level', type: 'float', nullCount: 0 },
+        { name: 'index', type: 'bool', nullCount: 0 },
+      ],
+      derivedFrom: { id: 1, kind: 'contours', params },
+    });
+
+  async function select(page: Page, name: string): Promise<void> {
+    await parts(page).choose(name).click();
+  }
+
+  test('shows how it was made: from which dataset, the interval and the base, the index lines and the column', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await setDatasets(page, [
+      SURFACE,
+      contours({ column: 'height', interval: 2.5, base: 0, indexEvery: 5 }),
+    ]);
+    await select(page, 'Contours of Surface (every 2.5)');
+    await expect(p.fact('Made from')).toHaveText('Surface');
+    await expect(p.fact('Contours')).toHaveText('every 2.5, counted from 0');
+    await expect(p.fact('Index lines')).toHaveText('every 5th line');
+    await expect(p.fact('Column')).toHaveText('height');
+    // The rows of every dataset are still there: its kind, its size and its heights.
+    await expect(p.fact('Kind')).toHaveText('Lines');
+    await expect(p.fact('Size')).toHaveText('31 lines');
+    await expect(p.fact('Heights')).toHaveText('Yes (Z)');
+  });
+
+  test('leaves out the column of the lines of a mesh, and has no such rows for a dataset that is not derived', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    await setDatasets(page, [SURFACE, contours({ interval: 10, base: -5, indexEvery: 1 })]);
+    await select(page, 'Contours of Surface (every 2.5)');
+    await expect(p.fact('Contours')).toHaveText('every 10, counted from -5');
+    await expect(p.fact('Index lines')).toHaveText('every line');
+    await expect(p.summary.locator('dt:text-is("Column")')).toHaveCount(0);
+    await select(page, 'Surface');
+    for (const term of ['Made from', 'Contours', 'Index lines', 'Column']) {
+      await expect(p.summary.locator(`dt:text-is("${term}")`)).toHaveCount(0);
+    }
+  });
+
+  test('follows the name of its source, and keeps every row inside the panel and in its box', async ({
+    page,
+  }) => {
+    const p = parts(page);
+    const long = 'S'.repeat(120);
+    await setDatasets(page, [
+      { ...SURFACE, name: long },
+      contours({ column: 'h'.repeat(80), interval: 2.5, base: 0, indexEvery: 5 }),
+    ]);
+    await select(page, 'Contours of Surface (every 2.5)');
+    await expect(p.fact('Made from')).toHaveAttribute('title', long);
+    await expect(p.fact('Column')).toHaveAttribute('title', 'h'.repeat(80));
+    await assertNoOverflow(p.panel);
+    const [panel, made] = [await rect(p.panel), await rect(p.fact('Made from'))];
+    expect(made.x + made.width).toBeLessThanOrEqual(panel.x + panel.width);
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`is readable and has no serious accessibility violations (${theme} theme)`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme });
+      await setDatasets(page, [
+        SURFACE,
+        contours({ column: 'height', interval: 2.5, base: 0, indexEvery: 5 }),
+      ]);
+      await select(page, 'Contours of Surface (every 2.5)');
+      await expect(parts(page).fact('Made from')).toBeVisible();
+      await expectNoSeriousViolations(page);
+    });
+  }
+});

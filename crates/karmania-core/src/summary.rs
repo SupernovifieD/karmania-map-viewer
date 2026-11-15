@@ -6,6 +6,7 @@ use crate::bbox::BBox;
 use crate::column::ColumnType;
 use crate::crs::CrsRef;
 use crate::dataset::{Dataset, DatasetId, Kind};
+use crate::derived::DerivedFrom;
 use crate::findings::Findings;
 
 /// One attribute column, described without its values.
@@ -50,6 +51,9 @@ pub struct Summary {
     /// What was found about it: warnings and info (errors keep a dataset from
     /// being loaded at all).
     pub findings: Findings,
+    /// The dataset it was made from and how, for a dataset that is derived from another (contour lines).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_from: Option<DerivedFrom>,
 }
 
 impl Dataset {
@@ -79,6 +83,7 @@ impl Dataset {
                 })
                 .collect(),
             findings,
+            derived_from: None,
         }
     }
 }
@@ -207,6 +212,34 @@ mod tests {
         assert_eq!(
             v["bbox"],
             json!({"min": [1.0, 2.0, 3.0], "max": [7.0, 8.0, 9.0]})
+        );
+    }
+
+    #[test]
+    fn a_derived_dataset_says_what_it_was_made_from_and_others_have_no_such_key() {
+        use crate::derived::{ContourParams, Derivation};
+        let mut s = points().summary(Findings::new());
+        assert!(
+            serde_json::to_value(&s)
+                .unwrap()
+                .get("derivedFrom")
+                .is_none()
+        );
+        s.derived_from = Some(DerivedFrom {
+            id: DatasetId(3),
+            how: Derivation::Contours {
+                params: ContourParams {
+                    column: None,
+                    interval: 5.0,
+                    base: 0.0,
+                    index_every: 5,
+                },
+            },
+        });
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(
+            v["derivedFrom"],
+            json!({"id": 3, "kind": "contours", "params": {"interval": 5.0, "base": 0.0, "indexEvery": 5}})
         );
     }
 

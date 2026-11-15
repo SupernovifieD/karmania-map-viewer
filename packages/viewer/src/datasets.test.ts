@@ -4,9 +4,14 @@ import {
   crsLabel,
   crsLabelNamed,
   crsTitleNamed,
+  derivedRows,
   describeWarnings,
   extentRows,
   formatCoordinate,
+  listedDatasets,
+  madeFrom,
+  selectionAfterChange,
+  selectionAfterRemoved,
   selectionAfterRemoving,
   warningCount,
 } from './datasets.js';
@@ -60,6 +65,191 @@ describe('what is selected once a dataset is removed', () => {
 
   it('is nothing when the only dataset is removed', () => {
     expect(selectionAfterRemoving([dataset(7)], 7, 7)).toBeUndefined();
+  });
+});
+
+/** A dataset made from `source` as contour lines, with the settings given. */
+const contoursOf = (
+  id: number,
+  source: number,
+  params: Partial<{ column: string; interval: number; base: number; indexEvery: number }> = {},
+): Summary => ({
+  ...dataset(id),
+  kind: 'lines',
+  derivedFrom: {
+    id: source,
+    kind: 'contours',
+    params: { interval: 2.5, base: 0, indexEvery: 5, ...params },
+  },
+});
+
+const idsOf = (list: readonly Summary[]): number[] => list.map((d) => d.id);
+
+describe('the order of the datasets in the Data tab', () => {
+  it('is the order they were loaded, each followed directly by what was made from it', () => {
+    // 3 is the contours of 1, loaded after 2; 4 is the contours of 2; 5 is the contours of 3 (lines of lines).
+    const loaded = [dataset(1), dataset(2), contoursOf(3, 1), contoursOf(4, 2), contoursOf(5, 3)];
+    expect(idsOf(listedDatasets(loaded))).toStrictEqual([1, 3, 5, 2, 4]);
+    expect(idsOf(listedDatasets([dataset(1), dataset(2)]))).toStrictEqual([1, 2]);
+    expect(listedDatasets([])).toStrictEqual([]);
+  });
+
+  it('keeps a dataset whose source is not loaded, with the others, so that none is lost', () => {
+    const loaded = [dataset(1), contoursOf(2, 99), dataset(3)];
+    expect(idsOf(listedDatasets(loaded))).toStrictEqual([1, 2, 3]);
+  });
+});
+
+describe('what removing a dataset removes with it', () => {
+  const loaded = [dataset(1), dataset(2), contoursOf(3, 1), contoursOf(4, 2), contoursOf(5, 3)];
+
+  it('is what was made from it, and from those, in the order they are listed', () => {
+    expect(idsOf(madeFrom(loaded, 1))).toStrictEqual([3, 5]);
+    expect(idsOf(madeFrom(loaded, 2))).toStrictEqual([4]);
+    expect(idsOf(madeFrom(loaded, 3))).toStrictEqual([5]);
+  });
+
+  it('is nothing for a dataset that has nothing made from it, or is not there', () => {
+    expect(madeFrom(loaded, 5)).toStrictEqual([]);
+    expect(madeFrom(loaded, 99)).toStrictEqual([]);
+    expect(madeFrom([], 1)).toStrictEqual([]);
+  });
+});
+
+describe('what is selected once a dataset and what was made from it are removed', () => {
+  const loaded = [dataset(1), contoursOf(2, 1), dataset(3), contoursOf(4, 3)];
+
+  it('stays when it is not among what goes', () => {
+    expect(selectionAfterRemoving(loaded, 1, 3)).toBe(3);
+    expect(selectionAfterRemoving(loaded, 1, 4)).toBe(4);
+  });
+
+  it('is the dataset listed after them when the selected one goes, whether it is the dataset or what was made from it', () => {
+    expect(selectionAfterRemoving(loaded, 1, 1)).toBe(3);
+    expect(selectionAfterRemoving(loaded, 1, 2)).toBe(3);
+  });
+
+  it('is the one listed before them when they were last, and nothing when nothing is left', () => {
+    expect(selectionAfterRemoving(loaded, 3, 4)).toBe(2);
+    expect(selectionAfterRemoving(loaded, 3, 3)).toBe(2);
+    expect(selectionAfterRemoving([dataset(1), contoursOf(2, 1)], 1, 2)).toBeUndefined();
+  });
+
+  it('is the source when only the lines are removed and they were selected', () => {
+    expect(selectionAfterRemoving(loaded, 2, 2)).toBe(3);
+    expect(selectionAfterRemoving([dataset(1), contoursOf(2, 1)], 2, 2)).toBe(1);
+  });
+});
+
+describe('what is selected once a removal that was waited for is over', () => {
+  const before = [dataset(1), contoursOf(2, 1), dataset(3), contoursOf(4, 3)];
+  const after = [dataset(3), contoursOf(4, 3)];
+
+  it('is what is selected now when that is still there, whatever was selected when the removal was asked for', () => {
+    // Asked for the removal of 1 with 1 selected; while it was waited for, the person chose 4 (or lines that were made came to be 5).
+    expect(selectionAfterRemoved(before, after, 1, 4)).toBe(4);
+    expect(selectionAfterRemoved(before, [...after, contoursOf(5, 3)], 1, 5)).toBe(5);
+    expect(selectionAfterRemoved(before, after, 1, undefined)).toBeUndefined();
+    // And when the removal changed nothing (there was no such dataset in the engine), what is selected is still there and stays.
+    expect(selectionAfterRemoved(before, before, 1, 1)).toBe(1);
+  });
+
+  it('is the dataset that takes the place of what was removed when the selection is among it, as when nothing was waited for', () => {
+    expect(selectionAfterRemoved(before, after, 1, 1)).toBe(3);
+    expect(selectionAfterRemoved(before, after, 1, 2)).toBe(3);
+    expect(selectionAfterRemoved(before, [dataset(1), contoursOf(2, 1)], 3, 4)).toBe(2);
+  });
+
+  it('is the dataset that takes the place of what was removed when the selection is lines that were made meanwhile and went with it', () => {
+    // 2 is removed with the lines 3 made from it; while that was waited for, 3 was replaced by 5 (which is not in `before`), selected, and 5 went too.
+    const first = [dataset(1), dataset(2), contoursOf(3, 2), dataset(4)];
+    expect(selectionAfterRemoved(first, [dataset(1), dataset(4)], 2, 5)).toBe(4);
+    // And when what takes its place is the last, the one before.
+    expect(
+      selectionAfterRemoved([dataset(1), dataset(2), contoursOf(3, 2)], [dataset(1)], 2, 5),
+    ).toBe(1);
+  });
+
+  it('is the first dataset listed when the one that would take its place is gone too, and nothing when nothing is left', () => {
+    // Waited for, 3 was removed as well, or the selection is lines of the dataset that are gone now.
+    expect(selectionAfterRemoved(before, [dataset(7)], 1, 2)).toBe(7);
+    expect(selectionAfterRemoved(before, [], 1, 1)).toBeUndefined();
+    expect(selectionAfterRemoved([dataset(1)], [], 1, 1)).toBeUndefined();
+  });
+});
+
+describe('what is selected when the datasets change under it', () => {
+  const before = [dataset(1), dataset(2), contoursOf(3, 1), contoursOf(4, 2)];
+
+  it('stays when it is still there, or when nothing is selected', () => {
+    expect(selectionAfterChange(before, [...before, contoursOf(9, 9)], 3)).toBe(3);
+    expect(selectionAfterChange(before, before, undefined)).toBeUndefined();
+  });
+
+  it('is the lines that replaced the selected lines, made from the same dataset', () => {
+    const after = [dataset(1), dataset(2), contoursOf(5, 1), contoursOf(4, 2)];
+    expect(selectionAfterChange(before, after, 3)).toBe(5);
+  });
+
+  it('is the dataset the selected lines were made from when they are gone', () => {
+    const after = [dataset(1), dataset(2), contoursOf(4, 2)];
+    expect(selectionAfterChange(before, after, 3)).toBe(1);
+  });
+
+  it('is the first dataset listed when what was selected is gone and was not lines of one that is there', () => {
+    expect(selectionAfterChange(before, [dataset(2), contoursOf(4, 2)], 1)).toBe(2);
+    expect(selectionAfterChange(before, [dataset(2)], 3)).toBe(2);
+    expect(selectionAfterChange(before, [], 3)).toBeUndefined();
+  });
+});
+
+describe('how a derived dataset says it was made', () => {
+  it('names the dataset, the interval and the base, the index lines and the column of a grid', () => {
+    const lines = contoursOf(2, 1, { column: 'height', interval: 0.0025, base: -10 });
+    expect(derivedRows(lines, 'Cone')).toStrictEqual([
+      { label: 'Made from', text: 'Cone' },
+      { label: 'Contours', text: 'every 0.0025, counted from -10' },
+      { label: 'Index lines', text: 'every 5th line' },
+      { label: 'Column', text: 'height' },
+    ]);
+  });
+
+  it('leaves out the column of a mesh, says "dataset 1" when the source is not loaded, and says every line for 1', () => {
+    const lines = contoursOf(2, 1, { indexEvery: 1 });
+    expect(derivedRows(lines, undefined)).toStrictEqual([
+      { label: 'Made from', text: 'dataset 1' },
+      { label: 'Contours', text: 'every 2.5, counted from 0' },
+      { label: 'Index lines', text: 'every line' },
+    ]);
+  });
+
+  it('counts the index lines as a person says it: 2nd, 3rd, 4th, 11th, 12th, 21st, 112th', () => {
+    const said = (n: number): string | undefined =>
+      derivedRows(contoursOf(2, 1, { indexEvery: n }), 'x').find((r) => r.label === 'Index lines')
+        ?.text;
+    expect(said(2)).toBe('every 2nd line');
+    expect(said(3)).toBe('every 3rd line');
+    expect(said(4)).toBe('every 4th line');
+    expect(said(11)).toBe('every 11th line');
+    expect(said(12)).toBe('every 12th line');
+    expect(said(13)).toBe('every 13th line');
+    expect(said(21)).toBe('every 21st line');
+    expect(said(112)).toBe('every 112th line');
+  });
+
+  it('says the digits of an interval or a base that mean something, and none of the noise of floats', () => {
+    const said = (interval: number, base: number): string | undefined =>
+      derivedRows(contoursOf(2, 1, { interval, base }), 'x').find((r) => r.label === 'Contours')
+        ?.text;
+    expect(said(1e-7, 0)).toBe('every 1e-7, counted from 0');
+    expect(said(0.00001234, -0.00005)).toBe('every 0.00001234, counted from -0.00005');
+    expect(said(0.1 + 0.2, 100 * 1.1)).toBe('every 0.3, counted from 110');
+    expect(said(2500000, -1e21)).toBe('every 2500000, counted from -1e+21');
+    expect(said(5, -0)).toBe('every 5, counted from 0');
+  });
+
+  it('says nothing for a dataset that was not made from another', () => {
+    expect(derivedRows(dataset(1), 'x')).toStrictEqual([]);
   });
 });
 

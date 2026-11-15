@@ -161,6 +161,19 @@ interface Case {
   readonly view: (page: Page) => Promise<void>;
 }
 
+/** A hill of 24 by 24 cells of 5 m, whose value is its height (0 to 40 at the top). */
+const hillGrid = {
+  name: 'hill',
+  crs: { kind: 'epsg', code: 32640 },
+  origin: [EAST, NORTH, 0],
+  spacing: [5, 5, 1],
+  dims: [24, 24, 1],
+  values: Array.from({ length: 24 * 24 }, (_, k) => {
+    const [dx, dy] = [((k % 24) + 0.5) * 5 - 60, (Math.floor(k / 24) + 0.5) * 5 - 60];
+    return 40 * Math.exp(-(dx * dx + dy * dy) / 1200);
+  }),
+} as const;
+
 const CASES: readonly Case[] = [
   {
     name: 'points',
@@ -232,6 +245,21 @@ const CASES: readonly Case[] = [
     layers: 1,
     load: (page) => importAndLoad(page, fixture('grid.asc'), projectionFor('grid.prj')),
     view: (page) => lookAt(page, [EAST + 20, NORTH + 15], 0.1),
+  },
+  {
+    // The contour lines of a grid over the grid: a hill of 24 by 24 cells of 5 m with the lines every 4, and the index lines (every 5th, from 0) twice as wide.
+    name: 'contours',
+    layers: 2,
+    load: async (page) => {
+      await loadLattice(page, 'grid', hillGrid);
+      await settled(page, 1);
+      await dispatch(page, {
+        type: 'setContours',
+        layerId: 'layer-1',
+        contours: { column: 'value', interval: 4, base: 0, indexEvery: 5, visible: true },
+      });
+    },
+    view: (page) => lookAt(page, [EAST + 60, NORTH + 60], 0.25),
   },
   {
     name: 'blocks',
@@ -360,6 +388,36 @@ const CASES_3D: readonly Case[] = [
         dims: [12, 12, 1],
         values: heights.map((height) => (Number.isNaN(height) ? 0 : height)),
         heights,
+      });
+    },
+    view: (page) => lookFrom(page, [EAST + 60, NORTH + 60, 25], 260, 340, 38),
+  },
+  {
+    // The hill of the surface above with its contour lines, which lie on it at their heights: the lines are over the surface, and the index lines are wider.
+    name: '3d-contours',
+    layers: 2,
+    load: async (page) => {
+      const heights: number[] = [];
+      for (let j = 0; j < 12; j += 1) {
+        for (let i = 0; i < 12; i += 1) {
+          const [dx, dy] = [(i + 0.5) * 10 - 60, (j + 0.5) * 10 - 60];
+          heights.push(20 + 18 * Math.exp(-(dx * dx + dy * dy) / 700));
+        }
+      }
+      await loadLattice(page, 'grid', {
+        name: 'ground',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [EAST, NORTH, 0],
+        spacing: [10, 10, 1],
+        dims: [12, 12, 1],
+        values: heights,
+        heights,
+      });
+      await settled(page, 1);
+      await dispatch(page, {
+        type: 'setContours',
+        layerId: 'layer-1',
+        contours: { column: 'value', interval: 2, base: 0, indexEvery: 5, visible: true },
       });
     },
     view: (page) => lookFrom(page, [EAST + 60, NORTH + 60, 25], 260, 340, 38),

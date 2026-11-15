@@ -114,3 +114,25 @@ export function pickDrop(
   const wanted = pointer.x >= nestAt ? 2 : 1;
   return near.find((candidate) => candidate.level === wanted) ?? near[0];
 }
+
+/** How near to the top or the bottom of the part of the panel that scrolls the pointer is, in pixels, when a dragged row starts to scroll it. */
+export const EDGE = 40;
+/** The most that the panel scrolls in a frame while a row is dragged, in pixels. */
+export const MAX_STEP = 16;
+
+const scaled = (depth: number): number =>
+  Math.max(1, Math.round((MAX_STEP * Math.min(depth, EDGE)) / EDGE));
+
+/**
+ * How far the panel is to scroll in a frame while a row is dragged and the pointer is at `y`, in a part that scrolls from `top` to `bottom`: up (negative) near its top,
+ * down (positive) near its bottom, nothing between; the nearer the edge, or the further past it, the faster, to `MAX_STEP`. A part with its two edges within `EDGE` of
+ * each other goes by the nearer.
+ */
+export function edgeStep(y: number, top: number, bottom: number): number {
+  const up = top + EDGE - y;
+  const down = y - (bottom - EDGE);
+  if (up > 0 && up >= down) {
+    return -scaled(up);
+  }
+  return down > 0 ? scaled(down) : 0;
+}
