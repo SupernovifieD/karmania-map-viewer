@@ -5,7 +5,7 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { dispatch } from '../support/render.js';
-import { loadLegendScene } from '../support/legend.js';
+import { loadGrid, loadLegendScene, showLegend } from '../support/legend.js';
 import type { Shot } from '../support/screenshots.js';
 
 const panel = (page: Page): Locator => page.locator('karmania-panel');
@@ -38,6 +38,9 @@ const long = (start: string): string =>
   `${start} of the northern pit, drill holes and trenches, seen from the west and from the south of it all`
     .padEnd(120, '.')
     .slice(0, 120);
+
+/** 16 cells, the last three with no value. */
+const WITH_HOLES = Array.from({ length: 16 }, (_, i) => (i < 13 ? i + 1 : Number.NaN));
 
 /** The page the states are shown on. */
 export const PATH = '/';
@@ -74,6 +77,32 @@ export const SHOTS: Shot[] = [
       await page.keyboard.press('Shift');
       await page.locator('karmania-legend-tab .row[data-layer="layer-3"]').focus();
       return restWithFocus(page);
+    },
+  },
+  {
+    // Two layers open: one at the top with the classes of its cells, and one in a group, a level in, with a line for the cells that have no value.
+    name: 'legend-tab-classes',
+    show: async (page) => {
+      await loadGrid(page, 'Topography', 1);
+      await loadGrid(page, 'Assays', 2, WITH_HOLES);
+      await loadGrid(page, 'Geology', 3);
+      await dispatch(
+        page,
+        {
+          type: 'setStyle',
+          layerId: 'layer-3',
+          patch: { colour: { mode: 'single', value: '#e69f00' } },
+        },
+        { type: 'createGroup', name: 'Samples' },
+        { type: 'moveNode', id: 'layer-2', to: { parent: 'group-1', index: 0 } },
+      );
+      await showLegend(page);
+      for (const id of ['layer-1', 'layer-2']) {
+        const row = page.locator(`karmania-legend-tab .row[data-layer="${id}"]`);
+        await row.locator('.open').click();
+        await page.locator(`karmania-legend-tab #legend-classes-${id} .entry`).first().waitFor();
+      }
+      return rest(page);
     },
   },
   {
