@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
 import { layerRow, legend, loadLegendScene, showLegend } from './support/legend.js';
-import { around, bytes, distance, dispatch, drawn } from './support/render.js';
+import { around, bytes, distance, dispatch, drawn, mapColour } from './support/render.js';
+import { projectionFor } from './support/fixtures.js';
 import { importAndLoad } from './support/wizard.js';
 
 /**
@@ -31,7 +32,8 @@ const editor = (page: Page, id: string): Locator =>
 const colourBy = (page: Page, id: string): Locator =>
   editor(page, id).locator('k-select[label="Colour by"]');
 const swatches = (page: Page, id: string): Locator => editor(page, id).locator('.swatch');
-const hex = (page: Page, id: string): Locator => editor(page, id).locator('k-input');
+const hex = (page: Page, id: string): Locator =>
+  editor(page, id).locator('k-input[label="Hex code"]');
 const hexInput = (page: Page, id: string): Locator => hex(page, id).locator('input');
 /** The field of the classes of a layer that is named `label`: Method or Classes. */
 const field = (page: Page, id: string, label: string): Locator =>
@@ -41,6 +43,51 @@ const face = (page: Page, id: string): Locator => ramp(page, id).getByRole('comb
 const rampList = (page: Page, id: string): Locator => ramp(page, id).getByRole('listbox');
 const rampChoices = (page: Page, id: string): Locator => rampList(page, id).getByRole('option');
 const reverse = (page: Page, id: string): Locator => editor(page, id).locator('k-checkbox');
+/** A field of numbers of a layer (`Opacity (%)`, `Point size (px)` or `Line width (px)`), and its input. */
+const numberField = (page: Page, id: string, label: string): Locator =>
+  editor(page, id).locator(`k-input[label="${label}"]`);
+const numberInput = (page: Page, id: string, label: string): Locator =>
+  numberField(page, id, label).locator('input');
+/** The opacity that the style of a layer in the scene has, or its size or width. */
+const numberOfStyle = (page: Page, id: string, key: string): Promise<unknown> =>
+  page.evaluate(
+    ([layerId, field]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        scene(): { layers: Record<string, { style: Record<string, unknown> } | undefined> };
+      };
+      return viewer.scene().layers[layerId]?.style[field];
+    },
+    [id, key] as const,
+  );
+
+/** How many pixels of the map are not the background of the map: what has been drawn on it. */
+async function painted(page: Page): Promise<number> {
+  const now = await drawn(page);
+  const background = await mapColour(page);
+  return page.evaluate(
+    ([width, height, colour]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        renderPixels(x: number, y: number, w: number, h: number): Uint8Array | undefined;
+      };
+      const read = viewer.renderPixels(0, 0, width, height);
+      let count = 0;
+      for (let at = 0; read !== undefined && at < read.length; at += 4) {
+        const away = Math.max(
+          Math.abs((read[at] ?? 0) - (colour[0] ?? 0)),
+          Math.abs((read[at + 1] ?? 0) - (colour[1] ?? 0)),
+          Math.abs((read[at + 2] ?? 0) - (colour[2] ?? 0)),
+        );
+        count += away > 8 ? 1 : 0;
+      }
+      return count;
+    },
+    [now.width, now.height, background] as const,
+  );
+}
 /** The colour of the first line of a layer's classes (the lowest class, or the highest if the ramp is reversed). */
 const firstDot = (page: Page, id: string): Locator =>
   legend(page).locator(`#legend-classes-${id} .dot`).first();
@@ -291,6 +338,10 @@ test.describe('the style editor: colour by, and a single colour', () => {
     expect((colourLabel?.y ?? 0) - ((select?.y ?? 0) + (select?.height ?? 0))).toBe(12);
     const hexLabel = await hex(page, 'layer-1').locator('label').boundingBox();
     expect((hexLabel?.y ?? 0) - ((swatchRow?.y ?? 0) + (swatchRow?.height ?? 0))).toBe(12);
+    // And the opacity is 12 under the hex code (with the room of its message), as wide as the editor.
+    const opacity = await numberField(page, 'layer-1', 'Opacity (%)').boundingBox();
+    expect((opacity?.y ?? 0) - ((field?.y ?? 0) + (field?.height ?? 0))).toBe(12);
+    expect(opacity?.width).toBe(whole?.width);
   });
 
   test('has an error appear in room that was kept: the rows under the editor stay where they are', async ({
@@ -313,18 +364,21 @@ test.describe('the style editor: colour by, and a single colour', () => {
     expect((await layerRow(page, 'layer-1').boundingBox())?.y).toBe(under?.y);
   });
 
-  test('has no serious accessibility violation with the editor open on a single colour and on classes, with an error in the hex code', async ({
+  test('has no serious accessibility violation with the editor open on a single colour and on classes, with an error in the hex code and in an opacity', async ({
     page,
   }) => {
     await open(page, 'layer-1', 'layer-2');
     await hexInput(page, 'layer-1').fill('x');
     await hexInput(page, 'layer-1').press('Enter');
+    await numberInput(page, 'layer-2', 'Opacity (%)').fill('x');
+    await numberInput(page, 'layer-2', 'Opacity (%)').press('Enter');
+    await expect(numberField(page, 'layer-2', 'Opacity (%)').locator('.error')).toBeVisible();
     await expectNoSeriousViolations(page);
   });
 });
 
 test.describe('the style editor: the classes of a column', () => {
-  test('has Method, Classes, Ramp and Reverse ramp under Colour by, in that order, named, showing what the layer has, and no swatches', async ({
+  test('has Method, Classes, Ramp and Reverse ramp under Colour by, then Opacity, in that order, named, showing what the layer has, and no swatches', async ({
     page,
   }) => {
     await open(page, 'layer-2');
@@ -336,7 +390,7 @@ test.describe('the style editor: the classes of a column', () => {
             (child) => child.getAttribute('label') ?? child.textContent.trim(),
           ),
         ),
-    ).toEqual(['Colour by', 'Method', 'Classes', 'Ramp', 'Reverse ramp']);
+    ).toEqual(['Colour by', 'Method', 'Classes', 'Ramp', 'Reverse ramp', 'Opacity (%)']);
     await expect(field(page, 'layer-2', 'Method').locator('select')).toHaveValue('equal');
     await expect(field(page, 'layer-2', 'Classes').locator('select')).toHaveValue('7');
     await expect(face(page, 'layer-2')).toHaveAccessibleName('Ramp Viridis');
@@ -354,6 +408,7 @@ test.describe('the style editor: the classes of a column', () => {
       await field(page, 'layer-2', 'Classes').boundingBox(),
       await ramp(page, 'layer-2').boundingBox(),
       await reverse(page, 'layer-2').boundingBox(),
+      await numberField(page, 'layer-2', 'Opacity (%)').boundingBox(),
     ];
     for (const box of boxes) {
       expect(box?.width).toBe(whole?.width);
@@ -701,5 +756,241 @@ test.describe('the style editor: the classes of a column', () => {
     await page.keyboard.press('ArrowDown');
     await expect(rampList(page, 'layer-2')).toHaveCount(1);
     await expectNoSeriousViolations(page);
+  });
+});
+
+test.describe('the style editor: opacity, point size and line width', () => {
+  /** Only `layer-1` is shown: the other layers are on the same cells. */
+  async function alone(page: Page): Promise<void> {
+    await dispatch(
+      page,
+      { type: 'setVisible', layerId: 'layer-2', visible: false },
+      { type: 'setGroupVisible', groupId: 'group-1', visible: false },
+      { type: 'setGroupVisible', groupId: 'group-2', visible: false },
+    );
+  }
+  /** The colour at the middle of the map. */
+  const centre = async (page: Page): Promise<number[]> => {
+    const now = await drawn(page);
+    return (await around(page, Math.floor(now.width / 2), Math.floor(now.height / 2), 0)).at(0, 0);
+  };
+
+  test('has the opacity on every layer, in percent, after the fields of the colour, and says what the layer has', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1', 'layer-2');
+    for (const id of ['layer-1', 'layer-2']) {
+      await expect(numberField(page, id, 'Opacity (%)').locator('label'), id).toHaveText(
+        'Opacity (%)',
+      );
+      await expect(numberInput(page, id, 'Opacity (%)'), id).toHaveValue('100');
+    }
+    // A grid has no size or width of its own.
+    await expect(editor(page, 'layer-1').locator('k-input')).toHaveCount(2);
+    await expect(editor(page, 'layer-2').locator('k-input')).toHaveCount(1);
+    // The opacity of a layer that has another is shown in percent: 0.6 is 60.
+    await dispatch(page, { type: 'setStyle', layerId: 'layer-2', patch: { opacity: 0.6 } });
+    await expect(numberInput(page, 'layer-2', 'Opacity (%)')).toHaveValue('60');
+  });
+
+  test('takes an opacity with Enter: the scene has a fraction, the field shows the number, and the map is drawn blended with what is under it', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1');
+    await alone(page);
+    const solid = await centre(page);
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('50');
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.5);
+    await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveValue('50');
+    const background = await mapColour(page);
+    const half = solid.map((channel, i) => Math.round((channel + (background[i] ?? 0)) / 2));
+    await expect.poll(async () => distance(await centre(page), half)).toBeLessThanOrEqual(3);
+    // A tenth is drawn nearer the background than a half.
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('10');
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+    await expect
+      .poll(async () => distance(await centre(page), background))
+      .toBeLessThan(distance(half, background));
+  });
+
+  test('takes a number when the field is left, with its unit if it is typed, and keeps decimals to the hundredth of a percent', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1');
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('25 %');
+    await legend(page).locator('.top span').first().click();
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.25);
+    await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveValue('25');
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('33.333');
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.3333);
+    await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveValue('33.33');
+    // Typed as it is shown, it is the same style: nothing is said.
+    const changes = await countChanges(page);
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('33.33');
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+    expect(await changes()).toBe(0);
+  });
+
+  test('says the range in words for text that is not an opacity, keeps the style and the text, and puts the number back with Escape; a number outside the range is not made the nearest one', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1');
+    for (const text of ['half', '150', '-5']) {
+      await numberInput(page, 'layer-1', 'Opacity (%)').fill(text);
+      await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+      await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error'), text).toHaveText(
+        'Use a number from 0 to 100.',
+      );
+      await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+      await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveValue(text);
+      expect(await numberOfStyle(page, 'layer-1', 'opacity')).toBe(1);
+    }
+    // Typing again takes the message away (it is about the text that was there).
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('15');
+    await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error')).toHaveCount(0);
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('-5');
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Enter');
+    await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error')).toBeVisible();
+    await numberInput(page, 'layer-1', 'Opacity (%)').press('Escape');
+    await expect(numberInput(page, 'layer-1', 'Opacity (%)')).toHaveValue('100');
+    await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error')).toHaveCount(0);
+    // Leaving the field with a text that is not a number says so too.
+    await numberInput(page, 'layer-1', 'Opacity (%)').fill('lots');
+    await legend(page).locator('.top span').first().click();
+    await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error')).toBeVisible();
+    expect(await numberOfStyle(page, 'layer-1', 'opacity')).toBe(1);
+  });
+
+  test('steps the number with the up and down arrows, by 1 and by 10 with Shift, taking it at once, and stops at the ends', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1');
+    const input = numberInput(page, 'layer-1', 'Opacity (%)');
+    await input.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(input).toHaveValue('99');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.99);
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(input).toHaveValue('89');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.89);
+    await page.keyboard.press('ArrowUp');
+    await expect(input).toHaveValue('90');
+    await page.keyboard.press('Shift+ArrowUp');
+    await expect(input).toHaveValue('100');
+    const changes = await countChanges(page);
+    await page.keyboard.press('ArrowUp');
+    await expect(input).toHaveValue('100');
+    expect(await changes()).toBe(0);
+    // A step goes from what is typed, and from what the layer has if that is not a number.
+    await input.fill('40');
+    await page.keyboard.press('ArrowUp');
+    await expect(input).toHaveValue('41');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.41);
+    await input.fill('lots');
+    await page.keyboard.press('ArrowDown');
+    await expect(input).toHaveValue('40');
+    await expect(numberField(page, 'layer-1', 'Opacity (%)').locator('.error')).toHaveCount(0);
+    await input.fill('0');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0);
+    await page.keyboard.press('ArrowDown');
+    await expect(input).toHaveValue('0');
+  });
+
+  test('has an error appear in room that was kept: the rows under the editor stay where they are', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadLegendScene(page);
+    await layerRow(page, 'layer-2').locator('.open').click();
+    await expect(numberField(page, 'layer-2', 'Opacity (%)')).toBeVisible();
+    // Typing scrolls the panel to the field, so the row is measured from the field (the scroll is not in it).
+    await numberInput(page, 'layer-2', 'Opacity (%)').fill('nope');
+    const from = async (): Promise<number> =>
+      ((await layerRow(page, 'layer-1').boundingBox())?.y ?? 0) -
+      ((await numberField(page, 'layer-2', 'Opacity (%)').boundingBox())?.y ?? 0);
+    const under = await from();
+    await numberInput(page, 'layer-2', 'Opacity (%)').press('Enter');
+    await expect(numberField(page, 'layer-2', 'Opacity (%)').locator('.error')).toBeVisible();
+    expect(await from()).toBe(under);
+  });
+
+  test('has the point size on a layer of points, 2 to 24: the scene has it, the map is drawn with bigger markers, and the layer keeps its opacity', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, 'points.csv', 'points.prj');
+    await showLegend(page);
+    await layerRow(page, 'layer-1').locator('.open').click();
+    await expect(editor(page, 'layer-1')).toBeVisible();
+    expect(
+      await editor(page, 'layer-1')
+        .locator('k-input')
+        .evaluateAll((all) => all.map((one) => one.getAttribute('label'))),
+    ).toEqual(['Hex code', 'Opacity (%)', 'Point size (px)']);
+    await expect(numberInput(page, 'layer-1', 'Point size (px)')).toHaveValue('6');
+    await numberInput(page, 'layer-1', 'Point size (px)').fill('2');
+    await numberInput(page, 'layer-1', 'Point size (px)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'pointSize')).toBe(2);
+    let small = 0;
+    await expect
+      .poll(async () => {
+        small = await painted(page);
+        return small;
+      })
+      .toBeGreaterThan(0);
+    await numberInput(page, 'layer-1', 'Point size (px)').fill('12');
+    await numberInput(page, 'layer-1', 'Point size (px)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'pointSize')).toBe(12);
+    await expect.poll(() => painted(page)).toBeGreaterThan(small * 4);
+    // Nothing else of the style was touched.
+    expect(await numberOfStyle(page, 'layer-1', 'opacity')).toBe(1);
+    // Outside 2 to 24 is said, and not made 2 or 24.
+    await numberInput(page, 'layer-1', 'Point size (px)').fill('30');
+    await numberInput(page, 'layer-1', 'Point size (px)').press('Enter');
+    await expect(numberField(page, 'layer-1', 'Point size (px)').locator('.error')).toHaveText(
+      'Use a number from 2 to 24.',
+    );
+    expect(await numberOfStyle(page, 'layer-1', 'pointSize')).toBe(12);
+  });
+
+  test('has the line width on a layer of lines, 1 to 8, and no point size: the scene has it and the map is drawn with wider lines', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, 'lines.csv', projectionFor('lines.prj'));
+    await showLegend(page);
+    await layerRow(page, 'layer-1').locator('.open').click();
+    await expect(editor(page, 'layer-1')).toBeVisible();
+    expect(
+      await editor(page, 'layer-1')
+        .locator('k-input')
+        .evaluateAll((all) => all.map((one) => one.getAttribute('label'))),
+    ).toEqual(['Hex code', 'Opacity (%)', 'Line width (px)']);
+    await expect(numberInput(page, 'layer-1', 'Line width (px)')).toHaveValue('2');
+    await numberInput(page, 'layer-1', 'Line width (px)').fill('1');
+    await numberInput(page, 'layer-1', 'Line width (px)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'lineWidth')).toBe(1);
+    let thin = 0;
+    await expect
+      .poll(async () => {
+        thin = await painted(page);
+        return thin;
+      })
+      .toBeGreaterThan(0);
+    await numberInput(page, 'layer-1', 'Line width (px)').fill('8');
+    await numberInput(page, 'layer-1', 'Line width (px)').press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'lineWidth')).toBe(8);
+    await expect.poll(() => painted(page)).toBeGreaterThan(thin * 3);
+    await numberInput(page, 'layer-1', 'Line width (px)').fill('9');
+    await numberInput(page, 'layer-1', 'Line width (px)').press('Enter');
+    await expect(numberField(page, 'layer-1', 'Line width (px)').locator('.error')).toHaveText(
+      'Use a number from 1 to 8.',
+    );
   });
 });
