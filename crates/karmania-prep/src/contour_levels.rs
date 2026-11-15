@@ -200,6 +200,43 @@ impl Levels {
     }
 }
 
+/// The default interval for data from `low` to `high` (brief 11.5): a nice number (1, 2, 2.5 or 5 times a power of ten) that gives 10 to
+/// 20 levels whatever the base, the largest that gives at least 10. `None` for a range that is not one that has a span: a number that is
+/// not finite, or the two ends the same.
+///
+/// A set of `low..high` and an interval `d` has between `floor(span / d)` and one more levels. The largest nice number at or under a
+/// tenth of the span gives at least 10; the one above it is a tenth of the span or more, and the nice numbers are never more than twice
+/// each other, so the one chosen is more than a twentieth of the span and the levels are fewer than 21, 20 at most.
+#[must_use]
+pub fn default_interval(low: f64, high: f64) -> Option<f64> {
+    let span = high - low;
+    if !(low.is_finite() && high.is_finite() && span.is_finite() && span > 0.0) {
+        return None;
+    }
+    let target = span / 10.0;
+    #[allow(clippy::cast_possible_truncation)]
+    let exponent = target.log10().floor() as i32;
+    // The power of ten of the target and the one below it, in case the target is just under a power (the logarithm is not exact).
+    (exponent.saturating_sub(1)..=exponent.saturating_add(1))
+        .rev()
+        .flat_map(|power| {
+            [50, 25, 20, 10]
+                .into_iter()
+                .map(move |tenths| nice(f64::from(tenths) / 10.0, power))
+        })
+        .find(|&interval| interval.is_finite() && interval > 0.0 && interval <= target)
+}
+
+/// `mantissa` times ten to the `power`, the nearest float to that number (a division by an exact power of ten when the power is
+/// negative, so that 2.5 times ten to the minus three is 0.0025 and not a float that is a hair above it).
+fn nice(mantissa: f64, power: i32) -> f64 {
+    if power >= 0 {
+        mantissa * 10f64.powi(power)
+    } else {
+        mantissa / 10f64.powi(power.saturating_neg())
+    }
+}
+
 /// A whole number of intervals as an `i64`; the caller has kept it within `MAX_REACH`.
 fn whole(value: f64) -> i64 {
     #[allow(clippy::cast_possible_truncation)]
@@ -378,5 +415,67 @@ mod tests {
             (0..11).map(f64::from).collect::<Vec<_>>()
         );
         assert_eq!(crossed(f64::NAN, 5.0), Vec::<f64>::new());
+    }
+
+    #[test]
+    fn the_default_interval_is_a_nice_number_that_gives_ten_to_twenty_levels_at_any_base() {
+        let nice_mantissas = [1.0, 2.0, 2.5, 5.0];
+        let mut cases = 0;
+        let mut span = 1.0e-9;
+        while span < 1.0e12 {
+            for offset in [0.0, 0.3, -0.7, 12_345.678, -987.65, 1.0 / 3.0] {
+                let low = offset * span;
+                let high = low + span;
+                let interval = default_interval(low, high).unwrap();
+                // A nice number: 1, 2, 2.5 or 5 times a power of ten (to the digits of a float).
+                let power = interval.log10().floor();
+                let mantissa = interval / 10f64.powf(power);
+                assert!(
+                    nice_mantissas.iter().any(|m| (mantissa - m).abs() < 1e-9)
+                        || (mantissa - 10.0).abs() < 1e-9,
+                    "{interval} for {low}..{high} is not nice ({mantissa})"
+                );
+                for base in [0.0, interval / 3.0, -interval * 7.0] {
+                    let levels = Levels::for_range(low, high, base, interval, 5).unwrap();
+                    assert!(
+                        (10..=20).contains(&levels.len()),
+                        "{} levels of {interval} in {low}..{high} from {base}",
+                        levels.len()
+                    );
+                }
+                cases += 1;
+            }
+            span *= 1.13;
+        }
+        assert!(cases > 1_000);
+        // Some that are known: a hundred over 0 to 100 (the largest that gives ten), 2.5 for 25 to 50 worth, and clean decimals.
+        assert_eq!(default_interval(0.0, 100.0), Some(10.0));
+        assert_eq!(default_interval(0.0, 99.0), Some(5.0));
+        assert_eq!(default_interval(100.0, 350.0), Some(25.0));
+        assert_eq!(default_interval(0.0, 0.025), Some(0.0025));
+        assert_eq!(default_interval(-3.2, 4.0), Some(0.5));
+        assert_eq!(default_interval(0.0, 1.0), Some(0.1));
+    }
+
+    #[test]
+    fn there_is_no_default_interval_without_a_span() {
+        assert_eq!(default_interval(5.0, 5.0), None);
+        assert_eq!(default_interval(5.0, 1.0), None);
+        assert_eq!(default_interval(f64::NAN, 1.0), None);
+        assert_eq!(default_interval(0.0, f64::INFINITY), None);
+        assert_eq!(default_interval(f64::MIN, f64::MAX), None);
+        // A span of a hair: still a nice number, and no more than a thousand levels.
+        assert!(default_interval(1.0, 1.0 + f64::EPSILON).is_some_and(|d| d > 0.0));
+    }
+
+    #[test]
+    fn a_nice_number_is_the_float_nearest_to_its_decimal_so_its_name_is_clean() {
+        // 2.5 times a tenth to the sixth is 2.4999999999999998e-6 as a product, and 2.5e-6 is what a person reads.
+        for mantissa in [1.0, 2.0, 2.5, 5.0, 10.0] {
+            for power in -22..=22 {
+                let written: f64 = format!("{mantissa}e{power}").parse().unwrap();
+                assert_eq!(nice(mantissa, power), written, "{mantissa}e{power}");
+            }
+        }
     }
 }

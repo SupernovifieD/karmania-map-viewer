@@ -5,15 +5,19 @@
 //! column, or the elevation of its plane. A cell with no value, or with no height, breaks the lines that would pass it. A mesh is contoured
 //! by the heights of its vertices, in its own coordinates; the lines are at their level exactly.
 
+use karmania_core::text::format_count;
 use karmania_core::{
-    Column, ColumnData, ColumnType, CrsRef, Dataset, DatasetId, Findings, Geometry, GridZ, Kind,
-    Lines, Positions, Table, Value,
+    Column, ColumnData, ColumnType, CrsRef, Dataset, DatasetId, Finding, FindingCode, Findings,
+    Geometry, GridZ, Kind, Lines, Mesh, Positions, Table, Value,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::contour_grid::{Contour, Field, Vertex, contour_field};
-use crate::contour_levels::{Levels, LevelsError};
+use crate::contour_levels::{Levels, LevelsError, MAX_LEVELS, default_interval};
 use crate::contour_mesh::{Surface, contour_surface};
+
+/// Every this many lines is an index line unless the settings say otherwise.
+pub const DEFAULT_INDEX_EVERY: u32 = 5;
 
 /// The settings of a set of contours. In JSON: `{ "column": .., "interval": .., "base": .., "indexEvery": .. }`; `column` is only for grids and
 /// is left out when it is not given (a grid then uses its first column of numbers).
@@ -55,6 +59,82 @@ pub enum ContourError {
     Levels(LevelsError),
     /// There is no line to draw: no level is crossed by the values.
     NoLines,
+}
+
+impl ContourError {
+    /// The finding that says why no contours were made, in words for a person (documented in `docs/validation-codes.md`).
+    #[must_use]
+    pub fn finding(&self) -> Finding {
+        let (code, message, hint) = match self {
+            Self::Kind(kind) => (
+                FindingCode::ContoursKindUnsupported,
+                format!(
+                    "Contour lines can only be made from a grid or a mesh, and this dataset is made of {}.",
+                    match kind {
+                        Kind::Points => "points",
+                        Kind::Lines => "lines",
+                        Kind::Polygons => "polygons",
+                        Kind::Blocks => "blocks",
+                        Kind::Grid => "a grid",
+                        Kind::Mesh => "a mesh",
+                    }
+                ),
+                "Make contour lines from a grid or a mesh.",
+            ),
+            Self::ColumnMissing(name) => (
+                FindingCode::ContoursColumnMissing,
+                format!("The dataset has no column named {name}, so contour lines cannot be made from it."),
+                "Make contour lines from a column the dataset has.",
+            ),
+            Self::ColumnNotNumeric { name, column_type } => (
+                FindingCode::ContoursColumnNotNumeric,
+                format!(
+                    "The column {name} is {}, not numbers, so contour lines cannot be made from it.",
+                    match column_type {
+                        ColumnType::Utf8 => "text",
+                        ColumnType::Bool => "true or false",
+                        _ => "categories",
+                    }
+                ),
+                "Make contour lines from a column of numbers.",
+            ),
+            Self::NoNumericColumn => (
+                FindingCode::ContoursColumnNoNumbers,
+                "The dataset has no column of numbers to make contour lines from.".to_string(),
+                "Add a column of numbers, such as heights, and make contour lines from it.",
+            ),
+            Self::NoValues(name) => (
+                FindingCode::ContoursColumnNoValues,
+                format!("The column {name} has no value that contour lines can be made from: every entry is empty or not a finite number."),
+                "Make contour lines from another column.",
+            ),
+            Self::NoHeights => (
+                FindingCode::ContoursHeightsNone,
+                "The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.".to_string(),
+                "Make contour lines from a mesh whose points have heights, or from a grid.",
+            ),
+            Self::Levels(LevelsError::Invalid) => (
+                FindingCode::ContoursIntervalInvalid,
+                "The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.".to_string(),
+                "Give an interval above 0, and an index line at least every line.",
+            ),
+            Self::Levels(LevelsError::TooMany { count }) => (
+                FindingCode::ContoursLevelsTooMany,
+                format!(
+                    "These settings make about {} contour lines, and the most is {}.",
+                    format_count(*count),
+                    format_count(MAX_LEVELS as u64)
+                ),
+                "Use a larger interval.",
+            ),
+            Self::Levels(LevelsError::NoRange) | Self::NoLines => (
+                FindingCode::ContoursLevelsNone,
+                "No contour line was made, because the values never cross a level of these settings.".to_string(),
+                "Try a smaller interval, or another base.",
+            ),
+        };
+        Finding::new(code, message).with_hint(hint)
+    }
 }
 
 /// Contour lines: the vertices of every line and where each starts, with the level of each and whether it is an index line.
@@ -150,6 +230,89 @@ fn numbers_of(column: &Column, cells: usize) -> Vec<f64> {
         .collect()
 }
 
+/// What a grid is contoured from: the values of one column for the cells of its first layer, and the heights of the cells.
+struct GridValues {
+    across: usize,
+    up: usize,
+    /// The name of the column of the values.
+    column: String,
+    /// The value of each cell, `NaN` for a cell with none (no value, or no height).
+    values: Vec<f64>,
+    /// The height of each cell if the grid has an elevation column.
+    heights: Option<Vec<f64>>,
+    /// The elevation of a grid that has no elevation column: 0 if it has none that is a number.
+    plane: f64,
+}
+
+impl GridValues {
+    fn of(dataset: &Dataset, column: Option<&str>) -> Result<Self, ContourError> {
+        let Geometry::Grid(grid) = &dataset.geometry else {
+            return Err(ContourError::Kind(dataset.kind()));
+        };
+        let [nx, ny, _] = grid.lattice.dims;
+        let (across, up) = (
+            usize::try_from(nx).unwrap_or(usize::MAX),
+            usize::try_from(ny).unwrap_or(usize::MAX),
+        );
+        let cells = across.checked_mul(up).ok_or(ContourError::NoLines)?;
+        let column = column_for(dataset, column)?;
+        let mut values = numbers_of(column, cells);
+        // The heights: those of the elevation column, where a cell with none is a cell with no value, or the elevation of the plane.
+        let heights = match &grid.z {
+            GridZ::FromColumn { name } => dataset
+                .attributes
+                .column(name)
+                .map(|elevation| numbers_of(elevation, cells)),
+            GridZ::Flat { .. } => None,
+        };
+        if let Some(heights) = &heights {
+            for (value, height) in values.iter_mut().zip(heights) {
+                if !height.is_finite() {
+                    *value = f64::NAN;
+                }
+            }
+        }
+        let plane = match &grid.z {
+            GridZ::Flat { elevation } if elevation.is_finite() => *elevation,
+            _ => 0.0,
+        };
+        Ok(Self {
+            across,
+            up,
+            column: column.name().to_string(),
+            values,
+            heights,
+            plane,
+        })
+    }
+
+    fn field(&self) -> Result<Field<'_>, ContourError> {
+        let field = Field::new(self.across, self.up, &self.values).ok_or(ContourError::NoLines)?;
+        match &self.heights {
+            Some(heights) => field.with_heights(heights).ok_or(ContourError::NoLines),
+            None => Ok(field),
+        }
+    }
+
+    /// The lowest and the highest value of the cells that have one.
+    fn range(&self, field: &Field<'_>) -> Result<(f64, f64), ContourError> {
+        field
+            .range()
+            .ok_or_else(|| ContourError::NoValues(self.column.clone()))
+    }
+}
+
+/// The surface of a mesh and the lowest and the highest height of its triangles.
+fn surface_of(mesh: &Mesh) -> Result<(Surface<'_>, f64, f64), ContourError> {
+    if !mesh.positions.has_z() {
+        return Err(ContourError::NoHeights);
+    }
+    let surface =
+        Surface::new(mesh.positions.as_slice(), &mesh.indices).ok_or(ContourError::NoLines)?;
+    let (low, high) = surface.range().ok_or(ContourError::NoHeights)?;
+    Ok((surface, low, high))
+}
+
 /// The contour lines of a grid by the values of a column.
 ///
 /// # Errors
@@ -165,56 +328,25 @@ pub fn contour_grid(
         return Err(ContourError::Kind(dataset.kind()));
     };
     let lattice = &grid.lattice;
-    let [nx, ny, _] = lattice.dims;
-    let (across, up) = (
-        usize::try_from(nx).unwrap_or(usize::MAX),
-        usize::try_from(ny).unwrap_or(usize::MAX),
-    );
-    let cells = across.checked_mul(up).ok_or(ContourError::NoLines)?;
-    let column = column_for(dataset, params.column.as_deref())?;
-    let mut values = numbers_of(column, cells);
-    // The heights: those of the elevation column, where a cell with none is a cell with no value, or the elevation of the plane.
-    let heights = match &grid.z {
-        GridZ::FromColumn { name } => dataset
-            .attributes
-            .column(name)
-            .map(|elevation| numbers_of(elevation, cells)),
-        GridZ::Flat { .. } => None,
-    };
-    if let Some(heights) = &heights {
-        for (value, height) in values.iter_mut().zip(heights) {
-            if !height.is_finite() {
-                *value = f64::NAN;
-            }
-        }
-    }
-    let plane = match &grid.z {
-        GridZ::Flat { elevation } if elevation.is_finite() => *elevation,
-        _ => 0.0,
-    };
-    let field = Field::new(across, up, &values).ok_or(ContourError::NoLines)?;
-    let field = match &heights {
-        Some(heights) => field.with_heights(heights).ok_or(ContourError::NoLines)?,
-        None => field,
-    };
-    let (low, high) = field
-        .range()
-        .ok_or_else(|| ContourError::NoValues(column.name().to_string()))?;
+    let input = GridValues::of(dataset, params.column.as_deref())?;
+    let field = input.field()?;
+    let (low, high) = input.range(&field)?;
     let levels = Levels::for_range(low, high, params.base, params.interval, params.index_every)
         .map_err(ContourError::Levels)?;
     let contours = contour_field(&field, &levels);
     let [dx, dy, _] = lattice.spacing;
     // A vertex of the index space `(x, y)` is at `((x + 0.5) dx, (y + 0.5) dy)` in the lattice's own axes (the centre of cell `(i, j)` is
     // at `((i + 0.5) dx, (j + 0.5) dy)`), which the lattice puts in the world.
+    let (has_heights, plane) = (input.heights.is_some(), input.plane);
     let place = |vertex: &Vertex| {
         let world = lattice.local_to_world([(vertex.x + 0.5) * dx, (vertex.y + 0.5) * dy, 0.0]);
         [
             world[0],
             world[1],
-            if heights.is_some() { vertex.z } else { plane },
+            if has_heights { vertex.z } else { plane },
         ]
     };
-    lines_of(&contours, &levels, heights.is_some() || plane != 0.0, place)
+    lines_of(&contours, &levels, has_heights || plane != 0.0, place)
 }
 
 /// The contour lines of a mesh by the heights of its vertices: the settings' `column` is not used (a mesh has one height). The lines
@@ -231,17 +363,43 @@ pub fn contour_mesh(
     let Geometry::Mesh(mesh) = &dataset.geometry else {
         return Err(ContourError::Kind(dataset.kind()));
     };
-    if !mesh.positions.has_z() {
-        return Err(ContourError::NoHeights);
-    }
-    let surface =
-        Surface::new(mesh.positions.as_slice(), &mesh.indices).ok_or(ContourError::NoLines)?;
-    let (low, high) = surface.range().ok_or(ContourError::NoHeights)?;
+    let (surface, low, high) = surface_of(mesh)?;
     let levels = Levels::for_range(low, high, params.base, params.interval, params.index_every)
         .map_err(ContourError::Levels)?;
     let contours = contour_surface(&surface, &levels);
     lines_of(&contours, &levels, true, |vertex| {
         [vertex.x, vertex.y, vertex.z]
+    })
+}
+
+/// The settings that a set of contours starts with (brief 11.5): the column (a grid's: the one named, or its first of numbers; a mesh
+/// has none), the default interval for the range of the values, a base of 0, and an index line every 5.
+///
+/// # Errors
+///
+/// [`ContourError::Kind`] for a dataset that is not a grid or a mesh, the errors of the column or the heights as in
+/// [`contour_grid`] and [`contour_mesh`], and [`ContourError::NoLines`] when the values are all one number (no interval makes a line).
+pub fn default_params(
+    dataset: &Dataset,
+    column: Option<&str>,
+) -> Result<ContourParams, ContourError> {
+    let (column, low, high) = match &dataset.geometry {
+        Geometry::Grid(_) => {
+            let input = GridValues::of(dataset, column)?;
+            let (low, high) = input.range(&input.field()?)?;
+            (Some(input.column), low, high)
+        }
+        Geometry::Mesh(mesh) => {
+            let (_, low, high) = surface_of(mesh)?;
+            (None, low, high)
+        }
+        other => return Err(ContourError::Kind(other.kind())),
+    };
+    Ok(ContourParams {
+        column,
+        interval: default_interval(low, high).ok_or(ContourError::NoLines)?,
+        base: 0.0,
+        index_every: DEFAULT_INDEX_EVERY,
     })
 }
 
@@ -857,6 +1015,194 @@ mod tests {
                 .all(|f| f.severity != karmania_core::Severity::Error),
             "{:?}",
             report.findings().collect::<Vec<_>>()
+        );
+    }
+
+    const DOCS: &str = include_str!("../../../docs/validation-codes.md");
+
+    /// A reason for no contours, the code of its finding, and the values of the names in the documented message.
+    type Case<'a> = (ContourError, &'a str, &'a [(&'a str, &'a str)]);
+
+    /// The documented message of a code, with its `{name}`s still in it.
+    fn documented(code: &str) -> String {
+        let section = DOCS
+            .split("\n## `")
+            .find(|section| section.starts_with(&format!("{code}`")))
+            .unwrap_or_else(|| panic!("{code} is not in docs/validation-codes.md"));
+        section
+            .lines()
+            .find_map(|line| line.strip_prefix("- Message: "))
+            .unwrap_or_else(|| panic!("{code} has no message"))
+            .to_string()
+    }
+
+    #[test]
+    fn every_reason_for_no_contours_is_a_finding_that_says_what_the_docs_say() {
+        let cases: [Case; 11] = [
+            (
+                ContourError::Kind(Kind::Points),
+                "contours.kind.unsupported",
+                &[("{shape}", "points")],
+            ),
+            (
+                ContourError::Kind(Kind::Blocks),
+                "contours.kind.unsupported",
+                &[("{shape}", "blocks")],
+            ),
+            (
+                ContourError::ColumnMissing("elevation".into()),
+                "contours.column.missing",
+                &[("{name}", "elevation")],
+            ),
+            (
+                ContourError::ColumnNotNumeric {
+                    name: "rock".into(),
+                    column_type: ColumnType::Utf8,
+                },
+                "contours.column.not_numeric",
+                &[("{name}", "rock"), ("{type}", "text")],
+            ),
+            (
+                ContourError::ColumnNotNumeric {
+                    name: "ok".into(),
+                    column_type: ColumnType::Bool,
+                },
+                "contours.column.not_numeric",
+                &[("{name}", "ok"), ("{type}", "true or false")],
+            ),
+            (
+                ContourError::NoNumericColumn,
+                "contours.column.no_numbers",
+                &[],
+            ),
+            (
+                ContourError::NoValues("elevation".into()),
+                "contours.column.no_values",
+                &[("{name}", "elevation")],
+            ),
+            (ContourError::NoHeights, "contours.heights.none", &[]),
+            (
+                ContourError::Levels(LevelsError::Invalid),
+                "contours.interval.invalid",
+                &[],
+            ),
+            (
+                ContourError::Levels(LevelsError::TooMany { count: 12_500 }),
+                "contours.levels.too_many",
+                &[("{count}", "12,500"), ("{limit}", "1,000")],
+            ),
+            (ContourError::NoLines, "contours.levels.none", &[]),
+        ];
+        for (error, code, fills) in cases {
+            let finding = error.finding();
+            assert_eq!(finding.code.as_str(), code);
+            let mut template = documented(code);
+            for (name, value) in fills {
+                template = template.replace(name, value);
+            }
+            assert!(
+                !template.contains('{'),
+                "{code}: a name is not filled: {template}"
+            );
+            assert_eq!(finding.message, template, "{code}");
+            assert!(
+                finding
+                    .hint
+                    .as_deref()
+                    .is_some_and(|hint| hint.split_whitespace().count() >= 4),
+                "{code}"
+            );
+        }
+        // The two reasons that are one thing to a person say the same, and a range that cannot be one is not a matter of the interval.
+        assert_eq!(
+            ContourError::Levels(LevelsError::NoRange).finding(),
+            ContourError::NoLines.finding()
+        );
+        // The limit is an error and "no line" is not.
+        assert_eq!(
+            ContourError::Levels(LevelsError::TooMany { count: 2_000 })
+                .finding()
+                .severity,
+            karmania_core::Severity::Error
+        );
+        assert_eq!(
+            ContourError::NoLines.finding().severity,
+            karmania_core::Severity::Warning
+        );
+        // The finding of a real call: too many levels names how many.
+        let dataset = grid_with(
+            lattice(10, 6),
+            GridZ::Flat { elevation: 0.0 },
+            vec![floats("value", 10, 6, |i, _| i)],
+        );
+        let error = contour_grid(&dataset, &params(0.001, 0.0)).unwrap_err();
+        assert_eq!(
+            error.finding().message,
+            "These settings make about 9,000 contour lines, and the most is 1,000."
+        );
+    }
+
+    #[test]
+    fn the_settings_that_a_set_of_contours_starts_with_are_the_default_interval_a_base_of_0_and_an_index_every_5()
+     {
+        let grid = grid_with(
+            lattice(10, 6),
+            GridZ::Flat { elevation: 0.0 },
+            vec![
+                Column::without_nulls("rock", ColumnData::Utf8(vec![String::new(); 60])),
+                floats("value", 10, 6, |i, j| 10.0 * i + j),
+            ],
+        );
+        // The values go from 0 to 95: the largest nice interval that gives ten levels is 5.
+        let found = default_params(&grid, None).unwrap();
+        assert_eq!(
+            found,
+            ContourParams {
+                column: Some("value".into()),
+                interval: 5.0,
+                base: 0.0,
+                index_every: 5
+            }
+        );
+        assert_eq!(default_params(&grid, Some("value")).unwrap(), found);
+        // With the settings it gives, the contours are made, and have 10 to 20 levels.
+        let lines = contours_of(&grid, &found).unwrap();
+        assert!((10..=20).contains(&lines.levels.len()));
+        let mesh = mesh_with(6, 4, true, |i, _| 3.0 * i);
+        assert_eq!(
+            default_params(&mesh, Some("ignored")).unwrap(),
+            ContourParams {
+                column: None,
+                interval: 1.0,
+                base: 0.0,
+                index_every: 5
+            }
+        );
+        assert!(contours_of(&mesh, &default_params(&mesh, None).unwrap()).is_ok());
+        // What stops it: another shape, a column that cannot be used, a mesh with no heights, and values that are all one number.
+        let points = crate::testutil::points(Some(CrsRef::Epsg { code: 32640 }), &[(0.0, 0.0)]);
+        assert_eq!(
+            default_params(&points, None),
+            Err(ContourError::Kind(Kind::Points))
+        );
+        assert_eq!(
+            default_params(&grid, Some("rock")),
+            Err(ContourError::ColumnNotNumeric {
+                name: "rock".into(),
+                column_type: ColumnType::Utf8
+            })
+        );
+        assert_eq!(
+            default_params(&grid, Some("nope")),
+            Err(ContourError::ColumnMissing("nope".into()))
+        );
+        assert_eq!(
+            default_params(&mesh_with(6, 4, false, |_, _| 0.0), None),
+            Err(ContourError::NoHeights)
+        );
+        assert_eq!(
+            default_params(&mesh_with(6, 4, true, |_, _| 7.0), None),
+            Err(ContourError::NoLines)
         );
     }
 }
