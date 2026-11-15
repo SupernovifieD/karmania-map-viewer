@@ -9,7 +9,7 @@ import { importAndLoad } from './support/wizard.js';
 
 /**
  * The Contours part of the style editor of a layer (step 20.6, brief 10.3): for a grid or a mesh, **Show contours**, and once they are on the column of a grid, the
- * interval, the base and how often there is an index line, with the lines made in the worker and listed in the Data tab, and a layer of their own under the layer.
+ * interval, the base and how often there is an index line, with the lines made in the worker and listed in the Data tab, and a layer of their own above the layer.
  */
 
 const editor = (page: Page, id: string): Locator =>
@@ -115,11 +115,11 @@ test.describe('the contours of a layer in the style editor', () => {
       indexEvery: 5,
       visible: true,
     });
-    // The lines are made: in the engine's datasets, with a layer of their own directly under the layer in the legend, drawn.
+    // The lines are made: in the engine's datasets, with a layer of their own directly above the layer in the legend, drawn.
     await expect
       .poll(async () => (await held(page)).names)
       .toEqual(['Surface', 'Contours of Surface (every 1)']);
-    expect((await held(page)).layers).toEqual(['layer-1', 'layer-2*']);
+    expect((await held(page)).layers).toEqual(['layer-2*', 'layer-1']);
     await expectLayersDrawn(page, 2);
     await expect(layerRow(page, 'layer-2')).toBeVisible();
     await expect(layerRow(page, 'layer-2').locator('.name')).toHaveText(
@@ -154,7 +154,7 @@ test.describe('the contours of a layer in the style editor', () => {
       visible: true,
     });
     await expectLayersDrawn(page, 2);
-    expect((await held(page)).layers).toEqual(['layer-1', 'layer-2*']);
+    expect((await held(page)).layers).toEqual(['layer-2*', 'layer-1']);
   });
 
   test('say what is wrong with a number that is not usable, in words, and leave the contours as they are; Escape puts back the number they have', async ({
@@ -230,7 +230,7 @@ test.describe('the contours of a layer in the style editor', () => {
     await input(page, 'layer-1', 'Interval').fill('2');
     await input(page, 'layer-1', 'Interval').press('Enter');
     await expect(status(page, 'layer-1')).toHaveCount(0);
-    await expect.poll(async () => (await held(page)).layers).toEqual(['layer-1', 'layer-2*']);
+    await expect.poll(async () => (await held(page)).layers).toEqual(['layer-2*', 'layer-1']);
   });
 
   test('are not a part of the style of the layers that have no such lines: points, lines, and the layer of the contours of a layer; a mesh has them, without a column', async ({

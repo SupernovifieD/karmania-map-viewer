@@ -145,7 +145,7 @@ function world(kind: Summary['kind'] = 'grid', rejectOnAbort = true) {
 }
 
 describe('the contours of a layer', () => {
-  it('are made when the layer has them: the engine is asked with the settings, and the layer of the lines is made under the layer', async () => {
+  it('are made when the layer has them: the engine is asked with the settings, and the layer of the lines is made above the layer', async () => {
     const w = world();
     expect(w.pending).toHaveLength(0);
     w.contours();
@@ -163,7 +163,7 @@ describe('the contours of a layer', () => {
       derived: { kind: 'contours', sourceLayer: 'layer-1' },
     });
     const order = w.scene.getState().legend.map((node) => node.id);
-    expect(order).toEqual(['layer-1', 'layer-2']);
+    expect(order).toEqual(['layer-2', 'layer-1']);
     expect(w.adopted).toEqual([[1, lines.id]]);
     expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
     // Nothing more is asked while the settings are what the lines were made with, whatever else changes.

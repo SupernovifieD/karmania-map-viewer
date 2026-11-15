@@ -6,7 +6,7 @@ import { frozen, layerById, sampleScene } from './test-support/documents.js';
 import type { SceneDocument } from './types.js';
 import { validateScene } from './validate.js';
 
-/** Two layers, a grid and points, and the grid is in a group with a layer under it. */
+/** Two layers, a grid and points, and the grid is in a group with a layer above it. */
 function surveyed(): SceneDocument {
   const base = addLayers(emptyScene(), [
     { id: 1, name: 'Surface', kind: 'grid', elementCount: 12, columns: [] },
@@ -33,7 +33,7 @@ const order = (doc: SceneDocument): string[] =>
   doc.legend.flatMap((node) => (node.type === 'layer' ? [node.id] : [node.id, ...node.children]));
 
 describe('setContoursLayer', () => {
-  it('makes the layer of the lines directly under its source, in its group, with a style of its own', () => {
+  it('makes the layer of the lines directly above its source, in its group, with a style of its own', () => {
     const doc = surveyed();
     const next = setContoursLayer(doc, 'layer-1', 10, 'Contours of Surface (every 2.5)');
     expect(layerById(next, 'layer-4')).toEqual({
@@ -44,15 +44,15 @@ describe('setContoursLayer', () => {
       style: { colour: { mode: 'single', value: CONTOURS_COLOUR }, opacity: 1, lineWidth: 1 },
       derived: { kind: 'contours', sourceLayer: 'layer-1' },
     });
-    expect(order(next)).toEqual(['layer-3', 'group-1', 'layer-2', 'layer-1', 'layer-4']);
+    expect(order(next)).toEqual(['layer-3', 'group-1', 'layer-2', 'layer-4', 'layer-1']);
     expect(validateScene(next)).toEqual([]);
-    // The source and every other layer are as they were.
+    // The source and every other layer are as they were. (The lines are listed above their source, which is also drawn over it: lines under an opaque grid are not seen.)
     expect(layerById(next, 'layer-1')).toBe(layerById(doc, 'layer-1'));
   });
 
-  it('puts it right under its source at the top level too, and not at the end of the legend', () => {
+  it('puts it right above its source at the top level too, and not at the end of the legend', () => {
     const next = setContoursLayer(surveyed(), 'layer-3', 11);
-    expect(order(next)).toEqual(['layer-3', 'layer-4', 'group-1', 'layer-2', 'layer-1']);
+    expect(order(next)).toEqual(['layer-4', 'layer-3', 'group-1', 'layer-2', 'layer-1']);
     expect(layerById(next, 'layer-4').name).toBe('Contours of Faults');
   });
 

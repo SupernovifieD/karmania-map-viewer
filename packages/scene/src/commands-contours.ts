@@ -1,5 +1,5 @@
 /**
- * The layer of the contour lines of a layer (brief 10.3 and 11.6): a layer of its own, derived from its source, listed directly under it in the
+ * The layer of the contour lines of a layer (brief 10.3 and 11.6): a layer of its own, derived from its source, listed directly above it in the
  * legend, which takes the lines the engine made as its dataset. The engine makes the lines (a new dataset each time); this says which layer shows
  * them, so that the style a person gave the lines (their colour, opacity, width) stays when they are made again with other settings.
  */
@@ -17,27 +17,24 @@ function contoursOf(doc: SceneDocument, sourceLayer: string): Layer | undefined 
   );
 }
 
-/** The legend with `id` put directly after `after`, in whichever group `after` is in (or at the top level). */
-function placedAfter(legend: readonly LegendNode[], after: string, id: string): LegendNode[] {
+/** The legend with `id` put directly before `before`, in whichever group `before` is in (or at the top level): above it in the list, and so drawn over it. */
+function placedBefore(legend: readonly LegendNode[], before: string, id: string): LegendNode[] {
   return legend.flatMap((node): LegendNode[] => {
     if (node.type === 'layer') {
-      return node.id === after ? [node, { type: 'layer', id }] : [node];
+      return node.id === before ? [{ type: 'layer', id }, node] : [node];
     }
-    const at = node.children.indexOf(after);
+    const at = node.children.indexOf(before);
     return [
       at < 0
         ? node
-        : {
-            ...node,
-            children: [...node.children.slice(0, at + 1), id, ...node.children.slice(at + 1)],
-          },
+        : { ...node, children: [...node.children.slice(0, at), id, ...node.children.slice(at)] },
     ];
   });
 }
 
 /**
  * Makes the layer that shows the contour lines of `sourceLayer` show the dataset `datasetId` (the lines the engine made), or takes it away
- * (`null`). Without such a layer one is made, directly under its source in the legend (in its group, if it has one), visible if the contours
+ * (`null`). Without such a layer one is made, directly above its source in the legend (in its group, if it has one: the legend is the draw order, and lines drawn under an opaque grid or mesh are not seen), visible if the contours
  * of the source are, and in a style of its own: one brown colour, solid, one pixel wide. With one, it is given the dataset and the `name` and
  * keeps its place and its style, which are the person's. A source that is not a layer, or is itself made from another layer (contours are not made of contours),
  * a dataset that is not a whole number of 0 or more, and what is already so, are the same document.
@@ -82,6 +79,6 @@ export function setContoursLayer(
   return {
     ...doc,
     layers: { ...doc.layers, [id]: layer },
-    legend: placedAfter(doc.legend, sourceLayer, id),
+    legend: placedBefore(doc.legend, sourceLayer, id),
   };
 }

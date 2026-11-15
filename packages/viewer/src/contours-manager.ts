@@ -3,7 +3,7 @@
  *
  * A layer whose scene has `contours` (an interval, a base, an index line every so many lines, a column for a grid) has a set of contour lines: the engine
  * makes them (`contours`, in steps in the worker) as a dataset of lines that is listed under the layer's own, and the layer of those lines is made, directly
- * under its source in the legend, by the scene's `setContoursLayer`. **When the settings change the engine makes them again, which replaces the old lines
+ * above its source in the legend (which is also drawn over it), by the scene's `setContoursLayer`. **When the settings change the engine makes them again, which replaces the old lines
  * (and the new dataset has a new number, so the layer that shows them is given it and keeps its style); when the settings go, the lines and their layer go; when
  * the lines cannot be made (a column that is not numbers, more than 1,000 levels, no level that the values cross) the old ones are gone too, and the layer says
  * why.** A request that a newer one has made useless (the settings changed again, the contours were turned off) is aborted.

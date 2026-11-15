@@ -1,6 +1,6 @@
 /**
  * The contour lines of a layer end to end in a real browser (brief 10.3, 11.5): the scene says a layer has contours, the engine makes them in the worker, the
- * lines are listed under their layer in the Data tab, have a layer of their own under it in the legend, and are drawn, the index lines wider. The settings are
+ * lines are listed under their layer in the Data tab, have a layer of their own above it in the legend, and are drawn, the index lines wider. The settings are
  * given as commands here (the controls of the style editor have their own tests).
  */
 import { expect, test } from '@playwright/test';
@@ -13,6 +13,7 @@ import {
   layerStatuses,
   loadLattice,
   mapColour,
+  pause,
   pixels,
 } from './support/render.js';
 
@@ -129,7 +130,7 @@ async function widths(page: Page): Promise<number[]> {
 const linesDrawn = (page: Page) => expectLayersDrawn(page, 2);
 
 test.describe('the contours of a layer', () => {
-  test('are made when the scene says so: listed under the layer in the Data tab, a layer under it in the legend, and drawn', async ({
+  test('are made when the scene says so: listed under the layer in the Data tab, a layer above it in the legend, and drawn', async ({
     page,
   }) => {
     await start(page);
@@ -142,8 +143,8 @@ test.describe('the contours of a layer', () => {
       id: state.datasets[0]?.id,
       params: { column: 'value', interval: 1, base: 0, indexEvery: 5 },
     });
-    // The layer of the lines is directly under its source in the legend, in the colour of contours, and the viewer gave the lines no other layer.
-    expect(state.legend).toEqual(['layer-1', 'layer-2']);
+    // The layer of the lines is directly above its source in the legend, which is the draw order: over it, in the colour of contours, and the viewer gave the lines no other layer.
+    expect(state.legend).toEqual(['layer-2', 'layer-1']);
     expect(state.layers.map((l) => [l.id, l.name, l.derived, l.visible])).toEqual([
       ['layer-1', 'Bands', false, true],
       ['layer-2', 'Contours of Bands (every 1)', true, true],
@@ -154,6 +155,35 @@ test.describe('the contours of a layer', () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(1)).toHaveAttribute('data-derived', '');
     await expect(rows.nth(1).locator('.icon')).toHaveAttribute('name', 'mountain');
+  });
+
+  test('are drawn over their layer, which is opaque: the lines are seen on the grid and not under it', async ({
+    page,
+  }) => {
+    await start(page);
+    await dispatch(page, contours());
+    await linesDrawn(page);
+    const { width, height } = await page.locator('karmania-map-area canvas').evaluate((canvas) => ({
+      width: (canvas as HTMLCanvasElement).width,
+      height: (canvas as HTMLCanvasElement).height,
+    }));
+    const middleRow = (): Promise<number[]> => pixels(page, [0, Math.floor(height / 2), width, 1]);
+    // The middle row of the map with the layer of the lines hidden, and shown: the grid is visible and solid in both, and the lines make the difference.
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-2', visible: false });
+    await pause(page, 300);
+    const without = await middleRow();
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-2', visible: true });
+    await pause(page, 300);
+    const withLines = await middleRow();
+    let different = 0;
+    for (let x = 0; x < width; x += 1) {
+      const change = Math.max(
+        ...[0, 1, 2].map((i) => Math.abs((withLines[x * 4 + i] ?? 0) - (without[x * 4 + i] ?? 0))),
+      );
+      if (change > 30) different += 1;
+    }
+    // 20 lines cross the middle row; each changes a pixel or two.
+    expect(different).toBeGreaterThan(14);
   });
 
   test('draw the index lines as wide as lines of twice the layer’s width, and the others as the layer’s: every 5th line, from the base', async ({
