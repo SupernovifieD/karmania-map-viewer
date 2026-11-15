@@ -121,3 +121,62 @@ export function stepMove(
   }
   return { move: { id, to }, say: announceMove(model, id, to) };
 }
+
+/**
+ * What Alt with Right or Left does to a layer: Right takes a layer of the top into the group right above it (as the last of its layers, so that it stays
+ * where it is in the list), Left takes a layer out of its group to just under the group. A group is never in a group, a layer of the top with no group right
+ * above it has none to go into, and a layer that is not in a group has none to leave: each says so.
+ */
+export function nestMove(
+  model: LegendModel,
+  id: string,
+  direction: 'in' | 'out',
+): { readonly move?: Move; readonly say: string } {
+  const lists = listsOf(model);
+  const place = placeOf(model, id);
+  const name = lists.names.get(id) ?? id;
+  if (place === undefined) {
+    return { say: `${name} cannot be moved.` };
+  }
+  const isGroup = lists.groups.has(id);
+  if (direction === 'in') {
+    if (isGroup) {
+      return { say: `${name} is a group, and a group cannot be in a group` };
+    }
+    if (place.parent !== null) {
+      return { say: `${name} is in ${lists.names.get(place.parent) ?? 'a group'} already` };
+    }
+    const above = lists.top[place.index - 1];
+    if (above === undefined || !lists.groups.has(above)) {
+      return { say: `${name} has no group right above it to go into` };
+    }
+    const to: Place = { parent: above, index: listOf(lists, above).length };
+    return { move: { id, to }, say: announceMove(model, id, to) };
+  }
+  if (place.parent === null) {
+    return { say: `${name} is not in a group` };
+  }
+  const group = placeOf(model, place.parent);
+  if (group === undefined) {
+    return { say: `${name} cannot be moved.` };
+  }
+  const to: Place = { parent: null, index: group.index + 1 };
+  return { move: { id, to }, say: announceMove(model, id, to) };
+}
+
+/** What is said when a group has been deleted: its layers are in the legend where it was. */
+export function announceDelete(model: LegendModel, groupId: string): string {
+  const lists = listsOf(model);
+  const name = lists.names.get(groupId) ?? groupId;
+  const count = listOf(lists, groupId).length;
+  if (count === 0) {
+    return `Deleted group ${name}`;
+  }
+  return `Deleted group ${name}; its ${String(count)} ${count === 1 ? 'layer is' : 'layers are'} in the legend`;
+}
+
+/** The id of the group that is in `after` and was not in `before`: the one that was made. `undefined` if there is none. */
+export function newGroup(before: LegendModel, after: LegendModel): string | undefined {
+  const known = new Set(before.entries.map((entry) => entry.id));
+  return after.entries.find((entry) => entry.type === 'group' && !known.has(entry.id))?.id;
+}

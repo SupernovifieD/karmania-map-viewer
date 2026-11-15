@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   expansionFor,
   itemKey,
+  keyAction,
   moveFrom,
   stillThere,
   toggleCommand,
@@ -269,5 +270,89 @@ describe('expansionFor', () => {
     expect(expansionFor(row('layer', 'layer-2'), 'ArrowRight')).toBeUndefined();
     expect(expansionFor(row('group', 'group-1'), 'ArrowRight')).toBeUndefined();
     expect(expansionFor(row('layer', 'layer-1'), 'Enter')).toBeUndefined();
+  });
+});
+
+describe('keyAction', () => {
+  /** `classified()` with a second group that is empty and a third that is folded (with `layer-5`, a layer with classes). */
+  function withGroups() {
+    const store = createSceneStore();
+    store.dispatch({ type: 'addLayers', datasets: [gridDataset(0), gridDataset(1)] });
+    store.dispatch({ type: 'addLayers', datasets: [dataset(2), gridDataset(3), gridDataset(4)] });
+    store.dispatch({ type: 'createGroup', name: 'Samples' });
+    store.dispatch({ type: 'createGroup', name: 'Empty' });
+    store.dispatch({ type: 'createGroup', name: 'Folded' });
+    store.dispatch({ type: 'moveNode', id: 'layer-4', to: { parent: 'group-1', index: 0 } });
+    store.dispatch({ type: 'moveNode', id: 'layer-5', to: { parent: 'group-3', index: 0 } });
+    store.dispatch({ type: 'setGroupCollapsed', groupId: 'group-3', collapsed: true });
+    return legendModel(store.getState(), {
+      breaks: { 'layer-1': breaks, 'layer-4': breaks, 'layer-5': breaks },
+    });
+  }
+  const model = withGroups();
+  const row = (items: ReturnType<typeof treeItems>, key: string) => {
+    const found = items.find((item) => itemKey(item) === key);
+    if (found === undefined) {
+      throw new Error(`There is no row ${key}.`);
+    }
+    return found;
+  };
+
+  it('folds a group that is open with Left and goes to its first layer with Right, and unfolds one that is folded with Right', () => {
+    const items = treeItems(model);
+    expect(keyAction(items, row(items, 'group:group-1'), 'ArrowLeft')).toEqual({
+      kind: 'fold',
+      groupId: 'group-1',
+      collapsed: true,
+    });
+    expect(keyAction(items, row(items, 'group:group-1'), 'ArrowRight')).toEqual({
+      kind: 'focus',
+      key: 'layer:layer-4',
+    });
+    expect(keyAction(items, row(items, 'group:group-3'), 'ArrowRight')).toEqual({
+      kind: 'fold',
+      groupId: 'group-3',
+      collapsed: false,
+    });
+  });
+
+  it('does nothing with Left on a group that is folded, or with Right on one that has no layer under it', () => {
+    const items = treeItems(model);
+    expect(keyAction(items, row(items, 'group:group-3'), 'ArrowLeft')).toBeUndefined();
+    expect(keyAction(items, row(items, 'group:group-2'), 'ArrowRight')).toBeUndefined();
+  });
+
+  it('opens a layer with Right and closes one that is open with Left, and with Left goes from a layer that is closed to its group', () => {
+    const closed = treeItems(model);
+    expect(keyAction(closed, row(closed, 'layer:layer-4'), 'ArrowRight')).toEqual({
+      kind: 'open',
+      id: 'layer-4',
+      open: true,
+    });
+    expect(keyAction(closed, row(closed, 'layer:layer-4'), 'ArrowLeft')).toEqual({
+      kind: 'focus',
+      key: 'group:group-1',
+    });
+    const open = treeItems(model, new Set(['layer-4']));
+    expect(keyAction(open, row(open, 'layer:layer-4'), 'ArrowLeft')).toEqual({
+      kind: 'open',
+      id: 'layer-4',
+      open: false,
+    });
+  });
+
+  it('does nothing on a layer of the top that is closed or has nothing to show, and for any other key', () => {
+    const items = treeItems(model);
+    expect(keyAction(items, row(items, 'layer:layer-1'), 'ArrowLeft')).toBeUndefined();
+    expect(keyAction(items, row(items, 'layer:layer-3'), 'ArrowRight')).toBeUndefined();
+    expect(keyAction(items, row(items, 'layer:layer-3'), 'ArrowLeft')).toBeUndefined();
+    expect(keyAction(items, row(items, 'group:group-1'), 'Enter')).toBeUndefined();
+    expect(keyAction(items, row(items, 'layer:layer-4'), 'ArrowDown')).toBeUndefined();
+  });
+
+  it('says in treeItems which group a layer is in', () => {
+    const items = treeItems(model);
+    expect(row(items, 'layer:layer-4')).toMatchObject({ parent: 'group-1' });
+    expect(row(items, 'layer:layer-1')).toMatchObject({ parent: null });
   });
 });
