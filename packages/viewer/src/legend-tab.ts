@@ -12,12 +12,19 @@ import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { LegendDrag } from './legend-drag.js';
 import type { DropRow } from './legend-drop.js';
-import { announceMove, newGroup, placeOf, stepMove } from './legend-order.js';
+import {
+  announceDelete,
+  announceMove,
+  nestMove,
+  newGroup,
+  placeOf,
+  stepMove,
+} from './legend-order.js';
 import type { Move } from './legend-order.js';
 import { rampGradient, safeColour } from './legend-swatch.js';
 import {
-  expansionFor,
   itemKey,
+  keyAction,
   moveFrom,
   stillThere,
   toggleCommand,
@@ -234,9 +241,43 @@ export class KarmaniaLegendTab extends LitElement {
           var(--k-icon-size-sm) var(--k-control-height-compact);
       }
 
-      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), name, count. */
+      /* A group: chevron (where a layer has its handle), switch (where a layer has its switch), name, count, and the room of the button that deletes it (28, where a layer has its button). */
       .group {
-        grid-template-columns: var(--k-icon-size-sm) var(--k-space-24) minmax(0, 1fr) auto;
+        grid-template-columns:
+          var(--k-icon-size-sm) var(--k-space-24) minmax(0, 1fr) auto
+          var(--k-control-height-compact);
+      }
+
+      /* The chevron folds and unfolds the group: a room as high as the row, for the pointer. */
+      .fold {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        height: 100%;
+        justify-content: center;
+      }
+
+      /* The button that deletes a group: seen when the row is pointed at or has the keyboard, in a room that is kept; for the pointer (the Delete key does it from the row). */
+      .remove {
+        align-items: center;
+        color: var(--k-text-muted);
+        cursor: pointer;
+        display: flex;
+        height: 100%;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity var(--k-motion-duration) var(--k-motion-easing);
+      }
+
+      .row:hover .remove,
+      .row:focus-within .remove {
+        opacity: 1;
+      }
+
+      @media (hover: none) {
+        .remove {
+          opacity: 1;
+        }
       }
 
       /* The layers of a group are 24 in. */
@@ -495,6 +536,42 @@ export class KarmaniaLegendTab extends LitElement {
     }
   }
 
+  /** Moves a layer into the group right above it, or out of its group, and says where it went or why it did not. */
+  private nestRow(item: TreeItem, direction: 'in' | 'out'): void {
+    if (this.model === undefined) {
+      return;
+    }
+    const step = nestMove(this.model, item.id, direction);
+    this.say(step.say);
+    if (step.move !== undefined) {
+      this.refocus = itemKey(item);
+      this.ask({ type: 'moveNode', id: step.move.id, to: step.move.to });
+    }
+  }
+
+  /** Deletes a group (its layers stay, where it was), says so, and puts the keyboard on its first layer, or on a row near it. */
+  private deleteGroup(id: string): void {
+    const model = this.model;
+    if (model === undefined) {
+      return;
+    }
+    this.say(announceDelete(model, id));
+    const rows = treeItems(model, this.open);
+    const at = rows.findIndex((row) => row.kind === 'group' && row.id === id);
+    const group = model.entries.find((entry) => entry.type === 'group' && entry.id === id);
+    const first = group?.type === 'group' ? group.layers[0]?.id : undefined;
+    // The keyboard goes to the group's first layer, which is in the legend where the group was; a group with none has no rows under it, so to the row after it,
+    // or the one before it.
+    const neighbour = rows[at + 1] ?? rows[at - 1];
+    this.refocus =
+      first !== undefined
+        ? `layer:${first}`
+        : neighbour === undefined
+          ? undefined
+          : itemKey(neighbour);
+    this.ask({ type: 'deleteGroup', groupId: id });
+  }
+
   /** `New group`: a group is made at the top, and the tab asks to rename it as soon as it is there. */
   private makeGroup(): void {
     this.creating = this.model;
@@ -581,6 +658,9 @@ export class KarmaniaLegendTab extends LitElement {
       if (!event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
         event.preventDefault();
         this.moveRow(item, event.key === 'ArrowUp' ? 'up' : 'down');
+      } else if (!event.shiftKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+        event.preventDefault();
+        this.nestRow(item, event.key === 'ArrowRight' ? 'in' : 'out');
       }
       return;
     }
@@ -602,11 +682,24 @@ export class KarmaniaLegendTab extends LitElement {
     } else if (event.key === ' ') {
       event.preventDefault();
       this.ask(toggleCommand(item));
-    } else {
-      const expanded = expansionFor(item, event.key);
-      if (expanded !== undefined) {
+    } else if ((event.key === 'Delete' || event.key === 'Backspace') && item.kind === 'group') {
+      event.preventDefault();
+      this.deleteGroup(item.id);
+    } else if (this.model !== undefined) {
+      const action = keyAction(treeItems(this.model, this.open), item, event.key);
+      if (action?.kind === 'open') {
         event.preventDefault();
-        this.open = withExpansion(this.open, item.id, expanded);
+        this.open = withExpansion(this.open, action.id, action.open);
+      } else if (action?.kind === 'fold') {
+        event.preventDefault();
+        this.ask({
+          type: 'setGroupCollapsed',
+          groupId: action.groupId,
+          collapsed: action.collapsed,
+        });
+      } else if (action?.kind === 'focus') {
+        event.preventDefault();
+        this.focusRow(action.key);
       }
     }
   }
@@ -757,7 +850,7 @@ export class KarmaniaLegendTab extends LitElement {
           ?data-dragging=${this.drag.dragging?.id === group.id}
           @pointerdown=${(event: PointerEvent) => {
             // A group is dragged by its row (it has no handle), but not by its chevron or its switch, which are for a press.
-            if (!(event.target as Element).closest('.switch, .chevron')) {
+            if (!(event.target as Element).closest('.switch, .fold, .remove')) {
               this.press(event, item);
             }
           }}
@@ -768,7 +861,19 @@ export class KarmaniaLegendTab extends LitElement {
             this.onKeyDown(event, item);
           }}
         >
-          <k-icon class="chevron" name="chevron-down" size="16" aria-hidden="true"></k-icon>
+          <span
+            class="fold"
+            aria-hidden="true"
+            @click=${() => {
+              this.focusRow(key);
+              this.ask({
+                type: 'setGroupCollapsed',
+                groupId: group.id,
+                collapsed: !group.collapsed,
+              });
+            }}
+            ><k-icon class="chevron" name="chevron-down" size="16"></k-icon
+          ></span>
           ${this.switch(item, BOX[group.visibility])}
           ${
             this.renaming === group.id
@@ -805,6 +910,15 @@ export class KarmaniaLegendTab extends LitElement {
                 >`
           }
           <span class="count">${String(group.layers.length)}</span>
+          <span
+            class="remove"
+            aria-hidden="true"
+            title="Delete group"
+            @click=${() => {
+              this.deleteGroup(group.id);
+            }}
+            ><k-icon name="trash-2" size="16"></k-icon
+          ></span>
         </div>
         ${
           group.collapsed
