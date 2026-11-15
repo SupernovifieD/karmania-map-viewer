@@ -6,12 +6,14 @@ import {
   MOST_CLASSES,
   SINGLE,
   SWATCHES,
+  classCountChoice,
   classCountOptions,
   classesWith,
   colourByOptions,
   colourByValue,
   colourFor,
   colourFromText,
+  methodChoice,
   methodOptions,
   rampOptions,
   rampPreview,
@@ -190,6 +192,43 @@ describe('methodOptions', () => {
     for (const column of [COLUMNS[1], { name: 'Flag', type: 'bool' as const }, undefined]) {
       const options = methodOptions(column);
       expect(options.map((option) => option.disabled)).toEqual([true, true, true, false]);
+    }
+  });
+});
+
+describe('methodChoice', () => {
+  it('is the method that the value names, for a column of numbers', () => {
+    expect(
+      ['equal', 'quantile', 'jenks', 'categories'].map((value) => methodChoice(value, COLUMNS[0])),
+    ).toEqual(['equal', 'quantile', 'jenks', 'categories']);
+  });
+
+  it('is only Categories for a column that is not numbers, and for no column at all: the others are not offered, so they are not taken', () => {
+    for (const column of [COLUMNS[1], undefined]) {
+      expect(methodChoice('equal', column)).toBeUndefined();
+      expect(methodChoice('quantile', column)).toBeUndefined();
+      expect(methodChoice('jenks', column)).toBeUndefined();
+      expect(methodChoice('categories', column)).toBe('categories');
+    }
+  });
+
+  it('is nothing for a value that is not a method', () => {
+    expect(methodChoice('', COLUMNS[0])).toBeUndefined();
+    expect(methodChoice('Equal intervals', COLUMNS[0])).toBeUndefined();
+    expect(methodChoice('__proto__', COLUMNS[0])).toBeUndefined();
+  });
+});
+
+describe('classCountChoice', () => {
+  it('is the whole number that the text is', () => {
+    expect(classCountChoice('3')).toBe(3);
+    expect(classCountChoice('12')).toBe(12);
+    expect(classCountChoice('20')).toBe(20);
+  });
+
+  it('is nothing for anything else: empty, signed, fractional, in another notation or with text', () => {
+    for (const text of ['', ' ', '-3', '3.5', '1e1', '0x10', 'five', '3 ', ' 3']) {
+      expect(classCountChoice(text), JSON.stringify(text)).toBeUndefined();
     }
   });
 });
