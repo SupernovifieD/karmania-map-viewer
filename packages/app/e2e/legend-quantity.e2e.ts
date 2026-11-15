@@ -235,16 +235,26 @@ test.describe('scrolling the Legend tab while a row is dragged, and by touch', (
   test.describe('with a finger', () => {
     test.use({ hasTouch: true });
 
-    /** A scroll of the page by a finger, from a point, by `by` pixels (down): what a person does, with touch events, as the browser would receive them. */
+    /**
+     * A finger put down at a point and moved up by `by` pixels (the page scrolls down), in twelve steps of a frame each, as the touch events that the browser
+     * would receive from a screen. (Not `Input.synthesizeScrollGesture`, which scrolls nothing in the Linux Chromium that CI and the Docker image have, not even
+     * a plain page: the first version of this test used it and failed in CI from the step that added it.)
+     */
     async function swipe(page: Page, x: number, y: number, by: number): Promise<void> {
       const session = await page.context().newCDPSession(page);
-      await session.send('Input.synthesizeScrollGesture', {
-        x,
-        y,
-        yDistance: -by,
-        gestureSourceType: 'touch',
-        speed: 1500,
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x, y }],
       });
+      const steps = 12;
+      for (let step = 1; step <= steps; step += 1) {
+        await session.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x, y: y - (by * step) / steps }],
+        });
+        await page.waitForTimeout(16);
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     }
 
     const middleOf = async (page: Page, target: ReturnType<typeof layerRow>) => {
