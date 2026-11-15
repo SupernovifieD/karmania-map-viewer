@@ -14,12 +14,25 @@
  * Everything is in the pipeline and nothing in it is a time: the same scene and data give the same calls in the same order.
  */
 import type { Engine } from '@karmania/engine';
-import type { ClassBreaks, ClassMethod, Frame, RenderBuffers } from '@karmania/engine/display';
+import type {
+  ClassBreaks,
+  ClassMethod,
+  DrawableEntry,
+  Frame,
+  RenderBuffers,
+} from '@karmania/engine/display';
 import type { BBox, Finding } from '@karmania/engine/types';
 import { DEFAULT_DISTANCE_LIMITS, DEFAULT_SCALE_LIMITS } from '@karmania/render';
 import type { ClassColouring, DistanceLimits, ScaleLimits } from '@karmania/render';
 import { OTHER_COLOUR, classColours, fitCamera2d, fitCamera3d } from '@karmania/scene';
-import type { Camera2d, Camera3d, LayerColour, LayerId, SceneStore } from '@karmania/scene';
+import type {
+  Camera2d,
+  Camera3d,
+  LayerColour,
+  LayerId,
+  LegendInputs,
+  SceneStore,
+} from '@karmania/scene';
 import { extentOfInParts, nextTask } from './extent.js';
 
 /** Where a layer is. */
@@ -158,6 +171,8 @@ export class LayerPipeline {
   /** The frame the layers are being prepared for, and which datasets are drawn in it. */
   private frame: Frame | null = null;
   private drawable = new Map<number, { drawn: boolean; findings: readonly Finding[] }>();
+  /** What the engine said of each dataset in the frame, as it said it: the legend gives the reasons in its words. */
+  private choice: readonly DrawableEntry[] = [];
   /** The datasets (a sorted list of ids) that `frame` was chosen for. */
   private chosenFor = '';
   private running = false;
@@ -173,6 +188,28 @@ export class LayerPipeline {
   /** What there is to say of each layer. */
   states(): ReadonlyMap<LayerId, LayerState> {
     return new Map([...this.entries].map(([id, entry]) => [id, entry.state]));
+  }
+
+  /**
+   * What the legend needs besides the scene (`legendModel`): what the engine said of each dataset, and the breaks of the layers that are coloured by
+   * classes. A layer's breaks are given only while they are of the classes its style asks for now: after the column, the method or the number of
+   * classes is changed, the old breaks are of other classes, and the legend shows the ramp the layer will have until the new ones come. A layer in
+   * one colour has none, though the engine may have been asked for the one class of its cells that have a value (the mask of a grid).
+   */
+  legendInputs(): LegendInputs {
+    const layers = this.options.scene.getState().layers;
+    const breaks: Record<LayerId, ClassBreaks> = {};
+    for (const [id, entry] of this.entries) {
+      const colour = layers[id]?.style.colour;
+      if (
+        colour?.mode === 'classes' &&
+        entry.breaks !== undefined &&
+        entry.classKey === classKeyOf(colour)
+      ) {
+        breaks[id] = entry.breaks;
+      }
+    }
+    return { breaks, drawable: this.choice };
   }
 
   /**
@@ -402,6 +439,7 @@ export class LayerPipeline {
     this.scale = undefined;
     this.distance = undefined;
     this.drawable = new Map();
+    this.choice = [];
     if (this.options.scene.getState().frame !== null) {
       this.options.scene.dispatch({ type: 'setFrame', frame: null });
     }
@@ -429,6 +467,7 @@ export class LayerPipeline {
       return false;
     }
     this.chosenFor = datasets;
+    this.choice = choice.drawable;
     this.drawable = new Map(
       choice.drawable.map((entry) => [
         entry.id,
@@ -732,6 +771,8 @@ export class LayerPipeline {
         entry.classKey = key;
         entry.breaks = result.breaks;
         entry.indices = indices;
+        // The legend lists these classes, and the layer's own state does not change for them: the viewer is told.
+        this.changed();
       } catch (error) {
         if (stale()) {
           return;

@@ -1,9 +1,12 @@
 import type { Summary } from '@karmania/engine';
+import type { LegendModel } from '@karmania/scene';
+import type { StyleInfo } from './legend-style.js';
 import { kButton, sharedStyles } from '@karmania/ui';
 import type { TabChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import './data-tab.js';
+import './legend-tab.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import { PANEL_TABS } from './panel-tabs.js';
 import type { PanelTab } from './panel-tabs.js';
@@ -36,6 +39,8 @@ export class KarmaniaPanel extends LitElement {
   static override properties = {
     tab: { type: String, reflect: true },
     collapsed: { type: Boolean, reflect: true },
+    legend: { attribute: false },
+    styles: { attribute: false },
     datasets: { attribute: false },
     selected: { attribute: false },
     rows: { attribute: false },
@@ -110,9 +115,10 @@ export class KarmaniaPanel extends LitElement {
         padding: 0;
       }
 
-      .body k-empty-state {
-        flex: 1 1 auto;
-        min-height: 0;
+      /* The tab is as tall as what is in it (it does not shrink to the room that there is, and spill out of itself): the body scrolls when there is more, and
+         it takes the room that is left when there is less, for its empty state. */
+      .body karmania-legend-tab {
+        flex: 1 0 auto;
       }
 
       /* Buttons stacked from the top, 8 from the top and 4 apart. At the sides there are 4 from the
@@ -132,6 +138,10 @@ export class KarmaniaPanel extends LitElement {
   declare tab: PanelTab;
   /** Whether the panel is folded away into its rail. */
   declare collapsed: boolean;
+  /** The legend, which the Legend tab shows: its layers and groups. */
+  declare legend: LegendModel | undefined;
+  /** What the style editors of the Legend tab are given, by layer. */
+  declare styles: Readonly<Record<string, StyleInfo>> | undefined;
   /** The datasets that are loaded, which the Data tab shows. */
   declare datasets: readonly Summary[];
   /** The `id` of the dataset that is selected. */
@@ -154,6 +164,8 @@ export class KarmaniaPanel extends LitElement {
     super();
     this.tab = 'legend';
     this.collapsed = false;
+    this.legend = undefined;
+    this.styles = undefined;
     this.datasets = [];
     this.selected = undefined;
     this.rows = undefined;
@@ -244,7 +256,10 @@ export class KarmaniaPanel extends LitElement {
               })}
             </k-tooltip>
             <div slot="legend" class="body" data-scroll-region>
-              <k-empty-state>Layers will appear here once maps are rendered.</k-empty-state>
+              <karmania-legend-tab
+                .model=${this.legend}
+                .styles=${this.styles}
+              ></karmania-legend-tab>
             </div>
             <div slot="data" class="body flush" data-scroll-region>
               <karmania-data-tab

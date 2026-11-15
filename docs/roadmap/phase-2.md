@@ -596,20 +596,62 @@ or releasing, and whenever the brief says to stop.
 
 ## M19: Legend system
 
-- [ ] 19.1 Legend tab tree from the legend model: rows of 10.3, empty state kept.
-- [ ] 19.2 Visibility for layers and groups (tri-state); keyboard.
-- [ ] 19.3 Class entries with counts and "No value".
-- [ ] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live
+- [x] 19.1 Legend tab tree from the legend model: rows of 10.3, empty state kept.
+  - [x] 19.1a The pipeline gives the legend what it needs: the engine's verdicts and the breaks, only for the style's own classes.
+  - [x] 19.1b The Legend tab element draws the rows (groups and layers, the room of each control kept).
+  - [x] 19.1c The viewer gives the panel the model; browser proofs; baselines.
+    - [x] 19.1c1 The viewer builds the legend and the panel shows it; the viewer is told when classes arrive.
+    - [x] 19.1c2 Browser proofs of the tab: rows, indent, alignment, swatches, long names, the scene followed, axe.
+    - [x] 19.1c3 Screenshot states of the tab and their baselines, looked at.
+- [x] 19.2 Visibility for layers and groups (tri-state); keyboard.
+  - [x] 19.2a The rows that can be reached, the arrow keys and what a switch asks of the scene, as functions.
+  - [x] 19.2b The tab draws the switches (a tri-state one for a group), has one tab stop with the arrow keys and Space, and the viewer gives the scene what it asks.
+  - [x] 19.2c Browser proofs; the three states photographed again.
+- [x] 19.3 Class entries with counts and "No value".
+  - [x] 19.3a Which layers can be opened, which are, and what Right and Left do, as functions.
+  - [x] 19.3b The tab draws the button, the class lines and the keys.
+  - [x] 19.3c Browser proofs; the states photographed.
+- [x] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live
   announcements; draw order follows.
-- [ ] 19.5 Groups: create, rename, delete, collapse, move layers in and out (drag
+  - [x] 19.4a Where Alt + Up or Down takes a row, and what is said when a row is moved, as functions.
+  - [x] 19.4b Where a row dropped at a point of the list lands, and where the line is, as functions.
+  - [x] 19.4c The tab moves the row with Alt + Up or Down, says it in a polite live region and keeps the keyboard on the row; browser proofs, with the draw order following.
+  - [x] 19.4d The tab has the drag handle, drags a row with the pointer and shows the drop line; browser proofs.
+  - [x] 19.4e The states photographed (a row pointed at, a row dragged); only the dragged row's handle is seen.
+- [x] 19.5 Groups: create, rename, delete, collapse, move layers in and out (drag
   and Alt + Right/Left).
-- [ ] 19.6 Style editor 1: colour by; single colour swatches and hex field.
-- [ ] 19.7 Style editor 2: method, classes, ramp with previews, reverse.
-- [ ] 19.8 Style editor 3: opacity, point size, line width.
-- [ ] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the
+  - [x] 19.5a What Right, Left and Alt with them do to a row, the sentence for a delete and the new group's id, as functions.
+  - [x] 19.5b The `New group` button and renaming a group in place (F2, double click, Enter, Escape); browser proofs; the states photographed again.
+  - [x] 19.5c Fold and unfold (chevron, Right and Left), delete (button and key), Alt + Right and Left; browser proofs.
+  - [x] 19.5d The states photographed (a group being renamed, a group pointed at); the others taken again.
+- [x] 19.6 Style editor 1: colour by; single colour swatches and hex field.
+  - [x] 19.6a What the style editor does with a style, as functions: the choices of Colour by, what a choice makes of the colour, a typed hex code, the twelve swatches.
+  - [x] 19.6b The style editor behind every layer's row: Colour by, the swatches and the hex code; browser proofs; the states photographed.
+- [x] 19.7 Style editor 2: method, classes, ramp with previews, reverse.
+  - [x] 19.7a The methods and which suit a column, the numbers of classes, the ramps and their previews, and what a change makes of the classes, as functions.
+  - [x] 19.7b1 The ramp picker (a select whose choices are drawn) as an element, and what a choice of Method or Classes is, as functions.
+  - [x] 19.7b2 The fields of a layer by classes in the style editor; browser proofs; the states photographed.
+- [x] 19.8 Style editor 3: opacity, point size, line width.
+  - [x] 19.8a The fields of numbers of a layer by its kind, what a typed number or a step of the arrow keys is, and the patch it makes, as functions.
+  - [x] 19.8b The fields in the style editor; browser proofs; the states photographed.
+- [x] 19.9 Notices for layers that are not drawn (icon, tooltip, reason in the
   expanded row).
-- [ ] 19.10 Long content and quantity: 50 layers, 12 classes, names of 120
+- [x] 19.10 Long content and quantity: 50 layers, 12 classes, names of 120
   characters, 10 million as a count; screenshots; axe.
+- [ ] 19.F The fixes (what CI and the review of the gate found)
+  - [x] 19.F1 The gallery's picture of the icons is taken again for the two icons that were added (CI found it red).
+  - [x] 19.F2 (review) A layer moved into a group that is folded keeps the keyboard (on the group) and the move says that the group is folded.
+  - [x] 19.F3 (review) A press whose release is lost is not a drag later; a drag that the pointer being taken away ends is proved.
+  - [x] 19.F4 (review) Leaving the field of a group's name for another field or row does not take the keyboard back to the group.
+  - [x] 19.F5 (review) A field of numbers shows the number that the layer has once a typed one is taken, and sends nothing when that is the layer's own.
+  - [x] 19.F7a (review) The two tests of 50 layers have the time that they need (`test.slow`).
+  - [x] 19.F6 (review) The text of every row at one level starts at one x: a group's name starts where the name of a layer at the top does.
+  - [x] 19.F7b (review) Tests that proved less than they said now prove it, and the parts of 10.3 that no test held are held.
+  - [x] 19.F8 (review) Comments and a record that said what is no longer so are mended.
+  - [x] 19.F9 (review, gate) A release outside the tab ends a press; the tests of 50 layers do not wait for them to be drawn; the last corrections of the second pass.
+  - [x] 19.F10 (review) The cancel of another pointer does not end a drag: only the pointer that is dragging does.
+  - [x] 19.F11 (review) A press of the same pointer anywhere in the page ends a press whose release is lost; a press of another pointer does not end a drag.
+  - [x] 19.F12 (gate) The states of 50 layers wait for the layers to be drawn, for as long as a busy machine needs, and have the time to do it.
 - [ ] 19.G Gate.
 
 ## M20: Contours

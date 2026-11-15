@@ -96,6 +96,22 @@ describe('the lines under a layer, by ranges', () => {
     ]);
   });
 
+  it('write the count of a model of ten million blocks whole, with its commas, and the line of the cells with no value too', () => {
+    const entries = classEntries(
+      style,
+      ranges([0, 10, 20, 30], [10_000_000, 9_876_543, 123_456_789], 12_345_678),
+    );
+    expect(entries.map((entry) => entry.countLabel)).toEqual([
+      '10,000,000',
+      '9,876,543',
+      '123,456,789',
+      '12,345,678',
+    ]);
+    expect(entries.map((entry) => entry.count)).toEqual([
+      10_000_000, 9_876_543, 123_456_789, 12_345_678,
+    ]);
+  });
+
   it('write each bound as it is, with the minus sign, and not rounded to what keeps the bounds apart', () => {
     const labels = classEntries(style, ranges([-2.5, 0, 2.5, 5], [1, 1, 1])).map((e) => e.label);
     expect(labels).toEqual([`${MINUS}2.5 – 0`, '0 – 2.5', '2.5 – 5']);
