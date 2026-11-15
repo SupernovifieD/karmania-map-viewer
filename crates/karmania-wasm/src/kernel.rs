@@ -5,10 +5,14 @@ use karmania_core::{CrsRef, DatasetId};
 use karmania_crs::Definitions;
 use karmania_io::kernel::Kernel as CoreKernel;
 use karmania_io::mapping::ImportMapping;
-use karmania_prep::{ClassBreaks, Frame, Method, Preparer, class_index_of, classify_dataset};
+use karmania_prep::{
+    ClassBreaks, ContourParams, Contourer, Frame, Method, Preparer, class_index_of,
+    classify_dataset,
+};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
+use crate::contours;
 use crate::convert::{to_js, to_js_with_nulls};
 use crate::input::{DatasetInput, read_dataset};
 use crate::page::page_to_js;
@@ -45,6 +49,7 @@ fn preferred_crs(preferred: JsValue) -> Result<Option<CrsRef>, JsError> {
 pub struct Kernel {
     inner: CoreKernel,
     prep: Preparer,
+    contours: Contourer,
 }
 
 #[wasm_bindgen]
@@ -56,6 +61,7 @@ impl Kernel {
         Kernel {
             inner: core_kernel(),
             prep: Preparer::new(),
+            contours: Contourer::new(),
         }
     }
 
@@ -142,12 +148,15 @@ impl Kernel {
         page_to_js(&found.page(u64::from(start), u64::from(count)))
     }
 
-    /// Unloads a dataset. Returns whether there was one with that id.
+    /// Unloads a dataset, and the datasets that were made from it (its contour lines), and stops the jobs on all of them. Returns
+    /// whether there was a dataset with that id.
     pub fn remove(&mut self, dataset: u32) -> bool {
-        let id = DatasetId(u64::from(dataset));
-        let removed = self.inner.registry_mut().remove(id);
-        self.prep.removed(id, self.inner.registry().len());
-        removed
+        contours::remove(
+            &mut self.inner,
+            &mut self.prep,
+            &mut self.contours,
+            DatasetId(u64::from(dataset)),
+        )
     }
 
     /// Chooses the coordinate system the map is drawn in and says which datasets are drawn in it, as
@@ -282,6 +291,79 @@ impl Kernel {
         let index =
             class_index_of(found, &breaks).map_err(|finding| JsError::new(&finding.message))?;
         Ok(Uint8Array::from(index.as_slice()))
+    }
+
+    /// Starts making the contour lines of a dataset (a grid or a mesh) and returns the job's id. `params` is `{ column?, interval, base,
+    /// indexEvery }`. Nothing is done until `stepContours`; what is wrong with the settings or the dataset is the answer of the first
+    /// step, as findings.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id or `params` does not have the shape of the settings.
+    #[wasm_bindgen(js_name = startContours)]
+    pub fn start_contours(&mut self, dataset: u32, params: JsValue) -> Result<u32, JsError> {
+        let params: ContourParams = serde_wasm_bindgen::from_value(params).map_err(|error| {
+            JsError::new(&format!("the contour settings are not valid: {error}"))
+        })?;
+        contours::start(
+            &self.inner,
+            &mut self.contours,
+            DatasetId(u64::from(dataset)),
+            &params,
+        )
+        .ok_or_else(|| JsError::new("there is no dataset with that id"))
+    }
+
+    /// Does the next part of making contours: up to `budget` squares, triangles or vertices (at least one part). Returns `{ status:
+    /// "progress", fraction }`, `{ status: "cancelled" }` (the dataset was removed) or `{ status: "done", result }`, where `result` is
+    /// `{ status: "loaded", summaries }` (the new lines, loaded: a summary with `derivedFrom`, which replaced the lines made before from
+    /// the same dataset) or `{ status: "blocked", findings }` (why there are none; the lines made before are gone too). After `done` or
+    /// `cancelled` the job no longer exists.
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no job with that id: it never existed, it is over or it was cancelled.
+    #[wasm_bindgen(js_name = stepContours)]
+    pub fn step_contours(&mut self, job: u32, budget: u32) -> Result<JsValue, JsError> {
+        let budget = usize::try_from(budget).unwrap_or(usize::MAX);
+        let stepped = contours::step(
+            &mut self.inner,
+            &mut self.prep,
+            &mut self.contours,
+            job,
+            budget,
+        )
+        .ok_or_else(|| JsError::new("there is no contours job with that id"))?;
+        to_js(&stepped)
+    }
+
+    /// Stops making contours and drops what has been made. Returns whether there was a job.
+    #[wasm_bindgen(js_name = cancelContours)]
+    pub fn cancel_contours(&mut self, job: u32) -> bool {
+        self.contours.cancel(job)
+    }
+
+    /// The settings a set of contours of a dataset starts with: `{ status: "defaults", params }` with the column (a grid's: `column`, or
+    /// its first of numbers), the default interval for the range of the values (a nice number giving 10 to 20 levels), a base of 0 and
+    /// an index line every 5, or `{ status: "not_available", findings }` when it cannot be contoured (another shape, a column that is
+    /// missing or not numbers, a mesh with no heights, values that are all one number).
+    ///
+    /// # Errors
+    ///
+    /// Throws if there is no dataset with that id.
+    #[wasm_bindgen(js_name = contourDefaults)]
+    pub fn contour_defaults(
+        &self,
+        dataset: u32,
+        column: Option<String>,
+    ) -> Result<JsValue, JsError> {
+        let defaults = contours::defaults(
+            &self.inner,
+            DatasetId(u64::from(dataset)),
+            column.as_deref(),
+        )
+        .ok_or_else(|| JsError::new("there is no dataset with that id"))?;
+        to_js(&defaults)
     }
 
     /// Loads a dataset made from arrays. `input` is one object: `{ kind, name, crs,

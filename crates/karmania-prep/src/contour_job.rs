@@ -81,6 +81,19 @@ fn share(done: usize, total: usize) -> f64 {
 }
 
 impl ContourJob {
+    /// The settings as the job uses them: a grid's column is the one it takes (the first of numbers if none was named), and a mesh has no
+    /// column (it has one height, so a column that was named is not used and is not kept).
+    fn used(&self, params: &ContourParams) -> ContourParams {
+        ContourParams {
+            column: match &self.work {
+                Work::Grid(job) => Some(job.input.column.clone()),
+                Work::Mesh(_) => None,
+                Work::Failed(_) => params.column.clone(),
+            },
+            ..params.clone()
+        }
+    }
+
     /// A job for `dataset` with `params`. Whatever is wrong with them is the answer of the first step.
     #[must_use]
     pub fn new(dataset: &Dataset, params: &ContourParams) -> Self {
@@ -227,7 +240,8 @@ impl MeshJob {
 /// The contour jobs of a kernel, by number. They share nothing, like the kernels that hold them.
 #[derive(Default)]
 pub struct Contourer {
-    jobs: BTreeMap<u32, (DatasetId, ContourJob)>,
+    /// The dataset of each job, the settings it uses, and the job.
+    jobs: BTreeMap<u32, (DatasetId, ContourParams, ContourJob)>,
     /// The identifier the next job gets. Identifiers are never reused.
     next: u32,
 }
@@ -247,8 +261,9 @@ impl Contourer {
     pub fn start(&mut self, dataset: &Dataset, params: &ContourParams) -> u32 {
         let id = self.next;
         self.next += 1;
-        self.jobs
-            .insert(id, (dataset.id, ContourJob::new(dataset, params)));
+        let job = ContourJob::new(dataset, params);
+        let used = job.used(params);
+        self.jobs.insert(id, (dataset.id, used, job));
         id
     }
 
@@ -261,7 +276,7 @@ impl Contourer {
         dataset: Option<&Dataset>,
         budget: usize,
     ) -> Option<ContourStep> {
-        let (_, running) = self.jobs.get_mut(&job)?;
+        let (_, _, running) = self.jobs.get_mut(&job)?;
         let step = match dataset {
             Some(dataset) => running.step(dataset, budget),
             None => ContourStep::Cancelled,
@@ -275,7 +290,14 @@ impl Contourer {
     /// The dataset a job is making contours of, or `None` if there is no such job.
     #[must_use]
     pub fn dataset_of(&self, job: u32) -> Option<DatasetId> {
-        self.jobs.get(&job).map(|(dataset, _)| *dataset)
+        self.jobs.get(&job).map(|(dataset, _, _)| *dataset)
+    }
+
+    /// The settings a job uses (see [`ContourJob`]: the column is the one a grid takes), or `None` if there is no such job. They are
+    /// what the dataset that comes of it says it was made with.
+    #[must_use]
+    pub fn params_of(&self, job: u32) -> Option<&ContourParams> {
+        self.jobs.get(&job).map(|(_, params, _)| params)
     }
 
     /// Stops a job and drops what it has made. Returns whether there was one.
@@ -285,7 +307,7 @@ impl Contourer {
 
     /// Stops the jobs that are making contours of `dataset`, which is being removed.
     pub fn forget_dataset(&mut self, dataset: DatasetId) {
-        self.jobs.retain(|_, (id, _)| *id != dataset);
+        self.jobs.retain(|_, (id, _, _)| *id != dataset);
     }
 
     /// How many jobs are under way.
@@ -479,6 +501,43 @@ mod tests {
             (None, Some(DatasetId(5)))
         );
         assert_eq!(contourer.jobs(), 1);
+    }
+
+    #[test]
+    fn a_job_says_the_settings_it_uses_the_column_a_grid_takes_and_none_for_a_mesh() {
+        let dataset = grid(40, 30, 0.0);
+        let named = default_params(&dataset, None).unwrap();
+        let none = ContourParams {
+            column: None,
+            ..named.clone()
+        };
+        let mut contourer = Contourer::new();
+        let (a, b) = (
+            contourer.start(&dataset, &none),
+            contourer.start(&dataset, &named),
+        );
+        // A column that was not named is the first of numbers, which is `value`.
+        assert_eq!(contourer.params_of(a), Some(&named));
+        assert_eq!(contourer.params_of(b), Some(&named));
+        assert_eq!(named.column.as_deref(), Some("value"));
+        // A mesh has none, even if one was given.
+        let hills = mesh(30, 25);
+        let given = ContourParams {
+            column: Some("z".into()),
+            ..default_params(&hills, None).unwrap()
+        };
+        let job = contourer.start(&hills, &given);
+        assert_eq!(contourer.params_of(job).unwrap().column, None);
+        assert_eq!(contourer.params_of(job).unwrap().interval, given.interval);
+        // A job that cannot start keeps what it was given, and none is known once it is over.
+        let bad = ContourParams {
+            column: Some("nope".into()),
+            ..named
+        };
+        let failed = contourer.start(&dataset, &bad);
+        assert_eq!(contourer.params_of(failed), Some(&bad));
+        assert!(contourer.cancel(failed));
+        assert_eq!(contourer.params_of(failed), None);
     }
 
     #[test]
