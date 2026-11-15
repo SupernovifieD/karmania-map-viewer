@@ -206,7 +206,7 @@ test.describe('the style editor: colour by, and a single colour', () => {
     await expect(legend(page).locator('#legend-classes-layer-1')).toHaveCount(0);
   });
 
-  test('has twelve swatches in a group of radio buttons named Colour, each named by its colour, the colour of the layer checked if it is one of them', async ({
+  test('has twelve swatches in a group of radio buttons named Colour, each named by its colour, the colour of the layer checked if it is one of them, and each a target of 24 by 24 in two rows of six', async ({
     page,
   }) => {
     await open(page, 'layer-1');
@@ -227,12 +227,34 @@ test.describe('the style editor: colour by, and a single colour', () => {
         all.map((swatch) => swatch.getAttribute('tabindex')),
       ),
     ).toEqual(['0', ...Array<string>(11).fill('-1')]);
-    // A swatch is 16 by 16 in its own colour, in a row with 4 between.
-    const first = await swatches(page, 'layer-1').nth(0).boundingBox();
-    const second = await swatches(page, 'layer-1').nth(1).boundingBox();
-    expect([first?.width, first?.height]).toEqual([16, 16]);
-    expect((second?.x ?? 0) - ((first?.x ?? 0) + (first?.width ?? 0))).toBe(4);
-    await expect(swatches(page, 'layer-1').nth(2)).toHaveCSS(
+    // Each swatch is a target of 24 by 24 (WCAG 2.2, 2.5.8) with its colour, 16 by 16, in the middle of it; the twelve are two rows of six, side by side and touching.
+    const boxes = await swatches(page, 'layer-1').evaluateAll((all) =>
+      all.map((swatch) => {
+        const target = swatch.getBoundingClientRect();
+        const chip = swatch.querySelector('.chip')?.getBoundingClientRect();
+        return {
+          x: target.x,
+          y: target.y,
+          width: target.width,
+          height: target.height,
+          chip:
+            chip === undefined
+              ? null
+              : [chip.width, chip.height, chip.x - target.x, chip.y - target.y],
+        };
+      }),
+    );
+    expect(boxes).toHaveLength(12);
+    for (const [at, box] of boxes.entries()) {
+      expect([box.width, box.height], `swatch ${String(at)}`).toEqual([24, 24]);
+      expect(box.chip, `the colour of swatch ${String(at)}`).toEqual([16, 16, 4, 4]);
+    }
+    const first = boxes[0];
+    for (const [at, box] of boxes.entries()) {
+      expect(box.x, `swatch ${String(at)} across`).toBe((first?.x ?? 0) + (at % 6) * 24);
+      expect(box.y, `swatch ${String(at)} down`).toBe((first?.y ?? 0) + Math.floor(at / 6) * 24);
+    }
+    await expect(swatches(page, 'layer-1').nth(2).locator('.chip')).toHaveCSS(
       'background-color',
       'rgb(178, 223, 138)',
     );
