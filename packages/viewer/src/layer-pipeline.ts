@@ -294,7 +294,8 @@ export class LayerPipeline {
     for (const [id, entry] of this.entries) {
       // A layer that is given another dataset (the layer of contours, when the lines are made again) is a layer to prepare afresh: what was prepared is of
       // a dataset that is gone.
-      if (doc.layers[id] === undefined || doc.layers[id]?.datasetId !== entry.datasetId) {
+      const layer = doc.layers[id];
+      if (layer === undefined || layer.datasetId !== entry.datasetId) {
         entry.abort?.abort();
         this.options.sink()?.removeLayer(id);
         this.entries.delete(id);
