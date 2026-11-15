@@ -645,6 +645,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F4 (review) Leaving the field of a group's name for another field or row does not take the keyboard back to the group.
   - [x] 19.F5 (review) A field of numbers shows the number that the layer has once a typed one is taken, and sends nothing when that is the layer's own.
   - [x] 19.F7a (review) The two tests of 50 layers have the time that they need (`test.slow`).
+  - [x] 19.F6 (review) The text of every row at one level starts at one x: a group's name starts where the name of a layer at the top does.
 - [ ] 19.G Gate.
 
 ## M20: Contours
