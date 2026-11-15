@@ -11,7 +11,7 @@ describe('the commands as values', () => {
   it('are listed, each once, and the list is every kind that a Command can be', () => {
     expectTypeOf<(typeof COMMAND_TYPES)[number]>().toEqualTypeOf<Command['type']>();
     expect(new Set(COMMAND_TYPES).size).toBe(COMMAND_TYPES.length);
-    expect(COMMAND_TYPES).toHaveLength(16);
+    expect(COMMAND_TYPES).toHaveLength(17);
   });
 
   it('do what the function of the same name does, for every kind, and give the same document when it changes nothing', () => {
@@ -34,6 +34,7 @@ describe('the commands as values', () => {
         layerId: 'layer-2',
         contours: { interval: 5, base: 0, indexEvery: 5, visible: true },
       },
+      { type: 'setContoursLayer', sourceLayer: 'layer-2', datasetId: 8, name: 'Lines' },
       { type: 'setViewMode', mode: '2d' },
       { type: 'setVerticalExaggeration', factor: 10 },
       { type: 'setCamera', patch: { camera2d: { unitsPerPixel: 3 } } },
@@ -52,6 +53,7 @@ describe('the commands as values', () => {
       { type: 'setVisible', layerId: 'layer-9', visible: true },
       { type: 'moveNode', id: 'layer-9', to: { parent: null, index: 0 } },
       { type: 'setStyle', layerId: 'layer-2', patch: { opacity: 3 } },
+      { type: 'setContoursLayer', sourceLayer: 'layer-9', datasetId: 8 },
       { type: 'setViewMode', mode: '3d' },
       { type: 'setCamera', patch: {} },
       { type: 'setSelection', selection: { layerId: 'layer-2', element: 0 } },
