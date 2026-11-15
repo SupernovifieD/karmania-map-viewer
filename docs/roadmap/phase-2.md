@@ -648,6 +648,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F6 (review) The text of every row at one level starts at one x: a group's name starts where the name of a layer at the top does.
   - [x] 19.F7b (review) Tests that proved less than they said now prove it, and the parts of 10.3 that no test held are held.
   - [x] 19.F8 (review) Comments and a record that said what is no longer so are mended.
+  - [x] 19.F9 (review, gate) A release outside the tab ends a press; the tests of 50 layers do not wait for them to be drawn; the last corrections of the second pass.
 - [ ] 19.G Gate.
 
 ## M20: Contours

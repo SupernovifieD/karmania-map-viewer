@@ -63,12 +63,18 @@ export async function loadGrid(
   await untilDrawn(page, count);
 }
 
-/** `count` grids, named `Layer 01`, `Layer 02` and so on, loaded one after the other and waited for once at the end: the quantity that a legend has to hold. */
+/**
+ * `count` grids, named `Layer 01`, `Layer 02` and so on, loaded one after the other, and waited for until they are all in the scene (and so in the legend). They
+ * are not waited for until they are drawn: 50 layers are prepared and drawn after the last of them is loaded, which takes as long as the machine is busy, and the
+ * rows of the legend, which is what is looked at with so many, do not need it. (A test that reads their classes waits for those.)
+ */
 export async function loadMany(page: Page, count: number): Promise<void> {
   for (let at = 1; at <= count; at += 1) {
     await loadLattice(page, 'grid', gridSpec(`Layer ${String(at).padStart(2, '0')}`));
   }
-  await untilDrawn(page, count);
+  await expect
+    .poll(async () => (await layerStatuses(page)).length, { timeout: 5_000 + count * 500 })
+    .toBe(count);
 }
 
 /** The names of the five layers of `loadLegendScene`, in the order they are loaded. */

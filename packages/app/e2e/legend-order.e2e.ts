@@ -360,6 +360,27 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     expect(await order(page)).toEqual(START);
   });
 
+  test('hears the release of a press that is let go outside the tab before it has been over the tab by four pixels, and a press that is made outside and dragged into the tab drags nothing', async ({
+    page,
+  }) => {
+    await open(page);
+    const handle = await middle(handleOf(page, 'layer-1'));
+    const tab = await legend(page).boundingBox();
+    // The room beside the tab, in the padding of the panel's body: the pointer goes there in one move, so that the tab sees none on the way, and is let go there.
+    const beside = { x: (tab?.x ?? 0) - 8, y: handle.y };
+    await page.mouse.move(handle.x, handle.y);
+    await page.mouse.down();
+    await page.mouse.move(beside.x, beside.y);
+    await page.mouse.up();
+    // Another press beside the tab, with the button down over the tab after it: it is that press, and the row that was pressed first has nothing to do with it.
+    await page.mouse.down();
+    const name = await middle(layerRow(page, 'layer-2').locator('.name'));
+    await page.mouse.move(name.x, name.y, { steps: 8 });
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    await page.mouse.up();
+    expect(await order(page)).toEqual(START);
+  });
+
   test('ends a drag when the pointer is taken away (pointercancel): nothing is moved and the line is gone', async ({
     page,
   }) => {

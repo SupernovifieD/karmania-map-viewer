@@ -122,12 +122,15 @@ describe('announceMove into a folded group', () => {
     );
   });
 
-  it('says nothing of it for a group that is open, and nothing for a move out of a folded group or within a list', () => {
+  it('says nothing of it for a group that is open, for a move within a list, or for a move out of a folded group (the layer is shown again, in the legend)', () => {
     expect(announceMove(model(), 'layer-2', { parent: 'group-1', index: 2 })).toBe(
       'Moved Assays into Samples',
     );
     expect(announceMove(folded(), 'layer-2', { parent: null, index: 0 })).toBe(
       'Moved Assays above Samples',
+    );
+    expect(announceMove(folded(), 'layer-3', { parent: null, index: 0 })).toBe(
+      'Moved Geology out of Samples',
     );
   });
 });
