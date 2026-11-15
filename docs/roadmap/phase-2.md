@@ -644,6 +644,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F3 (review) A press whose release is lost is not a drag later; a drag that the pointer being taken away ends is proved.
   - [x] 19.F4 (review) Leaving the field of a group's name for another field or row does not take the keyboard back to the group.
   - [x] 19.F5 (review) A field of numbers shows the number that the layer has once a typed one is taken, and sends nothing when that is the layer's own.
+  - [x] 19.F7a (review) The two tests of 50 layers have the time that they need (`test.slow`).
 - [ ] 19.G Gate.
 
 ## M20: Contours

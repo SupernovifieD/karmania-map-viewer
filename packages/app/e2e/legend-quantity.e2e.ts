@@ -77,6 +77,7 @@ test.describe('the Legend tab with a lot in it', () => {
   test('holds 50 layers: a row each, 32 high, in a list that scrolls and a page that does not, and the keyboard reaches the last row and the first', async ({
     page,
   }) => {
+    test.slow(true, 'it loads 50 layers');
     await page.goto('/?theme=light');
     await loadMany(page, 50);
     await showLegend(page);
@@ -175,6 +176,7 @@ test.describe('the Legend tab with a lot in it', () => {
   test('has no serious accessibility violation with 50 layers, one of them open on 12 classes with counts of ten million', async ({
     page,
   }) => {
+    test.slow(true, 'it loads 50 layers, and axe reads all of their rows');
     await page.goto('/?theme=light');
     await loadMany(page, 50);
     await showLegend(page);
