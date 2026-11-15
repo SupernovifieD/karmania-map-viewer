@@ -1,7 +1,13 @@
 import type { CrsInfo, Summary } from '@karmania/engine';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
-import { crsLabelNamed, crsTitleNamed, describeWarnings, extentRows } from './datasets.js';
+import {
+  crsLabelNamed,
+  crsTitleNamed,
+  derivedRows,
+  describeWarnings,
+  extentRows,
+} from './datasets.js';
 import type { CrsLookup } from './datasets.js';
 import { withoutNotDrawn } from './finding-text.js';
 import './findings.js';
@@ -21,6 +27,7 @@ export class KarmaniaDatasetSummary extends LitElement {
     summary: { attribute: false },
     crsInfo: { attribute: false },
     notice: { attribute: false },
+    sourceName: { attribute: false },
     names: { state: true },
   };
 
@@ -195,6 +202,8 @@ export class KarmaniaDatasetSummary extends LitElement {
   declare crsInfo: CrsLookup | undefined;
   /** Why the dataset is not drawn on the map, with what to do about it; `undefined` while it is, or is being prepared. */
   declare notice: string | undefined;
+  /** The name of the dataset this one was made from, when it was made from one that is loaded. */
+  declare sourceName: string | undefined;
   /** What it said of the codes it was asked about: the system, or `null` for a code that is not in the definitions. */
   declare names: ReadonlyMap<number, CrsInfo | null>;
   /** The codes it has been asked about, so that none is asked twice. */
@@ -205,6 +214,7 @@ export class KarmaniaDatasetSummary extends LitElement {
     this.summary = undefined;
     this.crsInfo = undefined;
     this.notice = undefined;
+    this.sourceName = undefined;
     this.names = new Map();
   }
 
@@ -253,6 +263,11 @@ export class KarmaniaDatasetSummary extends LitElement {
         <dd>${KIND_NAMES[dataset.kind]}</dd>
         <dt>Size</dt>
         <dd>${describeSize(dataset)}</dd>
+        ${derivedRows(dataset, this.sourceName).map(
+          (row) =>
+            html`<dt>${row.label}</dt>
+              <dd class="made" data-truncate title=${row.text}>${row.text}</dd>`,
+        )}
         ${
           dataset.vertexCount === undefined
             ? nothing
