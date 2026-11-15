@@ -7,6 +7,8 @@
  *   - a grid of 4,000,000 cells: from loading to the first frame under 1.5 s; new classes visible under 300 ms;
  *   - a model of 1,000,000 blocks: from loading to the first frame under 3 s; and, in 3D, the 95th percentile of the frame time of a scripted
  *     orbit under 50 ms (step 18.9b);
+ *   - the same grid with 20 levels of contour lines turned on: the lines made in the worker (the engine's answer) under 2 s, and drawn, with no task
+ *     of the main thread over 50 ms (step 20.7);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
  * It needs a quiet machine, so it is a project of its own, like `performance.perf.ts`: `pnpm perf` runs both. The numbers are for
@@ -89,6 +91,13 @@ interface Measured {
   readonly switchMs?: number;
   /** From asking for new classes to the picture having them. */
   readonly restyleMs?: number;
+  /** Twenty levels of contour lines: from turning them on to the engine's answer (the lines made and listed), and to the lines being drawn, in ms, with how many lines and vertices. */
+  readonly contours?: {
+    readonly madeMs: number;
+    readonly drawnMs: number;
+    readonly lines: number;
+    readonly vertices: number;
+  };
   /** The longest task of the main thread, from pressing Load to the end. */
   readonly longestTaskMs: number;
 }
@@ -102,6 +111,8 @@ interface Options {
   readonly blockSize?: number;
   readonly path: boolean;
   readonly restyle: boolean;
+  /** After the first frame (and the restyle), 20 levels of contour lines are made, from an interval of 5 on the values 0 to 99.9 of the grid. */
+  readonly contours?: boolean;
   /** After the first frame, the view is switched to 3D, fitted, and a scripted orbit is drawn: 300 frames of the camera going round and up and down. */
   readonly orbit?: boolean;
 }
@@ -268,6 +279,82 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     );
   }
 
+  let contours: Measured['contours'];
+  // With `KARMANIA_CPUPROFILE=1` the main thread is profiled while the contours are made, and the functions with the most time of their own are printed.
+  const cpu = process.env['KARMANIA_CPUPROFILE'] !== undefined && options.contours === true;
+  const session = cpu ? await page.context().newCDPSession(page) : undefined;
+  if (session !== undefined) {
+    await session.send('Profiler.enable');
+    await session.send('Profiler.setSamplingInterval', { interval: 200 });
+    await session.send('Profiler.start');
+  }
+  if (options.contours === true) {
+    // Twenty levels (an interval of 5 over the values 0 to 99.9), every fifth an index line: the settings are put in the scene, as the style editor does, and the
+    // time is to the engine's answer (the lines are a dataset of the list) and then to the lines being on the card and a frame having drawn them.
+    contours = await inPage<NonNullable<Measured['contours']>>(
+      page,
+      `const v = perf.viewer();
+       const column = v.datasets[0].columns.find((c) => c.type === 'float' || c.type === 'int').name;
+       const at = performance.now();
+       v.dispatch({ type: 'setContours', layerId: 'layer-1', contours: { column, interval: 5, base: 0, indexEvery: 5, visible: true } });
+       const made = await perf.until(() => v.datasets.length === 2, 120000);
+       const drawn = await perf.until(() => {
+         const states = v.layerStates();
+         const stats = v.renderStats();
+         return states.length === 2 && states.every(([, s]) => s.status === 'drawn') && stats && stats.layersDrawn >= 2;
+       }, 120000);
+       return { madeMs: Math.round(made - at), drawnMs: Math.round(drawn - at), lines: v.datasets[1].elementCount, vertices: v.datasets[1].vertexCount ?? 0 };`,
+    );
+  }
+
+  if (session !== undefined) {
+    const { profile } = (await session.send('Profiler.stop')) as {
+      profile: {
+        nodes: {
+          id: number;
+          callFrame: { functionName: string; url: string; lineNumber: number };
+        }[];
+        samples: number[];
+        timeDeltas: number[];
+      };
+    };
+    const own = new Map<number, number>();
+    profile.samples.forEach((node, i) => {
+      own.set(node, (own.get(node) ?? 0) + (profile.timeDeltas[i] ?? 0));
+    });
+    // The time of each function with what it called, too: the callers of what is heavy.
+    const parent = new Map<number, number>();
+    for (const node of profile.nodes as { id: number; children?: number[] }[]) {
+      for (const child of node.children ?? []) parent.set(child, node.id);
+    }
+    const inclusive = new Map<number, number>();
+    for (const [id, micro] of own) {
+      for (let at: number | undefined = id; at !== undefined; at = parent.get(at)) {
+        inclusive.set(at, (inclusive.get(at) ?? 0) + micro);
+      }
+    }
+    const heaviest = [...inclusive.entries()]
+      .map(([id, micro]) => {
+        const frame = profile.nodes.find((node) => node.id === id)?.callFrame;
+        return `${String(Math.round(micro / 1000))}ms ${frame?.functionName ?? ''}@${(frame?.url ?? '').split('/').pop() ?? ''}:${String(frame?.lineNumber ?? 0)}`;
+      })
+      .filter(
+        (line) =>
+          !line.includes('(idle)') && !line.includes('(root)') && !line.includes('(program)'),
+      )
+      .sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10))
+      .slice(0, 24);
+    console.info(`CPUTREE ${JSON.stringify(heaviest)}`);
+    const top = [...own.entries()]
+      .map(([id, micro]) => {
+        const frame = profile.nodes.find((node) => node.id === id)?.callFrame;
+        return `${String(Math.round(micro / 1000))}ms ${frame?.functionName ?? ''} ${(frame?.url ?? '').split('/').pop() ?? ''}:${String(frame?.lineNumber ?? 0)}`;
+      })
+      .sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10))
+      .slice(0, 16);
+    console.info(`CPU ${JSON.stringify(top)}`);
+  }
+
   const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
   // The frames over 50 ms and the scripts in them, for what a long task was made of (printed, not asserted).
   const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
@@ -316,6 +403,7 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     ...(frames === undefined ? {} : { frames }),
     ...(switchMs === undefined ? {} : { switchMs: Math.round(switchMs) }),
     ...(restyleMs === undefined ? {} : { restyleMs: Math.round(restyleMs) }),
+    ...(contours === undefined ? {} : { contours }),
     longestTaskMs: Math.round(
       Math.max(0, ...tasks.filter((task) => task.start >= started).map((task) => task.duration)),
     ),
@@ -386,6 +474,24 @@ test.describe('the 2D view with the large files', () => {
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
     expect(result.restyleMs, 'new classes visible').toBeLessThan(300);
+    expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
+  });
+
+  test('4,000,000 cells: 20 levels of contour lines, made in the worker and drawn', async ({
+    browser,
+  }) => {
+    test.setTimeout(900_000);
+    const result = await measure(browser, {
+      data: 'grid-4m.asc',
+      sidecar: 'grid-4m.prj',
+      path: false,
+      restyle: false,
+      contours: true,
+    });
+    RESULTS.push(result);
+    // The engine's answer: 20 levels of the 4,000,000 cells in steps in the worker, without blocking the page.
+    expect(result.contours?.madeMs, '20 contour levels made').toBeLessThan(2000);
+    // From loading to the lines drawn, no task of the main thread over 50 ms.
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
 

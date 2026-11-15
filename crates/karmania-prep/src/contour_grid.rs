@@ -207,7 +207,8 @@ impl Scan {
                         Side::Right => field.vertical(i + 1, j),
                     };
                     if let Some(found) = self.pieces.get_mut(level) {
-                        for (from, to) in pieces_of(corners, height) {
+                        let (pieces, count) = pieces_of(corners, height);
+                        for &(from, to) in pieces.iter().take(count) {
                             found.push((edge(from), edge(to)));
                         }
                     }
@@ -259,8 +260,9 @@ pub fn contour_field(field: &Field<'_>, levels: &Levels) -> Vec<Contour> {
         .collect()
 }
 
-/// The pieces of the line at `level` in a square with these corner values (bottom left, bottom right, top right, top left): one or two.
-fn pieces_of(corners: [f64; 4], level: f64) -> Vec<(Side, Side)> {
+/// The pieces of the line at `level` in a square with these corner values (bottom left, bottom right, top right, top left): none, one or two
+/// (a saddle), as the pieces and how many there are. No list is allocated: a grid of 4,000,000 cells at 20 levels has three million of them.
+fn pieces_of(corners: [f64; 4], level: f64) -> ([(Side, Side); 2], usize) {
     let [bl, br, tr, tl] = corners;
     let above = [bl >= level, br >= level, tr >= level, tl >= level];
     let crossed = [
@@ -269,13 +271,23 @@ fn pieces_of(corners: [f64; 4], level: f64) -> Vec<(Side, Side)> {
         (Side::Top, above[3] != above[2]),
         (Side::Left, above[0] != above[3]),
     ];
-    let sides: Vec<Side> = crossed
-        .iter()
-        .filter_map(|&(side, is_crossed)| is_crossed.then_some(side))
-        .collect();
-    match sides.as_slice() {
-        [from, to] => vec![(*from, *to)],
-        [_, _, _, _] => {
+    let mut sides = [Side::Bottom; 4];
+    let mut count = 0;
+    for (side, is_crossed) in crossed {
+        if is_crossed {
+            if let Some(slot) = sides.get_mut(count) {
+                *slot = side;
+            }
+            count += 1;
+        }
+    }
+    let mut pieces = [(Side::Bottom, Side::Bottom); 2];
+    match count {
+        2 => {
+            pieces[0] = (sides[0], sides[1]);
+            (pieces, 1)
+        }
+        4 => {
             // A saddle: the average of the four values decides which pair of corners is joined through the middle, and the line goes
             // round each of the others (the corners that are not joined are cut off, each by a piece between its two sides).
             let centre_above = (bl + br + tr + tl) / 4.0 >= level;
@@ -285,12 +297,18 @@ fn pieces_of(corners: [f64; 4], level: f64) -> Vec<(Side, Side)> {
                 2 => (Side::Right, Side::Top),
                 _ => (Side::Top, Side::Left),
             };
-            (0..4)
-                .filter(|&corner| above.get(corner).is_some_and(|&a| a != centre_above))
-                .map(cut)
-                .collect()
+            let mut found = 0;
+            for corner in 0..4 {
+                if above.get(corner).is_some_and(|&a| a != centre_above) {
+                    if let Some(slot) = pieces.get_mut(found) {
+                        *slot = cut(corner);
+                    }
+                    found += 1;
+                }
+            }
+            (pieces, found.min(2))
         }
-        _ => Vec::new(),
+        _ => (pieces, 0),
     }
 }
 
