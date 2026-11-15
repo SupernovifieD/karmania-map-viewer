@@ -20,6 +20,7 @@ import map from 'lucide-static/icons/map.svg?raw';
 import mapPin from 'lucide-static/icons/map-pin.svg?raw';
 import maximize from 'lucide-static/icons/maximize.svg?raw';
 import minus from 'lucide-static/icons/minus.svg?raw';
+import mountain from 'lucide-static/icons/mountain.svg?raw';
 import pentagon from 'lucide-static/icons/pentagon.svg?raw';
 import plus from 'lucide-static/icons/plus.svg?raw';
 import rotateCcw from 'lucide-static/icons/rotate-ccw.svg?raw';
@@ -52,6 +53,7 @@ export const ICON_NAMES = [
   'map-pin',
   'maximize',
   'minus',
+  'mountain',
   'pentagon',
   'plus',
   'rotate-ccw',
@@ -87,6 +89,7 @@ const DRAWINGS: Readonly<Record<IconName, string>> = {
   'map-pin': mapPin,
   maximize,
   minus,
+  mountain,
   pentagon,
   plus,
   'rotate-ccw': rotateCcw,
