@@ -356,6 +356,10 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     await dragTo(page, handleOf(page, 'layer-2'), (target?.x ?? 0) + 60, (target?.y ?? 0) + 2);
     await expect(dropLine(page)).toBeVisible();
     expect(await tops(page)).toEqual(before);
+    // Only the row that is dragged has its handle seen, and not every row's.
+    await expect(handleOf(page, 'layer-2')).toHaveCSS('opacity', '1');
+    await expect(handleOf(page, 'layer-3')).toHaveCSS('opacity', '0');
+    await expect(handleOf(page, 'layer-1')).toHaveCSS('opacity', '0');
     await expectNoSeriousViolations(page);
     await page.mouse.up();
   });
