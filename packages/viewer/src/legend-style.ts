@@ -288,6 +288,14 @@ export function numberPatch(field: NumberField, value: number): StylePatch {
   }
 }
 
+/**
+ * The number that a style has once `value` (in the unit of the field) is taken: the opacity is kept as a fraction of four decimals, so that `12.001` % is the
+ * 12 % that the layer may have already, and the sizes are what they were typed. The field shows this, and a number that is the layer's own is not a change.
+ */
+export function numberTaken(field: NumberField, value: number): number {
+  return field.key === 'opacity' ? rounded(rounded(value / 100, 4) * 100, 2) : value;
+}
+
 /** What some text typed in a field of numbers is: the number, or what is wrong with it in words. */
 export type TypedNumber = { readonly value: number } | { readonly error: string };
 
