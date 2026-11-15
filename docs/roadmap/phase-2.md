@@ -614,7 +614,7 @@ or releasing, and whenever the brief says to stop.
 - [ ] 19.4 Reordering by drag and drop with the drop line; Alt + Up/Down; live
   announcements; draw order follows.
   - [x] 19.4a Where Alt + Up or Down takes a row, and what is said when a row is moved, as functions.
-  - [ ] 19.4b Where a row dropped at a point of the list lands, and where the line is, as functions.
+  - [x] 19.4b Where a row dropped at a point of the list lands, and where the line is, as functions.
   - [ ] 19.4c The tab moves the row with Alt + Up or Down, says it in a polite live region and keeps the keyboard on the row.
   - [ ] 19.4d The tab has the drag handle, drags a row with the pointer and shows the drop line.
   - [ ] 19.4e Browser proofs (the draw order follows); the states photographed.
