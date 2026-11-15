@@ -90,7 +90,7 @@ test.describe('the Legend tab', () => {
     await expect(groupRow(page, 'group-2').locator('.count')).toHaveText('1');
   });
 
-  test('has rows of 32, the layers of a group 24 in, and the names of one kind of row at one level starting at one place', async ({
+  test('has rows of 32, the layers of a group 24 in, and the names of every row at one level, groups and layers, starting at one place', async ({
     page,
   }) => {
     await loadLegend(page);
@@ -114,6 +114,21 @@ test.describe('the Legend tab', () => {
       'text-left',
     );
     await assertAligned([groupName(page, 'group-1'), groupName(page, 'group-2')], 'text-left');
+    // The text of every row at the same level starts at the same x (10.3): the groups and the layers at the top are at one level, whatever they have at their left,
+    // and the layers of a group are 24 in from them.
+    await assertAligned(
+      [
+        groupName(page, 'group-1'),
+        groupName(page, 'group-2'),
+        layerName(page, 'layer-1'),
+        layerName(page, 'layer-2'),
+      ],
+      'text-left',
+    );
+    expect(
+      (await textStartOf(layerName(page, 'layer-3'))) -
+        (await textStartOf(groupName(page, 'group-1'))),
+    ).toBe(24);
     expect(
       (await textStartOf(layerName(page, 'layer-3'))) -
         (await textStartOf(layerName(page, 'layer-1'))),
