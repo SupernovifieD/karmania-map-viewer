@@ -9,12 +9,15 @@ import { PATH, SHOTS } from './states/legend-tab.js';
 
 test.use({ reducedMotion: 'reduce' });
 
-/** The states that load 50 layers, each time the page is made again (six times): they take most of the minute that a test has, and more when the machine is busy. */
+/** The states that load 50 layers, each time the page is made again (six times): they take most of the minute that a test has, and many times that when the machine is busy. */
 const SLOW = ['legend-tab-many', 'legend-tab-many-end'];
 
 for (const each of SHOTS) {
   test(`the state "${each.name}", at every window size in both themes`, async ({ page }) => {
-    test.slow(SLOW.includes(each.name), 'it loads 50 layers for each of the six pictures');
+    if (SLOW.includes(each.name)) {
+      // Each of the six pictures loads 50 layers and waits until they are drawn, which on a busy machine is a minute and more: ten minutes for the six.
+      test.setTimeout(600_000);
+    }
     await photograph(page, PATH, each);
   });
 }

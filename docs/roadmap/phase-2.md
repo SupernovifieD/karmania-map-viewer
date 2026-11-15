@@ -651,6 +651,7 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F9 (review, gate) A release outside the tab ends a press; the tests of 50 layers do not wait for them to be drawn; the last corrections of the second pass.
   - [x] 19.F10 (review) The cancel of another pointer does not end a drag: only the pointer that is dragging does.
   - [x] 19.F11 (review) A press of the same pointer anywhere in the page ends a press whose release is lost; a press of another pointer does not end a drag.
+  - [x] 19.F12 (gate) The states of 50 layers wait for the layers to be drawn, for as long as a busy machine needs, and have the time to do it.
 - [ ] 19.G Gate.
 
 ## M20: Contours
