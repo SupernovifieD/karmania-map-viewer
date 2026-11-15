@@ -100,12 +100,10 @@ async function start(page: Page): Promise<void> {
 /** The width in pixels of each line that crosses the middle row of the map, from the left: the sum of how much of the line's colour each pixel has. */
 async function widths(page: Page): Promise<number[]> {
   const background = await mapColour(page);
-  const { width, height } = await page
-    .locator('karmania-map-area canvas')
-    .evaluate((canvas) => ({
-      width: (canvas as HTMLCanvasElement).width,
-      height: (canvas as HTMLCanvasElement).height,
-    }));
+  const { width, height } = await page.locator('karmania-map-area canvas').evaluate((canvas) => ({
+    width: (canvas as HTMLCanvasElement).width,
+    height: (canvas as HTMLCanvasElement).height,
+  }));
   const row = await pixels(page, [0, Math.floor(height / 2), width, 1]);
   const toLine = LINE.map((channel, i) => channel - (background[i] ?? 0));
   const span = toLine.reduce((sum, d) => sum + d * d, 0);
