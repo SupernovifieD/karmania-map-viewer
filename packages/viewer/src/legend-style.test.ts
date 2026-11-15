@@ -2,12 +2,19 @@ import { createSceneStore } from '@karmania/scene';
 import type { LayerColour, NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
 import {
+  FEWEST_CLASSES,
+  MOST_CLASSES,
   SINGLE,
   SWATCHES,
+  classCountOptions,
+  classesWith,
   colourByOptions,
   colourByValue,
   colourFor,
   colourFromText,
+  methodOptions,
+  rampOptions,
+  rampPreview,
   styleInfos,
 } from './legend-style.js';
 import type { ColumnInfo } from './legend-style.js';
@@ -164,5 +171,109 @@ describe('styleInfos', () => {
       columns: [{ name: 'Au', type: 'float' }],
     });
     expect(infos['layer-2']?.style.colour.mode).toBe('classes');
+  });
+});
+
+describe('methodOptions', () => {
+  it('has all four methods for a column of numbers, in the order of the brief, with the words of the brief', () => {
+    for (const column of [COLUMNS[0], COLUMNS[2]]) {
+      expect(methodOptions(column)).toEqual([
+        { value: 'equal', label: 'Equal intervals', disabled: false },
+        { value: 'quantile', label: 'Quantiles', disabled: false },
+        { value: 'jenks', label: 'Natural breaks', disabled: false },
+        { value: 'categories', label: 'Categories', disabled: false },
+      ]);
+    }
+  });
+
+  it('can only be Categories for a column that is not numbers, and for no column at all', () => {
+    for (const column of [COLUMNS[1], { name: 'Flag', type: 'bool' as const }, undefined]) {
+      const options = methodOptions(column);
+      expect(options.map((option) => option.disabled)).toEqual([true, true, true, false]);
+    }
+  });
+});
+
+describe('classCountOptions', () => {
+  it('are 3 to 12, ascending', () => {
+    const options = classCountOptions(7);
+    expect(options.map((option) => option.value)).toEqual([
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+      '11',
+      '12',
+    ]);
+    expect(options.every((option) => option.value === option.label)).toBe(true);
+    expect([FEWEST_CLASSES, MOST_CLASSES]).toEqual([3, 12]);
+  });
+
+  it('keep the number of a layer that has one the editor does not offer, in its place, so that the field shows it', () => {
+    expect(classCountOptions(2).map((option) => option.value)).toEqual([
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+      '11',
+      '12',
+    ]);
+    expect(classCountOptions(20).at(-1)?.value).toBe('20');
+    expect(classCountOptions(20)).toHaveLength(11);
+  });
+});
+
+describe('rampOptions and rampPreview', () => {
+  it('lists the ramps of the scene with their ids, names and kinds, the sequential ones first and the categorical ones last', () => {
+    const ramps = rampOptions();
+    expect(ramps[0]).toMatchObject({ id: 'viridis', name: 'Viridis', kind: 'sequential' });
+    expect(ramps.at(-1)).toMatchObject({ id: 'paired', kind: 'categorical' });
+    expect(new Set(ramps.map((ramp) => ramp.id)).size).toBe(ramps.length);
+  });
+
+  it('blends the colours of a sequential ramp and goes the other way round when it is reversed', () => {
+    expect(rampPreview(['#000000', '#ffffff'], 'sequential', false)).toBe(
+      'linear-gradient(to right, #000000, #ffffff)',
+    );
+    expect(rampPreview(['#000000', '#ffffff'], 'diverging', true)).toBe(
+      'linear-gradient(to right, #ffffff, #000000)',
+    );
+  });
+
+  it('is a stripe for each colour of a categorical ramp, with hard edges, since its colours are not steps of one scale', () => {
+    expect(rampPreview(['#ff0000', '#00ff00', '#0000ff', '#ffff00'], 'categorical', false)).toBe(
+      'linear-gradient(to right, #ff0000 0% 25%, #00ff00 25% 50%, #0000ff 50% 75%, #ffff00 75% 100%)',
+    );
+  });
+
+  it('puts no text of a document into a style, and is no colour for no colours', () => {
+    expect(rampPreview(['#000000', 'red; background: url(x)'], 'sequential', false)).toBe(
+      'linear-gradient(to right, #000000, transparent)',
+    );
+    expect(rampPreview([], 'sequential', false)).toBe('transparent');
+  });
+});
+
+describe('classesWith', () => {
+  it('makes the classes that a change makes, keeping the rest', () => {
+    expect(classesWith(CLASSES, { method: 'jenks' })).toEqual({ ...CLASSES, method: 'jenks' });
+    expect(classesWith(CLASSES, { classes: 9 })).toEqual({ ...CLASSES, classes: 9 });
+    expect(classesWith(CLASSES, { ramp: 'blues' })).toEqual({ ...CLASSES, ramp: 'blues' });
+    expect(classesWith(CLASSES, { reverse: false })).toEqual({ ...CLASSES, reverse: false });
+  });
+
+  it('is nothing when the change is what the layer has, whatever else is said with it', () => {
+    expect(classesWith(CLASSES, { method: 'quantile' })).toBeUndefined();
+    expect(classesWith(CLASSES, { classes: 5, reverse: true })).toBeUndefined();
+    expect(classesWith(CLASSES, {})).toBeUndefined();
   });
 });
