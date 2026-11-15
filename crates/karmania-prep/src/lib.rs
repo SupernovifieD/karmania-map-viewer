@@ -48,7 +48,10 @@ pub use classify::{
 pub use contour_grid::{Contour, Field, Scan, Vertex, contour_field};
 pub use contour_levels::{Levels, LevelsError, MAX_LEVELS};
 pub use contour_mesh::{MeshScan, Surface, contour_surface};
-pub use contours::{ContourError, ContourLines, ContourParams, contour_grid, contours_name};
+pub use contours::{
+    ContourError, ContourLines, ContourParams, contour_grid, contour_mesh, contours_name,
+    contours_of,
+};
 pub use drawable::{DrawStatus, Drawability, drawable};
 pub use frame::{MapCrsChoice, map_crs_for, utm_crs};
 pub use grid::{
