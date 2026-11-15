@@ -20,6 +20,7 @@ import {
   numberOf,
   numberPatch,
   numberStep,
+  numberTaken,
   numberText,
   rampOptions,
   rampPreview,
@@ -394,6 +395,30 @@ describe('numberOf, numberText and numberPatch', () => {
       if ('value' in typed) {
         expect(numberPatch(OPACITY, typed.value), String(opacity)).toEqual({ opacity });
       }
+    }
+  });
+});
+
+describe('numberTaken', () => {
+  const OPACITY = fieldOf('points', 'opacity');
+  const POINT_SIZE = fieldOf('points', 'pointSize');
+
+  it('is the number that the style has once an opacity is taken: to the hundredth of a percent, which is four decimals of the fraction', () => {
+    expect(numberTaken(OPACITY, 12.001)).toBe(12);
+    expect(numberTaken(OPACITY, 33.333)).toBe(33.33);
+    expect(numberTaken(OPACITY, 33.336)).toBe(33.34);
+    expect(numberTaken(OPACITY, 55)).toBe(55);
+    expect(numberTaken(OPACITY, 0)).toBe(0);
+    expect(numberTaken(OPACITY, 100)).toBe(100);
+  });
+
+  it('is what was typed for a size, and is what numberOf gives for the style that the patch makes', () => {
+    expect(numberTaken(POINT_SIZE, 6.5)).toBe(6.5);
+    for (const value of [0.004, 12.001, 33.333, 99.999, 100]) {
+      const patch = numberPatch(OPACITY, numberTaken(OPACITY, value));
+      expect(numberOf(OPACITY, { colour: SINGLE_COLOUR, opacity: patch.opacity ?? 1 })).toBe(
+        numberTaken(OPACITY, value),
+      );
     }
   });
 });

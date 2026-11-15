@@ -833,6 +833,25 @@ test.describe('the style editor: opacity, point size and line width', () => {
     expect(await changes()).toBe(0);
   });
 
+  test('shows the number that the layer has, and not what was typed, when they are not the same: 12.001 % is the 12 % that the layer has, and says nothing', async ({
+    page,
+  }) => {
+    await open(page, 'layer-1');
+    const input = numberInput(page, 'layer-1', 'Opacity (%)');
+    await input.fill('12');
+    await input.press('Enter');
+    await expect.poll(() => numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.12);
+    const changes = await countChanges(page);
+    await input.fill('12.001');
+    await input.press('Enter');
+    // The layer is at 12 and the field says so; nothing was sent, and leaving the field sends nothing either.
+    await expect(input).toHaveValue('12');
+    await legend(page).locator('.top span').first().click();
+    await expect(input).toHaveValue('12');
+    expect(await changes()).toBe(0);
+    expect(await numberOfStyle(page, 'layer-1', 'opacity')).toBe(0.12);
+  });
+
   test('says the range in words for text that is not an opacity, keeps the style and the text, and puts the number back with Escape; a number outside the range is not made the nearest one', async ({
     page,
   }) => {

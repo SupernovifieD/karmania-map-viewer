@@ -19,6 +19,7 @@ import {
   numberOf,
   numberPatch,
   numberStep,
+  numberTaken,
   numberText,
   rampOptions,
 } from './legend-style.js';
@@ -235,10 +236,12 @@ export class KarmaniaStyleEditor extends LitElement {
       this.numberErrors = { ...this.numberErrors, [field.key]: typed.error };
       return;
     }
-    this.numbers = { ...this.numbers, [field.key]: String(typed.value) };
+    // What the layer will have, which is not always what was typed (an opacity is kept to four decimals): the field shows that, and a number that is the layer's own is no change.
+    const taken = numberTaken(field, typed.value);
+    this.numbers = { ...this.numbers, [field.key]: String(taken) };
     this.numberErrors = { ...this.numberErrors, [field.key]: '' };
-    if (numberOf(field, style) !== typed.value) {
-      this.change(numberPatch(field, typed.value));
+    if (numberOf(field, style) !== taken) {
+      this.change(numberPatch(field, taken));
     }
   }
 
