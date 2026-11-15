@@ -44,7 +44,7 @@ export interface StyleChange {
  * of 1, of 10 with Shift); a text that is not a number, or is outside what the scene accepts, is said so with the range and the style is left as it is; and
  * Escape puts back the number the layer has.
  *
- * The swatches are a group of radio buttons with one stop for Tab (the one that is chosen, or the first), moved by the arrow keys, which choose as they go. The
+ * The swatches are two rows of six targets of 24, a group of radio buttons with one stop for Tab (the one that is chosen, or the first), moved by the arrow keys, which choose as they go. The
  * hex code is taken when Enter is pressed or the field is left: six digits or three, with or without the `#`; text that is not a colour is said not to be one,
  * and the style is left as it is. Escape puts back the colour the layer has.
  */
@@ -80,31 +80,49 @@ export class KarmaniaStyleEditor extends LitElement {
         margin-bottom: var(--k-space-4);
       }
 
+      /* The twelve swatches are two rows of six: each is a target of 24 by 24 (WCAG 2.2, 2.5.8) with its colour, 16 by 16, in the middle of it. A row of twelve cannot have
+         targets of 24 in the width of the panel. */
       .swatches {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--k-space-4);
+        display: grid;
+        grid-template-columns: repeat(6, var(--k-space-24));
+        /* The colours are 4 in from their targets, and are to start where the labels and the fields do. */
+        margin-left: calc(var(--k-space-4) * -1);
       }
 
       .swatch {
+        align-items: center;
         background: none;
+        border: 0;
+        box-sizing: border-box;
+        cursor: pointer;
+        display: flex;
+        height: var(--k-space-24);
+        justify-content: center;
+        padding: 0;
+        width: var(--k-space-24);
+      }
+
+      .chip {
         border: var(--k-border-width) solid var(--k-border-strong);
         border-radius: var(--k-radius-sm);
         box-sizing: border-box;
-        cursor: pointer;
         height: var(--k-icon-size-sm);
-        padding: 0;
+        pointer-events: none;
         width: var(--k-icon-size-sm);
       }
 
       /* The colour that is chosen has a ring round it, which is not a matter of colour: two rings, the surface's and the accent's. */
-      .swatch[aria-checked='true'] {
+      .swatch[aria-checked='true'] .chip {
         box-shadow:
           0 0 0 var(--k-focus-width) var(--k-surface),
           0 0 0 calc(var(--k-focus-width) * 2) var(--k-accent);
       }
 
       .swatch:focus-visible {
+        outline: none;
+      }
+
+      .swatch:focus-visible .chip {
         outline: var(--k-focus-width) solid var(--k-accent);
         outline-offset: calc(var(--k-focus-width) * 2 + var(--k-border-width));
       }
@@ -331,14 +349,15 @@ export class KarmaniaStyleEditor extends LitElement {
                 aria-label=${colour}
                 aria-checked=${index === chosen ? 'true' : 'false'}
                 tabindex=${index === Math.max(chosen, 0) ? '0' : '-1'}
-                style=${`background: ${colour}`}
                 @click=${() => {
                   this.choose(colour);
                 }}
                 @keydown=${(event: KeyboardEvent) => {
                   this.onSwatchKey(event, index);
                 }}
-              ></button>
+              >
+                <span class="chip" aria-hidden="true" style=${`background: ${colour}`}></span>
+              </button>
             `,
           )}
         </div>
