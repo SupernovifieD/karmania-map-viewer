@@ -1,5 +1,5 @@
 import { createSceneStore } from '@karmania/scene';
-import type { LayerColour, NewDataset } from '@karmania/scene';
+import type { LayerColour, LayerStyle, NewDataset } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
 import {
   FEWEST_CLASSES,
@@ -15,11 +15,17 @@ import {
   colourFromText,
   methodChoice,
   methodOptions,
+  numberFields,
+  numberFromText,
+  numberOf,
+  numberPatch,
+  numberStep,
+  numberText,
   rampOptions,
   rampPreview,
   styleInfos,
 } from './legend-style.js';
-import type { ColumnInfo } from './legend-style.js';
+import type { ColumnInfo, NumberField, NumberKey } from './legend-style.js';
 
 const COLUMNS: readonly ColumnInfo[] = [
   { name: 'Au', type: 'float' },
@@ -314,5 +320,165 @@ describe('classesWith', () => {
     expect(classesWith(CLASSES, { method: 'quantile' })).toBeUndefined();
     expect(classesWith(CLASSES, { classes: 5, reverse: true })).toBeUndefined();
     expect(classesWith(CLASSES, {})).toBeUndefined();
+  });
+});
+
+/** The field of `key` that a layer of `kind` has. */
+function fieldOf(kind: Parameters<typeof numberFields>[0], key: NumberKey): NumberField {
+  const found = numberFields(kind).find((field) => field.key === key);
+  if (found === undefined) {
+    throw new Error(`A layer of ${kind} has no ${key} field.`);
+  }
+  return found;
+}
+
+describe('numberFields', () => {
+  it('has the opacity for every kind, then the size of points or the width of lines, with their units and the ranges the scene accepts', () => {
+    expect(numberFields('points')).toEqual([
+      { key: 'opacity', label: 'Opacity (%)', unit: '%', min: 0, max: 100 },
+      { key: 'pointSize', label: 'Point size (px)', unit: 'px', min: 2, max: 24 },
+    ]);
+    expect(numberFields('lines')).toEqual([
+      { key: 'opacity', label: 'Opacity (%)', unit: '%', min: 0, max: 100 },
+      { key: 'lineWidth', label: 'Line width (px)', unit: 'px', min: 1, max: 8 },
+    ]);
+    for (const kind of ['polygons', 'grid', 'mesh', 'blocks'] as const) {
+      expect(
+        numberFields(kind).map((field) => field.key),
+        kind,
+      ).toEqual(['opacity']);
+    }
+  });
+});
+
+describe('numberOf, numberText and numberPatch', () => {
+  const style = (extra: Partial<LayerStyle>): LayerStyle => ({
+    colour: SINGLE_COLOUR,
+    opacity: 1,
+    ...extra,
+  });
+  const OPACITY = fieldOf('points', 'opacity');
+  const POINT_SIZE = fieldOf('points', 'pointSize');
+  const LINE_WIDTH = fieldOf('lines', 'lineWidth');
+
+  it('shows the opacity as a percent, to two decimals at most, and the sizes as the style has them', () => {
+    expect(numberText(OPACITY, style({ opacity: 1 }))).toBe('100');
+    expect(numberText(OPACITY, style({ opacity: 0.6 }))).toBe('60');
+    expect(numberText(OPACITY, style({ opacity: 0 }))).toBe('0');
+    expect(numberText(OPACITY, style({ opacity: 0.3333 }))).toBe('33.33');
+    expect(numberText(OPACITY, style({ opacity: 0.07 }))).toBe('7');
+    expect(numberText(POINT_SIZE, style({ pointSize: 6.5 }))).toBe('6.5');
+    expect(numberText(LINE_WIDTH, style({ lineWidth: 3 }))).toBe('3');
+    expect(numberOf(OPACITY, style({ opacity: 0.55 }))).toBe(55);
+  });
+
+  it('shows the size of a layer that has none as the size it is drawn at (6 for points, 2 for lines)', () => {
+    expect(numberText(POINT_SIZE, style({}))).toBe('6');
+    expect(numberText(LINE_WIDTH, style({}))).toBe('2');
+  });
+
+  it('makes the opacity a fraction again, to four decimals, with no noise of floating point, and the sizes as they are', () => {
+    expect(numberPatch(OPACITY, 55)).toEqual({ opacity: 0.55 });
+    expect(numberPatch(OPACITY, 100)).toEqual({ opacity: 1 });
+    expect(numberPatch(OPACITY, 0)).toEqual({ opacity: 0 });
+    expect(numberPatch(OPACITY, 33.33)).toEqual({ opacity: 0.3333 });
+    expect(numberPatch(OPACITY, 7)).toEqual({ opacity: 0.07 });
+    expect(numberPatch(POINT_SIZE, 9)).toEqual({ pointSize: 9 });
+    expect(numberPatch(LINE_WIDTH, 4.5)).toEqual({ lineWidth: 4.5 });
+  });
+
+  it('gives back what it was given: what is shown, typed and made a patch is the style that there was', () => {
+    for (const opacity of [0, 0.01, 0.07, 0.25, 0.6, 0.999, 1]) {
+      const typed = numberFromText(OPACITY, numberText(OPACITY, style({ opacity })));
+      expect('value' in typed, String(opacity)).toBe(true);
+      if ('value' in typed) {
+        expect(numberPatch(OPACITY, typed.value), String(opacity)).toEqual({ opacity });
+      }
+    }
+  });
+});
+
+describe('numberFromText', () => {
+  const OPACITY = fieldOf('points', 'opacity');
+  const POINT_SIZE = fieldOf('points', 'pointSize');
+  const LINE_WIDTH = fieldOf('lines', 'lineWidth');
+
+  it('reads digits, with a point for the decimals, with space round them, in the range of the field, ends included', () => {
+    expect(numberFromText(OPACITY, '55')).toEqual({ value: 55 });
+    expect(numberFromText(OPACITY, ' 55 ')).toEqual({ value: 55 });
+    expect(numberFromText(OPACITY, '0')).toEqual({ value: 0 });
+    expect(numberFromText(OPACITY, '100')).toEqual({ value: 100 });
+    expect(numberFromText(OPACITY, '12.5')).toEqual({ value: 12.5 });
+    expect(numberFromText(OPACITY, '.5')).toEqual({ value: 0.5 });
+    expect(numberFromText(POINT_SIZE, '2')).toEqual({ value: 2 });
+    expect(numberFromText(POINT_SIZE, '24')).toEqual({ value: 24 });
+    expect(numberFromText(LINE_WIDTH, '1')).toEqual({ value: 1 });
+    expect(numberFromText(LINE_WIDTH, '8')).toEqual({ value: 8 });
+  });
+
+  it('takes the unit of the field after the number, in any case, with or without a space, and no other unit', () => {
+    expect(numberFromText(OPACITY, '55%')).toEqual({ value: 55 });
+    expect(numberFromText(OPACITY, '55 %')).toEqual({ value: 55 });
+    expect(numberFromText(POINT_SIZE, '9px')).toEqual({ value: 9 });
+    expect(numberFromText(POINT_SIZE, '9 PX')).toEqual({ value: 9 });
+    expect('error' in numberFromText(OPACITY, '55px')).toBe(true);
+    expect('error' in numberFromText(POINT_SIZE, '9%')).toBe(true);
+    expect('error' in numberFromText(LINE_WIDTH, '3pt')).toBe(true);
+  });
+
+  it('says the range in words for a number outside it, one just outside included', () => {
+    expect(numberFromText(OPACITY, '101')).toEqual({ error: 'Use a number from 0 to 100.' });
+    expect(numberFromText(POINT_SIZE, '1.9')).toEqual({ error: 'Use a number from 2 to 24.' });
+    expect(numberFromText(POINT_SIZE, '24.1')).toEqual({ error: 'Use a number from 2 to 24.' });
+    expect(numberFromText(LINE_WIDTH, '0')).toEqual({ error: 'Use a number from 1 to 8.' });
+    expect(numberFromText(LINE_WIDTH, '9')).toEqual({ error: 'Use a number from 1 to 8.' });
+  });
+
+  it('says the same for anything that is not a number: empty, signed, an exponent, hexadecimal, text, two marks, a comma (a decimal mark here and a thousands mark there)', () => {
+    for (const text of [
+      '',
+      ' ',
+      '-5',
+      '+5',
+      '1e1',
+      '0x10',
+      'half',
+      '5.5.5',
+      '12,5',
+      '1,000',
+      '5 5',
+      '%',
+    ]) {
+      expect(numberFromText(OPACITY, text), JSON.stringify(text)).toEqual({
+        error: 'Use a number from 0 to 100.',
+      });
+    }
+  });
+});
+
+describe('numberStep', () => {
+  const OPACITY = fieldOf('points', 'opacity');
+  const POINT_SIZE = fieldOf('points', 'pointSize');
+
+  it('goes up or down by 1, and by 10 for a large step', () => {
+    expect(numberStep(OPACITY, 50, 1, false)).toBe(51);
+    expect(numberStep(OPACITY, 50, -1, false)).toBe(49);
+    expect(numberStep(OPACITY, 50, 1, true)).toBe(60);
+    expect(numberStep(OPACITY, 50, -1, true)).toBe(40);
+  });
+
+  it('stops at the ends of the range, and a step from a number past one comes back to it', () => {
+    expect(numberStep(OPACITY, 100, 1, false)).toBe(100);
+    expect(numberStep(OPACITY, 95, 1, true)).toBe(100);
+    expect(numberStep(OPACITY, 0, -1, false)).toBe(0);
+    expect(numberStep(POINT_SIZE, 2, -1, false)).toBe(2);
+    expect(numberStep(POINT_SIZE, 20, 1, true)).toBe(24);
+    expect(numberStep(POINT_SIZE, 6, -1, true)).toBe(2);
+  });
+
+  it('keeps the decimals of the number it steps from, without the noise of floating point', () => {
+    expect(numberStep(OPACITY, 12.3, 1, false)).toBe(13.3);
+    expect(numberStep(OPACITY, 0.1, 1, false)).toBe(1.1);
+    expect(numberStep(POINT_SIZE, 6.7, -1, false)).toBe(5.7);
   });
 });

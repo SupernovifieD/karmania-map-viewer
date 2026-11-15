@@ -1,11 +1,27 @@
 /**
  * What the style editor of the Legend tab does with a layer's style, as functions, so that it is tried without a browser: the choices of "Colour by", what
- * choosing one makes of the colour, and what a person typing a colour is understood to mean (section 10.3 of the brief).
+ * choosing one makes of the colour, what a person typing a colour is understood to mean, the fields of numbers (opacity, point size, line width) and what a
+ * number that is typed or stepped is (section 10.3 of the brief).
  */
 import type { Summary } from '@karmania/engine';
 import type { ClassMethod } from '@karmania/engine/display';
-import { DEFAULT_CLASSES, DEFAULT_METHOD, DEFAULT_RAMP, RAMPS, rampById } from '@karmania/scene';
-import type { ClassColour, LayerColour, LayerStyle, Ramp, SceneDocument } from '@karmania/scene';
+import {
+  DEFAULT_CLASSES,
+  DEFAULT_LINE_WIDTH,
+  DEFAULT_METHOD,
+  DEFAULT_POINT_SIZE,
+  DEFAULT_RAMP,
+  RAMPS,
+  rampById,
+} from '@karmania/scene';
+import type {
+  ClassColour,
+  LayerColour,
+  LayerStyle,
+  Ramp,
+  SceneDocument,
+  StylePatch,
+} from '@karmania/scene';
 import type { SelectOption } from '@karmania/ui';
 import { safeColour } from './legend-swatch.js';
 
@@ -202,4 +218,110 @@ export function classesWith(
     next.reverse === current.reverse
     ? undefined
     : next;
+}
+
+/** The numbers of a style that the editor has a field for. */
+export type NumberKey = 'opacity' | 'pointSize' | 'lineWidth';
+
+/** A field of numbers: what it is called, the unit that is written after the number, and from what to what the scene accepts it (in that unit). */
+export interface NumberField {
+  readonly key: NumberKey;
+  readonly label: string;
+  readonly unit: '%' | 'px';
+  readonly min: number;
+  readonly max: number;
+}
+
+const OPACITY: NumberField = { key: 'opacity', label: 'Opacity (%)', unit: '%', min: 0, max: 100 };
+const POINT_SIZE: NumberField = {
+  key: 'pointSize',
+  label: 'Point size (px)',
+  unit: 'px',
+  min: 2,
+  max: 24,
+};
+const LINE_WIDTH: NumberField = {
+  key: 'lineWidth',
+  label: 'Line width (px)',
+  unit: 'px',
+  min: 1,
+  max: 8,
+};
+
+/** The fields of numbers of a layer of `kind`, in the order of the brief: its opacity, and then the size of its points or the width of its lines. */
+export function numberFields(kind: Summary['kind']): readonly NumberField[] {
+  if (kind === 'points') {
+    return [OPACITY, POINT_SIZE];
+  }
+  return kind === 'lines' ? [OPACITY, LINE_WIDTH] : [OPACITY];
+}
+
+/** `value` to at most `places` decimals, without the digits that are only the noise of floating point. */
+const rounded = (value: number, places: number): number => Number(value.toFixed(places));
+
+/** The number that a style has for `field`, in the unit of the field: opacity as a percent (the style has it from 0 to 1), the sizes as the style has them. */
+export function numberOf(field: NumberField, style: LayerStyle): number {
+  switch (field.key) {
+    case 'opacity':
+      return rounded(style.opacity * 100, 2);
+    case 'pointSize':
+      return style.pointSize ?? DEFAULT_POINT_SIZE;
+    case 'lineWidth':
+      return style.lineWidth ?? DEFAULT_LINE_WIDTH;
+  }
+}
+
+/** What the field shows for a style: the number, and no unit (the label has it). */
+export function numberText(field: NumberField, style: LayerStyle): string {
+  return String(numberOf(field, style));
+}
+
+/** The patch that sets `field` to `value` (in the unit of the field): opacity goes back to a fraction, to four decimals. */
+export function numberPatch(field: NumberField, value: number): StylePatch {
+  switch (field.key) {
+    case 'opacity':
+      return { opacity: rounded(value / 100, 4) };
+    case 'pointSize':
+      return { pointSize: value };
+    case 'lineWidth':
+      return { lineWidth: value };
+  }
+}
+
+/** What some text typed in a field of numbers is: the number, or what is wrong with it in words. */
+export type TypedNumber = { readonly value: number } | { readonly error: string };
+
+const NUMBER = /^(\d+(?:\.\d+)?|\.\d+)\s*(%|px)?$/i;
+
+/**
+ * The number that text typed in `field` means, in the unit of the field: digits with a point for the decimals, and the unit of the field after them if the
+ * person likes, and space round it. Nothing else is a number (not a sign, not an exponent, not the unit of another field, not a comma, which is the decimal
+ * mark of some places and the thousands mark of others, so that `1,000` would be read as 1 by one and 1000 by the other), and one outside what the scene
+ * accepts is not one either: the error says the range.
+ */
+export function numberFromText(field: NumberField, text: string): TypedNumber {
+  const match = NUMBER.exec(text.trim());
+  const digits = match?.[1];
+  const unit = match?.[2]?.toLowerCase();
+  const value = digits === undefined ? Number.NaN : Number(digits);
+  if (
+    digits === undefined ||
+    (unit !== undefined && unit !== field.unit) ||
+    value < field.min ||
+    value > field.max
+  ) {
+    return { error: `Use a number from ${String(field.min)} to ${String(field.max)}.` };
+  }
+  return { value };
+}
+
+/** The number that a step of an arrow key from `from` is, in the unit of the field: 1 (10 with Shift), kept within what the scene accepts. */
+export function numberStep(
+  field: NumberField,
+  from: number,
+  direction: 1 | -1,
+  large: boolean,
+): number {
+  const next = rounded(from + direction * (large ? 10 : 1), 2);
+  return Math.min(field.max, Math.max(field.min, next));
 }
