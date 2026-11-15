@@ -130,7 +130,12 @@ export class ContoursManager {
       }
     }
     // A job or a record of a layer that is gone goes with it.
-    for (const id of [...this.jobs.keys(), ...this.made.keys(), ...this.failed.keys()]) {
+    for (const id of [
+      ...this.jobs.keys(),
+      ...this.made.keys(),
+      ...this.failed.keys(),
+      ...this.styles.keys(),
+    ]) {
       if (doc.layers[id] === undefined) {
         this.forget(id);
       }
@@ -290,8 +295,8 @@ export class ContoursManager {
     this.made.delete(layerId);
     this.shown.delete(layerId);
     const lines = this.takeAwayLinesLayer(doc, layerId);
-    if (lines !== undefined) {
-      this.removeFromEngine(lines.datasetId);
+    if (lines !== undefined || hadState) {
+      this.removeLinesOf(doc.layers[layerId]?.datasetId, lines?.datasetId);
     }
     if (hadState) {
       this.changed();
@@ -319,6 +324,22 @@ export class ContoursManager {
     return lines;
   }
 
+  /**
+   * Takes out of the engine the lines of the dataset `source`: those that the layer of the lines shows (`shown`), and any that were made from it
+   * all the same, which no layer shows (an answer kept because another job was under way, and that job was then stopped, or failed).
+   */
+  private removeLinesOf(source: number | undefined, shown: number | undefined): void {
+    const ids = new Set(shown === undefined ? [] : [shown]);
+    for (const dataset of this.options.engine.datasets()) {
+      if (dataset.derivedFrom?.id === source) {
+        ids.add(dataset.id);
+      }
+    }
+    for (const id of ids) {
+      this.removeFromEngine(id);
+    }
+  }
+
   /** Takes a dataset of lines out of the engine, and brings the layers to what is left. */
   private removeFromEngine(datasetId: number): void {
     void this.options.engine.remove(datasetId).then(
@@ -333,7 +354,8 @@ export class ContoursManager {
 
   /**
    * The engine answered a job that was stopped all the same (it had finished when it was told to stop): the lines it made are not the layer's.
-   * When another job is under way for the layer its lines replace them; when none is, nothing wants them, and they are taken out.
+   * When another job is under way for the layer its lines replace them (and if that one is stopped too, `withdraw` takes them out); when none
+   * is, nothing wants them, and they are taken out.
    */
   private dropStray(layerId: LayerId, result: LoadResult): void {
     const lines = result.status === 'loaded' ? result.summaries[0] : undefined;

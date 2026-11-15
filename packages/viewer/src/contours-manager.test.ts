@@ -141,6 +141,10 @@ function world(kind: Summary['kind'] = 'grid', rejectOnAbort = true) {
     contours,
     derived,
     datasets: () => datasets,
+    /** Puts a dataset in the engine (the fake's list) that the scene knows nothing of. */
+    add: (added: Summary): void => {
+      datasets = [...datasets, added];
+    },
   };
 }
 
@@ -248,6 +252,54 @@ describe('the contours of a layer', () => {
     w.contours();
     await settle();
     expect(w.pending).toHaveLength(2);
+  });
+
+  it('take out the lines of an answer that was kept because another job was under way, when that job is stopped too', async () => {
+    const w = world('grid', false);
+    // Lines of another dataset are in the engine too, and are not the business of this layer.
+    const others = summary(50, 'Contours of Other (every 1)', 'lines', {
+      id: 2,
+      kind: 'contours',
+      params: { interval: 1, base: 0, indexEvery: 5 },
+    });
+    w.add(others);
+    w.contours();
+    w.contours({ interval: 5 });
+    // The first is answered after it was stopped, while the second is under way: the second replaces its lines, so they are left.
+    const late = await w.finish(0);
+    expect(w.removed).toEqual([]);
+    // The contours are turned off and the second is stopped: no layer shows the lines of the first, and they go all the same.
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.removed).toEqual([late.id]);
+    expect(w.datasets().map((dataset) => dataset.id)).toEqual([1, 50]);
+    await settle();
+    expect(w.adopted.at(-1)).toEqual([1, 50]);
+  });
+
+  it('do not keep the style of a layer of lines for another layer that comes to have the same number', async () => {
+    const w = world();
+    w.contours();
+    await w.finish(0);
+    w.scene.dispatch({
+      type: 'setStyle',
+      layerId: w.derived()?.id ?? '',
+      patch: { opacity: 0.4, colour: { mode: 'single', value: '#112233' } },
+    });
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    // The layer goes (and the manager sees that it has), and a layer of the same number is made for another dataset.
+    w.scene.dispatch({ type: 'removeLayersOfDataset', datasetId: 1 });
+    w.scene.dispatch({
+      type: 'addLayers',
+      datasets: [{ id: 1, name: 'Surface', kind: 'grid', elementCount: 10, columns: [] }],
+    });
+    expect(Object.keys(w.scene.getState().layers)).toEqual(['layer-1']);
+    w.contours();
+    await w.finish(1);
+    expect(w.derived()?.style).toEqual({
+      colour: { mode: 'single', value: '#a0713f' },
+      opacity: 1,
+      lineWidth: 1,
+    });
   });
 
   it('do not take anything out of the engine for a stopped job whose answer is that there are no lines', async () => {

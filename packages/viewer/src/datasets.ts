@@ -74,7 +74,8 @@ export function selectionAfterRemoving(
 /**
  * The dataset to select once `removed` (and what was made from it) is gone from `before`, which left `after`, when `selected` is what is selected
  * now (the removal is waited for, and what is selected can change meanwhile: contour lines made again, or another dataset chosen): the selection
- * is left alone if it is still there, and if not it is as `selectionAfterRemoving` says, or the first dataset listed when that one is gone too.
+ * is left alone if it is still there, and if not it is the dataset that takes the place of what was removed (as `selectionAfterRemoving` says), or the first
+ * dataset listed when that one is gone too.
  */
 export function selectionAfterRemoved(
   before: readonly Summary[],
@@ -85,7 +86,9 @@ export function selectionAfterRemoved(
   if (selected === undefined || after.some((dataset) => dataset.id === selected)) {
     return selected;
   }
-  const next = selectionAfterRemoving(before, removed, selected);
+  // (The neighbour of what was removed, whatever the selection was: it may be lines that were made while the removal was waited for, which
+  // `before` does not have.)
+  const next = selectionAfterRemoving(before, removed, removed);
   return next !== undefined && after.some((dataset) => dataset.id === next)
     ? next
     : listedDatasets(after)[0]?.id;
