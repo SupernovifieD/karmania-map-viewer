@@ -9,6 +9,7 @@
 //! errors thrown are for misuse, such as passing something that is not a list of
 //! files, or asking for a dataset that does not exist.
 
+mod contours;
 mod convert;
 mod crs;
 mod input;
