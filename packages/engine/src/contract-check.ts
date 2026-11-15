@@ -13,6 +13,7 @@ import {
   CRS_SOURCES,
   CRS_UNITS,
   DELIMITERS,
+  DERIVED_KINDS,
   FORMATS,
   KINDS,
   PHASES,
@@ -21,8 +22,10 @@ import {
   WIZARD_STEPS,
   type BBox,
   type ColumnSummary,
+  type ContourParams,
   type CrsInfo,
   type CrsRef,
+  type DerivedFrom,
   type DetectedCrs,
   type Finding,
   type ImportStatus,
@@ -311,7 +314,7 @@ export function checkedPreview(value: unknown, path = 'preview'): Preview {
   return o as unknown as Preview;
 }
 
-function checkedFindings(value: unknown, path: string): readonly Finding[] {
+export function checkedFindings(value: unknown, path: string): readonly Finding[] {
   return checkedArray(value, path).map((f, i) => checkedFinding(f, `${path}[${String(i)}]`));
 }
 
@@ -337,12 +340,34 @@ function checkedColumnSummary(value: unknown, path: string): ColumnSummary {
   return o as unknown as ColumnSummary;
 }
 
+/** The settings of a set of contours: an interval above 0, a base, and an index every 1 or more lines. */
+export function checkedContourParams(value: unknown, path = 'params'): ContourParams {
+  const o = checkedObject(value, path, ['interval', 'base', 'indexEvery'], ['column']);
+  if ('column' in o) checkedString(o['column'], `${path}.column`);
+  const interval = checkedNumber(o['interval'], `${path}.interval`);
+  if (!(interval > 0)) throw new ContractError(`${path}.interval`, 'expected a number above 0');
+  checkedNumber(o['base'], `${path}.base`);
+  if (checkedCount(o['indexEvery'], `${path}.indexEvery`) < 1) {
+    throw new ContractError(`${path}.indexEvery`, 'expected 1 or more');
+  }
+  return o as unknown as ContourParams;
+}
+
+/** What a dataset was made from. */
+export function checkedDerivedFrom(value: unknown, path = 'derivedFrom'): DerivedFrom {
+  const o = checkedObject(value, path, ['id', 'kind', 'params']);
+  if (checkedCount(o['id'], `${path}.id`) < 1) throw new ContractError(`${path}.id`, 'below 1');
+  checkedOneOf(o['kind'], `${path}.kind`, DERIVED_KINDS);
+  checkedContourParams(o['params'], `${path}.params`);
+  return o as unknown as DerivedFrom;
+}
+
 export function checkedSummary(value: unknown, path = 'summary'): Summary {
   const o = checkedObject(
     value,
     path,
     ['id', 'name', 'kind', 'elementCount', 'hasZ', 'columns', 'findings'],
-    ['vertexCount', 'crs', 'bbox'],
+    ['vertexCount', 'crs', 'bbox', 'derivedFrom'],
   );
   if (checkedCount(o['id'], `${path}.id`) < 1) throw new ContractError(`${path}.id`, 'below 1');
   checkedString(o['name'], `${path}.name`);
@@ -352,6 +377,7 @@ export function checkedSummary(value: unknown, path = 'summary'): Summary {
   if ('crs' in o) checkedCrs(o['crs'], `${path}.crs`);
   if (typeof o['hasZ'] !== 'boolean') throw new ContractError(`${path}.hasZ`, 'expected a boolean');
   if ('bbox' in o) checkedBBox(o['bbox'], `${path}.bbox`);
+  if ('derivedFrom' in o) checkedDerivedFrom(o['derivedFrom'], `${path}.derivedFrom`);
   checkedArray(o['columns'], `${path}.columns`).forEach((c, i) => {
     checkedColumnSummary(c, `${path}.columns[${String(i)}]`);
   });

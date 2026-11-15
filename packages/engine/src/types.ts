@@ -202,6 +202,33 @@ export interface ColumnSummary {
   readonly nullCount: number;
 }
 
+/** The settings of a set of contour lines (brief 11.5). */
+export interface ContourParams {
+  /** Grids only: the column of the heights. A grid with none named takes its first column of numbers. */
+  readonly column?: string;
+  /** The height between two lines, above 0. */
+  readonly interval: number;
+  /** A height that has a line: the others are `base + k * interval`. */
+  readonly base: number;
+  /** Every this many lines is an index line, the base being one; 1 or more. */
+  readonly indexEvery: number;
+}
+
+/** The kinds of derivation: how a dataset can be made from another. */
+export const DERIVED_KINDS = ['contours'] as const;
+
+/** How a dataset was made from another. */
+export type DerivedKind = (typeof DERIVED_KINDS)[number];
+
+/** The dataset another was made from, and how (for the contour lines of a grid or a mesh). */
+export interface DerivedFrom {
+  /** The dataset it was made from. */
+  readonly id: number;
+  readonly kind: DerivedKind;
+  /** The settings it was made with: the interval is the one used, and a grid's column is the one taken. */
+  readonly params: ContourParams;
+}
+
 /** What a loaded dataset is, without its data. */
 export interface Summary {
   readonly id: number;
@@ -217,6 +244,8 @@ export interface Summary {
   readonly columns: readonly ColumnSummary[];
   /** Warnings and info about the dataset; errors would have stopped it loading. */
   readonly findings: readonly Finding[];
+  /** For a dataset made from another: which, and how. Absent for every other dataset. */
+  readonly derivedFrom?: DerivedFrom;
 }
 
 /** What loading datasets came to: they are all loaded, or none is. */
@@ -440,3 +469,11 @@ export interface Page {
   readonly count: number;
   readonly columns: readonly PageColumn[];
 }
+
+/**
+ * The settings a set of contours starts with, or why a dataset has none: another shape, a column that is
+ * missing or not numbers, a mesh with no heights, values that are all one number.
+ */
+export type ContourDefaultsResult =
+  | { readonly status: 'defaults'; readonly params: ContourParams }
+  | { readonly status: 'not_available'; readonly findings: readonly Finding[] };

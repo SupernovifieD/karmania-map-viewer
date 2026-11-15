@@ -31,6 +31,14 @@ export interface KernelApi {
   ) => unknown;
   /** The class of every element that is drawn under class breaks, one byte each. */
   readonly classIndex: (datasetId: number, breaks: unknown) => Uint8Array;
+  /** Starts making the contour lines of a dataset; returns the job's id. */
+  readonly startContours: (datasetId: number, params: unknown) => number;
+  /** Does the next part of making contours. */
+  readonly stepContours: (jobId: number, budget: number) => unknown;
+  /** Stops making contours; says whether there was a job. */
+  readonly cancelContours: (jobId: number) => boolean;
+  /** The settings a set of contours of a dataset starts with, or why there are none. */
+  readonly contourDefaults: (datasetId: number, column: string | undefined) => unknown;
   /** Releases the kernel's memory. */
   readonly free: () => void;
 }

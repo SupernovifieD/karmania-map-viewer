@@ -31,7 +31,11 @@ export function startHandler(
     post: (message, transfer) => {
       const entry = { message, transfer };
       posted.push(entry);
-      if (message.type !== 'progress' && message.type !== 'prepareProgress') {
+      if (
+        message.type !== 'progress' &&
+        message.type !== 'prepareProgress' &&
+        message.type !== 'contoursProgress'
+      ) {
         waiting.get(message.id)?.(entry);
         waiting.delete(message.id);
       }

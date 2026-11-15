@@ -2,6 +2,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { IMPORT_PHASES } from './api.js';
 import type {
+  ContoursOptions,
   Engine,
   EngineEvents,
   EngineOptions,
@@ -15,7 +16,15 @@ import type {
 import type { FrameChoice, PrepareResult } from './display.js';
 import { assertNever } from './exhaustive.js';
 import type { DatasetInput } from './inputs.js';
-import type { CrsInfo, CrsRef, Phase, Summary } from './types.js';
+import type {
+  ContourDefaultsResult,
+  ContourParams,
+  CrsInfo,
+  CrsRef,
+  LoadResult,
+  Phase,
+  Summary,
+} from './types.js';
 
 function wording(phase: ImportPhase): string {
   switch (phase) {
@@ -56,6 +65,8 @@ function inertEngine(): Engine {
     prepare: unavailable,
     classify: unavailable,
     classIndex: unavailable,
+    contours: unavailable,
+    contourDefaults: unavailable,
     on: () => () => undefined,
     dispose: () => undefined,
   };
@@ -73,7 +84,7 @@ describe('the engine interface', () => {
     expectTypeOf<EngineEvents>().toHaveProperty('datasets');
   });
 
-  it('has the methods of the briefs: those of phase 1, the two EPSG lookups, and display preparation', () => {
+  it('has the methods of the briefs: those of phase 1, the two EPSG lookups, display preparation and contours', () => {
     expectTypeOf<Engine['load']>().parameter(0).toEqualTypeOf<DatasetInput>();
     expectTypeOf<Engine['datasets']>().returns.toEqualTypeOf<readonly Summary[]>();
     expectTypeOf<Engine['crsInfo']>().toEqualTypeOf<
@@ -92,10 +103,18 @@ describe('the engine interface', () => {
       (id: number, params: PrepareParams, options?: PrepareOptions) => Promise<PrepareResult>
     >();
     expectTypeOf<Engine['classIndex']>().returns.toEqualTypeOf<Promise<Uint8Array>>();
+    expectTypeOf<Engine['contours']>().toEqualTypeOf<
+      (id: number, params: ContourParams, options?: ContoursOptions) => Promise<LoadResult>
+    >();
+    expectTypeOf<Engine['contourDefaults']>().toEqualTypeOf<
+      (id: number, column?: string) => Promise<ContourDefaultsResult>
+    >();
     expect(Object.keys(inertEngine()).sort()).toEqual([
       'chooseFrame',
       'classIndex',
       'classify',
+      'contourDefaults',
+      'contours',
       'crsInfo',
       'datasets',
       'dispose',

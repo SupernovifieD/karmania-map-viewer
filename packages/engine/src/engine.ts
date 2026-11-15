@@ -8,6 +8,7 @@ import type {
   EngineEvent,
   EngineEvents,
   EngineOptions,
+  ContoursOptions,
   ImportOptions,
   LoadOptions,
   PrepareOptions,
@@ -20,7 +21,7 @@ import { EngineDisposedError } from './errors.js';
 import { createPageCache } from './page-cache.js';
 import { createRegistry } from './registry.js';
 import { transferablesOf } from './transfer.js';
-import type { ImportMapping, LoadResult } from './types.js';
+import type { ImportMapping, LoadResult, Summary } from './types.js';
 
 /** Makes the worker, at `workerUrl` or at the one that ships with the engine. */
 function spawnWorker(workerUrl: string | URL | undefined): Worker {
@@ -38,6 +39,20 @@ function spawnWorker(workerUrl: string | URL | undefined): Worker {
 /** The address the worker should fetch the module from, made absolute where there is a page. */
 function moduleAddress(wasmUrl: string | URL): string {
   return typeof location === 'undefined' ? String(wasmUrl) : new URL(wasmUrl, location.href).href;
+}
+
+/** The datasets that were made from `id`, and from those: what the worker takes out with it. */
+function madeFrom(summaries: readonly Summary[], id: number): number[] {
+  const found: number[] = [];
+  for (let at = 0, parents = [id]; at < parents.length; at += 1) {
+    for (const summary of summaries) {
+      if (summary.derivedFrom?.id === parents[at] && !parents.includes(summary.id)) {
+        parents.push(summary.id);
+        found.push(summary.id);
+      }
+    }
+  }
+  return found;
 }
 
 /** Starts an engine with a worker of its own. */
@@ -206,13 +221,53 @@ export function createEngineOnPort(
       return client.request('classIndex', { dataset: id, breaks });
     },
 
+    contours: async (id, params, contoursOptions: ContoursOptions = {}) => {
+      assertUsable();
+      await started;
+      const { signal, onProgress } = contoursOptions;
+      const result = await client.request(
+        'contours',
+        { dataset: id, params },
+        {
+          ...(signal === undefined ? {} : { signal }),
+          ...(onProgress === undefined ? {} : { onContoursProgress: onProgress }),
+        },
+      );
+      // Whatever the answer, the worker has taken out the lines made before from this dataset: so does the list, with the new ones in
+      // the same change.
+      const before = registry
+        .summaries()
+        // (Contour lines are the one kind of derived dataset, so every dataset made from this one is a set of them.)
+        .filter((summary) => summary.derivedFrom?.id === id)
+        .map((summary) => summary.id);
+      for (const old of before) {
+        pages.forget(old);
+      }
+      registry.update(before, result.status === 'loaded' ? result.summaries : []);
+      return result;
+    },
+
+    contourDefaults: async (id, column) => {
+      assertUsable();
+      await started;
+      return client.request('contourDefaults', {
+        dataset: id,
+        ...(column === undefined ? {} : { column }),
+      });
+    },
+
     remove: async (id) => {
       assertUsable();
       await started;
       const removed = await client.request('remove', { dataset: id });
       pages.forget(id);
       if (removed) {
-        registry.remove(id);
+        // What was made from the dataset (its contour lines) went with it in the worker.
+        const gone = [id, ...madeFrom(registry.summaries(), id)];
+        for (const dataset of gone) {
+          pages.forget(dataset);
+        }
+        registry.update(gone, []);
       }
     },
 
