@@ -160,6 +160,16 @@ describe('what is selected once a removal that was waited for is over', () => {
     expect(selectionAfterRemoved(before, [dataset(1), contoursOf(2, 1)], 3, 4)).toBe(2);
   });
 
+  it('is the dataset that takes the place of what was removed when the selection is lines that were made meanwhile and went with it', () => {
+    // 2 is removed with the lines 3 made from it; while that was waited for, 3 was replaced by 5 (which is not in `before`), selected, and 5 went too.
+    const first = [dataset(1), dataset(2), contoursOf(3, 2), dataset(4)];
+    expect(selectionAfterRemoved(first, [dataset(1), dataset(4)], 2, 5)).toBe(4);
+    // And when what takes its place is the last, the one before.
+    expect(
+      selectionAfterRemoved([dataset(1), dataset(2), contoursOf(3, 2)], [dataset(1)], 2, 5),
+    ).toBe(1);
+  });
+
   it('is the first dataset listed when the one that would take its place is gone too, and nothing when nothing is left', () => {
     // Waited for, 3 was removed as well, or the selection is lines of the dataset that are gone now.
     expect(selectionAfterRemoved(before, [dataset(7)], 1, 2)).toBe(7);
