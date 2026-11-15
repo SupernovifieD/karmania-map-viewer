@@ -638,7 +638,7 @@ or releasing, and whenever the brief says to stop.
   expanded row).
 - [x] 19.10 Long content and quantity: 50 layers, 12 classes, names of 120
   characters, 10 million as a count; screenshots; axe.
-- [ ] 19.F The fixes (what CI and the review of the gate found)
+- [x] 19.F The fixes (what CI and the review of the gate found)
   - [x] 19.F1 The gallery's picture of the icons is taken again for the two icons that were added (CI found it red).
   - [x] 19.F2 (review) A layer moved into a group that is folded keeps the keyboard (on the group) and the move says that the group is folded.
   - [x] 19.F3 (review) A press whose release is lost is not a drag later; a drag that the pointer being taken away ends is proved.
@@ -652,7 +652,12 @@ or releasing, and whenever the brief says to stop.
   - [x] 19.F10 (review) The cancel of another pointer does not end a drag: only the pointer that is dragging does.
   - [x] 19.F11 (review) A press of the same pointer anywhere in the page ends a press whose release is lost; a press of another pointer does not end a drag.
   - [x] 19.F12 (gate) The states of 50 layers wait for the layers to be drawn, for as long as a busy machine needs, and have the time to do it.
-- [ ] 19.G Gate.
+- [x] 19.G Gate.
+- [ ] 19.H Follow-ups after the owner's answers to the M19 report (2026-11-15).
+  - [ ] 19.H1 Group rows: a folder icon in the room of a swatch, so that the alignment of 19.F6 looks as a tree and not as a gap.
+  - [ ] 19.H2 The palette swatches as two rows of six, with targets of 24 (WCAG 2.2).
+  - [ ] 19.H3 Notices for layers whose preparation failed or that the renderer does not draw.
+  - [ ] 19.H4 The panel scrolls by touch everywhere, and a drag scrolls it at its edges.
 
 ## M20: Contours
 
