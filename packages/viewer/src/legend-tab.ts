@@ -452,7 +452,7 @@ export class KarmaniaLegendTab extends LitElement {
   declare styles: Readonly<Record<string, StyleInfo>> | undefined;
   /** The key of the row that last had the keyboard, which is the row with the stop for Tab if it is still a row. */
   declare private current: string | undefined;
-  /** The ids of the layers that a person has opened (a layer is open only if it has lines to show: `treeItems`). */
+  /** The ids of the layers that a person has opened (every layer opens: its class lines, if it has some, and its style). */
   declare private open: ReadonlySet<string>;
   /** The group whose name is being changed in place, if one is. */
   declare private renaming: string | undefined;

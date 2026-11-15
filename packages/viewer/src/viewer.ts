@@ -711,12 +711,12 @@ export class KarmaniaViewer extends LitElement {
     this.changePanel(event.detail);
   };
 
-  /** The map area says nothing can be drawn and sends people to the Legend, which says why for each layer. */
-  /** What the Legend tab asked of the scene (to switch a layer or a group, and later to move, rename and style) is done by the command it gives. */
+  /** What the Legend tab asked of the scene (to switch, move, group, rename or style a layer) is done by the command it gives. */
   private readonly onLegendCommand = (event: CustomEvent<LegendCommand>): void => {
     this.dispatch(event.detail.command);
   };
 
+  /** The map area says nothing can be drawn and sends people to the Legend, which says why for each layer. */
   private readonly onShowLegend = (): void => {
     this.changePanel({ tab: 'legend', collapsed: false });
   };
