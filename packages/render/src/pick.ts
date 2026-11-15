@@ -9,6 +9,9 @@
  * depth). One pixel is read back, without waiting for the card.
  */
 
+import { LessDepth, NoBlending, ShaderMaterial } from 'three';
+import type { IUniform, Side } from 'three';
+
 /** The most layers that can be told apart: the alpha byte holds the place plus one, and 0 is nothing. */
 export const MAX_PICK_LAYERS = 254;
 
@@ -66,6 +69,31 @@ vec4 pickColour(float element) {
   return vec4(r, g, b, uPickLayer) / 255.0;
 }
 `;
+
+/**
+ * The material that picks for a layer: made from the layer's own shaders, which are written for a `PICK` define, and sharing its uniforms (so that
+ * the layer's look, the viewport and the tie-break of the frame are the frame's). It writes a number and not a colour, so nothing is blended; the
+ * depth test is the drawing's (strictly nearer).
+ */
+export function pickMaterial(options: {
+  readonly uniforms: Record<string, IUniform>;
+  readonly vertexShader: string;
+  readonly fragmentShader: string;
+  readonly side?: Side;
+}): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: options.uniforms,
+    defines: { PICK: '' },
+    vertexShader: options.vertexShader,
+    fragmentShader: options.fragmentShader,
+    transparent: false,
+    blending: NoBlending,
+    depthTest: true,
+    depthFunc: LessDepth,
+    depthWrite: true,
+    ...(options.side === undefined ? {} : { side: options.side }),
+  });
+}
 
 /**
  * The smallest a marker or a line is when it is picked, in CSS pixels: what is drawn is a few pixels, which a pointer does not hit on purpose, so what
