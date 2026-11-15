@@ -30,7 +30,7 @@ interface Pressed {
  * pointer is taken away (nothing is moved).
  *
  * The release is heard in the window, wherever it is; a press whose release is lost all the same (the window lost the pointer) is not a drag later: a move with no
- * button down, or a press that is not it, ends it.
+ * button down, or a new press of the same pointer anywhere in the page, ends it. What is heard of other pointers (a finger, while the mouse drags) is not this one's.
  *
  * It says what was dropped (`onDrop`) and what is dragged and where it would land (`dragging`, `drop`) for the tab to draw.
  */
@@ -49,13 +49,7 @@ export class LegendDrag implements ReactiveController {
     host.addController(this);
   }
 
-  hostConnected(): void {
-    // In the capture phase, so that it is before the press that a row is about to make.
-    this.host.addEventListener('pointerdown', this.onAnyDown, true);
-  }
-
   hostDisconnected(): void {
-    this.host.removeEventListener('pointerdown', this.onAnyDown, true);
     this.end();
   }
 
@@ -72,6 +66,8 @@ export class LegendDrag implements ReactiveController {
     // have the pointer yet), is a release all the same, and a press that never heard of it would be armed for the next time the pointer comes over the tab.
     window.addEventListener('pointerup', this.onUp);
     window.addEventListener('pointercancel', this.onCancel);
+    // In the capture phase, so that it comes before the press that a row is about to make (and not for the one that is making this).
+    window.addEventListener('pointerdown', this.onAnyDown, true);
   }
 
   /** Whether a row is being dragged (and not only pressed). */
@@ -85,11 +81,13 @@ export class LegendDrag implements ReactiveController {
   }
 
   /**
-   * A press of the pointer anywhere in the tab, before the row it is on has made its own: if one is armed already, its release never came (it was let go outside
-   * the tab, or the window lost it), and it is over. Left armed, it would make a drag of a row that nobody pressed.
+   * A press of the pointer that is pressed, anywhere in the page, before the one that a row is about to make: it is pressed again, so its release never came
+   * (it was let go where nothing heard it, or the window lost it), and the press that was armed is over. Left armed, it would make a drag of a row that nobody
+   * pressed, with the next press that is dragged over the tab. A press of another pointer (a finger, while the mouse drags) is not this one's.
    */
   private readonly onAnyDown = (event: PointerEvent): void => {
-    if (event.isPrimary && this.pressed !== undefined) {
+    const pressed = this.pressed;
+    if (pressed !== undefined && event.isPrimary && event.pointerId === pressed.pointerId) {
       this.end();
     }
   };
@@ -156,6 +154,7 @@ export class LegendDrag implements ReactiveController {
     this.host.removeEventListener('pointermove', this.onMove);
     window.removeEventListener('pointerup', this.onUp);
     window.removeEventListener('pointercancel', this.onCancel);
+    window.removeEventListener('pointerdown', this.onAnyDown, true);
     this.host.removeEventListener('lostpointercapture', this.onCancel);
     if (pressed !== undefined && this.host.hasPointerCapture(pressed.pointerId)) {
       this.host.releasePointerCapture(pressed.pointerId);

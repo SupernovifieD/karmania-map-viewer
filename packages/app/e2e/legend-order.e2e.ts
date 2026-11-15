@@ -360,6 +360,47 @@ test.describe('dragging rows of the Legend tab with the pointer', () => {
     expect(await order(page)).toEqual(START);
   });
 
+  test("ends a press whose release was lost when the pointer is pressed again anywhere in the page, and a drag that is made after it is that press's: the press is outside the tab", async ({
+    page,
+  }) => {
+    await open(page);
+    await pressWithoutRelease(page, 'layer-1');
+    const tab = await legend(page).boundingBox();
+    const handle = await middle(handleOf(page, 'layer-1'));
+    // Beside the tab, in the padding of the panel's body: a press there is not one that the tab hears, and the pointer then goes over the tab, the button down.
+    await page.mouse.move((tab?.x ?? 0) - 8, handle.y);
+    await page.mouse.down();
+    const name = await middle(layerRow(page, 'layer-2').locator('.name'));
+    await page.mouse.move(name.x, name.y, { steps: 8 });
+    await expect(legend(page)).not.toHaveAttribute('data-dragging', '');
+    await page.mouse.up();
+    expect(await order(page)).toEqual(START);
+  });
+
+  test('goes on with a drag when another pointer is pressed (a finger, while the mouse drags): only a press of the pointer that is dragging is its own', async ({
+    page,
+  }) => {
+    await open(page);
+    const target = await layerRow(page, 'layer-4').boundingBox();
+    await dragTo(page, handleOf(page, 'layer-1'), (target?.x ?? 0) + 60, (target?.y ?? 0) + 2);
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          isPrimary: true,
+          pointerId: 2,
+          pointerType: 'touch',
+          buttons: 1,
+        }),
+      );
+    });
+    await expect(legend(page)).toHaveAttribute('data-dragging', '');
+    await page.mouse.up();
+    await expect
+      .poll(() => order(page))
+      .toEqual(['group-2:layer-5', 'group-1:layer-3,layer-1,layer-4', 'layer-2']);
+  });
+
   test('goes on with a drag when another pointer is cancelled (a second finger, anywhere in the window): only the cancel of the pointer that is dragging ends it', async ({
     page,
   }) => {
