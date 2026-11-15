@@ -84,6 +84,10 @@ interface ViewerElement {
   layerStates(): [string, { status: string; fraction?: number; message?: string }][];
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
+  renderPick(
+    x: number,
+    y: number,
+  ): Promise<{ layerId: string; element: number } | null | undefined>;
   dispatch(command: unknown): unknown;
   load(input: unknown): Promise<{ status: string }>;
 }
@@ -140,6 +144,30 @@ export function pixels(
     }
     return [...read];
   }, rectangle);
+}
+
+/**
+ * What the renderer picks at a point of the map: `x` and `y` in CSS pixels from the top left of the canvas. `null` where nothing is drawn;
+ * the layer's id and the element (from 0) where something is.
+ */
+export function pickAt(
+  page: Page,
+  x: number,
+  y: number,
+): Promise<{ layerId: string; element: number } | null> {
+  return page.evaluate(
+    async ([px, py]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+      const hit = await viewer.renderPick(px as number, py as number);
+      if (hit === undefined) {
+        throw new Error('There is no renderer.');
+      }
+      return hit;
+    },
+    [x, y],
+  );
 }
 
 /** Gives the scene a command, as the controls of the viewer do. */

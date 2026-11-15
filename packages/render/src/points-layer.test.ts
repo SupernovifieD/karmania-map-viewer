@@ -36,11 +36,18 @@ const parts = (layer: ReturnType<typeof createPointsLayer>): Points[] =>
 const uniforms = (layer: ReturnType<typeof createPointsLayer>) =>
   (parts(layer)[0]?.material as ShaderMaterial).uniforms;
 
+/** A shader as the material that draws has it: the lines that are only for the material that picks are left out. */
+const drawing = (source: string): string =>
+  source.replace(
+    /#ifdef PICK[\s\S]*?(?:#else([\s\S]*?))?#endif/g,
+    (_all, otherwise?: string) => otherwise ?? '',
+  );
+
 describe('createPointsLayer', () => {
   it('writes the depth of the plane it lies in only in 3D: the material of the view from above is as it was, and the two share their uniforms', () => {
     const layer = createPointsLayer(points(3), LOOK);
     const flat = parts(layer)[0]?.material as ShaderMaterial;
-    expect(flat.fragmentShader).not.toContain('gl_FragDepth');
+    expect(drawing(flat.fragmentShader)).not.toContain('gl_FragDepth');
     expect(flat.vertexShader).not.toContain('vCentre');
     layer.prepareFrame({ ...INFO, flat: false });
     const solid = parts(layer)[0]?.material as ShaderMaterial;
@@ -54,6 +61,43 @@ describe('createPointsLayer', () => {
     );
     layer.prepareFrame({ ...INFO, flat: true });
     expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
+  it('picks with materials of its own, made from the same shaders, that write the number of each point and not a colour, and gives its own back', () => {
+    const layer = createPointsLayer(points(POINTS_PER_PART + 2), LOOK);
+    layer.step?.();
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    const back = layer.pick?.(2);
+    const picking = parts(layer).map((part) => part.material as ShaderMaterial);
+    // One material for every part, not the one that draws, with the same uniforms (so that the look and the viewport are the frame's), and nothing blended.
+    expect(new Set(picking).size).toBe(1);
+    const [using] = picking;
+    expect(using).not.toBe(flat);
+    expect(using?.defines).toHaveProperty('PICK');
+    expect(using?.uniforms).toBe(flat.uniforms);
+    expect(using?.transparent).toBe(false);
+    expect(using?.blending).toBe(0);
+    expect(using?.fragmentShader).toBe(flat.fragmentShader);
+    expect(using?.vertexShader).toBe(flat.vertexShader);
+    // The layer is the third in the drawing order, and the numbers of the points go on from one part to the next.
+    expect(flat.uniforms['uPickLayer']?.value).toBe(3);
+    const numbers = parts(layer).map(
+      (part) => part.geometry.getAttribute('aElement').array as Float32Array,
+    );
+    expect(numbers[0]?.[0]).toBe(0);
+    expect(numbers[0]?.[POINTS_PER_PART - 1]).toBe(POINTS_PER_PART - 1);
+    expect(Array.from(numbers[1] ?? [])).toEqual([POINTS_PER_PART, POINTS_PER_PART + 1]);
+    back?.();
+    expect(parts(layer).every((part) => part.material === flat)).toBe(true);
+    // In 3D it has its own, that write the depth of the plane as the drawing does; made once.
+    layer.prepareFrame({ ...INFO, flat: false });
+    layer.pick?.(0);
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    expect(solid).not.toBe(using);
+    expect(solid.defines).toHaveProperty('PICK');
+    expect(solid.fragmentShader).toContain('gl_FragDepth = tiedDepth(plane)');
+    layer.pick?.(0);
+    expect(parts(layer)[0]?.material).toBe(solid);
   });
 
   it('gives a part that is built later the material of the view it is in, and frees both materials', () => {

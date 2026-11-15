@@ -17,7 +17,7 @@ import {
   zoom3dAt,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
+import type { Controller2d, Controller3d, PickHit, Renderer, RenderStats } from '@karmania/render';
 import {
   cameraTo2d,
   cameraTo3d,
@@ -307,6 +307,14 @@ export class KarmaniaViewer extends LitElement {
   /** A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer. */
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined {
     return this.renderer?.readPixels(x, y, width, height);
+  }
+
+  /**
+   * Which element of which layer is at a point of the map (`x` and `y` in CSS pixels from the top left of the canvas), as the renderer picks it
+   * (see `Renderer.pick`); `null` where there is none, and `undefined` without a renderer. For tests, and for what a click does.
+   */
+  async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
+    return this.renderer?.pick(x, y);
   }
 
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
