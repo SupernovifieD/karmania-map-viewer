@@ -16,8 +16,12 @@ import {
   loadLattice,
   pickAt,
   pixels,
+  sceneFrame,
+  setViewMode,
+  stats,
   withData,
 } from './support/render.js';
+import { pixelOf3d } from './support/project.js';
 import { importAndLoad } from './support/wizard.js';
 
 /** The points of `points.csv`: easting and northing in the file's own coordinates (EPSG:32640), in the order of the file (element 0 first). */
@@ -924,5 +928,376 @@ test.describe('picking blocks', () => {
     );
     await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
     expect(await pickNear(page, middleOf(1, 1), { scale: 0.25 })).toBeNull();
+  });
+});
+
+/**
+ * Looks at `target` (map coordinates) with the 3D camera from `heading` and `elevation` (degrees) at `distance`, and gives a way to say what is picked
+ * where a point of the map is seen: the pixel the camera puts it at, in CSS pixels from the top left, worked out from the renderer's own account of its camera.
+ */
+async function look3d(
+  page: Page,
+  target: readonly [number, number, number],
+  options: { heading?: number; elevation?: number; distance?: number },
+) {
+  const { heading = 0, elevation = 45, distance = 300 } = options;
+  await dispatch(
+    page,
+    {
+      type: 'setCamera',
+      patch: { camera3d: { target: [...target], distance, heading, elevation, fov: 45 } },
+    },
+    { type: 'setViewMode', mode: '3d' },
+  );
+  await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
+  const frame = await sceneFrame(page);
+  const origin = frame?.origin ?? [0, 0, 0];
+  // The camera looks at the target (relative to the origin of the frame, as the renderer has it) before anything is asked of it.
+  await expect
+    .poll(async () =>
+      (await stats(page))?.perspective?.target.map((value, axis) =>
+        Math.round(value - ((target[axis] ?? 0) - (origin[axis] ?? 0))),
+      ),
+    )
+    .toEqual([0, 0, 0]);
+  return {
+    /** What is picked where the point (map coordinates) is seen. */
+    async at(point: readonly [number, number, number]) {
+      const now = await drawn(page);
+      const buffer = pixelOf3d(now, origin, point);
+      if (buffer === undefined) {
+        throw new Error('The point is behind the camera.');
+      }
+      return pickAt(
+        page,
+        (buffer.x + 0.5) / now.pixelRatio,
+        (now.height - buffer.y - 0.5) / now.pixelRatio,
+      );
+    },
+  };
+}
+
+test.describe('picking in 3D', () => {
+  /** The faces of the pyramid of `SHAPES` and the plate over it; the height of the pyramid at `(east, north)` metres from its corner. */
+  const heightOfPyramid = (east: number, north: number): number =>
+    40 * (1 - Math.max(Math.abs(east - 50), Math.abs(north - 50)) / 50);
+  const at = (east: number, north: number, up: number): [number, number, number] => [
+    EAST_ORIGIN + east,
+    NORTH_ORIGIN + north,
+    up,
+  ];
+
+  async function loadShapes(page: Page): Promise<void> {
+    await page.goto('/?theme=light');
+    const text = [
+      ...SHAPES.map(
+        ([e, n, u]) => `v ${String(EAST_ORIGIN + e)} ${String(NORTH_ORIGIN + n)} ${String(u)}`,
+      ),
+      ...FACES.map((face) => `f ${face.join(' ')}`),
+    ].join('\n');
+    await importAndLoad(
+      page,
+      { name: 'shapes.obj', mimeType: 'text/plain', buffer: Buffer.from(`${text}\n`) },
+      projectionFor('shapes.prj'),
+    );
+    await drawn(page);
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+  }
+
+  test('picks the triangle that the camera sees at a point of a mesh, from above and from the side, and the nearer of two that are over each other', async ({
+    page,
+  }) => {
+    await loadShapes(page);
+    // From straight above at the apex, the faces are where they are in 2D (but for the perspective).
+    const above = await look3d(page, at(50, 50, 20), { elevation: 90, distance: 400 });
+    expect((await above.at(at(50, 92, heightOfPyramid(50, 92))))?.element).toBe(4);
+    expect((await above.at(at(92, 50, heightOfPyramid(92, 50))))?.element).toBe(3);
+    expect((await above.at(at(8, 50, heightOfPyramid(8, 50))))?.element).toBe(5);
+    expect((await above.at(at(15, 3, heightOfPyramid(15, 3))))?.element).toBe(2);
+    // From the south, a little above the horizon: the plate at 100 m is over the south face of the pyramid and nearer the camera than the faces
+    // behind it along the same line of sight, and it is what is picked there; where it is not in the way the face is.
+    const side = await look3d(page, at(50, 50, 40), { elevation: 20, distance: 400 });
+    expect((await side.at(at(50, 20, 100)))?.element).toBe(1);
+    expect((await side.at(at(60, 5, 100)))?.element).toBe(0);
+    expect((await side.at(at(15, 3, heightOfPyramid(15, 3))))?.element).toBe(2);
+    // The pyramid's north face is behind its south face seen from the south: the line of sight to it is the south face's.
+    expect((await side.at(at(50, 85, heightOfPyramid(50, 85))))?.element).not.toBe(4);
+  });
+
+  test('does not pick a point that is behind a hill, as it is not seen, and picks it from where it is', async ({
+    page,
+  }) => {
+    await loadShapes(page);
+    // A point 10 metres beyond the north foot of the pyramid, at ground level.
+    const loaded = await page.evaluate(() => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        load(input: unknown): Promise<{ status: string }>;
+      };
+      return viewer.load({
+        kind: 'points',
+        name: 'Cairn',
+        crs: { kind: 'epsg', code: 32640 },
+        x: new Float64Array([500_050]),
+        y: new Float64Array([2_765_110]),
+        z: new Float64Array([0]),
+        columns: [],
+      });
+    });
+    expect(loaded.status).toBe('loaded');
+    await expect
+      .poll(async () => layerStatuses(page))
+      .toEqual([
+        ['layer-1', 'drawn'],
+        ['layer-2', 'drawn'],
+      ]);
+    const cairn = at(50, 110, 0);
+    // From above it is the point (layer-2, element 0).
+    const above = await look3d(page, at(50, 80, 0), { elevation: 90, distance: 400 });
+    expect(await above.at(cairn)).toEqual({ layerId: 'layer-2', element: 0 });
+    // From the south at 20 degrees the ray to it passes the apex 22 metres below the apex's height: the pyramid is in the way, and is what is picked.
+    const side = await look3d(page, at(50, 80, 0), { elevation: 20, distance: 400 });
+    const hit = await side.at(cairn);
+    expect(hit?.layerId).toBe('layer-1');
+    // From the north it is seen: nothing is in front of it.
+    const north = await look3d(page, at(50, 80, 0), { elevation: 20, distance: 400, heading: 180 });
+    expect(await north.at(cairn)).toEqual({ layerId: 'layer-2', element: 0 });
+  });
+});
+
+test.describe('picking blocks in 3D', () => {
+  const COLUMNS = 4;
+  const ROWS = 3;
+  const LAYERS = 2;
+  const numberOf = (i: number, j: number, k: number): number => (k * ROWS + j) * COLUMNS + i;
+
+  test('picks the block whose side face the camera sees, and not the blocks behind it, nor the faces that no camera sees', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'blocks', {
+      name: 'model',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [10, 10, 5],
+      dims: [COLUMNS, ROWS, LAYERS],
+      values: Array.from({ length: COLUMNS * ROWS * LAYERS }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+    const south = await look3d(page, [EAST_ORIGIN + 20, NORTH_ORIGIN + 15, 5], {
+      elevation: 15,
+      heading: 0,
+      distance: 120,
+    });
+    // The south face of the block (i, 0, k): its middle is at 10 i + 5 east, 0 north, 5 k + 2.5 up. Nothing else is nearer along the line of sight.
+    for (const [i, k] of [
+      [0, 0],
+      [2, 1],
+      [3, 0],
+      [1, 1],
+    ] as const) {
+      expect(
+        await south.at([EAST_ORIGIN + 10 * i + 5, NORTH_ORIGIN, 5 * k + 2.5]),
+        `south face of the block ${String(i)}, 0, ${String(k)}`,
+      ).toEqual({ layerId: 'layer-1', element: numberOf(i, 0, k) });
+    }
+    // The top of a block at the back (the row 2, which is the highest layer) is seen over the front ones from this low angle.
+    expect((await south.at([EAST_ORIGIN + 25, NORTH_ORIGIN + 25, 10]))?.element).toBe(
+      numberOf(2, 2, 1),
+    );
+  });
+});
+
+test.describe('picking lines in 3D', () => {
+  test('picks the line at the height it is drawn at', async ({ page }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, fixture('lines.csv'), projectionFor('lines.prj'));
+    await drawn(page);
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+    // A goes from (500000, 2765000, 100) to (500050, 2765040, 102) and on to (500100, 2765100, 105); B from (500200, 2765000, 98) to (500260, 2765060, 99).
+    const view = await look3d(page, [500_100, 2_765_040, 100], {
+      elevation: 40,
+      heading: 20,
+      distance: 300,
+    });
+    expect(await view.at([500_025, 2_765_020, 101])).toEqual({ layerId: 'layer-1', element: 0 });
+    expect(await view.at([500_075, 2_765_070, 103.5])).toEqual({ layerId: 'layer-1', element: 0 });
+    expect(await view.at([500_230, 2_765_030, 98.5])).toEqual({ layerId: 'layer-1', element: 1 });
+    // Where the line is not, at the same place on the ground but a long way above or below it, nothing.
+    expect(await view.at([500_025, 2_765_020, 160])).toBeNull();
+  });
+});
+
+/** Loads a point in the middle of the cell (2, 3) of a grid of 6 by 6 cells of 10 metres at the origin, at the height of the grid: a second layer, above it in the legend. */
+async function loadMarker(page: Page): Promise<void> {
+  const loaded = await page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+      load(input: unknown): Promise<{ status: string }>;
+    };
+    return viewer.load({
+      kind: 'points',
+      name: 'Marker',
+      crs: { kind: 'epsg', code: 32640 },
+      x: new Float64Array([500_025]),
+      y: new Float64Array([2_765_035]),
+      z: new Float64Array([0]),
+      columns: [],
+    });
+  });
+  expect(loaded.status).toBe('loaded');
+  await expect
+    .poll(async () => layerStatuses(page))
+    .toEqual([
+      ['layer-1', 'drawn'],
+      ['layer-2', 'drawn'],
+    ]);
+}
+
+test.describe('picking layers in one plane in 3D', () => {
+  test('is the layer that is higher in the legend where a grid and points lie in one plane, as it is drawn, whichever way the camera looks', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'floor',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [10, 10, 1],
+      dims: [6, 6, 1],
+      values: Array.from({ length: 36 }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await loadMarker(page);
+    const marker: [number, number, number] = [500_025, 2_765_035, 0];
+    // The newer layer is the higher in the legend: the point is on top of the cell it lies in, seen from the side as from above.
+    for (const [heading, elevation] of [
+      [0, 25],
+      [180, 25],
+      [90, 40],
+      [0, 90],
+    ] as const) {
+      const view = await look3d(page, marker, { heading, elevation, distance: 200 });
+      expect(
+        await view.at(marker),
+        `heading ${String(heading)}, elevation ${String(elevation)}`,
+      ).toEqual({ layerId: 'layer-2', element: 0 });
+    }
+    // With the grid moved to the top of the legend it is the cell.
+    await dispatch(page, { type: 'moveNode', id: 'layer-1', to: { parent: null, index: 0 } });
+    const view = await look3d(page, marker, { heading: 0, elevation: 25, distance: 200 });
+    expect(await view.at(marker)).toEqual({ layerId: 'layer-1', element: 3 * 6 + 2 });
+  });
+
+  test('is the marker over the whole of its disc, not only at its middle, when the plane it lies in is seen at a grazing angle', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'floor',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [10, 10, 1],
+      dims: [6, 6, 1],
+      values: Array.from({ length: 36 }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await loadMarker(page);
+    const marker: [number, number, number] = [500_025, 2_765_035, 0];
+    // At 12 degrees above the horizon the plane of the grid is across most of the marker's disc in depth, and a marker with one depth of its own would be
+    // behind it over half the disc: the pick is the marker's wherever its disc is, as the drawing is.
+    await look3d(page, marker, { heading: 0, elevation: 12, distance: 200 });
+    const now = await drawn(page);
+    const buffer = pixelOf3d(now, (await sceneFrame(page))?.origin ?? [0, 0, 0], marker);
+    if (buffer === undefined) throw new Error('The marker is behind the camera.');
+    const [x, y] = [
+      (buffer.x + 0.5) / now.pixelRatio,
+      (now.height - buffer.y - 0.5) / now.pixelRatio,
+    ];
+    for (const [dx, dy] of [
+      [0, 0],
+      [0, -4],
+      [0, 4],
+      [-4, 0],
+      [4, 0],
+      [3, 3],
+    ] as const) {
+      expect(
+        await pickAt(page, x + dx, y + dy),
+        `${String(dx)}, ${String(dy)} from the marker`,
+      ).toEqual({
+        layerId: 'layer-2',
+        element: 0,
+      });
+    }
+  });
+
+  test('is the 3D view as soon as it is asked for, before a frame of it is drawn', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'floor',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [10, 10, 1],
+      dims: [6, 6, 1],
+      values: Array.from({ length: 36 }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await loadMarker(page);
+    // Warmed: picked once in 3D, so that the programs that pick in 3D are made (they are made at the first pick, and frames are drawn while they are),
+    // and then back to the view from above, drawn.
+    const warm = await look3d(page, [500_025, 2_765_035, 0], {
+      heading: 0,
+      elevation: 25,
+      distance: 200,
+    });
+    expect((await warm.at([500_025, 2_765_035, 0]))?.layerId).toBe('layer-2');
+    await setViewMode(page, '2d');
+    await expect.poll(async () => (await stats(page))?.viewMode).toBe('2d');
+    const settled = (await drawn(page)).frames;
+    await expect.poll(async () => (await stats(page))?.frames ?? 0).toBeGreaterThan(settled);
+    // In one go: switch to 3D looking at the marker, wait only for the microtasks, and pick at the middle of the map, where the target is. The layers
+    // were last drawn for the view from above, and are told what the view is as they are picked.
+    const hit = await page.evaluate(async () => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        dispatch(command: unknown): unknown;
+        setViewMode(mode: '2d' | '3d'): void;
+        renderStats(): { frames: number; cssWidth: number; cssHeight: number } | undefined;
+        renderPick(
+          x: number,
+          y: number,
+        ): Promise<{ layerId: string; element: number } | null | undefined>;
+      };
+      const before = viewer.renderStats()?.frames ?? 0;
+      viewer.dispatch({
+        type: 'setCamera',
+        patch: {
+          camera3d: {
+            target: [500_025, 2_765_035, 0],
+            distance: 200,
+            heading: 0,
+            elevation: 25,
+            fov: 45,
+          },
+        },
+      });
+      viewer.setViewMode('3d');
+      for (let i = 0; i < 4; i += 1) {
+        await Promise.resolve();
+      }
+      const size = viewer.renderStats();
+      const picked = await viewer.renderPick((size?.cssWidth ?? 0) / 2, (size?.cssHeight ?? 0) / 2);
+      return { picked, framesBetween: (viewer.renderStats()?.frames ?? 0) - before };
+    });
+    expect(hit.picked).toEqual({ layerId: 'layer-2', element: 0 });
   });
 });
