@@ -87,6 +87,16 @@ export type {
   Size,
 } from './export-layout.js';
 export { MAX_EXPORT_FOV, exportCamera2d, exportCamera3d } from './export-frame.js';
+export {
+  EXPORT_DPIS,
+  MAX_EXPORT_SIDE,
+  MIN_EXPORT_SIDE,
+  SIZE_PRESETS,
+  maxSide,
+  sizeInPixels,
+  sizeProblems,
+} from './export-size.js';
+export type { ExportDpi, GpuSizes, SizePreset, SizeProblem } from './export-size.js';
 export { exportLegendLines } from './export-lines.js';
 export type { ExportLine } from './export-lines.js';
 export { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';
