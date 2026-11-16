@@ -1,7 +1,8 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth } from 'three';
-import type { InstancedBufferGeometry, Mesh, ShaderMaterial } from 'three';
+import type { InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
+import { ROUND_AMBIENT } from './light.js';
 import { MAX_CLASSES } from './look.js';
 import { drawing } from './pick-test-support.js';
 import type { FrameInfo, LayerLook } from './look.js';
@@ -138,6 +139,33 @@ describe('createLinesLayer', () => {
     );
     layer.prepareFrame({ ...INFO, flat: true });
     expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
+  it('lights the segments as tubes only in 3D and only when it is asked to (the outline of a polygon is flat), with the light of the frame', () => {
+    const asked = createLinesLayer(lines(2), LOOK, { tube: true });
+    const flat = parts(asked)[0]?.material as ShaderMaterial;
+    expect(flat.fragmentShader).not.toContain('uLight');
+    asked.prepareFrame({ ...INFO, flat: false, light: [-0.5, 0.5, Math.SQRT1_2] });
+    const solid = parts(asked)[0]?.material as ShaderMaterial;
+    const lit = drawing(solid.fragmentShader);
+    expect(lit).toContain('colour *= uAmbient + (1.0 - uAmbient) * max(dot(normal, uLight), 0.0)');
+    // The colour is lit before the line is drawn in it.
+    expect(lit.indexOf('colour *= uAmbient')).toBeLessThan(lit.indexOf('gl_FragColor'));
+    // The shading is in the branch that draws, and not in the one that picks, which writes a number and not a colour.
+    const picking = [...solid.fragmentShader.matchAll(/#ifdef PICK([\s\S]*?)#else/g)]
+      .map((match) => match[1])
+      .join('');
+    expect(picking).not.toContain('uAmbient');
+    expect((solid.uniforms['uLight']?.value as Vector3).toArray()).toEqual([
+      -0.5,
+      0.5,
+      Math.SQRT1_2,
+    ]);
+    expect(solid.uniforms['uAmbient']?.value).toBe(ROUND_AMBIENT);
+    // Without the option, which is what the outline of a polygon has, the 3D material is as it was.
+    const plain = createLinesLayer(lines(2), LOOK);
+    plain.prepareFrame({ ...INFO, flat: false });
+    expect((parts(plain)[0]?.material as ShaderMaterial).fragmentShader).not.toContain('uLight');
   });
 
   it('puts a layer of few segments in one part with one instance for each, and has nothing to step', () => {
