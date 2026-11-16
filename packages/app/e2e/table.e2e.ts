@@ -641,6 +641,54 @@ test.describe('the table', () => {
       expect(widths[1]).toBeGreaterThan(200);
     });
 
+    test('do not show a row that was asked for in the rows that there were, once they are given other rows before there was room', async ({
+      page,
+    }) => {
+      const found = await page.evaluate(async () => {
+        const holder = document.createElement('div');
+        holder.style.cssText = 'display: none; height: 300px; width: 600px;';
+        const table = document.createElement('k-table') as HTMLElement & {
+          rowCount: number;
+          fetch: (start: number, count: number) => Promise<unknown>;
+          showRow(row: number): void;
+          updateComplete: Promise<boolean>;
+        };
+        table.rowCount = 1000;
+        table.fetch = (start, count) =>
+          Promise.resolve({
+            start,
+            count,
+            columns: [
+              {
+                name: 'word',
+                values: Array.from({ length: count }, (_, i) => `word ${String(start + i)}`),
+                nulls: new Uint8Array(count),
+              },
+            ],
+          });
+        holder.append(table);
+        document.body.append(holder);
+        await table.updateComplete;
+        const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300));
+        await settle();
+        // There is no room to show a row in: the request waits for it.
+        table.showRow(300);
+        table.rowCount = 500;
+        await table.updateComplete;
+        holder.style.display = 'block';
+        await settle();
+        const viewport = table.shadowRoot?.querySelector('.viewport');
+        const result = {
+          active: viewport?.getAttribute('aria-activedescendant'),
+          scrolled: viewport?.scrollTop,
+          focused: table.shadowRoot?.activeElement !== null,
+        };
+        holder.remove();
+        return result;
+      });
+      expect(found).toEqual({ active: 'cell-0-0', scrolled: 0, focused: false });
+    });
+
     test('mark the words they cut as cut on purpose, so that an ellipsis is not taken for an overflow', async ({
       page,
     }) => {
