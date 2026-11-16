@@ -20,6 +20,8 @@ export const EXPORT_COLOURS = {
   border: '#7d8794',
   /** The decorative line, `--k-border`. */
   divider: '#dfe3e8',
+  /** The head of the north arrow's needle: `--k-accent`. */
+  accent: '#1a56c4',
 } as const;
 
 /** The type of the picture (the type scale of the stylesheet: `--k-font-size-*` and `--k-line-height-*`), in pixels, and the weights used. */
@@ -54,6 +56,9 @@ export const LEGEND_ROW = {
   /** The least the text of a count is from the label before it. */
   countGap: 16,
 } as const;
+
+/** The box of the furniture over the map (the north arrow and the scale bar), as the screen has it: a raised surface, a line of 1 round it, corners of 8 (`--k-radius-lg`). */
+export const EXPORT_FURNITURE = { border: 1, radius: 8 } as const;
 
 /** The scale bar of the picture, as the one on the screen (`scale-bar.ts` of the viewer): 24 high, ticks of its height at the ends, a line of 2. */
 export const EXPORT_SCALE_BAR = {
