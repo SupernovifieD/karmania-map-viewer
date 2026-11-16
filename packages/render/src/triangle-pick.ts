@@ -80,8 +80,20 @@ export function createTrianglePicker(
 
   /** Makes the pick triangles of `order` (or all), a part of `TRIANGLES_PER_PART` at a time, each triangle with three vertices of its own. */
   function build(order: Uint32Array | undefined, version: number): void {
-    clear();
     const count = order === undefined ? Math.min(total, version) : order.length;
+    // A layer that is not by class and is still being built grows: the parts that are made are kept (they hold the triangles before `made.version`, whatever their
+    // size), and only the triangles after it are made. (Made again whole in each frame of the building, a layer of a million triangles would copy them ten times
+    // over, and each time more.)
+    const grown =
+      order === undefined &&
+      made !== undefined &&
+      made.order === undefined &&
+      made.version > 0 &&
+      made.version < version;
+    const first = grown && made !== undefined ? made.version : 0;
+    if (!grown) {
+      clear();
+    }
     material ??= pickMaterial({
       uniforms: { uPickLayer: layerNumber },
       vertexShader: VERTEX,
@@ -89,7 +101,7 @@ export function createTrianglePicker(
       side: DoubleSide,
     });
     material.depthWrite = options.depthWrite;
-    for (let from = 0; from < count; from += TRIANGLES_PER_PART) {
+    for (let from = first; from < count; from += TRIANGLES_PER_PART) {
       const size = Math.min(TRIANGLES_PER_PART, count - from);
       const places = new Float32Array(size * 9);
       const elements = new Float32Array(size * 3);
