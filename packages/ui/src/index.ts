@@ -27,6 +27,12 @@ export type { SegmentedChange, SegmentedOption } from './components/segmented.js
 export { CHECKBOX_CHANGE, KCheckbox } from './components/checkbox.js';
 export type { CheckboxChange } from './components/checkbox.js';
 export { KProgress } from './components/progress.js';
-export { KTable, TABLE_PAGE_SIZE } from './components/table.js';
-export type { TableColumn, TableFetch, TableRows, TableValues } from './components/table.js';
+export { KTable, TABLE_PAGE_SIZE, TABLE_SELECT } from './components/table.js';
+export type {
+  TableColumn,
+  TableFetch,
+  TableRows,
+  TableSelect,
+  TableValues,
+} from './components/table.js';
 export { NULL_TEXT, formatCell, formatNumber, isNumeric } from './components/table-format.js';

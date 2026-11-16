@@ -42,6 +42,14 @@ export interface TableRows {
 /** Gets `count` rows, from row `start` (counting from 0). */
 export type TableFetch = (start: number, count: number) => Promise<TableRows>;
 
+/** The name of the event the table sends when a person selects a row (a click on a cell, or Enter or Space on the cell the keyboard is on). */
+export const TABLE_SELECT = 'k-table-select';
+
+/** Which row was selected, counting from 0. */
+export interface TableSelect {
+  readonly row: number;
+}
+
 /** How many rows are asked for at a time. */
 export const TABLE_PAGE_SIZE = 256;
 
@@ -123,6 +131,7 @@ export class KTable extends LitElement {
   static override properties = {
     rowCount: { type: Number },
     fetch: { attribute: false },
+    selectedRow: { attribute: false },
     label: { type: String },
     columns: { state: true },
     layout: { state: true },
@@ -249,6 +258,17 @@ export class KTable extends LitElement {
         color: var(--k-text-muted);
       }
 
+      /* The row that is selected (it is the selection of the map too): a tint of the accent over the cells, which the row numbers and the cell the keyboard is on keep their own marks over. */
+      .row[aria-selected='true'] .cell:not(.number) {
+        background: color-mix(in srgb, var(--k-accent) 16%, transparent);
+      }
+
+      .row[aria-selected='true'] .cell.number {
+        background: color-mix(in srgb, var(--k-accent) 16%, var(--k-surface));
+        color: var(--k-text);
+        font-weight: var(--k-weight-medium);
+      }
+
       .head {
         font-weight: var(--k-weight-medium);
         line-height: calc(var(--k-table-header-height) - var(--k-border-width));
@@ -295,6 +315,10 @@ export class KTable extends LitElement {
   declare fetch: TableFetch | undefined;
   /** What the table is called, for people who cannot see it. */
   declare label: string;
+  /** The row that is selected, counting from 0, if one is: it is tinted and says so to assistive technology. */
+  declare selectedRow: number | undefined;
+  /** A row that was asked to be shown before the table was laid out: it is shown when it is. */
+  private wanted: number | undefined;
   /** The names of the columns, once the first page is in. */
   declare private columns: readonly TableColumn[];
   /** How wide the columns are, once they have been measured. */
@@ -333,6 +357,7 @@ export class KTable extends LitElement {
     this.rowCount = 0;
     this.fetch = undefined;
     this.label = 'Table';
+    this.selectedRow = undefined;
     this.columns = [];
     this.layout = undefined;
     this.scrolled = 0;
@@ -409,6 +434,7 @@ export class KTable extends LitElement {
     this.askForPages();
     this.forgetFarPages();
     this.titleCutWords();
+    this.showWanted();
     if (this.retrying && !this.hasProblem()) {
       this.retrying = false;
       this.viewport?.focus();
@@ -503,6 +529,12 @@ export class KTable extends LitElement {
         column = lastColumn;
         row = event.ctrlKey ? lastRow : row;
         break;
+      case 'Enter':
+      case ' ':
+        // The row the keyboard is on is selected.
+        event.preventDefault();
+        this.select(this.activeRow);
+        return;
       default:
         return;
     }
@@ -515,15 +547,58 @@ export class KTable extends LitElement {
     );
   };
 
-  /** A click on a cell puts the keyboard there. */
+  /** A click on a cell puts the keyboard there, and selects its row. */
   private readonly onClick = (event: MouseEvent): void => {
     const cell = event.target instanceof Element ? event.target.closest('[role="gridcell"]') : null;
     const row = Number(cell?.parentElement?.getAttribute('aria-rowindex'));
     const column = Number(cell?.getAttribute('aria-colindex'));
     if (cell !== null && Number.isInteger(row) && Number.isInteger(column)) {
       this.moveTo(row - 2, column - 2, 0);
+      this.select(row - 2);
     }
   };
+
+  /** Says that a person selected a row. */
+  private select(row: number): void {
+    this.dispatchEvent(
+      new CustomEvent<TableSelect>(TABLE_SELECT, {
+        detail: { row },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
+   * Puts the keyboard on row `row` (counting from 0) and scrolls as far as shows it, and gives the table the focus: for a person who asked to be shown a row
+   * ("Show in table"). The table keeps the column it was on. If the table has not been laid out yet (it was only just made, or is being measured) it is done
+   * when it is. A row that the table does not have is not shown.
+   */
+  showRow(row: number): void {
+    if (!Number.isInteger(row) || row < 0) {
+      return;
+    }
+    this.wanted = row;
+    this.showWanted();
+  }
+
+  private showWanted(): void {
+    const row = this.wanted;
+    const viewport = this.viewport;
+    if (
+      row === undefined ||
+      this.layout === undefined ||
+      viewport === null ||
+      this.bodyHeight <= 0
+    ) {
+      return;
+    }
+    this.wanted = undefined;
+    if (row < this.rowCount) {
+      this.moveTo(row, Math.min(this.activeColumn, Math.max(0, this.columns.length - 1)), 0);
+      viewport.focus();
+    }
+  }
 
   /** The rows that are drawn now. */
   private currentWindow() {
@@ -722,7 +797,12 @@ export class KTable extends LitElement {
 
   private renderRow(row: number) {
     return html`
-      <div class="row" role="row" aria-rowindex=${row + 2}>
+      <div
+        class="row"
+        role="row"
+        aria-rowindex=${row + 2}
+        aria-selected=${row === this.selectedRow ? 'true' : nothing}
+      >
         <div class="cell number" role="rowheader">${row + 1}</div>
         ${this.columns.map((column, index) => {
           const cell = this.cell(row, index);
