@@ -2,6 +2,7 @@ import { kButton, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
+import { createClickDetector } from './map-click.js';
 import './nav-group.js';
 import './north-arrow.js';
 import './scale-bar.js';
@@ -27,6 +28,9 @@ export const SHOW_LEGEND = 'karmania-show-legend';
 
 /** The name of the event the map area sends when the pointer moves over it, or leaves it. */
 export const POINTER_ON_MAP = 'karmania-pointer-on-map';
+
+/** The name of the event the map area sends when the map is clicked: pressed and let go in one place, on the map and not on what is laid over it. */
+export const MAP_CLICK = 'karmania-map-click';
 
 /** Where the pointer is on the map, in CSS pixels from its top left, and how big the map is; `null` when it is off the map. */
 export type PointerOnMap = {
@@ -312,6 +316,9 @@ export class KarmaniaMapArea extends LitElement {
         tabindex=${this.interactive ? '0' : nothing}
         @pointermove=${this.onPointerMove}
         @pointerleave=${this.onPointerLeave}
+        @pointerdown=${this.onPointerDown}
+        @pointerup=${this.onPointerUp}
+        @pointercancel=${this.onPointerCancel}
         @dragenter=${this.onDragEnter}
         @dragover=${this.onDragOver}
         @dragleave=${this.onDragLeave}
@@ -390,6 +397,34 @@ export class KarmaniaMapArea extends LitElement {
 
   private readonly onPointerLeave = (): void => {
     this.tell(null);
+  };
+
+  /** What says whether a press and a release were a click (`map-click.ts`). */
+  private readonly clicks = createClickDetector();
+
+  private readonly onPointerDown = (event: PointerEvent): void => {
+    // On the map itself: the target is the canvas or the main element, and not a control laid over them.
+    const first = event.composedPath()[0];
+    this.clicks.down(event, first === this.canvas || first === event.currentTarget);
+  };
+
+  private readonly onPointerUp = (event: PointerEvent): void => {
+    const at = this.clicks.up(event);
+    const box = this.canvas?.getBoundingClientRect();
+    if (at === undefined || box === undefined) {
+      return;
+    }
+    this.dispatchEvent(
+      new CustomEvent<PointerOnMap>(MAP_CLICK, {
+        detail: { x: at.x - box.left, y: at.y - box.top, width: box.width, height: box.height },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private readonly onPointerCancel = (): void => {
+    this.clicks.cancel();
   };
 
   private tell(where: PointerOnMap): void {
@@ -513,6 +548,7 @@ declare global {
     [IMPORT_REQUEST]: CustomEvent;
     [SHOW_LEGEND]: CustomEvent;
     [POINTER_ON_MAP]: CustomEvent<PointerOnMap>;
+    [MAP_CLICK]: CustomEvent<PointerOnMap>;
     [FILES_DROPPED]: CustomEvent<DroppedFiles>;
   }
 }

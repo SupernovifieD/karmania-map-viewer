@@ -642,6 +642,28 @@ export class KarmaniaViewer extends LitElement {
     }
   };
 
+  /** The pick that was asked for last: the answer of an older one that comes after is not taken. */
+  private pickSerial = 0;
+
+  /**
+   * A click on the map selects what is at that point of it (the renderer's pick), or nothing when nothing is: a click on the empty map clears the
+   * selection. The answer comes from the card a little later, and one that a later click has overtaken is dropped.
+   */
+  private readonly onMapClick = (event: CustomEvent<PointerOnMap>): void => {
+    const click = event.detail;
+    const renderer = this.renderer;
+    if (click === null || renderer === undefined) {
+      return;
+    }
+    this.pickSerial += 1;
+    const serial = this.pickSerial;
+    void renderer.pick(click.x, click.y).then((hit) => {
+      if (serial === this.pickSerial && this.renderer === renderer) {
+        this.store.dispatch({ type: 'setSelection', selection: hit });
+      }
+    });
+  };
+
   /** Stops listening to the scene; set while the viewer is in a page. */
   private unlistenScene: (() => void) | undefined;
 
@@ -992,6 +1014,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-navigate=${this.onNavigate}
           @karmania-map-crs-request=${this.onMapCrsRequest}
           @karmania-pointer-on-map=${this.onPointer}
+          @karmania-map-click=${this.onMapClick}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
