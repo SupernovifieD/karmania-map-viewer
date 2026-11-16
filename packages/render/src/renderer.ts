@@ -28,7 +28,9 @@ import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import { frameLight } from './light.js';
-import { MAX_PICK_LAYERS, decodePick } from './pick.js';
+import { createHighlight } from './highlight.js';
+import type { Highlight } from './highlight.js';
+import { MAX_PICK_LAYERS, decodePick, encodePick } from './pick.js';
 import type { PickHit } from './pick.js';
 import { tieBreak } from './tie-break.js';
 import type { LayerOutcome } from './layer-set.js';
@@ -122,6 +124,12 @@ export interface Renderer {
    * @throws Error while the card has the context away: there is nothing to read.
    */
   readPixels(x: number, y: number, width: number, height: number): Uint8Array;
+  /**
+   * The element that is selected, or `null` for none: an outline is drawn round it, over the layers, in the accent colour of the canvas (its CSS `accent-color`)
+   * and a ring of the colour of the text outside that. The outline is of the pixels that picking would pick for the element, so it follows the shape the layer
+   * draws it in, in 2D and in 3D. A selection of a layer that is not there, is not visible or is beyond the first `MAX_PICK_LAYERS` draws nothing.
+   */
+  setSelection(selection: PickHit | null): void;
   /**
    * Which element of which layer is at a point of the map: `x` and `y` in CSS pixels from the top left of the canvas. The layers that are drawn
    * (the visible ones, and the pixels of them that are drawn: what a class has no colour for is not there) are drawn again into a target that holds
@@ -363,6 +371,8 @@ export async function createRenderer(
 
   /** The colour of outlines: the colour of the text where the canvas is, which contrasts with the map in the theme that it is in. */
   let outline: readonly [number, number, number] = [0, 0, 0];
+  /** The accent colour, from the canvas's `accent-color`: the outline of the selected element. */
+  let accent: readonly [number, number, number] = [0.102, 0.337, 0.769];
 
   /** What the map is cleared to is the background of the canvas, which the page gives (the token `--k-surface-map`). */
   let background = '';
@@ -370,6 +380,9 @@ export async function createRenderer(
     const style = view.getComputedStyle(canvas);
     const ink = parseCssColour(style.color);
     outline = ink === undefined ? [0, 0, 0] : [ink.r / 255, ink.g / 255, ink.b / 255];
+    const accented = parseCssColour(style.accentColor);
+    accent =
+      accented === undefined ? accent : [accented.r / 255, accented.g / 255, accented.b / 255];
     const colour = parseCssColour(style.backgroundColor);
     const opaque = colour !== undefined && colour.a > 0 ? colour : undefined;
     const text =
@@ -402,6 +415,93 @@ export async function createRenderer(
       }
     };
     gl.compileAsync(own, activeCamera()).then(done, done);
+  }
+
+  /** The element that is selected, the programs of the picking materials that its outline is made with (by layer and view), and the pass that makes it. */
+  let selection: PickHit | null = null;
+  const warmed = new Set<string>();
+  const warming = new Set<string>();
+  let highlight: Highlight | undefined;
+
+  /** The picking materials of a layer are made again when the layer is: what was said of their programs is not so any more. */
+  function forgetHighlightPrograms(id: string): void {
+    for (const key of [...warmed, ...warming]) {
+      if (key.startsWith(`${id}:`)) {
+        warmed.delete(key);
+        warming.delete(key);
+      }
+    }
+  }
+
+  /** Makes the programs of the picking materials of the layer that the outline is of, off this thread (as a pick does), and asks for a frame when they are made. */
+  function warmHighlight(id: string, own: Scene, rank: number, key: string): void {
+    if (warming.has(key)) {
+      return;
+    }
+    warming.add(key);
+    const back = layers.pick(id, rank, true);
+    if (back === undefined) {
+      warmed.add(key);
+      warming.delete(key);
+      return;
+    }
+    const ready = gl.compileAsync(own, activeCamera());
+    back();
+    const done = (): void => {
+      if (warming.delete(key)) {
+        warmed.add(key);
+        invalidate();
+      }
+    };
+    ready.then(done, done);
+  }
+
+  /**
+   * The outline of the selected element, over the layers: the layer is drawn into a target of its own with its picking materials, and a pass over the
+   * picture draws a ring round the pixels that say the element (`highlight.ts`). Nothing is drawn for a selection that is not of a layer that is there
+   * and drawn.
+   */
+  function drawHighlight(everything: boolean): void {
+    if (selection === null) {
+      return;
+    }
+    const id = selection.layerId;
+    const own = scenes.get(id);
+    const rank = drawOrder().indexOf(id);
+    if (own === undefined || rank < 0 || rank >= MAX_PICK_LAYERS) {
+      return;
+    }
+    const key = `${id}:${viewMode}`;
+    if (!warmed.has(key)) {
+      if (!everything) {
+        warmHighlight(id, own, rank, key);
+        return;
+      }
+      // A picture that is read back is of everything, and has its programs made now.
+      warmed.add(key);
+    }
+    const expected = encodePick(rank, selection.element);
+    // (Of what is drawn: the outline hugs the point, the line, the polygon, and not the larger target that a pointer is given.)
+    const back = layers.pick(id, rank, true);
+    if (expected === undefined || back === undefined) {
+      return;
+    }
+    highlight ??= createHighlight();
+    const mask = highlight.targetFor(size.width, size.height);
+    const colour = new Color();
+    gl.getClearColor(colour);
+    const alpha = gl.getClearAlpha();
+    try {
+      gl.setRenderTarget(mask);
+      gl.setClearColor(0x000000, 0);
+      gl.clear();
+      gl.render(own, activeCamera());
+    } finally {
+      gl.setRenderTarget(null);
+      gl.setClearColor(colour, alpha);
+      back();
+    }
+    highlight.draw(gl, mask, expected, size.pixelRatio, { accent, contrast: outline });
   }
 
   /** What is true of the screen and the theme for the frame that is drawn now. */
@@ -463,6 +563,7 @@ export async function createRenderer(
       drawn += 1;
     }
     layersDrawn = drawn;
+    drawHighlight(everything);
     frames += 1;
     if (more) {
       invalidate();
@@ -654,6 +755,8 @@ export async function createRenderer(
     gl.setSize(size.width, size.height, false);
     // And its programs are gone: they are compiled again, a layer at a time and off this thread, before the layers are drawn.
     programs.reset();
+    warmed.clear();
+    warming.clear();
     invalidate();
   };
   canvas.addEventListener('webglcontextlost', onLost);
@@ -699,6 +802,7 @@ export async function createRenderer(
         return 'unsupported';
       }
       const outcome = layers.set(id, buffers, look);
+      forgetHighlightPrograms(id);
       if (outcome === 'drawn') {
         programs.put(id, buffers.kind);
       } else {
@@ -735,9 +839,25 @@ export async function createRenderer(
         return false;
       }
       const removed = layers.remove(id);
+      forgetHighlightPrograms(id);
       programs.remove(id);
       invalidate();
       return removed;
+    },
+    setSelection(next) {
+      if (disposed) {
+        return;
+      }
+      const same =
+        selection === next ||
+        (selection !== null &&
+          next !== null &&
+          selection.layerId === next.layerId &&
+          selection.element === next.element);
+      selection = next === null ? null : { layerId: next.layerId, element: next.element };
+      if (!same) {
+        invalidate();
+      }
     },
     setDepthRange(min, max) {
       if (disposed || (depth.min === min && depth.max === max)) {
@@ -825,6 +945,7 @@ export async function createRenderer(
       layers.clear();
       programs.reset();
       pickTarget?.dispose();
+      highlight?.dispose();
       gl.dispose();
       // A context that is away already has nothing to give up.
       if (!lost) {

@@ -369,6 +369,7 @@ export class KarmaniaViewer extends LitElement {
     }
     this.renderer = made;
     this.cannotDraw = made === undefined;
+    made?.setSelection(this.store.getState().selection);
     this.lookThroughCamera();
     this.refreshController();
     this.pipeline?.rendererReady();
@@ -628,6 +629,10 @@ export class KarmaniaViewer extends LitElement {
     // What is higher in the legend is drawn over what is lower.
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
+    }
+    // The selected element has an outline.
+    if (state.selection !== previous.selection) {
+      this.renderer?.setSelection(state.selection);
     }
     // A layer whose style or visibility changed looks different, and is not built again for it.
     for (const [id, layer] of Object.entries(state.layers)) {

@@ -107,8 +107,12 @@ describe('createLinesLayer', () => {
     );
     expect(numbers[0]?.[0]).toBe(0);
     expect(Array.from(numbers[1] ?? [])).toEqual([7, 8]);
+    expect(flat.uniforms['uPickMin']?.value).toBeGreaterThan(0);
     back?.();
     expect(parts(layer).every((part) => part.material === flat)).toBe(true);
+    // The outline of a selected line is of the line as it is drawn: no wider ribbon.
+    layer.pick?.(1, true)();
+    expect(flat.uniforms['uPickMin']?.value).toBe(0);
     layer.prepareFrame({ ...INFO, flat: false });
     layer.pick?.(0);
     const solid = parts(layer)[0]?.material as ShaderMaterial;
