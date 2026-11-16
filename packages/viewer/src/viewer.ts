@@ -18,7 +18,16 @@ import {
   zoom3dAt,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Controller3d, PickHit, Renderer, RenderStats } from '@karmania/render';
+import type {
+  Controller2d,
+  Controller3d,
+  ExportLimits,
+  ExportRenderOptions,
+  ExportRendered,
+  PickHit,
+  Renderer,
+  RenderStats,
+} from '@karmania/render';
 import {
   cameraTo2d,
   cameraTo3d,
@@ -320,6 +329,19 @@ export class KarmaniaViewer extends LitElement {
    */
   async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
     return this.renderer?.pick(x, y);
+  }
+
+  /**
+   * Draws the map again for the picture of an export, band by band (see `Renderer.renderExport`); `undefined` without a renderer. The export of the viewer is made
+   * with this (22.6), and the drawing of it is tested through it.
+   */
+  async renderExport(options: ExportRenderOptions): Promise<ExportRendered | undefined> {
+    return this.renderer?.renderExport(options);
+  }
+
+  /** What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`). */
+  exportLimits(): ExportLimits | undefined {
+    return this.renderer?.exportLimits();
   }
 
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */

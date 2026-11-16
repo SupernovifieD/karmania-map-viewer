@@ -26,6 +26,8 @@ import { perspectiveFrame } from './camera-3d.js';
 import type { PerspectiveFrame } from './camera-3d.js';
 import { CompiledLayers } from './compiled-layers.js';
 import { parseCssColour } from './css-colour.js';
+import { createExporter, ExportError } from './export-render.js';
+import type { ExportLimits, ExportRenderOptions, ExportRendered } from './export-render.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import { frameLight } from './light.js';
@@ -138,6 +140,17 @@ export interface Renderer {
    * has the context away. A layer beyond the first `MAX_PICK_LAYERS` in the drawing order is not picked.
    */
   pick(x: number, y: number): Promise<PickHit | null>;
+  /**
+   * What the graphics card allows an export (the most a side of a picture is, and a point): for the dialog to say before it asks for a picture, and for the
+   * checks of `renderExport`.
+   */
+  exportLimits(): ExportLimits;
+  /**
+   * Draws the map again for a picture of the size of the map in an export (see `export-render.ts`): into a target of its own, at `scale` times the sizes of the
+   * screen, with the cameras and the colours it is given, and gives the picture a band at a time, from its top row. The screen's drawing, its cameras and its
+   * picking are not changed. Rejects with an `ExportError` (its `code` says why), or with the signal's reason if it is aborted; a size or scale that is not one is a RangeError.
+   */
+  renderExport(options: ExportRenderOptions): Promise<ExportRendered>;
   stats(): RenderStats;
   /** Stops watching the canvas, frees what is on the card and gives the context up. Calling it again does nothing. */
   dispose(): void;
@@ -275,6 +288,10 @@ export async function createRenderer(
   const programs = new CompiledLayers();
   /** The layers that were moved by their place in the legend, in 3D, and are put back when the view is 2D. */
   const broken = new Set<string>();
+  /** One more each time what an export draws is changed (the layers, their look and order, the view): an export that sees it change stops. */
+  let revision = 0;
+  /** The size in CSS pixels of each layer of points that is drawn (0 for one that is hidden): what the card's largest point is asked of by an export. */
+  const pointSizes = new Map<string, number>();
   gl.autoClear = false;
   // Objects are drawn in the order they were put (a fill under its outline), and not sorted by how far they are: three would otherwise work
   // out the bounding sphere of every geometry at its first frame, a pass over every vertex of a million points, only to sort by it.
@@ -353,6 +370,31 @@ export async function createRenderer(
   }
 
   const activeCamera = () => (viewMode === '3d' ? camera3d : camera2d);
+
+  /** Whether a view that the scene gives is the one the renderer has (the scene gives it whenever anything of it changed, and it is often the same). */
+  const sameView = (next: RendererView): boolean => {
+    const same = (a: readonly number[], b: readonly number[]): boolean =>
+      a.length === b.length && a.every((value, i) => value === b[i]);
+    return (
+      viewMode === next.viewMode &&
+      verticalExaggeration === next.verticalExaggeration &&
+      same(origin, next.origin) &&
+      same(
+        [...look.centre, look.unitsPerPixel, look.heading],
+        [...next.camera2d.centre, next.camera2d.unitsPerPixel, next.camera2d.heading],
+      ) &&
+      same(
+        [...orbit.target, orbit.distance, orbit.heading, orbit.elevation, orbit.fov],
+        [
+          ...next.camera3d.target,
+          next.camera3d.distance,
+          next.camera3d.heading,
+          next.camera3d.elevation,
+          next.camera3d.fov,
+        ],
+      )
+    );
+  };
 
   /** The colour of outlines: the colour of the text where the canvas is, which contrasts with the map in the theme that it is in. */
   let outline: readonly [number, number, number] = [0, 0, 0];
@@ -696,6 +738,89 @@ export async function createRenderer(
       : { layerId, element: found.element };
   }
 
+  /** How many turns of the page an export gives the screen's drawing to finish what it has begun (the layers built, the programs made) before it says it is not ready. */
+  const MAX_SETTLE_TURNS = 3000;
+  const nextTask = (): Promise<void> =>
+    new Promise<void>((resolve) => {
+      view.setTimeout(resolve, 0);
+    });
+
+  /**
+   * Lets the screen's drawing finish what it has begun, a frame at a time as it would (a part of each layer put on the card, the programs of each made off this thread), so
+   * that an export does not put a million points on the card in one task. Nothing is waited for by the clock: it is a number of turns, after which it says it is not ready.
+   */
+  async function settle(): Promise<void> {
+    for (let turn = 0; turn < MAX_SETTLE_TURNS; turn += 1) {
+      if (unusable()) {
+        return;
+      }
+      if (!layers.pending && drawOrder().every((id) => programs.has(id))) {
+        return;
+      }
+      draw(false);
+      await nextTask();
+    }
+    throw new ExportError('not_ready', 'The map is still being put on the graphics card.');
+  }
+
+  /** What the card allows, as it says. */
+  function exportLimits(): ExportLimits {
+    const number = (value: unknown, fallback: number): number =>
+      typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+    const first = (value: unknown, at: number, fallback: number): number =>
+      value instanceof Int32Array || value instanceof Float32Array
+        ? number(value[at], fallback)
+        : fallback;
+    return {
+      renderbuffer: number(context.getParameter(context.MAX_RENDERBUFFER_SIZE), DEFAULT_MAX_BUFFER),
+      texture: number(context.getParameter(context.MAX_TEXTURE_SIZE), DEFAULT_MAX_BUFFER),
+      viewport: first(context.getParameter(context.MAX_VIEWPORT_DIMS), 0, DEFAULT_MAX_BUFFER),
+      pointSize: first(context.getParameter(context.ALIASED_POINT_SIZE_RANGE), 1, 1),
+    };
+  }
+
+  const renderExport = createExporter({
+    gl,
+    view: () => ({
+      viewMode,
+      origin,
+      extent,
+      depth: { min: depth.min, max: depth.max },
+      verticalExaggeration,
+    }),
+    layers: () =>
+      drawOrder().flatMap((id) => {
+        const scene = scenes.get(id);
+        return scene === undefined ? [] : [{ id, scene }];
+      }),
+    place: placeLayer,
+    prepare: (info) => {
+      layers.prepareFrame(info);
+    },
+    settle,
+    revision: () => revision,
+    // (The card says it has lost the context at once; the event that sets `lost` comes a turn later.)
+    status: () => (disposed ? 'disposed' : lost || context.isContextLost() ? 'lost' : 'ok'),
+    limits: exportLimits,
+    largestPoint: () => Math.max(0, ...pointSizes.values()),
+    error: () => context.getError(),
+    read: async (target, y, rows, into) => {
+      const out: unknown = await gl.readRenderTargetPixelsAsync(
+        target,
+        0,
+        y,
+        target.width,
+        rows,
+        into,
+      );
+      // (three answers nothing, and leaves the array as it was, for a target that has not been drawn into.)
+      if (out !== into) {
+        throw new ExportError('not_ready', 'The graphics card did not give the picture.');
+      }
+    },
+    yieldTask: nextTask,
+  });
+
   /** Gives the buffer the size of the box at the pixel ratio of the page now, and asks for a frame if it changed. */
   function resize(): void {
     const next = bufferSize(cssWidth, cssHeight, view.devicePixelRatio, maxBuffer);
@@ -775,6 +900,9 @@ export async function createRenderer(
         return;
       }
       const changedMode = viewMode !== next.viewMode;
+      if (!sameView(next)) {
+        revision += 1;
+      }
       viewMode = next.viewMode;
       look = next.camera2d;
       orbit = next.camera3d;
@@ -800,6 +928,7 @@ export async function createRenderer(
         return;
       }
       extent = next;
+      revision += 1;
       placeCameras();
       invalidate();
     },
@@ -807,7 +936,13 @@ export async function createRenderer(
       if (disposed) {
         return 'unsupported';
       }
+      revision += 1;
       const outcome = layers.set(id, buffers, look);
+      if (outcome === 'drawn' && buffers.kind === 'points') {
+        pointSizes.set(id, look.visible ? look.pointSize : 0);
+      } else {
+        pointSizes.delete(id);
+      }
       forgetHighlightPrograms(id);
       if (outcome === 'drawn') {
         programs.put(id, buffers.kind);
@@ -822,6 +957,12 @@ export async function createRenderer(
         return false;
       }
       const known = layers.setLook(id, look);
+      if (known) {
+        revision += 1;
+        if (pointSizes.has(id)) {
+          pointSizes.set(id, look.visible ? look.pointSize : 0);
+        }
+      }
       invalidate();
       return known;
     },
@@ -830,6 +971,9 @@ export async function createRenderer(
         return false;
       }
       const known = layers.setClasses(id, classes);
+      if (known) {
+        revision += 1;
+      }
       invalidate();
       return known;
     },
@@ -838,6 +982,7 @@ export async function createRenderer(
         return;
       }
       order = [...ids];
+      revision += 1;
       invalidate();
     },
     removeLayer(id) {
@@ -845,6 +990,10 @@ export async function createRenderer(
         return false;
       }
       const removed = layers.remove(id);
+      pointSizes.delete(id);
+      if (removed) {
+        revision += 1;
+      }
       forgetHighlightPrograms(id);
       programs.remove(id);
       invalidate();
@@ -871,6 +1020,7 @@ export async function createRenderer(
       }
       depth.min = min;
       depth.max = max;
+      revision += 1;
       placeCameras();
       invalidate();
     },
@@ -903,6 +1053,8 @@ export async function createRenderer(
       return pixels;
     },
     pick,
+    exportLimits,
+    renderExport,
     stats() {
       return {
         frames,
