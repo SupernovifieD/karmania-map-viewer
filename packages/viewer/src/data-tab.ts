@@ -17,6 +17,7 @@ export class KarmaniaDataTab extends LitElement {
   static override properties = {
     datasets: { attribute: false },
     selected: { attribute: false },
+    selectedElement: { attribute: false },
     rows: { attribute: false },
     crsInfo: { attribute: false },
     notices: { attribute: false },
@@ -54,6 +55,8 @@ export class KarmaniaDataTab extends LitElement {
   declare datasets: readonly Summary[];
   /** The `id` of the dataset that is selected. */
   declare selected: number | undefined;
+  /** The row of the selected dataset that is the selected element of the map, if there is one: the table tints it. */
+  declare selectedElement: number | undefined;
   /** Gets the rows of a dataset. */
   declare rows: RowSource | undefined;
   /** Says what an EPSG code means, for the coordinate system of the summary. */
@@ -71,6 +74,7 @@ export class KarmaniaDataTab extends LitElement {
     super();
     this.datasets = [];
     this.selected = undefined;
+    this.selectedElement = undefined;
     this.rows = undefined;
     this.crsInfo = undefined;
     this.notices = new Map();
@@ -116,6 +120,16 @@ export class KarmaniaDataTab extends LitElement {
     button?.focus();
   }
 
+  /** Shows a row of the table of the dataset that is selected: the table scrolls to it, the keyboard is on it, and it has the focus (once it has been laid out). */
+  async showRow(row: number): Promise<void> {
+    await this.updateComplete;
+    const table = this.renderRoot.querySelector('k-table');
+    if (table !== null) {
+      await table.updateComplete;
+      table.showRow(row);
+    }
+  }
+
   private readonly onImport = (): void => {
     this.dispatchEvent(new CustomEvent(IMPORT_REQUEST, { bubbles: true, composed: true }));
   };
@@ -142,6 +156,7 @@ export class KarmaniaDataTab extends LitElement {
             : html`<k-table
                 label="${selected.name}, rows"
                 .rowCount=${selected.elementCount}
+                .selectedRow=${this.selectedElement}
                 .fetch=${this.fetcherFor(selected.id)}
               ></k-table>`
         }

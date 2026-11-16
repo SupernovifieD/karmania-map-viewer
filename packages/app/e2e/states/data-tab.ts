@@ -11,7 +11,7 @@ import type { Locator, Page } from '@playwright/test';
 import { fixturePath } from '../support/picker.js';
 import type { Pick } from '../support/picker.js';
 import type { Shot } from '../support/screenshots.js';
-import { layerStatuses } from '../support/render.js';
+import { dispatch, layerStatuses } from '../support/render.js';
 import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
@@ -116,6 +116,19 @@ export const SHOTS: Shot[] = [
       await load(page, 'points.csv', 'points.prj');
       await load(page, fixture('lines.csv'), projectionFor('lines.prj'));
       await load(page, fixture('grid.asc'), projectionFor('grid.prj'));
+      return rest(page);
+    },
+  },
+  {
+    // The row of the table that is the selected element of the map is tinted, and its number is in the text colour in weight 500.
+    name: 'data-tab-selected-row',
+    show: async (page) => {
+      await load(page, 'points.csv', 'points.prj');
+      await dispatch(page, {
+        type: 'setSelection',
+        selection: { layerId: 'layer-1', element: 2 },
+      });
+      await table(page).locator('[role="row"][aria-selected="true"]').waitFor();
       return rest(page);
     },
   },

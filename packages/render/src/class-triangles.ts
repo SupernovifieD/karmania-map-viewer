@@ -30,6 +30,12 @@ export interface ClassedTriangles {
    * class: classes that are not one for each element are not used, and then none is.
    */
   set(classes: ClassColouring | undefined): boolean;
+  /**
+   * The triangles that are drawn by class, in the order they are drawn (the class that comes first, and in each class the order of the indices):
+   * those of the classes that have a colour. `undefined` when they are not drawn by class. A new array only when what is drawn has changed, and the
+   * `version` goes up with it (it is what a picking pass made from the order asks whether it is still right).
+   */
+  drawn(): { readonly order: Uint32Array; readonly version: number } | undefined;
   /** Frees the meshes' geometries and materials. */
   dispose(): void;
 }
@@ -38,6 +44,9 @@ interface Entry {
   readonly kind: number;
   readonly mesh: Mesh;
   readonly colour: Vector3;
+  /** Where the triangles of the class are in the order of the classes, and how many. */
+  readonly from: number;
+  readonly count: number;
 }
 
 export function createClassedTriangles(options: ClassedTrianglesOptions): ClassedTriangles {
@@ -46,6 +55,12 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
   const entries: Entry[] = [];
   /** The classes that the meshes are made from. */
   let held: Uint8Array | undefined;
+  /** The triangles in the order of the classes (the class that comes first, and in a class the order of the indices). */
+  let byClass = new Uint32Array(0);
+  /** What `drawn` says, and when it was worked out: it changes when the classes or the colours do. */
+  let version = 0;
+  let order: Uint32Array | undefined;
+  let orderVersion = -1;
 
   /** The colours of the classes: a class with a colour is drawn in it, and one without is not drawn. */
   function paint(colours: readonly string[]): void {
@@ -57,6 +72,7 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
       }
       entry.mesh.visible = hex !== undefined;
     }
+    version += 1;
   }
 
   function clear(): void {
@@ -67,6 +83,8 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
     }
     entries.length = 0;
     held = undefined;
+    byClass = new Uint32Array(0);
+    version += 1;
   }
 
   return {
@@ -102,6 +120,7 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
         kept += counts[k] ?? 0;
       }
       const sorted = new Uint32Array(kept * 3);
+      const ids = new Uint32Array(kept);
       const cursor = starts.slice();
       for (let t = 0; t < total; t += 1) {
         const kind = kinds[t] ?? MAX_CLASSES;
@@ -111,6 +130,7 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
           sorted[place] = triangles[t * 3] ?? 0;
           sorted[place + 1] = triangles[t * 3 + 1] ?? 0;
           sorted[place + 2] = triangles[t * 3 + 2] ?? 0;
+          ids[place / 3] = t;
         }
       }
       for (let kind = 0; kind < MAX_CLASSES; kind += 1) {
@@ -126,11 +146,29 @@ export function createClassedTriangles(options: ClassedTrianglesOptions): Classe
         const mesh = new Mesh(geometry, material);
         mesh.frustumCulled = false;
         parent.add(mesh);
-        entries.push({ kind, mesh, colour });
+        entries.push({ kind, mesh, colour, from: starts[kind] ?? 0, count });
       }
+      byClass = ids;
       held = next.indices;
       paint(next.colours);
       return true;
+    },
+    drawn() {
+      if (held === undefined) {
+        return undefined;
+      }
+      if (order === undefined || orderVersion !== version) {
+        const shown = entries.filter((entry) => entry.mesh.visible);
+        const next = new Uint32Array(shown.reduce((sum, entry) => sum + entry.count, 0));
+        let at = 0;
+        for (const entry of shown) {
+          next.set(byClass.subarray(entry.from, entry.from + entry.count), at);
+          at += entry.count;
+        }
+        order = next;
+        orderVersion = version;
+      }
+      return { order, version: orderVersion };
     },
     dispose() {
       clear();

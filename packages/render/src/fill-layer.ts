@@ -7,6 +7,7 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { DoubleSide, LessDepth, NormalBlending, ShaderMaterial, Vector3 } from 'three';
 import { createClassedTriangles } from './class-triangles.js';
+import { createTrianglePicker } from './triangle-pick.js';
 import type { LayerObject } from './layer-set.js';
 import { colourOf } from './look.js';
 import type { ClassColouring } from './look.js';
@@ -74,6 +75,20 @@ export function createFillLayer(
     },
   });
 
+  // Picking: the polygon of each triangle is what is picked. The fill writes no depth, and so do the pick triangles: of polygons that overlap, the one
+  // that is drawn last is the one on top, and is picked.
+  const pickNumber = { value: 0 };
+  const picker = createTrianglePicker(
+    {
+      positions: buffers.positions,
+      triangles: buffers.triangles,
+      owners: buffers.trianglePolygon,
+      parent: triangles.group,
+      depthWrite: false,
+    },
+    pickNumber,
+  );
+
   const layer: LayerObject = {
     object: triangles.group,
     setLook(next) {
@@ -81,6 +96,10 @@ export function createFillLayer(
       uniforms.uColour.value.set(r, g, b);
       uniforms.uOpacity.value = next.opacity;
       triangles.group.visible = next.visible;
+    },
+    pick(rank) {
+      pickNumber.value = rank + 1;
+      return picker.show(classed.drawn(), triangles.built());
     },
     // The fill is the same at every pixel ratio and on every theme.
     prepareFrame() {
@@ -91,6 +110,7 @@ export function createFillLayer(
       material.visible = !classed.set(next);
     },
     dispose() {
+      picker.dispose();
       classed.dispose();
       triangles.dispose();
       material.dispose();

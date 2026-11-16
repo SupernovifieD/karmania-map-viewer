@@ -80,10 +80,15 @@ interface ViewerElement {
     camera3d: Camera3d;
     frame: SceneFrame | null;
     layers: Record<string, { style: { colour: { mode: string; value?: string } } }>;
+    selection: { layerId: string; element: number } | null;
   };
   layerStates(): [string, { status: string; fraction?: number; message?: string }][];
   renderStats(): Stats | undefined;
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined;
+  renderPick(
+    x: number,
+    y: number,
+  ): Promise<{ layerId: string; element: number } | null | undefined>;
   dispatch(command: unknown): unknown;
   load(input: unknown): Promise<{ status: string }>;
 }
@@ -142,6 +147,40 @@ export function pixels(
   }, rectangle);
 }
 
+/**
+ * What the renderer picks at a point of the map: `x` and `y` in CSS pixels from the top left of the canvas. `null` where nothing is drawn;
+ * the layer's id and the element (from 0) where something is.
+ */
+export function pickAt(
+  page: Page,
+  x: number,
+  y: number,
+): Promise<{ layerId: string; element: number } | null> {
+  return page.evaluate(
+    async ([px, py]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+      const hit = await viewer.renderPick(px as number, py as number);
+      if (hit === undefined) {
+        throw new Error('There is no renderer.');
+      }
+      return hit;
+    },
+    [x, y],
+  );
+}
+
+/** The element that is selected in the scene, or `null`. */
+export function selection(page: Page): Promise<{ layerId: string; element: number } | null> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    return viewer.scene().selection;
+  });
+}
+
 /** Gives the scene a command, as the controls of the viewer do. */
 export function dispatch(page: Page, ...commands: readonly unknown[]): Promise<void> {
   return page.evaluate((list) => {
@@ -152,6 +191,38 @@ export function dispatch(page: Page, ...commands: readonly unknown[]): Promise<v
       viewer.dispatch(command);
     }
   }, commands);
+}
+
+/**
+ * From now on the picks that the viewer's renderer is asked for are counted (`pickCount`), and the answer of each is given `delay` milliseconds after the card
+ * has said it: for a click whose answer comes late.
+ */
+export function watchPicks(page: Page, delay = 0): Promise<void> {
+  return page.evaluate((ms) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+      renderer?: { pick(x: number, y: number): Promise<unknown> };
+    };
+    const renderer = viewer.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is no renderer.');
+    }
+    const counted = window as unknown as { karmaniaPicks?: number };
+    counted.karmaniaPicks = 0;
+    const original = renderer.pick.bind(renderer);
+    renderer.pick = async (x, y) => {
+      counted.karmaniaPicks = (counted.karmaniaPicks ?? 0) + 1;
+      const answer = await original(x, y);
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return answer;
+    };
+  }, delay);
+}
+
+/** The number of picks asked for since `watchPicks`. */
+export function pickCount(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { karmaniaPicks?: number }).karmaniaPicks ?? 0);
 }
 
 /** Lets a number of milliseconds pass in the page. */
