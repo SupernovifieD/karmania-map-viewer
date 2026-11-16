@@ -10,6 +10,15 @@ export { parseCssColour } from './css-colour.js';
 export type { Rgba } from './css-colour.js';
 export type { BufferSize } from './buffer-size.js';
 export { createRenderer } from './renderer.js';
+export type { TakeBand } from './export-bands.js';
+export { ExportError } from './export-render.js';
+export type {
+  Bytes,
+  ExportErrorCode,
+  ExportLimits,
+  ExportRenderOptions,
+  ExportRendered,
+} from './export-render.js';
 export { MAX_PICK_ELEMENT, MAX_PICK_LAYERS, PICK_MIN_LINE, PICK_MIN_POINT } from './pick.js';
 export type { PickHit } from './pick.js';
 export { HIGHLIGHT_EDGE, HIGHLIGHT_RING } from './highlight.js';

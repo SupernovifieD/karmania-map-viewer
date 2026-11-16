@@ -300,6 +300,11 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
     }
   };
 
+  // The screen's clear colour, which every render of a layer asserts again for the target that is bound (three does that on each `render`), so it is put back
+  // once, after the last of them and with no target bound, where it is written for the screen: put back earlier, the screen would be cleared to a darker colour.
+  const kept = new Color();
+  gl.getClearColor(kept);
+  const keptAlpha = gl.getClearAlpha();
   try {
     // The programs, made with the target bound and together, and waited for.
     host.prepare(info);
@@ -317,16 +322,11 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
     guard(true);
     onProgress?.(DONE_COMPILING);
 
+    // The map's colour is set while the target is bound: three writes a clear colour for the target that is bound when it is set (the working colour space for a
+    // target, sRGB for the screen), so this is the colour as it is. (The screen's own is put back at the very end, below.)
     slice(() => {
-      const kept = new Color();
-      gl.getClearColor(kept);
-      const alpha = gl.getClearAlpha();
       gl.setClearColor(clear, 1);
-      try {
-        gl.clear();
-      } finally {
-        gl.setClearColor(kept, alpha);
-      }
+      gl.clear();
     });
     for (const [rank, { id, scene }] of layers.entries()) {
       guard(true);
@@ -369,6 +369,7 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
     });
     return { viewMode: view.viewMode };
   } finally {
+    gl.setClearColor(kept, keptAlpha);
     target.dispose();
   }
 }

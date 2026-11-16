@@ -17,7 +17,7 @@ interface Fake {
   readonly host: ExportHost;
   readonly log: string[];
   readonly infos: FrameInfo[];
-  readonly clears: { colour: [number, number, number]; alpha: number }[];
+  readonly clears: { colour: [number, number, number]; alpha: number; bound: boolean }[];
   state: { status: 'ok' | 'lost' | 'disposed'; revision: number; viewMode: '2d' | '3d' };
 }
 
@@ -74,7 +74,8 @@ function fake(
     getClearAlpha: () => 0.25,
     setClearColor(next, alpha = 1) {
       colour = next.clone();
-      clears.push({ colour: [next.r, next.g, next.b], alpha });
+      clears.push({ colour: [next.r, next.g, next.b], alpha, bound });
+      log.push(`clearColour ${bound ? 'bound' : 'unbound'}`);
     },
   };
   const host: ExportHost = {
@@ -157,6 +158,7 @@ describe('the export of the map', () => {
       // The clear is a slice; and then each layer, with the depth cleared before it in 2D.
       'prepare',
       'bind',
+      'clearColour bound',
       'clear',
       'unbind',
       'prepare',
@@ -174,6 +176,8 @@ describe('the export of the map', () => {
       'unbind',
       'yield',
       'read 0 6',
+      // And the screen's clear colour is put back last, with no target bound.
+      'clearColour unbound',
     ]);
   });
 
@@ -201,7 +205,7 @@ describe('the export of the map', () => {
   });
 
   it('clears to the bytes of the background as they are, and puts the clear colour that was there back', async () => {
-    const { host, clears } = fake();
+    const { host, clears, log } = fake();
     await createExporter(host)(options());
     // The colour is made in the working space of three from the bytes: converted from sRGB it would be 0.81 for 233, and the picture would be darker than the screen.
     expect(clears[0]?.colour[0]).toBeCloseTo(233 / 255, 12);
@@ -210,6 +214,13 @@ describe('the export of the map', () => {
     expect(clears[0]?.alpha).toBe(1);
     expect(clears[1]?.colour[0]).toBeCloseTo(0.1, 12);
     expect(clears[1]?.alpha).toBe(0.25);
+    // three writes a clear colour for the target that is bound when it is set, and writes it again on every render: the map's is set with the target bound (as it is,
+    // for the target), and the screen's is put back once, after the last render, with it unbound (as the screen's is made). Put back earlier, or with the target bound, the
+    // screen is cleared to a darker colour from then on (found by the byte-for-byte test of the browser).
+    expect(clears.map((clear) => clear.bound)).toEqual([true, false]);
+    const last = log.lastIndexOf('clearColour unbound');
+    expect(last).toBe(log.length - 1);
+    expect(last).toBeGreaterThan(log.lastIndexOf('render b'));
     expect(clears).toHaveLength(2);
   });
 
