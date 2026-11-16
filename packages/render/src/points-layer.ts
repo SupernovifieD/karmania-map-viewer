@@ -3,7 +3,9 @@
  * whatever colour they are on whatever map. One colour for the layer, or the colour of the class of each point when it is given its classes
  * (`setClasses`: a byte for each point, looked up in a palette; a point with no value, or whose class has no colour, is not drawn). Each marker is one vertex that the card makes into a square
  * of the size of the marker, and the shader draws the disc in it, with an edge a pixel wide that is smoothed, so that the same marker
- * is the same size on every screen (the size is in CSS pixels times the device pixel ratio). A layer of a million points
+ * is the same size on every screen (the size is in CSS pixels times the device pixel ratio). In 3D the marker is lit as a sphere (the light of the
+ * world, `light.ts`: a side that faces it is brighter, never brighter than the layer's colour), its outline is not, and it is as large as the person chose
+ * and does not shrink with distance; from above it is a flat disc. A layer of a million points
  * is put on the card a part at a time, so that no frame has to take all of it: a part is a number of points and never a time.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
@@ -19,6 +21,7 @@ import {
   Vector3,
 } from 'three';
 import type { LayerObject } from './layer-set.js';
+import { ROUND_AMBIENT } from './light.js';
 import { MAX_CLASSES, colourOf } from './look.js';
 import { PICK_FRAGMENT_GLSL, PICK_MIN_POINT, pickMaterial } from './pick.js';
 import { PLANE_DEPTH_GLSL } from './plane-depth.js';
@@ -60,6 +63,21 @@ void main() {
 `;
 
 /**
+ * In 3D the disc is a sphere seen from the camera: the normal at a pixel of it leans away from the middle as far as the pixel is from it (the fill is
+ * the disc inside the outline, whose edge is a normal that is flat on the screen) and `uLight`, the light of the world in the space of the camera, lights
+ * it as it lights a mesh, with `uAmbient` of the colour kept where it does not reach. `gl_PointCoord` counts down from the top, the camera's y up.
+ * The outline is not lit: it is there to read on any colour.
+ */
+const SPHERE = /* glsl */ `
+  float radius = max(reach - uOutlineWidth, 0.5);
+  vec2 offset = (gl_PointCoord - vec2(0.5)) * (uDiameter + 1.0);
+  vec2 across = vec2(offset.x, -offset.y) / radius;
+  across *= min(1.0, inversesqrt(max(dot(across, across), 1e-6)));
+  vec3 normal = vec3(across, sqrt(max(1.0 - dot(across, across), 0.0)));
+  colour *= uAmbient + (1.0 - uAmbient) * max(dot(normal, uLight), 0.0);
+`;
+
+/**
  * The fragment shader: the disc and its outline. For 3D it also writes the depth of the level plane through the marker's centre at each pixel
  * of it (`plane-depth.ts`), where the one depth of the point would be behind the plane of the layers under it over half of the marker.
  */
@@ -72,6 +90,7 @@ uniform float uOpacity;
 uniform vec3 uPalette[${String(MAX_CLASSES)}];
 uniform float uCount;
 uniform float uClassed;
+${plane ? 'uniform vec3 uLight;\nuniform float uAmbient;' : ''}
 varying float vClass;
 ${plane ? 'varying vec3 vCentre;' : ''}
 ${plane ? PLANE_DEPTH_GLSL : ''}
@@ -105,6 +124,7 @@ void main() {
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : 'gl_FragDepth = clamp(length(gl_PointCoord - vec2(0.5)) * 2.0, 0.0, 1.0);'}
 #else
   float fill = clamp(reach - uOutlineWidth - away + 0.5, 0.0, 1.0);
+  ${plane ? SPHERE : ''}
   gl_FragColor = vec4(mix(uOutline, colour, fill), inside * uOpacity);
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : ''}
 #endif
@@ -126,6 +146,8 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
     uPalette: { value: Array.from({ length: MAX_CLASSES }, () => new Vector3()) },
     uCount: { value: 0 },
     uClassed: { value: 0 },
+    uLight: { value: new Vector3(0, 0, 1) },
+    uAmbient: { value: ROUND_AMBIENT },
     uPickLayer: { value: 0 },
     uPickMin: { value: 0 },
   };
@@ -262,6 +284,7 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       uniforms.uDiameter.value = size * ratio;
       uniforms.uOutlineWidth.value = OUTLINE_WIDTH * ratio;
       uniforms.uOutline.value.set(...info.outline);
+      uniforms.uLight.value.set(...info.light);
     },
     setClasses(next: ClassColouring | undefined) {
       if (next !== undefined && next.indices.length === total) {

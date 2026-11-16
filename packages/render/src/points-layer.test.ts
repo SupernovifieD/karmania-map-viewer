@@ -1,7 +1,8 @@
 import type { RenderBuffers } from '@karmania/engine/display';
 import { LessDepth } from 'three';
-import type { Points, ShaderMaterial } from 'three';
+import type { Points, ShaderMaterial, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
+import { AMBIENT, ROUND_AMBIENT } from './light.js';
 import { MAX_CLASSES } from './look.js';
 import { drawing } from './pick-test-support.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
@@ -55,6 +56,35 @@ describe('createPointsLayer', () => {
     );
     layer.prepareFrame({ ...INFO, flat: true });
     expect(parts(layer)[0]?.material).toBe(flat);
+  });
+
+  it('lights the marker as a sphere only in 3D, takes the light of the frame, and leaves the outline and the picking alone', () => {
+    const layer = createPointsLayer(points(3), LOOK);
+    const flat = parts(layer)[0]?.material as ShaderMaterial;
+    // From above it is a flat disc: nothing of the light is in its shader.
+    expect(flat.fragmentShader).not.toContain('uLight');
+    layer.prepareFrame({ ...INFO, flat: false, light: [-0.5, 0.5, Math.SQRT1_2] });
+    const solid = parts(layer)[0]?.material as ShaderMaterial;
+    const lit = drawing(solid.fragmentShader);
+    expect(lit).toContain('colour *= uAmbient + (1.0 - uAmbient) * max(dot(normal, uLight), 0.0)');
+    // The outline is mixed in after the colour is lit, so it is not.
+    expect(lit.indexOf('colour *= uAmbient')).toBeLessThan(lit.indexOf('mix(uOutline, colour'));
+    // The shading is in the branch that draws, and not in the one that picks, which writes a number and not a colour.
+    const picking = [...solid.fragmentShader.matchAll(/#ifdef PICK([\s\S]*?)#else/g)]
+      .map((match) => match[1])
+      .join('');
+    expect(picking).not.toContain('uAmbient');
+    // The light is the frame's, in the space of the camera, each frame; the ambient is that of round markers, more than a mesh keeps.
+    expect((solid.uniforms['uLight']?.value as Vector3).toArray()).toEqual([
+      -0.5,
+      0.5,
+      Math.SQRT1_2,
+    ]);
+    layer.prepareFrame({ ...INFO, flat: false, light: [0, 1, 0] });
+    expect((solid.uniforms['uLight']?.value as Vector3).toArray()).toEqual([0, 1, 0]);
+    expect(solid.uniforms['uAmbient']?.value).toBe(ROUND_AMBIENT);
+    expect(ROUND_AMBIENT).toBeGreaterThan(AMBIENT);
+    expect(ROUND_AMBIENT).toBeLessThan(1);
   });
 
   it('picks with materials of its own, made from the same shaders, that write the number of each point and not a colour, and gives its own back', () => {
