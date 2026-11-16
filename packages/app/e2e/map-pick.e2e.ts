@@ -627,3 +627,179 @@ test.describe('picking a surface', () => {
     ).toBeNull();
   });
 });
+
+test.describe('picking a grid', () => {
+  const COLUMNS = 4;
+  const ROWS = 3;
+  const CELL = 10;
+  const NAN = Number.NaN;
+
+  /** A grid of 4 by 3 cells of 10 metres with its first cell's lower left corner at the origin, and a value for each cell (the cell with a NaN has none). */
+  async function load(page: Page, rotation?: number, values?: readonly number[]): Promise<void> {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'cells',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [CELL, CELL, 1],
+      dims: [COLUMNS, ROWS, 1],
+      ...(rotation === undefined ? {} : { rotation }),
+      values: values ?? Array.from({ length: COLUMNS * ROWS }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+  }
+
+  /** The middle of the cell `(i, j)` in map coordinates, for a grid turned by `rotation` degrees about its origin. */
+  const middleOf = (i: number, j: number, rotation = 0): [number, number] => {
+    const turn = (rotation * Math.PI) / 180;
+    const along = (i + 0.5) * CELL;
+    const up = (j + 0.5) * CELL;
+    return [
+      EAST_ORIGIN + along * Math.cos(turn) - up * Math.sin(turn),
+      NORTH_ORIGIN + along * Math.sin(turn) + up * Math.cos(turn),
+    ];
+  };
+
+  test('says the number of the cell under the pointer, counted from 0 with i fastest', async ({
+    page,
+  }) => {
+    await load(page);
+    for (const [i, j] of [
+      [0, 0],
+      [3, 0],
+      [1, 1],
+      [0, 2],
+      [3, 2],
+      [2, 1],
+    ] as const) {
+      expect(
+        await pickNear(page, middleOf(i, j), { scale: 0.25 }),
+        `cell ${String(i)}, ${String(j)}`,
+      ).toEqual({
+        layerId: 'layer-1',
+        element: j * COLUMNS + i,
+      });
+    }
+  });
+
+  test('changes cell exactly at the edge between two cells, and is nothing beyond the grid', async ({
+    page,
+  }) => {
+    await load(page);
+    // At 0.25 metres a pixel: two pixels, half a metre, each side of the edge between the cells 0 and 1 at 10 metres from the corner, and of the one above.
+    const edge: [number, number] = [EAST_ORIGIN + CELL, NORTH_ORIGIN + CELL / 2];
+    expect((await pickNear(page, edge, { scale: 0.25, right: -2 }))?.element).toBe(0);
+    expect((await pickNear(page, edge, { scale: 0.25, right: 2 }))?.element).toBe(1);
+    const above: [number, number] = [EAST_ORIGIN + CELL / 2, NORTH_ORIGIN + CELL];
+    expect((await pickNear(page, above, { scale: 0.25, up: -2 }))?.element).toBe(0);
+    expect((await pickNear(page, above, { scale: 0.25, up: 2 }))?.element).toBe(COLUMNS);
+    // Beyond the grid on each side.
+    expect(await pickNear(page, [EAST_ORIGIN - 5, NORTH_ORIGIN + 15], { scale: 0.25 })).toBeNull();
+    expect(
+      await pickNear(page, [EAST_ORIGIN + COLUMNS * CELL + 5, NORTH_ORIGIN + 15], { scale: 0.25 }),
+    ).toBeNull();
+    expect(await pickNear(page, [EAST_ORIGIN + 15, NORTH_ORIGIN - 5], { scale: 0.25 })).toBeNull();
+    expect(
+      await pickNear(page, [EAST_ORIGIN + 15, NORTH_ORIGIN + ROWS * CELL + 5], { scale: 0.25 }),
+    ).toBeNull();
+  });
+
+  test('is nothing in a cell that has no value, which is not drawn', async ({ page }) => {
+    // The cell (1, 1), number 5, has no value.
+    await load(
+      page,
+      undefined,
+      Array.from({ length: COLUMNS * ROWS }, (_, n) => (n === 5 ? NAN : n)),
+    );
+    expect(await pickNear(page, middleOf(1, 1), { scale: 0.25 })).toBeNull();
+    expect((await pickNear(page, middleOf(2, 1), { scale: 0.25 }))?.element).toBe(6);
+    expect((await pickNear(page, middleOf(1, 0), { scale: 0.25 }))?.element).toBe(1);
+  });
+
+  test('is where the cells are drawn when the lattice is turned, and when the map is', async ({
+    page,
+  }) => {
+    await load(page, 30);
+    for (const [i, j] of [
+      [0, 0],
+      [3, 2],
+      [2, 1],
+    ] as const) {
+      expect((await pickNear(page, middleOf(i, j, 30), { scale: 0.25 }))?.element).toBe(
+        j * COLUMNS + i,
+      );
+    }
+    // A cell of a grid that is not turned, seen with the map turned a quarter: the middle of the cell (3, 0) is 30 metres east of the cell (0, 0)'s.
+    await load(page);
+    const from = middleOf(0, 0);
+    expect(
+      (await pickNear(page, from, { scale: 0.5, heading: 90, up: 30 / 0.5, right: 0 }))?.element,
+    ).toBe(3);
+  });
+
+  test('numbers the cells over all the tiles of a grid that is cut because it is wider than a texture', async ({
+    page,
+  }) => {
+    const wide = 4100;
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'wide',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [1, 1, 1],
+      dims: [wide, 2, 1],
+      values: Array.from({ length: wide * 2 }, (_, n) => n % 50),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+    for (const [i, j] of [
+      [0, 0],
+      [4095, 1],
+      [4096, 0],
+      [4099, 1],
+    ] as const) {
+      expect(
+        (await pickNear(page, [EAST_ORIGIN + i + 0.5, NORTH_ORIGIN + j + 0.5], { scale: 0.1 }))
+          ?.element,
+        `cell ${String(i)}, ${String(j)}`,
+      ).toBe(j * wide + i);
+    }
+  });
+
+  test('numbers the cells over all the tiles of a grid that is cut because it is taller than a texture', async ({
+    page,
+  }) => {
+    const tall = 4100;
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'grid', {
+      name: 'tall',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [1, 1, 1],
+      dims: [3, tall, 1],
+      values: Array.from({ length: 3 * tall }, (_, n) => n % 50),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+    for (const [i, j] of [
+      [0, 0],
+      [2, 4095],
+      [1, 4096],
+      [2, 4099],
+    ] as const) {
+      expect(
+        (await pickNear(page, [EAST_ORIGIN + i + 0.5, NORTH_ORIGIN + j + 0.5], { scale: 0.1 }))
+          ?.element,
+        `cell ${String(i)}, ${String(j)}`,
+      ).toBe(j * 3 + i);
+    }
+  });
+
+  test('does not pick a layer that is hidden', async ({ page }) => {
+    await load(page);
+    expect((await pickNear(page, middleOf(1, 1), { scale: 0.25 }))?.element).toBe(5);
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
+    expect(await pickNear(page, middleOf(1, 1), { scale: 0.25 })).toBeNull();
+  });
+});
