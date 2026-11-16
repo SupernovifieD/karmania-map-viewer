@@ -910,4 +910,8 @@ declare global {
   interface HTMLElementTagNameMap {
     'k-table': KTable;
   }
+
+  interface HTMLElementEventMap {
+    [TABLE_SELECT]: CustomEvent<TableSelect>;
+  }
 }

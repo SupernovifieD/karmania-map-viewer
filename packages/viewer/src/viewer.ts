@@ -46,6 +46,7 @@ import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js'
 import { identifyModel } from './identify.js';
 import './identify-popover.js';
 import type { IdentifyClose, IdentifyShow } from './identify-popover.js';
+import type { TableSelect } from '@karmania/ui';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -744,6 +745,23 @@ export class KarmaniaViewer extends LitElement {
     );
   };
 
+  /**
+   * A person selected a row of the table (a click, or Enter or Space): the element of the dataset that is that row is the scene's selection, so that the
+   * map outlines it. It has no popover: that is for a click on the map. A dataset that no layer shows has nothing to select.
+   */
+  private readonly onTableSelect = (event: CustomEvent<TableSelect>): void => {
+    const dataset = this.selected;
+    const layer = Object.values(this.store.getState().layers).find(
+      (each) => each.datasetId === dataset,
+    );
+    if (layer !== undefined) {
+      this.store.dispatch({
+        type: 'setSelection',
+        selection: { layerId: layer.id, element: event.detail.row },
+      });
+    }
+  };
+
   /** The row of the selected dataset that is the scene's selected element: the table tints it. `undefined` when the selection is of another dataset or none. */
   private selectedElementOfDataset(): number | undefined {
     const state = this.store.getState();
@@ -1140,6 +1158,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-import-request=${this.chooseFiles}
           @karmania-legend-command=${this.onLegendCommand}
           @karmania-contours-turn-on=${this.onContoursTurnOn}
+          @k-table-select=${this.onTableSelect}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}
