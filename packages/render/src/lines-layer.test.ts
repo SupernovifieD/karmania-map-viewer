@@ -133,8 +133,8 @@ describe('createLinesLayer', () => {
     expect(solid.fragmentShader).toContain('ribbonNormal(vStartV, vEndV)');
     expect(solid.vertexShader).toContain('vStartV');
     expect(solid.uniforms).toBe(flat.uniforms);
-    expect(solid.fragmentShader.indexOf('planeDepth(vStartV')).toBeLessThan(
-      solid.fragmentShader.indexOf('discard;'),
+    expect(drawing(solid.fragmentShader).indexOf('planeDepth(vStartV')).toBeLessThan(
+      drawing(solid.fragmentShader).indexOf('discard;'),
     );
     layer.prepareFrame({ ...INFO, flat: true });
     expect(parts(layer)[0]?.material).toBe(flat);
