@@ -393,6 +393,20 @@ export function distance(pixel: readonly number[], colour: readonly number[]): n
   return Math.max(...colour.map((channel, i) => Math.abs((pixel[i] ?? 0) - channel)));
 }
 
+/** The least of its colour that a point or a line keeps where the light does not reach it in 3D (`ROUND_AMBIENT` in `light.ts`): they are lit as a sphere and a tube. */
+export const ROUND_AMBIENT = 0.5;
+
+/**
+ * Whether a pixel is of a point or a line of `colour` in 3D: lit, so it is some part of that colour, never more than it and never less than
+ * `ROUND_AMBIENT` of it (to within a few of a byte), in every channel. A pixel of another colour, such as the map's or a mesh's, is not.
+ */
+export function isLitRound(pixel: readonly number[], colour: readonly number[]): boolean {
+  return colour.every((channel, k) => {
+    const value = pixel[k] ?? 0;
+    return value <= channel + 3 && value >= Math.floor(channel * ROUND_AMBIENT) - 3;
+  });
+}
+
 /** The colour the map shows where nothing is drawn: the background of the canvas, as the 4 bytes of a pixel. */
 export async function mapColour(page: Page): Promise<number[]> {
   return page.locator('karmania-map-area canvas').evaluate((element) => {

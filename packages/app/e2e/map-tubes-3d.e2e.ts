@@ -10,6 +10,7 @@ import {
   drawn,
   layerColour,
   layerStatuses,
+  ROUND_AMBIENT,
   sceneFrame,
   stats,
 } from './support/render.js';
@@ -25,8 +26,6 @@ const START = [500_000, 2_765_000, 100] as const;
 const END = [500_050, 2_765_040, 102] as const;
 const MIDDLE = [(START[0] + END[0]) / 2, (START[1] + END[1]) / 2, (START[2] + END[2]) / 2] as const;
 
-/** The least of its colour that a round marker keeps where the light does not reach it (`ROUND_AMBIENT` in `light.ts`). */
-const ROUND_AMBIENT = 0.5;
 /** The light, to the north-west and 45 degrees up. */
 const LIGHT = [-0.5, 0.5, Math.SQRT1_2] as const;
 /** The width the pictures are taken at, in pixels: the widest there is, so that the two sides of a line are far apart. */
