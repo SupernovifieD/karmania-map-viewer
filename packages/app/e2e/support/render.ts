@@ -80,6 +80,7 @@ interface ViewerElement {
     camera3d: Camera3d;
     frame: SceneFrame | null;
     layers: Record<string, { style: { colour: { mode: string; value?: string } } }>;
+    selection: { layerId: string; element: number } | null;
   };
   layerStates(): [string, { status: string; fraction?: number; message?: string }][];
   renderStats(): Stats | undefined;
@@ -168,6 +169,16 @@ export function pickAt(
     },
     [x, y],
   );
+}
+
+/** The element that is selected in the scene, or `null`. */
+export function selection(page: Page): Promise<{ layerId: string; element: number } | null> {
+  return page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as ViewerElement;
+    return viewer.scene().selection;
+  });
 }
 
 /** Gives the scene a command, as the controls of the viewer do. */
