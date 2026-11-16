@@ -9,6 +9,7 @@ import {
   dispatch,
   drawn,
   layerColour,
+  ROUND_AMBIENT,
   sceneFrame,
   stats,
   withData,
@@ -27,8 +28,6 @@ const FIRST = readFileSync(fixturePath('points.csv'), 'utf8')
   .slice(0, 3)
   .map(Number) as [number, number, number];
 
-/** The least of its colour that a round marker keeps where the light does not reach it (`ROUND_AMBIENT` in `light.ts`). */
-const ROUND_AMBIENT = 0.5;
 /** The light, to the north-west and 45 degrees up. */
 const LIGHT = [-0.5, 0.5, Math.SQRT1_2] as const;
 /** The size of the marker the pictures are taken of, in pixels: big enough to sample the sides of it. */
