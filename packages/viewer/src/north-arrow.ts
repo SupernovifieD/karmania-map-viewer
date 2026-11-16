@@ -1,4 +1,12 @@
-import { northArrow } from '@karmania/scene';
+import {
+  NORTH_ARROW_BOX,
+  NORTH_ARROW_CENTRE,
+  NORTH_ARROW_HEAD,
+  NORTH_ARROW_LETTER,
+  NORTH_ARROW_STROKE,
+  NORTH_ARROW_TAIL,
+  northArrow,
+} from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 
@@ -95,25 +103,29 @@ export class KarmaniaNorthArrow extends LitElement {
       <k-tooltip text="Reset to north" placement="left">
         <button type="button" aria-label=${`Reset to north. ${arrow.label}`} @click=${this.onClick}>
           <!-- The needle and the N above it turn about the middle of the button: nothing is clipped, the farthest point is 15 of the 20. -->
-          <svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+          <svg
+            viewBox=${`0 0 ${String(NORTH_ARROW_BOX)} ${String(NORTH_ARROW_BOX)}`}
+            aria-hidden="true"
+            focusable="false"
+          >
             <g
               data-angle=${String(arrow.angle)}
-              transform=${`rotate(${String(arrow.angle)} 20 20)`}
+              transform=${`rotate(${String(arrow.angle)} ${String(NORTH_ARROW_CENTRE)} ${String(NORTH_ARROW_CENTRE)})`}
             >
               <path
                 class="letter"
-                d="M17 11V5L23 11V5"
+                d=${NORTH_ARROW_LETTER}
                 fill="none"
-                stroke-width="1.5"
+                stroke-width=${String(NORTH_ARROW_STROKE)}
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-              <path class="head" d="M20 14L25.5 29L20 25.5L14.5 29Z" />
+              <path class="head" d=${NORTH_ARROW_HEAD} />
               <path
                 class="tail"
-                d="M20 25.5V34"
+                d=${NORTH_ARROW_TAIL}
                 fill="none"
-                stroke-width="1.5"
+                stroke-width=${String(NORTH_ARROW_STROKE)}
                 stroke-linecap="round"
               />
             </g>

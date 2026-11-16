@@ -140,4 +140,18 @@ export type {
   VerticalExaggeration,
   ViewMode,
 } from './types.js';
-export { EXPORT_COLOURS, EXPORT_SCALE_BAR, EXPORT_TYPE, LEGEND_ROW } from './export-theme.js';
+export {
+  EXPORT_COLOURS,
+  EXPORT_FURNITURE,
+  EXPORT_SCALE_BAR,
+  EXPORT_TYPE,
+  LEGEND_ROW,
+} from './export-theme.js';
+export {
+  NORTH_ARROW_BOX,
+  NORTH_ARROW_CENTRE,
+  NORTH_ARROW_HEAD,
+  NORTH_ARROW_LETTER,
+  NORTH_ARROW_STROKE,
+  NORTH_ARROW_TAIL,
+} from './north-arrow-paths.js';

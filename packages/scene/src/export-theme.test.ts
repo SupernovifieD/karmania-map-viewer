@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { EXPORT_COLOURS, EXPORT_TYPE, LEGEND_ROW } from './export-theme.js';
+import { EXPORT_COLOURS, EXPORT_FURNITURE, EXPORT_TYPE, LEGEND_ROW } from './export-theme.js';
 import { MAP_BACKGROUNDS } from './palettes.js';
 
 const tokens = readFileSync(new URL('../../ui/src/tokens.css', import.meta.url), 'utf8');
@@ -27,6 +27,7 @@ describe('the colours of the exported picture', () => {
       muted: light('--k-text-muted'),
       border: light('--k-border-strong'),
       divider: light('--k-border'),
+      accent: light('--k-accent'),
     });
   });
 
@@ -54,6 +55,15 @@ describe('the type of the exported picture', () => {
   it('puts Inter first, as the stylesheet does', () => {
     expect(EXPORT_TYPE.family.startsWith('Inter,')).toBe(true);
     expect(tokens).toMatch(/--k-font-sans:\s*'Inter',/);
+  });
+});
+
+describe('the furniture of the exported picture', () => {
+  it('has the border width and the corner radius of the stylesheet', () => {
+    expect(EXPORT_FURNITURE).toEqual({
+      border: px('--k-border-width'),
+      radius: px('--k-radius-lg'),
+    });
   });
 });
 
