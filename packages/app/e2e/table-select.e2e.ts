@@ -12,7 +12,10 @@ import {
   distance,
   drawn,
   layerStatuses,
+  pause,
+  pickCount,
   selection,
+  watchPicks,
 } from './support/render.js';
 
 /** Loads `count` points in a row 20 metres apart from `east`, each with a serial number, and says nothing until they are drawn. */
@@ -61,6 +64,21 @@ test.describe('selecting a row of the table', () => {
     await page.getByRole('tab', { name: 'Data' }).click();
     await expect(page.locator('karmania-data-tab k-table [role="grid"]')).toBeVisible();
     await expect(cell(page, 4)).toBeVisible();
+  });
+
+  test('is not taken back by the answer of a click on the map that comes after the row: what was decided last stands', async ({
+    page,
+  }) => {
+    await watchPicks(page, 400);
+    const box = await page.locator('karmania-map-area canvas').boundingBox();
+    if (box === null) throw new Error('The map is not on the page.');
+    await page.mouse.click(box.x + 20, box.y + 20);
+    expect(await pickCount(page)).toBe(1);
+    await cell(page, 4).click();
+    await expect.poll(() => selection(page)).toEqual({ layerId: 'layer-1', element: 4 });
+    // The answer of the click comes now: the row is still the selection.
+    await pause(page, 900);
+    expect(await selection(page)).toEqual({ layerId: 'layer-1', element: 4 });
   });
 
   test('selects the element of the row that is clicked, and has no popover', async ({ page }) => {
