@@ -69,6 +69,43 @@ const uniforms = (mesh: Mesh | undefined) => (mesh?.material as ShaderMaterial).
 const textureOf = (mesh: Mesh | undefined) => uniforms(mesh)['uCells']?.value as DataTexture | null;
 
 describe('createGridLayer', () => {
+  it("picks with a material for each tile, made from the same shaders, that knows where its tile is in the grid, and gives the tiles' own back", () => {
+    const layer = createGridLayer(warped(), LOOK);
+    layer.setClasses?.(numbered());
+    const drawing = meshes(layer).map((mesh) => mesh.material as ShaderMaterial);
+    const back = layer.pick?.(4);
+    const picking = meshes(layer).map((mesh) => mesh.material as ShaderMaterial);
+    expect(picking).toHaveLength(2);
+    picking.forEach((material, t) => {
+      const own = drawing[t] as ShaderMaterial;
+      expect(material).not.toBe(own);
+      expect(material.defines).toHaveProperty('PICK');
+      expect(material.uniforms).toBe(own.uniforms);
+      expect(material.transparent).toBe(false);
+      expect(material.fragmentShader).toBe(own.fragmentShader);
+      expect(material.side).toBe(DoubleSide);
+      expect(material.depthFunc).toBe(LessDepth);
+      // The classes the tile is drawn with are what it is picked with: a cell with none is not drawn, and is not picked.
+      expect(material.uniforms['uCells']?.value).toBeInstanceOf(DataTexture);
+    });
+    // Where each tile is in the grid, and how wide the grid is; the layer's number (one more than its place) is the same for both tiles.
+    expect(
+      picking.map((m) => (m.uniforms['uTile']?.value as { toArray(): number[] }).toArray()),
+    ).toEqual([
+      [0, 0, 3, 2],
+      [3, 0, 1, 3],
+    ]);
+    expect(picking.map((m) => m.uniforms['uColumns']?.value as number)).toEqual([4, 4]);
+    expect(picking.map((m) => m.uniforms['uPickLayer']?.value as number)).toEqual([5, 5]);
+    expect(picking[0]?.uniforms['uPickLayer']).toBe(picking[1]?.uniforms['uPickLayer']);
+    back?.();
+    expect(meshes(layer).map((mesh) => mesh.material)).toEqual(drawing);
+    // Made once for each tile.
+    layer.pick?.(0);
+    expect(meshes(layer).map((mesh) => mesh.material)).toEqual(picking);
+    layer.dispose();
+  });
+
   it('is a mesh for each tile when the grid is warped, with the positions and the uvs once for all of them', () => {
     const layer = createGridLayer(warped(), LOOK);
     expect(meshes(layer)).toHaveLength(2);
