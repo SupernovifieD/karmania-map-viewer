@@ -45,7 +45,7 @@ import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
 import { identifyModel } from './identify.js';
 import './identify-popover.js';
-import type { IdentifyClose } from './identify-popover.js';
+import type { IdentifyClose, IdentifyShow } from './identify-popover.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -638,6 +638,8 @@ export class KarmaniaViewer extends LitElement {
     if (state.selection !== previous.selection) {
       this.renderer?.setSelection(state.selection);
       this.refreshIdentify();
+      // The row of the table that is the selected element is tinted.
+      this.requestUpdate();
     }
     // A layer whose style or visibility changed looks different, and is not built again for it.
     for (const [id, layer] of Object.entries(state.layers)) {
@@ -730,6 +732,28 @@ export class KarmaniaViewer extends LitElement {
     }
     area.identifyAt = found.at;
     area.identify = identifyModel(summary, found.element, found.page);
+  }
+
+  /** "Show in table": the Data tab is shown, with the dataset of the element selected, and the table scrolls to its row, which has the keyboard and the focus. */
+  private readonly onIdentifyShow = (event: CustomEvent<IdentifyShow>): void => {
+    const { datasetId, element } = event.detail;
+    this.selected = datasetId;
+    this.changePanel({ tab: 'data', collapsed: false });
+    void this.updateComplete.then(() =>
+      this.renderRoot.querySelector('karmania-panel')?.showRow(element),
+    );
+  };
+
+  /** The row of the selected dataset that is the scene's selected element: the table tints it. `undefined` when the selection is of another dataset or none. */
+  private selectedElementOfDataset(): number | undefined {
+    const state = this.store.getState();
+    const selection = state.selection;
+    if (selection === null || this.selected === undefined) {
+      return undefined;
+    }
+    return state.layers[selection.layerId]?.datasetId === this.selected
+      ? selection.element
+      : undefined;
   }
 
   /** The popover is closed with its button (the element stays selected) or with Escape (the selection is cleared too); focus goes back to the map. */
@@ -1094,6 +1118,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-pointer-on-map=${this.onPointer}
           @karmania-map-click=${this.onMapClick}
           @karmania-identify-close=${this.onIdentifyClose}
+          @karmania-identify-show=${this.onIdentifyShow}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
@@ -1108,6 +1133,7 @@ export class KarmaniaViewer extends LitElement {
           .styles=${styles}
           .datasets=${this.datasets}
           .selected=${this.selected}
+          .selectedElement=${this.selectedElementOfDataset()}
           .rows=${this.rows}
           .crsInfo=${this.crsInfo}
           .notices=${notices}
