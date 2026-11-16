@@ -70,11 +70,10 @@ describe('readBands', () => {
       width: 2,
       height: 16,
       rows: 8,
-      read: async (y, rows, into) => {
+      read: async (y, _rows, into) => {
         events.push(`read ${String(y)}`);
         into.fill(0);
         await Promise.resolve();
-        void rows;
       },
       onBand: async (_rows, first) => {
         events.push(`take ${String(first)}`);
