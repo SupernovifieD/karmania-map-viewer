@@ -803,3 +803,126 @@ test.describe('picking a grid', () => {
     expect(await pickNear(page, middleOf(1, 1), { scale: 0.25 })).toBeNull();
   });
 });
+
+test.describe('picking blocks', () => {
+  const COLUMNS = 4;
+  const ROWS = 3;
+  const LAYERS = 2;
+  const CELL = 10;
+  const HEIGHT = 5;
+  const NAN = Number.NaN;
+
+  /** A model of 4 by 3 by 2 blocks of 10 by 10 by 5 metres, the first block's lower corner at the origin, and a value for each (a NaN has none). */
+  async function load(page: Page, rotation?: number, values?: readonly number[]): Promise<void> {
+    await page.goto('/?theme=light');
+    await loadLattice(page, 'blocks', {
+      name: 'model',
+      crs: { kind: 'epsg', code: 32640 },
+      origin: [EAST_ORIGIN, NORTH_ORIGIN, 0],
+      spacing: [CELL, CELL, HEIGHT],
+      dims: [COLUMNS, ROWS, LAYERS],
+      ...(rotation === undefined ? {} : { rotation }),
+      values: values ?? Array.from({ length: COLUMNS * ROWS * LAYERS }, (_, n) => n),
+    });
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+  }
+
+  /** The middle of the column of blocks `(i, j)` in map coordinates, for a model turned by `rotation` degrees about its origin. */
+  const middleOf = (i: number, j: number, rotation = 0): [number, number] => {
+    const turn = (rotation * Math.PI) / 180;
+    const along = (i + 0.5) * CELL;
+    const up = (j + 0.5) * CELL;
+    return [
+      EAST_ORIGIN + along * Math.cos(turn) - up * Math.sin(turn),
+      NORTH_ORIGIN + along * Math.sin(turn) + up * Math.cos(turn),
+    ];
+  };
+  /** The number of the block at `(i, j, k)`: `i` fastest, then `j`, then `k`. */
+  const numberOf = (i: number, j: number, k: number): number => (k * ROWS + j) * COLUMNS + i;
+
+  test('says the number of the block whose top is under the pointer from above: the highest block of each column', async ({
+    page,
+  }) => {
+    await load(page);
+    for (const [i, j] of [
+      [0, 0],
+      [3, 0],
+      [1, 1],
+      [0, 2],
+      [3, 2],
+    ] as const) {
+      expect(
+        await pickNear(page, middleOf(i, j), { scale: 0.25 }),
+        `column ${String(i)}, ${String(j)}`,
+      ).toEqual({ layerId: 'layer-1', element: numberOf(i, j, LAYERS - 1) });
+    }
+  });
+
+  test('is the block under the top one where the top one has no value, as it is drawn, and in one pass whatever the opacity of the layer', async ({
+    page,
+  }) => {
+    // The top block of the column (1, 1) has no value.
+    await load(
+      page,
+      undefined,
+      Array.from({ length: COLUMNS * ROWS * LAYERS }, (_, n) =>
+        n === numberOf(1, 1, LAYERS - 1) ? NAN : n,
+      ),
+    );
+    expect((await pickNear(page, middleOf(1, 1), { scale: 0.25 }))?.element).toBe(
+      numberOf(1, 1, 0),
+    );
+    expect((await pickNear(page, middleOf(2, 1), { scale: 0.25 }))?.element).toBe(
+      numberOf(2, 1, LAYERS - 1),
+    );
+    // Less than opaque: the layer is drawn in two passes, and is picked in one, with the same result.
+    await dispatch(page, { type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    expect((await pickNear(page, middleOf(1, 1), { scale: 0.25 }))?.element).toBe(
+      numberOf(1, 1, 0),
+    );
+    expect((await pickNear(page, middleOf(2, 1), { scale: 0.25 }))?.element).toBe(
+      numberOf(2, 1, LAYERS - 1),
+    );
+  });
+
+  test('changes block at the edge between two blocks, and is nothing beyond the model', async ({
+    page,
+  }) => {
+    await load(page);
+    const edge: [number, number] = [EAST_ORIGIN + CELL, NORTH_ORIGIN + CELL / 2];
+    expect((await pickNear(page, edge, { scale: 0.25, right: -2 }))?.element).toBe(
+      numberOf(0, 0, 1),
+    );
+    expect((await pickNear(page, edge, { scale: 0.25, right: 2 }))?.element).toBe(
+      numberOf(1, 0, 1),
+    );
+    expect(await pickNear(page, [EAST_ORIGIN - 5, NORTH_ORIGIN + 15], { scale: 0.25 })).toBeNull();
+    expect(
+      await pickNear(page, [EAST_ORIGIN + COLUMNS * CELL + 5, NORTH_ORIGIN + 15], { scale: 0.25 }),
+    ).toBeNull();
+  });
+
+  test('is where the blocks are drawn when the model is turned', async ({ page }) => {
+    await load(page, 30);
+    for (const [i, j] of [
+      [0, 0],
+      [3, 2],
+      [2, 1],
+    ] as const) {
+      expect(
+        (await pickNear(page, middleOf(i, j, 30), { scale: 0.25 }))?.element,
+        `column ${String(i)}, ${String(j)}`,
+      ).toBe(numberOf(i, j, LAYERS - 1));
+    }
+  });
+
+  test('does not pick a layer that is hidden', async ({ page }) => {
+    await load(page);
+    expect((await pickNear(page, middleOf(1, 1), { scale: 0.25 }))?.element).toBe(
+      numberOf(1, 1, LAYERS - 1),
+    );
+    await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
+    expect(await pickNear(page, middleOf(1, 1), { scale: 0.25 })).toBeNull();
+  });
+});
