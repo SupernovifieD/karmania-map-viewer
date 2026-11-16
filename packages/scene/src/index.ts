@@ -140,3 +140,4 @@ export type {
   VerticalExaggeration,
   ViewMode,
 } from './types.js';
+export { EXPORT_COLOURS, EXPORT_SCALE_BAR, EXPORT_TYPE, LEGEND_ROW } from './export-theme.js';
