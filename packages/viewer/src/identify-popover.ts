@@ -58,7 +58,12 @@ export class KarmaniaIdentify extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--k-space-8);
-        min-width: var(--k-popover-min-width);
+        /* The least width, which the most it may have takes over from on a map that is narrower than the least: a minimum is stronger than a maximum in CSS. */
+        max-width: var(--popover-max-width, none);
+        min-width: min(
+          var(--k-popover-min-width),
+          var(--popover-max-width, var(--k-popover-min-width))
+        );
         padding: var(--k-space-12);
         /* Not seen until it has been put: it is measured at its natural size first. */
         visibility: hidden;
@@ -197,11 +202,11 @@ export class KarmaniaIdentify extends LitElement {
       return;
     }
     // Measured without the limits of the last time, which may have made it smaller than its content wants.
-    section.style.maxWidth = '';
+    section.style.removeProperty('--popover-max-width');
     section.style.maxHeight = '';
     const size = { width: section.offsetWidth, height: section.offsetHeight };
     const at = placePopover(this.anchor, size, this.area);
-    section.style.maxWidth = `${String(at.maxWidth)}px`;
+    section.style.setProperty('--popover-max-width', `${String(at.maxWidth)}px`);
     section.style.maxHeight = `${String(at.maxHeight)}px`;
     this.style.left = `${String(at.left)}px`;
     this.style.top = `${String(at.top)}px`;

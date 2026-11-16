@@ -110,6 +110,24 @@ test.describe('the identify popover', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(area.y + area.height - 16 + 1);
   });
 
+  test('is no wider than the map leaves it on a map that is narrower than 320 pixels: it does not reach the right-hand column', async ({
+    page,
+  }) => {
+    // The panel is half the window (at most 640): a window of 600 leaves 300 of the map.
+    await page.setViewportSize({ width: 600, height: 800 });
+    const area = await page.locator('karmania-map-area').boundingBox();
+    if (area === null) throw new Error('The map is not on the page.');
+    expect(area.width).toBeLessThan(320);
+    const at = await place(page, 2, { right: -60, up: 100 });
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeVisible();
+    const box = await dialog(page).boundingBox();
+    if (box === null) throw new Error('No popover.');
+    expect(box.width).toBeLessThan(240);
+    expect(box.x).toBeGreaterThanOrEqual(area.x + 16 - 1);
+    expect(box.x + box.width).toBeLessThanOrEqual(area.x + area.width - 16 - 48 + 1);
+  });
+
   test('closes with its button and leaves the element selected, with its outline', async ({
     page,
   }) => {
