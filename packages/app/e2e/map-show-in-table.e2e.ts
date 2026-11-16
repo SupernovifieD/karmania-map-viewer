@@ -103,7 +103,7 @@ test.describe('Show in table', () => {
     await expect(grid).toBeFocused();
     await expect(grid).toHaveAttribute(
       'aria-activedescendant',
-      new RegExp(`^.*${String(element)}`),
+      new RegExp(`^cell-${String(element)}-\\d+$`),
     );
     await expect(row.locator('.cell.active')).toHaveCount(1);
     // The row is within the part of the table that is seen.
@@ -156,6 +156,10 @@ test.describe('Show in table', () => {
         'karmania-data-tab k-table [role="row"][aria-selected="true"] [role="rowheader"]',
       ),
     ).toHaveText(String(element + 1));
+    // The row is tinted and that is all: the keyboard is not moved to it, and the table does not take the focus from the map.
+    const grid = page.locator('karmania-data-tab k-table [role="grid"]');
+    await expect(grid).not.toBeFocused();
+    await expect(grid).toHaveAttribute('aria-activedescendant', 'cell-0-0');
     // The table of another dataset has no row that is the selected element: the element is of the first.
     await loadMany(page, 'Marks', [510_000, 2_765_000]);
     await expect(page.locator('karmania-data-tab k-table')).toHaveAttribute('label', 'Marks, rows');
