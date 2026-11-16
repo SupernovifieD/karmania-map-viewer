@@ -445,8 +445,12 @@ export async function createRenderer(
       warming.delete(key);
       return;
     }
-    const ready = gl.compileAsync(own, activeCamera());
-    back();
+    let ready: Promise<unknown>;
+    try {
+      ready = gl.compileAsync(own, activeCamera());
+    } finally {
+      back();
+    }
     const done = (): void => {
       if (warming.delete(key)) {
         warmed.add(key);
@@ -480,10 +484,14 @@ export async function createRenderer(
       // A picture that is read back is of everything, and has its programs made now.
       warmed.add(key);
     }
+    // An element that the target cannot say (beyond what three bytes hold) has no outline; asked before anything is swapped, so that nothing is left swapped.
     const expected = encodePick(rank, selection.element);
+    if (expected === undefined) {
+      return;
+    }
     // (Of what is drawn: the outline hugs the point, the line, the polygon, and not the larger target that a pointer is given.)
     const back = layers.pick(id, rank, true);
-    if (expected === undefined || back === undefined) {
+    if (back === undefined) {
       return;
     }
     highlight ??= createHighlight();
@@ -638,9 +646,14 @@ export async function createRenderer(
     layers.prepareFrame(frameInfo());
     // The programs of the picking materials are made first, off this thread, and a pick that comes after the first does not wait: they are there.
     const compiling = swapToPicking();
-    const ready = compiling.scenes.map((own) => gl.compileAsync(own, activeCamera()));
-    compiling.restore();
-    await Promise.all(ready);
+    let ready: Promise<unknown>[];
+    try {
+      ready = compiling.scenes.map((own) => gl.compileAsync(own, activeCamera()));
+    } finally {
+      compiling.restore();
+    }
+    // (A program that could not be made is the card's to say, in the frame; it does not make a click fail.)
+    await Promise.allSettled(ready);
     if (unusable()) {
       return null;
     }
@@ -679,7 +692,15 @@ export async function createRenderer(
       gl.setClearColor(colour, alpha);
       picking.restore();
     }
-    await read;
+    try {
+      await read;
+    } catch (error) {
+      // The card took the context away while the pixel was being read: there is nothing to say. Any other failure is a fault, and is let through.
+      if (unusable()) {
+        return null;
+      }
+      throw error;
+    }
     if (unusable()) {
       return null;
     }

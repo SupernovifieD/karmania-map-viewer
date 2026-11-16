@@ -63,6 +63,10 @@ export const PICK_FRAGMENT_GLSL = /* glsl */ `
 uniform float uPickLayer;
 vec4 pickColour(float element) {
   float n = element + 1.0;
+  // An element that three bytes cannot say would be written as another one: it is not written.
+  if (n > ${String(MAX_PICK_ELEMENT + 1)}.0) {
+    discard;
+  }
   float r = mod(n, 256.0);
   float g = mod(floor(n / 256.0), 256.0);
   float b = floor(n / 65536.0);

@@ -175,6 +175,30 @@ test.describe('the outline of the selected point', () => {
     expect(distance(await pixelAt(page, centre, 7, 0), dark.ink)).toBeLessThanOrEqual(6);
   });
 
+  test('is not drawn for an element that the pick cannot say (beyond 16.7 million), and leaves the layers as they were drawn', async ({
+    page,
+  }) => {
+    const { map } = await colours(page);
+    const centre = await centreOn(page, POINTS[2] as [number, number]);
+    const own = await pixelAt(page, centre, 0, 0);
+    expect(own).not.toEqual(map);
+    // The scene takes any whole number as an element: this one is not the number of a row of this dataset, and has no outline.
+    await select(page, 'layer-1', 20_000_000);
+    await drawn(page);
+    await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: 1.0001 } } });
+    await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: 1 } } });
+    await drawn(page);
+    // The points are drawn as they were (the layer is not left drawing numbers), and nothing is round them.
+    await expect.poll(async () => pixelAt(page, centre, 0, 0)).toEqual(own);
+    expect(distance(await pixelAt(page, centre, 5, 0), map)).toBeLessThanOrEqual(6);
+    // A row that there is has its outline again.
+    await select(page, 'layer-1', 2);
+    const { accent } = await colours(page);
+    await expect
+      .poll(async () => distance(await pixelAt(page, centre, 5, 0), accent))
+      .toBeLessThanOrEqual(6);
+  });
+
   test('is not drawn for a layer that is hidden, or a selection of a layer that is not there, and comes back with the layer', async ({
     page,
   }) => {
@@ -295,6 +319,53 @@ test.describe('the outline of the selected line, polygon, cell and block', () =>
     await expect
       .poll(async () => distance(await pixelAt(page, centre, 103, 0), map))
       .toBeLessThanOrEqual(6);
+  });
+
+  test('leaves a polygon as it is drawn when its selection is of an element that the pick cannot say', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    await importAndLoad(page, {
+      name: 'square.geojson',
+      mimeType: 'application/geo+json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          type: 'FeatureCollection',
+          crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::32640' } },
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  [
+                    [500000, 2765000],
+                    [500100, 2765000],
+                    [500100, 2765100],
+                    [500000, 2765100],
+                    [500000, 2765000],
+                  ],
+                ],
+              },
+            },
+          ],
+        }),
+      ),
+    });
+    await drawn(page);
+    await expect.poll(async () => layerStatuses(page)).toEqual([['layer-1', 'drawn']]);
+    await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+    const centre = await centreOn(page, [500_050, 2_765_050], 0.5);
+    const own = await pixelAt(page, centre, 0, 0);
+    // An element that the pick cannot say: the layer's triangles are not swapped for the ones that pick, which would be left on show.
+    await select(page, 'layer-1', 20_000_000);
+    await drawn(page);
+    await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: 0.5001 } } });
+    await dispatch(page, { type: 'setCamera', patch: { camera2d: { unitsPerPixel: 0.5 } } });
+    await drawn(page);
+    await expect.poll(async () => pixelAt(page, centre, 0, 0)).toEqual(own);
+    await expect.poll(async () => pixelAt(page, centre, 40, 30)).toEqual(own);
   });
 
   test('is round a cell of a grid, outside its edge, over the cells next to it, and the cell is as it was', async ({

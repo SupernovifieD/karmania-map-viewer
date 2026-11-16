@@ -50,8 +50,8 @@ describe('createPointsLayer', () => {
     expect(solid.vertexShader).toContain('vCentre');
     expect(solid.uniforms).toBe(flat.uniforms);
     // The change from pixel to pixel is worked out before the first discard, where every pixel of a block of four runs it.
-    expect(solid.fragmentShader.indexOf('planeDepth(vCentre')).toBeLessThan(
-      solid.fragmentShader.indexOf('discard;'),
+    expect(drawing(solid.fragmentShader).indexOf('planeDepth(vCentre')).toBeLessThan(
+      drawing(solid.fragmentShader).indexOf('discard;'),
     );
     layer.prepareFrame({ ...INFO, flat: true });
     expect(parts(layer)[0]?.material).toBe(flat);

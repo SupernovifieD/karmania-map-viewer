@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_PICK_ELEMENT, MAX_PICK_LAYERS, decodePick, encodePick } from './pick.js';
+import {
+  MAX_PICK_ELEMENT,
+  MAX_PICK_LAYERS,
+  PICK_FRAGMENT_GLSL,
+  decodePick,
+  encodePick,
+} from './pick.js';
 
 describe('the four bytes of a pixel of the picking target', () => {
   it('say the layer and the element that were written, from 0 each', () => {
@@ -37,5 +43,16 @@ describe('the four bytes of a pixel of the picking target', () => {
     expect(encodePick(0, -1)).toBeUndefined();
     expect(encodePick(0.5, 0)).toBeUndefined();
     expect(encodePick(0, Number.NaN)).toBeUndefined();
+  });
+});
+
+describe('the shader that writes an element', () => {
+  it('writes none that three bytes cannot say, instead of another that they can: the limit in the shader is the limit of the encoding', () => {
+    // The shader's number is the element plus one: it has to be no more than the largest element plus one, and an element beyond is discarded.
+    expect(PICK_FRAGMENT_GLSL).toContain(`if (n > ${String(MAX_PICK_ELEMENT + 1)}.0) {`);
+    expect(PICK_FRAGMENT_GLSL).toMatch(/if \(n > \d+\.0\) \{\s*discard;\s*\}/);
+    // The largest element is written as it is said (blue 255 and one less than full in the others: 0xfffffe + 1 = 0xffffff), and the next is not an element.
+    expect(encodePick(0, MAX_PICK_ELEMENT)).toEqual([255, 255, 255, 1]);
+    expect(encodePick(0, MAX_PICK_ELEMENT + 1)).toBeUndefined();
   });
 });
