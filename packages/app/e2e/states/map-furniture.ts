@@ -8,7 +8,7 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import type { Shot } from '../support/screenshots.js';
-import { dispatch, drawn, layerStatuses, stats, withData } from '../support/render.js';
+import { camera, dispatch, drawn, layerStatuses, stats, withData } from '../support/render.js';
 import { importAsLocalGrid } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
@@ -42,6 +42,25 @@ async function in3d(page: Page): Promise<void> {
   await page.locator('karmania-app header.toolbar').getByRole('radio', { name: '3D' }).click();
   await expect.poll(async () => (await stats(page))?.viewMode).toBe('3d');
   await drawn(page);
+  await page.mouse.move(0, 0);
+}
+
+/** The third point of `points.csv` (easting, northing): the one that the states of the selection are of (element 2). */
+const THIRD_POINT = [500060.5, 2765071.0] as const;
+
+/** Clicks the third point of the map, where the first view put it, which selects it and opens the identify popover; waits for the popover to be put, with its row. */
+async function identifyThirdPoint(page: Page): Promise<void> {
+  const view = await camera(page);
+  const box = await canvas(page).boundingBox();
+  if (box === null) {
+    throw new Error('The map is not shown.');
+  }
+  await page.mouse.click(
+    box.x + box.width / 2 + (THIRD_POINT[0] - view.centre[0]) / view.unitsPerPixel,
+    box.y + box.height / 2 - (THIRD_POINT[1] - view.centre[1]) / view.unitsPerPixel,
+  );
+  await expect(page.locator('karmania-identify[placed] section')).toBeVisible();
+  await expect(page.locator('karmania-identify dl')).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -102,6 +121,29 @@ export const SHOTS: Shot[] = [
       }
       await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.6);
       await expect(page.locator('karmania-status-chip .value').first()).not.toHaveText('');
+      return whole(page);
+    },
+  },
+  {
+    // A point that was clicked: the outline of the accent round it, and the identify popover next to it, with the point's attributes.
+    name: 'map-identify',
+    show: async (page) => {
+      await mapWith(page);
+      await identifyThirdPoint(page);
+      return whole(page);
+    },
+  },
+  {
+    // A point that is selected without a click (a row of the table): the outline, and no popover.
+    name: 'map-selected',
+    show: async (page) => {
+      await mapWith(page);
+      await dispatch(page, {
+        type: 'setSelection',
+        selection: { layerId: 'layer-1', element: 2 },
+      });
+      await drawn(page);
+      await page.evaluate(() => document.fonts.ready);
       return whole(page);
     },
   },

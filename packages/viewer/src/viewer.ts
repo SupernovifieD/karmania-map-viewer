@@ -735,6 +735,31 @@ export class KarmaniaViewer extends LitElement {
     area.identify = identifyModel(summary, found.element, found.page);
   }
 
+  /**
+   * Escape clears the selection (and so ends the popover and the outline) when the keyboard is on the map or on the table: a key of the map or of the table
+   * that nothing else has used. The popover's own Escape is taken before it gets here, and a field or a dialog that wants Escape has it first.
+   */
+  private readonly onEscape = (event: KeyboardEvent): void => {
+    if (
+      event.key !== 'Escape' ||
+      event.defaultPrevented ||
+      this.store.getState().selection === null
+    ) {
+      return;
+    }
+    // Where the keyboard is: the map, or the table (the fields of the Legend and the buttons of the panel have their own uses of the key).
+    const onMapOrTable = event
+      .composedPath()
+      .some(
+        (node) =>
+          node instanceof HTMLElement &&
+          (node.localName === 'main' || node.localName === 'k-table'),
+      );
+    if (onMapOrTable) {
+      this.store.dispatch({ type: 'setSelection', selection: null });
+    }
+  };
+
   /** "Show in table": the Data tab is shown, with the dataset of the element selected, and the table scrolls to its row, which has the keyboard and the focus. */
   private readonly onIdentifyShow = (event: CustomEvent<IdentifyShow>): void => {
     const { datasetId, element } = event.detail;
@@ -1135,6 +1160,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-map-crs-request=${this.onMapCrsRequest}
           @karmania-pointer-on-map=${this.onPointer}
           @karmania-map-click=${this.onMapClick}
+          @keydown=${this.onEscape}
           @karmania-identify-close=${this.onIdentifyClose}
           @karmania-identify-show=${this.onIdentifyShow}
           @karmania-import-request=${this.chooseFiles}
@@ -1159,6 +1185,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-legend-command=${this.onLegendCommand}
           @karmania-contours-turn-on=${this.onContoursTurnOn}
           @k-table-select=${this.onTableSelect}
+          @keydown=${this.onEscape}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}
