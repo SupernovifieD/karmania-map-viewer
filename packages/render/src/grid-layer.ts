@@ -24,9 +24,11 @@ import {
   ShaderMaterial,
   UnsignedByteType,
   Vector3,
+  Vector4,
 } from 'three';
 import type { LayerObject } from './layer-set.js';
 import { MAX_CLASSES, colourOf } from './look.js';
+import { PICK_FRAGMENT_GLSL, pickMaterial } from './pick.js';
 import type { ClassColouring, LayerLook } from './look.js';
 import { sinCos } from './rotation.js';
 
@@ -49,13 +51,24 @@ uniform vec3 uPalette[${String(MAX_CLASSES)}];
 uniform float uCount;
 uniform float uOpacity;
 varying vec2 vUv;
+#ifdef PICK
+// The first column and row of the tile and how many of each it has, and how many columns the grid has: which cell a pixel is of.
+uniform vec4 uTile;
+uniform float uColumns;
+${PICK_FRAGMENT_GLSL}
+#endif
 
 void main() {
   float cell = floor(texture2D(uCells, vUv).r * 255.0 + 0.5);
   if (cell >= uCount) {
     discard;
   }
+#ifdef PICK
+  vec2 inTile = min(floor(vUv * uTile.zw), uTile.zw - 1.0);
+  gl_FragColor = pickColour((uTile.y + inTile.y) * uColumns + uTile.x + inTile.x);
+#else
   gl_FragColor = vec4(uPalette[int(cell)], uOpacity);
+#endif
 }
 `;
 
@@ -140,6 +153,7 @@ function warpedGeometries(
 export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObject {
   const group = new Group();
   const palette = Array.from({ length: MAX_CLASSES }, () => new Vector3());
+  const pickLayer = { value: 0 };
   const laidOut =
     buffers.placement === undefined ? warpedGeometries(buffers) : placedGeometries(buffers);
   const tiles = laidOut.map(({ tile, geometry }) => {
@@ -148,6 +162,10 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
       uPalette: { value: palette },
       uCount: { value: 0 },
       uOpacity: { value: 1 },
+      // For picking: where the tile is in the grid, and the layer's number (shared by the tiles).
+      uTile: { value: new Vector4(tile.i0, tile.j0, tile.nx, tile.ny) },
+      uColumns: { value: buffers.size[0] },
+      uPickLayer: pickLayer,
     };
     const material = new ShaderMaterial({
       uniforms,
@@ -171,6 +189,8 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
       material,
       mesh,
       texture: undefined as DataTexture | undefined,
+      /** The material that picks, made when the first pick wants it. */
+      picking: undefined as ShaderMaterial | undefined,
     };
   });
   const [columns, rows] = buffers.size;
@@ -214,6 +234,25 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
         entry.uniforms.uOpacity.value = next.opacity;
       }
       show();
+    },
+    // Picking: the cell of each pixel (the number of the cell in the grid, `i` fastest) is worked out by the shader of the tile, from where the tile is in the
+    // grid and where the pixel is in the tile; a cell with no class or none that has a colour is discarded as when it is drawn, and is not picked.
+    pick(rank) {
+      pickLayer.value = rank + 1;
+      for (const entry of tiles) {
+        entry.picking ??= pickMaterial({
+          uniforms: entry.uniforms,
+          vertexShader: VERTEX,
+          fragmentShader: FRAGMENT,
+          side: DoubleSide,
+        });
+        entry.mesh.material = entry.picking;
+      }
+      return () => {
+        for (const entry of tiles) {
+          entry.mesh.material = entry.material;
+        }
+      };
     },
     // A grid has no size in pixels and no outline: it is the same at every pixel ratio and on every theme.
     prepareFrame() {
@@ -261,6 +300,7 @@ export function createGridLayer(buffers: GridBuffers, look: LayerLook): LayerObj
       for (const entry of tiles) {
         entry.geometry.dispose();
         entry.material.dispose();
+        entry.picking?.dispose();
       }
     },
   };

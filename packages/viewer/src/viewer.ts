@@ -5,6 +5,7 @@ import type {
   Engine,
   LoadOptions,
   LoadResult,
+  Page,
   Summary,
 } from '@karmania/engine';
 import {
@@ -17,7 +18,7 @@ import {
   zoom3dAt,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Controller3d, Renderer, RenderStats } from '@karmania/render';
+import type { Controller2d, Controller3d, PickHit, Renderer, RenderStats } from '@karmania/render';
 import {
   cameraTo2d,
   cameraTo3d,
@@ -42,6 +43,10 @@ import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
+import { identifyModel } from './identify.js';
+import './identify-popover.js';
+import type { IdentifyClose, IdentifyShow } from './identify-popover.js';
+import type { TableSelect } from '@karmania/ui';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -309,6 +314,14 @@ export class KarmaniaViewer extends LitElement {
     return this.renderer?.readPixels(x, y, width, height);
   }
 
+  /**
+   * Which element of which layer is at a point of the map (`x` and `y` in CSS pixels from the top left of the canvas), as the renderer picks it
+   * (see `Renderer.pick`); `null` where there is none, and `undefined` without a renderer. For tests, and for what a click does.
+   */
+  async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
+    return this.renderer?.pick(x, y);
+  }
+
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
   renderStats(): RenderStats | undefined {
     return this.renderer?.stats();
@@ -361,6 +374,7 @@ export class KarmaniaViewer extends LitElement {
     }
     this.renderer = made;
     this.cannotDraw = made === undefined;
+    made?.setSelection(this.store.getState().selection);
     this.lookThroughCamera();
     this.refreshController();
     this.pipeline?.rendererReady();
@@ -621,12 +635,185 @@ export class KarmaniaViewer extends LitElement {
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
     }
+    // The selected element has an outline, and the popover is of it while it is the selection.
+    if (state.selection !== previous.selection) {
+      this.renderer?.setSelection(state.selection);
+      this.refreshIdentify();
+      // The row of the table that is the selected element is tinted.
+      this.requestUpdate();
+    }
     // A layer whose style or visibility changed looks different, and is not built again for it.
     for (const [id, layer] of Object.entries(state.layers)) {
       if (layer !== previous.layers[id]) {
         this.renderer?.setLayerLook(id, layerLook(layer));
       }
     }
+  };
+
+  /** The pick that was asked for last: the answer of an older one that comes after is not taken. */
+  private pickSerial = 0;
+
+  /** What a person decided after a click on the map (Escape, a row of the table, the popover closed) stands over the click's answer, which is not taken when it comes. */
+  private overtakePick(): void {
+    this.pickSerial += 1;
+  }
+
+  /**
+   * A click on the map selects what is at that point of it (the renderer's pick), or nothing when nothing is: a click on the empty map clears the
+   * selection. The answer comes from the card a little later, and one that a later click has overtaken is dropped.
+   */
+  private readonly onMapClick = (event: CustomEvent<PointerOnMap>): void => {
+    const click = event.detail;
+    const renderer = this.renderer;
+    if (click === null || renderer === undefined) {
+      return;
+    }
+    this.pickSerial += 1;
+    const serial = this.pickSerial;
+    void renderer.pick(click.x, click.y).then((hit) => {
+      if (serial !== this.pickSerial || this.renderer !== renderer) {
+        return;
+      }
+      // What is clicked is identified where it was clicked, and its row is read for the popover (a click on nothing clears the selection, which ends it).
+      if (hit !== null) {
+        this.identified = { ...hit, at: { x: click.x, y: click.y } };
+      }
+      this.store.dispatch({ type: 'setSelection', selection: hit });
+      this.readIdentified();
+      this.refreshIdentify();
+    });
+  };
+
+  /**
+   * The element that a click identified, and where the map was clicked: what the popover is of. The popover is of it while it is the selection: a selection that
+   * is another (a row chosen in the table, a click elsewhere) or none ends it.
+   */
+  private identified:
+    { layerId: string; element: number; at: { x: number; y: number }; page?: Page } | undefined;
+
+  /** Reads the row of the identified element (one row, from the engine's cache if it was read), and tells the popover when it has come. */
+  private readIdentified(): void {
+    const found = this.identified;
+    const engine = this.engine;
+    const layer = found === undefined ? undefined : this.store.getState().layers[found.layerId];
+    if (found === undefined || engine === undefined || layer === undefined) {
+      return;
+    }
+    const gone = { start: found.element, count: 0, columns: [] };
+    engine.rows(layer.datasetId, found.element, 1).then(
+      (page) => {
+        if (this.identified === found) {
+          found.page = page;
+          this.refreshIdentify();
+        }
+      },
+      () => {
+        if (this.identified === found) {
+          found.page = gone;
+          this.refreshIdentify();
+        }
+      },
+    );
+  }
+
+  /** Gives the map area what the popover says now, or nothing when what was identified is not the selection any more (or its layer or dataset is gone). */
+  private refreshIdentify(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null) {
+      return;
+    }
+    const state = this.store.getState();
+    const found = this.identified;
+    const same =
+      found !== undefined &&
+      state.selection?.layerId === found.layerId &&
+      state.selection.element === found.element;
+    const layer = same ? state.layers[found.layerId] : undefined;
+    const summary =
+      layer === undefined ? undefined : this.datasets.find((each) => each.id === layer.datasetId);
+    if (!same || summary === undefined) {
+      this.identified = undefined;
+      area.identify = undefined;
+      return;
+    }
+    area.identifyAt = found.at;
+    area.identify = identifyModel(summary, found.element, found.page);
+  }
+
+  /**
+   * Escape clears the selection (and so ends the popover and the outline) when the keyboard is on the map or on the table: a key of the map or of the table
+   * that nothing else has used. The popover's own Escape is taken before it gets here, and a field or a dialog that wants Escape has it first.
+   */
+  private readonly onEscape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || event.defaultPrevented) {
+      return;
+    }
+    // Where the keyboard is: the map, or the table (the fields of the Legend and the buttons of the panel have their own uses of the key).
+    const onMapOrTable = event
+      .composedPath()
+      .some(
+        (node) =>
+          node instanceof HTMLElement &&
+          (node.localName === 'main' || node.localName === 'k-table'),
+      );
+    if (onMapOrTable) {
+      // (A click that was just made and has not been answered is cleared with the rest.)
+      this.overtakePick();
+      if (this.store.getState().selection !== null) {
+        this.store.dispatch({ type: 'setSelection', selection: null });
+      }
+    }
+  };
+
+  /** "Show in table": the Data tab is shown, with the dataset of the element selected, and the table scrolls to its row, which has the keyboard and the focus. */
+  private readonly onIdentifyShow = (event: CustomEvent<IdentifyShow>): void => {
+    const { datasetId, element } = event.detail;
+    this.selected = datasetId;
+    this.changePanel({ tab: 'data', collapsed: false });
+    void this.updateComplete.then(() =>
+      this.renderRoot.querySelector('karmania-panel')?.showRow(element),
+    );
+  };
+
+  /**
+   * A person selected a row of the table (a click, or Enter or Space): the element of the dataset that is that row is the scene's selection, so that the
+   * map outlines it. It has no popover: that is for a click on the map. A dataset that no layer shows has nothing to select.
+   */
+  private readonly onTableSelect = (event: CustomEvent<TableSelect>): void => {
+    const dataset = this.selected;
+    const layer = Object.values(this.store.getState().layers).find(
+      (each) => each.datasetId === dataset,
+    );
+    if (layer !== undefined) {
+      this.overtakePick();
+      this.store.dispatch({
+        type: 'setSelection',
+        selection: { layerId: layer.id, element: event.detail.row },
+      });
+    }
+  };
+
+  /** The row of the selected dataset that is the scene's selected element: the table tints it. `undefined` when the selection is of another dataset or none. */
+  private selectedElementOfDataset(): number | undefined {
+    const state = this.store.getState();
+    const selection = state.selection;
+    if (selection === null || this.selected === undefined) {
+      return undefined;
+    }
+    return state.layers[selection.layerId]?.datasetId === this.selected
+      ? selection.element
+      : undefined;
+  }
+
+  /** The popover is closed with its button (the element stays selected) or with Escape (the selection is cleared too); focus goes back to the map. */
+  private readonly onIdentifyClose = (event: CustomEvent<IdentifyClose>): void => {
+    this.overtakePick();
+    this.identified = undefined;
+    if (event.detail.escape) {
+      this.store.dispatch({ type: 'setSelection', selection: null });
+    }
+    this.refreshIdentify();
+    this.renderRoot.querySelector('karmania-map-area')?.focusTarget?.focus();
   };
 
   /** Stops listening to the scene; set while the viewer is in a page. */
@@ -979,6 +1166,10 @@ export class KarmaniaViewer extends LitElement {
           @karmania-navigate=${this.onNavigate}
           @karmania-map-crs-request=${this.onMapCrsRequest}
           @karmania-pointer-on-map=${this.onPointer}
+          @karmania-map-click=${this.onMapClick}
+          @keydown=${this.onEscape}
+          @karmania-identify-close=${this.onIdentifyClose}
+          @karmania-identify-show=${this.onIdentifyShow}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
@@ -993,12 +1184,15 @@ export class KarmaniaViewer extends LitElement {
           .styles=${styles}
           .datasets=${this.datasets}
           .selected=${this.selected}
+          .selectedElement=${this.selectedElementOfDataset()}
           .rows=${this.rows}
           .crsInfo=${this.crsInfo}
           .notices=${notices}
           @karmania-import-request=${this.chooseFiles}
           @karmania-legend-command=${this.onLegendCommand}
           @karmania-contours-turn-on=${this.onContoursTurnOn}
+          @k-table-select=${this.onTableSelect}
+          @keydown=${this.onEscape}
           @karmania-dataset-select=${this.onDatasetSelect}
           @karmania-dataset-remove=${this.onDatasetRemove}
           @karmania-panel-change=${this.onPanelChange}

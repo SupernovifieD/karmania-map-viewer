@@ -9,10 +9,14 @@ import type { Camera2d, Camera3d, VerticalExaggeration, ViewMode } from '@karman
 import {
   Color,
   OrthographicCamera,
+  NearestFilter,
   PerspectiveCamera,
+  RGBAFormat,
   Scene,
   SRGBColorSpace,
+  UnsignedByteType,
   WebGLRenderer,
+  WebGLRenderTarget,
 } from 'three';
 import { bufferSize } from './buffer-size.js';
 import { orthographicFrame } from './camera-2d.js';
@@ -24,9 +28,13 @@ import { parseCssColour } from './css-colour.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
 import { frameLight } from './light.js';
+import { createHighlight } from './highlight.js';
+import type { Highlight } from './highlight.js';
+import { MAX_PICK_LAYERS, decodePick, encodePick } from './pick.js';
+import type { PickHit } from './pick.js';
 import { tieBreak } from './tie-break.js';
 import type { LayerOutcome } from './layer-set.js';
-import type { ClassColouring, LayerLook } from './look.js';
+import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 
 /** What the renderer says of itself, for tests and diagnostics. */
 export interface RenderStats {
@@ -116,6 +124,19 @@ export interface Renderer {
    * @throws Error while the card has the context away: there is nothing to read.
    */
   readPixels(x: number, y: number, width: number, height: number): Uint8Array;
+  /**
+   * The element that is selected, or `null` for none: an outline is drawn round it, over the layers, in the accent colour of the canvas (its CSS `accent-color`)
+   * and a ring of the colour of the text outside that. The outline is of the pixels that picking would pick for the element, so it follows the shape the layer
+   * draws it in, in 2D and in 3D. A selection of a layer that is not there, is not visible or is beyond the first `MAX_PICK_LAYERS` draws nothing.
+   */
+  setSelection(selection: PickHit | null): void;
+  /**
+   * Which element of which layer is at a point of the map: `x` and `y` in CSS pixels from the top left of the canvas. The layers that are drawn
+   * (the visible ones, and the pixels of them that are drawn: what a class has no colour for is not there) are drawn again into a target that holds
+   * numbers, and the one pixel is read back without waiting for the card (`pick.ts`). `null` where nothing is, or outside the map, or while the card
+   * has the context away. A layer beyond the first `MAX_PICK_LAYERS` in the drawing order is not picked.
+   */
+  pick(x: number, y: number): Promise<PickHit | null>;
   stats(): RenderStats;
   /** Stops watching the canvas, frees what is on the card and gives the context up. Calling it again does nothing. */
   dispose(): void;
@@ -350,6 +371,8 @@ export async function createRenderer(
 
   /** The colour of outlines: the colour of the text where the canvas is, which contrasts with the map in the theme that it is in. */
   let outline: readonly [number, number, number] = [0, 0, 0];
+  /** The accent colour, from the canvas's `accent-color`: the outline of the selected element. */
+  let accent: readonly [number, number, number] = [0.102, 0.337, 0.769];
 
   /** What the map is cleared to is the background of the canvas, which the page gives (the token `--k-surface-map`). */
   let background = '';
@@ -357,6 +380,9 @@ export async function createRenderer(
     const style = view.getComputedStyle(canvas);
     const ink = parseCssColour(style.color);
     outline = ink === undefined ? [0, 0, 0] : [ink.r / 255, ink.g / 255, ink.b / 255];
+    const accented = parseCssColour(style.accentColor);
+    accent =
+      accented === undefined ? accent : [accented.r / 255, accented.g / 255, accented.b / 255];
     const colour = parseCssColour(style.backgroundColor);
     const opaque = colour !== undefined && colour.a > 0 ? colour : undefined;
     const text =
@@ -391,6 +417,125 @@ export async function createRenderer(
     gl.compileAsync(own, activeCamera()).then(done, done);
   }
 
+  /** The element that is selected, the programs of the picking materials that its outline is made with (by layer and view), and the pass that makes it. */
+  let selection: PickHit | null = null;
+  const warmed = new Set<string>();
+  const warming = new Set<string>();
+  let highlight: Highlight | undefined;
+
+  /** The picking materials of a layer are made again when the layer is: what was said of their programs is not so any more. */
+  function forgetHighlightPrograms(id: string): void {
+    for (const key of [...warmed, ...warming]) {
+      if (key.startsWith(`${id}:`)) {
+        warmed.delete(key);
+        warming.delete(key);
+      }
+    }
+  }
+
+  /** Makes the programs of the picking materials of the layer that the outline is of, off this thread (as a pick does), and asks for a frame when they are made. */
+  function warmHighlight(id: string, own: Scene, rank: number, key: string): void {
+    if (warming.has(key)) {
+      return;
+    }
+    warming.add(key);
+    const back = layers.pick(id, rank, true);
+    if (back === undefined) {
+      warmed.add(key);
+      warming.delete(key);
+      return;
+    }
+    let ready: Promise<unknown>;
+    try {
+      ready = gl.compileAsync(own, activeCamera());
+    } finally {
+      back();
+    }
+    const done = (): void => {
+      if (warming.delete(key)) {
+        warmed.add(key);
+        invalidate();
+      }
+    };
+    ready.then(done, done);
+  }
+
+  /**
+   * The outline of the selected element, over the layers: the layer is drawn into a target of its own with its picking materials, and a pass over the
+   * picture draws a ring round the pixels that say the element (`highlight.ts`). Nothing is drawn for a selection that is not of a layer that is there
+   * and drawn.
+   */
+  function drawHighlight(everything: boolean): void {
+    if (selection === null) {
+      return;
+    }
+    const id = selection.layerId;
+    const own = scenes.get(id);
+    const rank = drawOrder().indexOf(id);
+    if (own === undefined || rank < 0 || rank >= MAX_PICK_LAYERS) {
+      return;
+    }
+    const key = `${id}:${viewMode}`;
+    if (!warmed.has(key)) {
+      if (!everything) {
+        warmHighlight(id, own, rank, key);
+        return;
+      }
+      // A picture that is read back is of everything, and has its programs made now.
+      warmed.add(key);
+    }
+    // An element that the target cannot say (beyond what three bytes hold) has no outline; asked before anything is swapped, so that nothing is left swapped.
+    const expected = encodePick(rank, selection.element);
+    if (expected === undefined) {
+      return;
+    }
+    // (Of what is drawn: the outline hugs the point, the line, the polygon, and not the larger target that a pointer is given.)
+    const back = layers.pick(id, rank, true);
+    if (back === undefined) {
+      return;
+    }
+    highlight ??= createHighlight();
+    const mask = highlight.targetFor(size.width, size.height);
+    const colour = new Color();
+    gl.getClearColor(colour);
+    const alpha = gl.getClearAlpha();
+    try {
+      gl.setRenderTarget(mask);
+      gl.setClearColor(0x000000, 0);
+      gl.clear();
+      gl.render(own, activeCamera());
+    } finally {
+      gl.setRenderTarget(null);
+      gl.setClearColor(colour, alpha);
+      back();
+    }
+    highlight.draw(gl, mask, expected, size.pixelRatio, { accent, contrast: outline });
+  }
+
+  /** What is true of the screen and the theme for the frame that is drawn now. */
+  function frameInfo(): FrameInfo {
+    return {
+      pixelRatio: size.pixelRatio,
+      viewport: [size.width, size.height],
+      flat: viewMode === '2d',
+      light: frameLight(viewMode === '2d', camera3d.matrixWorldInverse.elements),
+      outline,
+    };
+  }
+
+  /**
+   * Puts a layer where the view says it is for the draw: in 3D the layer that is higher in the legend is moved a little towards the camera, so that of
+   * two in one plane it is the one seen; in 2D they are where they are, as the depth is cleared between layers.
+   */
+  function placeLayer(id: string, own: Scene, rank: number): void {
+    if (viewMode === '3d') {
+      tieBreak(own, rank);
+      broken.add(id);
+    } else if (broken.delete(id)) {
+      tieBreak(own, 0);
+    }
+  }
+
   /** Draws a frame. `everything` draws every layer now, compiling what has to be compiled (a picture that is read back, which is of all of them). */
   function draw(everything: boolean): void {
     // The frame that was asked for and has not come is this one: it is not drawn twice, nor after the renderer is gone.
@@ -404,13 +549,7 @@ export async function createRenderer(
     readBackground();
     // The next part of what is still being built goes on the card before the frame, and another frame is asked for if there is more.
     const more = layers.step();
-    layers.prepareFrame({
-      pixelRatio: size.pixelRatio,
-      viewport: [size.width, size.height],
-      flat: viewMode === '2d',
-      light: frameLight(viewMode === '2d', camera3d.matrixWorldInverse.elements),
-      outline,
-    });
+    layers.prepareFrame(frameInfo());
     // The map's colour first. In 2D each layer then has its own depth; in 3D the clear above is the only one, so all layers share it.
     gl.clear();
     let drawn = 0;
@@ -419,14 +558,7 @@ export async function createRenderer(
       if (own === undefined) {
         continue;
       }
-      // In 3D the layer that is higher in the legend is moved a little towards the camera, so that of two in one plane it is the one seen; in 2D
-      // they are where they are, as the depth is cleared between layers.
-      if (viewMode === '3d') {
-        tieBreak(own, rank);
-        broken.add(id);
-      } else if (broken.delete(id)) {
-        tieBreak(own, 0);
-      }
+      placeLayer(id, own, rank);
       if (!everything && !programs.has(id)) {
         warm(id, own);
         continue;
@@ -439,6 +571,7 @@ export async function createRenderer(
       drawn += 1;
     }
     layersDrawn = drawn;
+    drawHighlight(everything);
     frames += 1;
     if (more) {
       invalidate();
@@ -451,6 +584,131 @@ export async function createRenderer(
         draw(false);
       });
     }
+  }
+
+  /** The target of picking: the size of the drawing buffer, made when the first pick wants it and made again when the buffer changes size. */
+  let pickTarget: WebGLRenderTarget | undefined;
+  function targetOfPicking(): WebGLRenderTarget {
+    if (
+      pickTarget === undefined ||
+      pickTarget.width !== size.width ||
+      pickTarget.height !== size.height
+    ) {
+      pickTarget?.dispose();
+      pickTarget = new WebGLRenderTarget(size.width, size.height, {
+        type: UnsignedByteType,
+        format: RGBAFormat,
+        minFilter: NearestFilter,
+        magFilter: NearestFilter,
+        generateMipmaps: false,
+        depthBuffer: true,
+        stencilBuffer: false,
+      });
+    }
+    return pickTarget;
+  }
+
+  /** Puts the picking materials of every layer that has them in place, in the order the layers are drawn, and says how to put them back. */
+  function swapToPicking(): { restore: () => void; scenes: Scene[] } {
+    const restores: (() => void)[] = [];
+    const swapped: Scene[] = [];
+    for (const [rank, id] of drawOrder().entries()) {
+      const own = scenes.get(id);
+      const back = own === undefined || rank >= MAX_PICK_LAYERS ? undefined : layers.pick(id, rank);
+      if (own !== undefined && back !== undefined) {
+        restores.push(back);
+        swapped.push(own);
+      }
+    }
+    return {
+      restore: () => {
+        for (const back of restores) {
+          back();
+        }
+      },
+      scenes: swapped,
+    };
+  }
+
+  /** Whether there is nothing to draw on (the renderer is disposed of, or the card has the context away): asked again after a wait, as it may have changed. */
+  const unusable = (): boolean => disposed || lost;
+
+  async function pick(x: number, y: number): Promise<PickHit | null> {
+    if (unusable() || cssWidth <= 0 || cssHeight <= 0 || !Number.isFinite(x + y)) {
+      return null;
+    }
+    // The pixel of the buffer (rows from the bottom, as the card has them).
+    const px = Math.floor((x * size.width) / cssWidth);
+    const py = size.height - 1 - Math.floor((y * size.height) / cssHeight);
+    if (px < 0 || px >= size.width || py < 0 || py >= size.height) {
+      return null;
+    }
+    layers.prepareFrame(frameInfo());
+    // The programs of the picking materials are made first, off this thread, and a pick that comes after the first does not wait: they are there.
+    const compiling = swapToPicking();
+    let ready: Promise<unknown>[];
+    try {
+      ready = compiling.scenes.map((own) => gl.compileAsync(own, activeCamera()));
+    } finally {
+      compiling.restore();
+    }
+    // (A program that could not be made is the card's to say, in the frame; it does not make a click fail.)
+    await Promise.allSettled(ready);
+    if (unusable()) {
+      return null;
+    }
+    // (What may have changed while the programs were made: the uniforms, and the layers that were put or taken.)
+    layers.prepareFrame(frameInfo());
+    const order = drawOrder();
+    const target = targetOfPicking();
+    target.scissor.set(px, py, 1, 1);
+    target.scissorTest = true;
+    const picking = swapToPicking();
+    const colour = new Color();
+    gl.getClearColor(colour);
+    const alpha = gl.getClearAlpha();
+    let read: Promise<unknown>;
+    const bytes = new Uint8Array(4);
+    try {
+      gl.setRenderTarget(target);
+      // Nothing is 0: what the map is cleared to for the page is not what is cleared here.
+      gl.setClearColor(0x000000, 0);
+      gl.clear();
+      for (const [rank, id] of order.entries()) {
+        const own = scenes.get(id);
+        if (own === undefined || rank >= MAX_PICK_LAYERS || !picking.scenes.includes(own)) {
+          continue;
+        }
+        placeLayer(id, own, rank);
+        if (viewMode === '2d') {
+          gl.clearDepth();
+        }
+        gl.render(own, activeCamera());
+      }
+      // The read is begun here, with the card's commands for the pixel behind it, and waited for after the state is put back.
+      read = gl.readRenderTargetPixelsAsync(target, px, py, 1, 1, bytes);
+    } finally {
+      gl.setRenderTarget(null);
+      gl.setClearColor(colour, alpha);
+      picking.restore();
+    }
+    try {
+      await read;
+    } catch (error) {
+      // The card took the context away while the pixel was being read: there is nothing to say. Any other failure is a fault, and is let through.
+      if (unusable()) {
+        return null;
+      }
+      throw error;
+    }
+    if (unusable()) {
+      return null;
+    }
+    const found = decodePick(bytes);
+    const layerId = found === undefined ? undefined : order[found.rank];
+    return found === undefined || layerId === undefined
+      ? null
+      : { layerId, element: found.element };
   }
 
   /** Gives the buffer the size of the box at the pixel ratio of the page now, and asks for a frame if it changed. */
@@ -518,6 +776,8 @@ export async function createRenderer(
     gl.setSize(size.width, size.height, false);
     // And its programs are gone: they are compiled again, a layer at a time and off this thread, before the layers are drawn.
     programs.reset();
+    warmed.clear();
+    warming.clear();
     invalidate();
   };
   canvas.addEventListener('webglcontextlost', onLost);
@@ -563,6 +823,7 @@ export async function createRenderer(
         return 'unsupported';
       }
       const outcome = layers.set(id, buffers, look);
+      forgetHighlightPrograms(id);
       if (outcome === 'drawn') {
         programs.put(id, buffers.kind);
       } else {
@@ -599,9 +860,25 @@ export async function createRenderer(
         return false;
       }
       const removed = layers.remove(id);
+      forgetHighlightPrograms(id);
       programs.remove(id);
       invalidate();
       return removed;
+    },
+    setSelection(next) {
+      if (disposed) {
+        return;
+      }
+      const same =
+        selection === next ||
+        (selection !== null &&
+          next !== null &&
+          selection.layerId === next.layerId &&
+          selection.element === next.element);
+      selection = next === null ? null : { layerId: next.layerId, element: next.element };
+      if (!same) {
+        invalidate();
+      }
     },
     setDepthRange(min, max) {
       if (disposed || (depth.min === min && depth.max === max)) {
@@ -640,6 +917,7 @@ export async function createRenderer(
       context.readPixels(x, y, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
       return pixels;
     },
+    pick,
     stats() {
       return {
         frames,
@@ -687,6 +965,8 @@ export async function createRenderer(
       }
       layers.clear();
       programs.reset();
+      pickTarget?.dispose();
+      highlight?.dispose();
       gl.dispose();
       // A context that is away already has nothing to give up.
       if (!lost) {

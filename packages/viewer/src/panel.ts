@@ -43,6 +43,7 @@ export class KarmaniaPanel extends LitElement {
     styles: { attribute: false },
     datasets: { attribute: false },
     selected: { attribute: false },
+    selectedElement: { attribute: false },
     rows: { attribute: false },
     crsInfo: { attribute: false },
     notices: { attribute: false },
@@ -146,6 +147,8 @@ export class KarmaniaPanel extends LitElement {
   declare datasets: readonly Summary[];
   /** The `id` of the dataset that is selected. */
   declare selected: number | undefined;
+  /** The row of the selected dataset that is the selected element of the map, if there is one. */
+  declare selectedElement: number | undefined;
   /** Gets the rows of a dataset, for the table of the Data tab. */
   declare rows: RowSource | undefined;
   /** Says what an EPSG code means, for the Data tab. */
@@ -168,6 +171,7 @@ export class KarmaniaPanel extends LitElement {
     this.styles = undefined;
     this.datasets = [];
     this.selected = undefined;
+    this.selectedElement = undefined;
     this.rows = undefined;
     this.crsInfo = undefined;
     this.notices = new Map();
@@ -224,6 +228,12 @@ export class KarmaniaPanel extends LitElement {
     button?.focus();
   }
 
+  /** Shows a row of the table of the selected dataset in the Data tab (the tab itself is the viewer's to show). */
+  async showRow(row: number): Promise<void> {
+    await this.updateComplete;
+    await this.renderRoot.querySelector('karmania-data-tab')?.showRow(row);
+  }
+
   override render() {
     return html`
       <aside aria-label="Side panel">
@@ -265,6 +275,7 @@ export class KarmaniaPanel extends LitElement {
               <karmania-data-tab
                 .datasets=${this.datasets}
                 .selected=${this.selected}
+                .selectedElement=${this.selectedElement}
                 .rows=${this.rows}
                 .crsInfo=${this.crsInfo}
                 .notices=${this.notices}
