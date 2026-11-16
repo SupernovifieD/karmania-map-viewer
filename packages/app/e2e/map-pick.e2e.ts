@@ -1261,7 +1261,13 @@ test.describe('picking layers in one plane in 3D', () => {
     expect((await warm.at([500_025, 2_765_035, 0]))?.layerId).toBe('layer-2');
     await setViewMode(page, '2d');
     await expect.poll(async () => (await stats(page))?.viewMode).toBe('2d');
+    // A frame of the view from above is drawn after this point (the one for the switch may have come already, and is not waited for): the camera is moved a little.
     const settled = (await drawn(page)).frames;
+    const above = await camera(page);
+    await dispatch(page, {
+      type: 'setCamera',
+      patch: { camera2d: { unitsPerPixel: above.unitsPerPixel * 1.001 } },
+    });
     await expect.poll(async () => (await stats(page))?.frames ?? 0).toBeGreaterThan(settled);
     // In one go: switch to 3D looking at the marker, wait only for the microtasks, and pick at the middle of the map, where the target is. The layers
     // were last drawn for the view from above, and are told what the view is as they are picked.
@@ -1295,9 +1301,12 @@ test.describe('picking layers in one plane in 3D', () => {
         await Promise.resolve();
       }
       const size = viewer.renderStats();
+      // (The pick itself waits for the programs of the view, and a frame may come in that time: what is said is that none was drawn when it was asked for.)
+      const framesWhenAsked = (viewer.renderStats()?.frames ?? 0) - before;
       const picked = await viewer.renderPick((size?.cssWidth ?? 0) / 2, (size?.cssHeight ?? 0) / 2);
-      return { picked, framesBetween: (viewer.renderStats()?.frames ?? 0) - before };
+      return { picked, framesWhenAsked };
     });
+    expect(hit.framesWhenAsked).toBe(0);
     expect(hit.picked).toEqual({ layerId: 'layer-2', element: 0 });
   });
 });
