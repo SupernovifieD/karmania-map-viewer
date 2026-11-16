@@ -86,6 +86,7 @@ export type {
   Rect,
   Size,
 } from './export-layout.js';
+export { MAX_EXPORT_FOV, exportCamera2d, exportCamera3d } from './export-frame.js';
 export { exportLegendLines } from './export-lines.js';
 export type { ExportLine } from './export-lines.js';
 export { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';
