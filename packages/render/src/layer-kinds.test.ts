@@ -1,5 +1,5 @@
 import type { RenderBuffers } from '@karmania/engine/display';
-import type { Mesh } from 'three';
+import type { Mesh, ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { makeLayer } from './layer-kinds.js';
 import type { LayerLook } from './look.js';
@@ -35,6 +35,53 @@ describe('makeLayer', () => {
     ]);
     expect((own as { visible: boolean } | undefined)?.visible).toBe(false);
     layer?.dispose();
+  });
+
+  it('lights lines as tubes in 3D, and the outline of a polygon, which is lines too, stays flat', () => {
+    const square = Float32Array.of(0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0);
+    const lines = makeLayer(
+      {
+        kind: 'lines',
+        positions: square,
+        segments: Uint32Array.of(0, 1, 1, 2),
+        segmentLine: Uint32Array.of(0, 0),
+      },
+      LOOK,
+    );
+    const polygons = makeLayer(
+      {
+        kind: 'polygons',
+        positions: square,
+        triangles: Uint32Array.of(0, 1, 2, 0, 2, 3),
+        trianglePolygon: Uint32Array.of(0, 0),
+        outline: Uint32Array.of(0, 1, 1, 2, 2, 3, 3, 0),
+        outlinePolygon: Uint32Array.of(0, 0, 0, 0),
+      },
+      LOOK,
+    );
+    const frame = {
+      pixelRatio: 1,
+      viewport: [100, 100],
+      flat: false,
+      light: [0, 0, 1],
+      outline: [0, 0, 0],
+    } as const;
+    lines?.prepareFrame({ ...frame, viewport: [100, 100], light: [0, 0, 1], outline: [0, 0, 0] });
+    polygons?.prepareFrame({
+      ...frame,
+      viewport: [100, 100],
+      light: [0, 0, 1],
+      outline: [0, 0, 0],
+    });
+    const shader = (mesh: unknown): string =>
+      (mesh as Mesh).material instanceof Object
+        ? ((mesh as Mesh).material as ShaderMaterial).fragmentShader
+        : '';
+    expect(shader(lines?.object.children[0])).toContain('uLight');
+    const outline = polygons?.object.children[1]?.children[0];
+    expect(shader(outline)).not.toContain('uLight');
+    lines?.dispose();
+    polygons?.dispose();
   });
 
   it('draws every kind of buffers there is: none is left out as unsupported', () => {
