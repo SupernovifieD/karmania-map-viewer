@@ -398,6 +398,8 @@ export class KTable extends LitElement {
       this.fine = 0;
       this.activeRow = 0;
       this.activeColumn = 0;
+      // A row that was asked for and has not been shown is a row of the rows that there were.
+      this.wanted = undefined;
       this.startedAgain = true;
     }
   }
