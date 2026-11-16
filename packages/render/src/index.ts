@@ -12,6 +12,7 @@ export type { BufferSize } from './buffer-size.js';
 export { createRenderer } from './renderer.js';
 export { MAX_PICK_ELEMENT, MAX_PICK_LAYERS, PICK_MIN_LINE, PICK_MIN_POINT } from './pick.js';
 export type { PickHit } from './pick.js';
+export { HIGHLIGHT_EDGE, HIGHLIGHT_RING } from './highlight.js';
 export type { RenderStats, Renderer, RendererOptions, RendererView } from './renderer.js';
 export { attachController2d } from './controller-2d.js';
 export type { Controller2d, Controller2dOptions } from './controller-2d.js';

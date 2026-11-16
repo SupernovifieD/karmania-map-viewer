@@ -262,6 +262,28 @@ const CASES: readonly Case[] = [
     view: (page) => lookAt(page, [EAST + 60, NORTH + 60], 0.25),
   },
   {
+    // The selected polygon (the second of three, with a hole) has an outline of the accent colour, with a ring of the colour of the text outside it, over
+    // what is next to it, and is as it is drawn inside it.
+    name: 'highlight',
+    layers: 1,
+    load: async (page) => {
+      await importAndLoad(
+        page,
+        geojson('leases.geojson', [
+          polygon(EAST, NORTH, 60, 1),
+          polygon(EAST + 80, NORTH + 10, 60, 2, 20),
+          polygon(EAST + 40, NORTH + 80, 60, 3),
+        ]),
+      );
+      await settled(page, 1);
+      await dispatch(page, {
+        type: 'setSelection',
+        selection: { layerId: 'layer-1', element: 1 },
+      });
+    },
+    view: (page) => lookAt(page, [EAST + 80, NORTH + 60], 0.3),
+  },
+  {
     name: 'blocks',
     layers: 1,
     load: importBlocks,
@@ -445,6 +467,20 @@ const CASES_3D: readonly Case[] = [
     name: '3d-blocks',
     layers: 1,
     load: importBlocks,
+    view: (page) => lookFrom(page, [EAST + 15, NORTH + 15, 100], 80, 30, 35),
+  },
+  {
+    // The block at the top in the middle of the model is selected: its outline is round what the camera sees of it, over the blocks next to it.
+    name: '3d-highlight',
+    layers: 1,
+    load: async (page) => {
+      await importBlocks(page);
+      await settled(page, 1);
+      await dispatch(page, {
+        type: 'setSelection',
+        selection: { layerId: 'layer-1', element: 13 },
+      });
+    },
     view: (page) => lookFrom(page, [EAST + 15, NORTH + 15, 100], 80, 30, 35),
   },
   {

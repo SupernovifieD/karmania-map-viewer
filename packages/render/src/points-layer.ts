@@ -227,9 +227,9 @@ export function createPointsLayer(buffers: PointsBuffers, look: LayerLook): Laye
       uniforms.uDiameter.value = size * ratio;
       group.visible = next.visible;
     },
-    pick(rank: number) {
+    pick(rank: number, exact = false) {
       uniforms.uPickLayer.value = rank + 1;
-      uniforms.uPickMin.value = PICK_MIN_POINT * ratio;
+      uniforms.uPickMin.value = exact ? 0 : PICK_MIN_POINT * ratio;
       for (const part of geometries) {
         elementsOf(part);
       }

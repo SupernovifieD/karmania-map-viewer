@@ -327,8 +327,8 @@ describe('LayerSet: a layer that makes more of itself when its classes come', ()
       dispose: () => undefined,
       setLook: () => undefined,
       prepareFrame: () => undefined,
-      pick: (rank: number) => {
-        calls.push(`pick ${String(rank)}`);
+      pick: (rank: number, exact?: boolean) => {
+        calls.push(`pick ${String(rank)}${exact === true ? ' exact' : ''}`);
         return () => {
           calls.push(`back ${String(rank)}`);
         };
@@ -339,6 +339,9 @@ describe('LayerSet: a layer that makes more of itself when its classes come', ()
     expect(calls).toEqual(['pick 3']);
     back?.();
     expect(calls).toEqual(['pick 3', 'back 3']);
+    // For the outline of a selected element the layer is asked for what is drawn.
+    set.pick('layer-1', 3, true)?.();
+    expect(calls.slice(2)).toEqual(['pick 3 exact', 'back 3']);
     // No such layer: nothing to pick.
     expect(set.pick('layer-9', 0)).toBeUndefined();
   });

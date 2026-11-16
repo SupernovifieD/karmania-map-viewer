@@ -101,6 +101,9 @@ export class KarmaniaMapArea extends LitElement {
       /* The map: it fills the area exactly, whatever the area is, and is under everything else. Its background is
          the colour that the renderer clears it to, which it reads from here: the map has the colour of the area. */
       canvas {
+        /* The accent, which the renderer reads from here (a custom property is read as the text it was written as, and this one as a colour) to draw the
+           outline of the selected element. */
+        accent-color: var(--k-accent);
         background-color: var(--k-surface-map);
         cursor: grab;
         display: block;

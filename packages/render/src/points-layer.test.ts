@@ -81,8 +81,13 @@ describe('createPointsLayer', () => {
     expect(numbers[0]?.[0]).toBe(0);
     expect(numbers[0]?.[POINTS_PER_PART - 1]).toBe(POINTS_PER_PART - 1);
     expect(Array.from(numbers[1] ?? [])).toEqual([POINTS_PER_PART, POINTS_PER_PART + 1]);
+    expect(flat.uniforms['uPickMin']?.value).toBeGreaterThan(0);
     back?.();
     expect(parts(layer).every((part) => part.material === flat)).toBe(true);
+    // The outline of a selected point is of the point as it is drawn: no larger target.
+    layer.pick?.(2, true)();
+    expect(flat.uniforms['uPickMin']?.value).toBe(0);
+    expect(flat.uniforms['uPickLayer']?.value).toBe(3);
     // In 3D it has its own, that write the depth of the plane as the drawing does; made once.
     layer.prepareFrame({ ...INFO, flat: false });
     layer.pick?.(0);

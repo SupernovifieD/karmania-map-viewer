@@ -311,9 +311,9 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       uniforms.uWidth.value = width * ratio;
       group.visible = next.visible;
     },
-    pick(rank: number) {
+    pick(rank: number, exact = false) {
       uniforms.uPickLayer.value = rank + 1;
-      uniforms.uPickMin.value = PICK_MIN_LINE * ratio;
+      uniforms.uPickMin.value = exact ? 0 : PICK_MIN_LINE * ratio;
       for (const part of parts) {
         elementsOf(part);
       }

@@ -45,8 +45,8 @@ export function combineLayers(combination: Combination): LayerObject {
     ...(parts.every((part) => part.pick === undefined)
       ? {}
       : {
-          pick(rank: number) {
-            const backs = parts.flatMap((part) => part.pick?.(rank) ?? []);
+          pick(rank: number, exact = false) {
+            const backs = parts.flatMap((part) => part.pick?.(rank, exact) ?? []);
             return () => {
               for (const back of backs) {
                 back();

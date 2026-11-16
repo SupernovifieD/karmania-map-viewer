@@ -29,9 +29,10 @@ export interface LayerObject {
   /**
    * Picking (`pick.ts`): puts in place of the layer's materials those that write the number of the element each fragment belongs to, and the number
    * `rank` plus one for the layer, instead of a colour, and gives back what puts the layer's own back. They are made from the same shaders, so what
-   * is picked is what is drawn. A layer that has none is not picked.
+   * is picked is what is drawn. A layer that has none is not picked. `exact` is for the outline of a selected element, which is of what is drawn: a point
+   * and a line are then their own size, and not the larger one that a pointer picks them at.
    */
-  pick?(rank: number): () => void;
+  pick?(rank: number, exact?: boolean): () => void;
 }
 
 /** Makes the layer of some buffers, looking as `look` says, or `undefined` if buffers of that kind are not drawn (yet). */
@@ -108,8 +109,8 @@ export class LayerSet {
   }
 
   /** Puts the picking materials of a layer in place of its own: see `LayerObject.pick`. `undefined` if there is no such layer or it cannot be picked. */
-  pick(id: string, rank: number): (() => void) | undefined {
-    return this.layers.get(id)?.pick?.(rank);
+  pick(id: string, rank: number, exact = false): (() => void) | undefined {
+    return this.layers.get(id)?.pick?.(rank, exact);
   }
 
   /** Tells every layer what is true of the screen and the theme for the frame that is about to be drawn. */
