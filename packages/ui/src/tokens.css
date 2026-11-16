@@ -58,6 +58,8 @@
   --k-panel-rail-width: 40px;
   /* The strip along the panel's edge that can be grabbed to resize it. */
   --k-resize-hit-width: 6px;
+  /* The least the identify popover is wide (the most, 320, is in the viewer's placement of it, which is also given the map's size). */
+  --k-popover-min-width: 240px;
   /* How wide a column of the wizard's preview table is: room for the name of the column and the
      selector of its role. */
   --k-mapping-column-width: 160px;

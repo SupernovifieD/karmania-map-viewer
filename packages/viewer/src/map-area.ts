@@ -3,12 +3,15 @@ import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
 import { createClickDetector } from './map-click.js';
+import './identify-popover.js';
 import './nav-group.js';
 import './north-arrow.js';
 import './scale-bar.js';
 import './status-chip.js';
+import type { IdentifyModel } from './identify.js';
 import type { MapCrsText } from './map-crs-text.js';
 import { KEYS_2D, KEYS_3D } from './map-label.js';
+import type { Point, Size } from './popover-place.js';
 import type { Readout } from './pointer-readout.js';
 import type { ScaleBarModel, ViewMode } from '@karmania/scene';
 
@@ -67,7 +70,10 @@ export class KarmaniaMapArea extends LitElement {
     progress: { type: Number },
     reasons: { attribute: false },
     interactive: { type: Boolean },
+    identify: { attribute: false },
+    identifyAt: { attribute: false },
     dragging: { state: true },
+    size: { state: true },
   };
 
   static override styles = [
@@ -257,8 +263,15 @@ export class KarmaniaMapArea extends LitElement {
    * since a stop that does nothing is in a person's way, and the empty state's own button is the first thing after the toolbar.
    */
   declare interactive: boolean;
+  /** What the identify popover says, or `undefined` for none: it is laid over the map next to where `identifyAt` (the click, in CSS pixels from the top left) is. */
+  declare identify: IdentifyModel | undefined;
+  declare identifyAt: Point;
+  /** How big the area is, which the popover is kept inside of. */
+  declare private size: Size;
   /** Whether files are being dragged over the area. */
   declare private dragging: boolean;
+
+  private sizeObserver: ResizeObserver | undefined;
 
   /**
    * How many of the area's elements the drag is over. Moving onto a child fires `dragenter` for
@@ -282,7 +295,28 @@ export class KarmaniaMapArea extends LitElement {
     this.progress = 0;
     this.reasons = [];
     this.interactive = false;
+    this.identify = undefined;
+    this.identifyAt = { x: 0, y: 0 };
+    this.size = { width: 0, height: 0 };
     this.dragging = false;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // The popover is kept inside the area, whatever the area is: a window that is resized, a panel that is folded away.
+    this.sizeObserver = new ResizeObserver((entries) => {
+      const box = entries.at(-1)?.contentRect;
+      if (box !== undefined && (box.width !== this.size.width || box.height !== this.size.height)) {
+        this.size = { width: box.width, height: box.height };
+      }
+    });
+    this.sizeObserver.observe(this);
+  }
+
+  override disconnectedCallback(): void {
+    this.sizeObserver?.disconnect();
+    this.sizeObserver = undefined;
+    super.disconnectedCallback();
   }
 
   /** What has the focus when the keys are the map's: there from the first render, and `undefined` until then. */
@@ -353,6 +387,15 @@ export class KarmaniaMapArea extends LitElement {
           this.furnished
             ? html`<karmania-nav-group class="furniture nav"></karmania-nav-group>`
             : nothing
+        }
+        ${
+          this.identify === undefined
+            ? nothing
+            : html`<karmania-identify
+                .model=${this.identify}
+                .anchor=${this.identifyAt}
+                .area=${this.size}
+              ></karmania-identify>`
         }
         ${
           this.chipped

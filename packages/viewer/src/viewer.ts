@@ -5,6 +5,7 @@ import type {
   Engine,
   LoadOptions,
   LoadResult,
+  Page,
   Summary,
 } from '@karmania/engine';
 import {
@@ -42,6 +43,9 @@ import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
+import { identifyModel } from './identify.js';
+import './identify-popover.js';
+import type { IdentifyClose } from './identify-popover.js';
 import './panel.js';
 import type { PanelChange } from './panel.js';
 import {
@@ -630,9 +634,10 @@ export class KarmaniaViewer extends LitElement {
     if (state.legend !== previous.legend) {
       this.renderer?.setLayerOrder(drawOrder(state));
     }
-    // The selected element has an outline.
+    // The selected element has an outline, and the popover is of it while it is the selection.
     if (state.selection !== previous.selection) {
       this.renderer?.setSelection(state.selection);
+      this.refreshIdentify();
     }
     // A layer whose style or visibility changed looks different, and is not built again for it.
     for (const [id, layer] of Object.entries(state.layers)) {
@@ -658,10 +663,83 @@ export class KarmaniaViewer extends LitElement {
     this.pickSerial += 1;
     const serial = this.pickSerial;
     void renderer.pick(click.x, click.y).then((hit) => {
-      if (serial === this.pickSerial && this.renderer === renderer) {
-        this.store.dispatch({ type: 'setSelection', selection: hit });
+      if (serial !== this.pickSerial || this.renderer !== renderer) {
+        return;
       }
+      // What is clicked is identified where it was clicked, and its row is read for the popover (a click on nothing clears the selection, which ends it).
+      if (hit !== null) {
+        this.identified = { ...hit, at: { x: click.x, y: click.y } };
+      }
+      this.store.dispatch({ type: 'setSelection', selection: hit });
+      this.readIdentified();
+      this.refreshIdentify();
     });
+  };
+
+  /**
+   * The element that a click identified, and where the map was clicked: what the popover is of. The popover is of it while it is the selection: a selection that
+   * is another (a row chosen in the table, a click elsewhere) or none ends it.
+   */
+  private identified:
+    { layerId: string; element: number; at: { x: number; y: number }; page?: Page } | undefined;
+
+  /** Reads the row of the identified element (one row, from the engine's cache if it was read), and tells the popover when it has come. */
+  private readIdentified(): void {
+    const found = this.identified;
+    const engine = this.engine;
+    const layer = found === undefined ? undefined : this.store.getState().layers[found.layerId];
+    if (found === undefined || engine === undefined || layer === undefined) {
+      return;
+    }
+    const gone = { start: found.element, count: 0, columns: [] };
+    engine.rows(layer.datasetId, found.element, 1).then(
+      (page) => {
+        if (this.identified === found) {
+          found.page = page;
+          this.refreshIdentify();
+        }
+      },
+      () => {
+        if (this.identified === found) {
+          found.page = gone;
+          this.refreshIdentify();
+        }
+      },
+    );
+  }
+
+  /** Gives the map area what the popover says now, or nothing when what was identified is not the selection any more (or its layer or dataset is gone). */
+  private refreshIdentify(): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null) {
+      return;
+    }
+    const state = this.store.getState();
+    const found = this.identified;
+    const same =
+      found !== undefined &&
+      state.selection?.layerId === found.layerId &&
+      state.selection.element === found.element;
+    const layer = same ? state.layers[found.layerId] : undefined;
+    const summary =
+      layer === undefined ? undefined : this.datasets.find((each) => each.id === layer.datasetId);
+    if (!same || summary === undefined) {
+      this.identified = undefined;
+      area.identify = undefined;
+      return;
+    }
+    area.identifyAt = found.at;
+    area.identify = identifyModel(summary, found.element, found.page);
+  }
+
+  /** The popover is closed with its button (the element stays selected) or with Escape (the selection is cleared too); focus goes back to the map. */
+  private readonly onIdentifyClose = (event: CustomEvent<IdentifyClose>): void => {
+    this.identified = undefined;
+    if (event.detail.escape) {
+      this.store.dispatch({ type: 'setSelection', selection: null });
+    }
+    this.refreshIdentify();
+    this.renderRoot.querySelector('karmania-map-area')?.focusTarget?.focus();
   };
 
   /** Stops listening to the scene; set while the viewer is in a page. */
@@ -1015,6 +1093,7 @@ export class KarmaniaViewer extends LitElement {
           @karmania-map-crs-request=${this.onMapCrsRequest}
           @karmania-pointer-on-map=${this.onPointer}
           @karmania-map-click=${this.onMapClick}
+          @karmania-identify-close=${this.onIdentifyClose}
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>

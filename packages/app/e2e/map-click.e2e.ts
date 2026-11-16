@@ -53,7 +53,8 @@ test.describe('clicking the map', () => {
     const here = await centreOn(page, 2);
     await page.mouse.click(here.x, here.y);
     await expect.poll(() => selection(page)).toEqual({ layerId: 'layer-1', element: 2 });
-    await page.mouse.click(here.x + 80, here.y + 60);
+    // (The empty map up and to the left: the popover of the point is to the right of it and below.)
+    await page.mouse.click(here.x - 80, here.y - 60);
     await expect.poll(() => selection(page)).toBeNull();
   });
 
@@ -64,9 +65,9 @@ test.describe('clicking the map', () => {
     await page.mouse.click(here.x, here.y);
     await expect.poll(() => selection(page)).toEqual({ layerId: 'layer-1', element: 2 });
     const before = await camera(page);
-    await page.mouse.move(here.x + 100, here.y + 100);
+    await page.mouse.move(here.x - 100, here.y - 100);
     await page.mouse.down();
-    await page.mouse.move(here.x + 140, here.y + 100, { steps: 5 });
+    await page.mouse.move(here.x - 60, here.y - 100, { steps: 5 });
     await page.mouse.up();
     await expect.poll(async () => (await camera(page)).centre[0]).not.toBe(before.centre[0]);
     expect(await selection(page)).toEqual({ layerId: 'layer-1', element: 2 });
