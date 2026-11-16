@@ -73,8 +73,11 @@ export function identifyModel(
   if (page.count < 1) {
     return { ...head, state: 'missing', rows: [], more: 0 };
   }
+  // The attributes are the last columns of the page (as many as the dataset has): looked for among those only, as a name may be one of the columns that say
+  // what the row is (an attribute called Z, or i), which come first.
+  const own = page.columns.slice(Math.max(0, page.columns.length - summary.columns.length));
   const rows = summary.columns.flatMap((column): IdentifyRow[] => {
-    const found = page.columns.find((each) => each.name === column.name);
+    const found = own.find((each) => each.name === column.name);
     if (found === undefined) {
       return [];
     }

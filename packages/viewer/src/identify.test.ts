@@ -121,6 +121,23 @@ describe('what the popover says of an element', () => {
     expect(model.rows.map((row) => row.name)).toEqual(['Hole']);
   });
 
+  it('says the attribute that has the name of a column that says what the row is, and not that column: an attribute called Z beside the Z of a point', () => {
+    const position = [
+      { name: 'X', values: Float64Array.of(500010.5), nulls: Uint8Array.of(0) },
+      { name: 'Y', values: Float64Array.of(2765020.25), nulls: Uint8Array.of(0) },
+      { name: 'Z', values: Float64Array.of(115), nulls: Uint8Array.of(0) },
+    ];
+    const model = identifyModel(
+      summary('points', ['Z', 'Hole']),
+      0,
+      page({ Z: 7, Hole: 'DH001' }, position),
+    );
+    expect(model.rows.map((row) => [row.name, row.value])).toEqual([
+      ['Z', '7'],
+      ['Hole', 'DH001'],
+    ]);
+  });
+
   it('shows at most 8 attributes and says how many more there are', () => {
     const names = Array.from({ length: 11 }, (_, i) => `c${String(i)}`);
     const model = identifyModel(
