@@ -654,3 +654,72 @@ describe('createBlocksLayer: a dense model, by its exposed faces', () => {
     expect(uniforms(createBlocksLayer(blocks(3), LOOK))['uMasked']?.value).toBe(0);
   });
 });
+
+/** The meshes of a layer, a depth pass and a colour pass for each part, in the order they are in the layer's object. */
+const everyMesh = (layer: ReturnType<typeof createBlocksLayer>): Mesh[] =>
+  layer.object.children as Mesh[];
+const numbersOf = (mesh: Mesh | undefined): number[] => [
+  ...((geometryOf(mesh)?.getAttribute('aElement').array as Float32Array | undefined) ?? []),
+];
+
+describe('createBlocksLayer: picking', () => {
+  it("picks the blocks of a sparse model with a material that writes the number of each, in one pass whatever the opacity, and puts the layer's own back", () => {
+    const count = BLOCKS_PER_PART + 2;
+    const layer = createBlocksLayer(blocks(count), { ...LOOK, opacity: 0.5 });
+    layer.step?.();
+    layer.setClasses?.(numbered(count));
+    const [depth, colour] = everyMesh(layer);
+    const own = colour?.material as ShaderMaterial;
+    expect(depth?.visible).toBe(true);
+    const back = layer.pick?.(3);
+    const using = colour?.material as ShaderMaterial;
+    expect(using).not.toBe(own);
+    expect(using.defines).toHaveProperty('PICK');
+    expect(using.uniforms).toBe(own.uniforms);
+    expect(using.uniforms['uPickLayer']?.value).toBe(4);
+    expect(using.transparent).toBe(false);
+    expect(using.depthFunc).toBe(LessDepth);
+    expect(using.depthWrite).toBe(true);
+    expect(using.side).toBe(DoubleSide);
+    expect(using.vertexShader).toBe(own.vertexShader);
+    expect(using.fragmentShader).toBe(own.fragmentShader);
+    // The depth pass of a layer that is less than opaque is not drawn: the pick pass is the one.
+    expect(
+      everyMesh(layer)
+        .filter((mesh, n) => n % 2 === 0)
+        .every((mesh) => !mesh.visible),
+    ).toBe(true);
+    // The number of each block, across the two parts.
+    const [, first, , second] = everyMesh(layer);
+    expect(numbersOf(first)[0]).toBe(0);
+    expect(numbersOf(first)[BLOCKS_PER_PART - 1]).toBe(BLOCKS_PER_PART - 1);
+    expect(numbersOf(second)).toEqual([BLOCKS_PER_PART, BLOCKS_PER_PART + 1]);
+    back?.();
+    expect(colour?.material).toBe(own);
+    expect(depth?.visible).toBe(true);
+  });
+
+  it('numbers the instances of a dense model by the block that each is: the blocks that are drawn and have a face that shows', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    layer.setClasses?.(every(27));
+    settle(layer);
+    layer.pick?.(0);
+    // The 26 blocks of the outside, in order; the middle one, 13, is not an instance.
+    expect(numbersOf(everyMesh(layer)[1])).toEqual(
+      Array.from({ length: 27 }, (_, n) => n).filter((n) => n !== 13),
+    );
+    // With no colour for the class of one of them, it is not an instance either, and the middle one now has a face that shows.
+    const classes: ClassColouring = {
+      indices: Uint8Array.from({ length: 27 }, (_, n) => (n === 0 ? 1 : 0)),
+      colours: ['#ff0000'],
+    };
+    layer.setClasses?.(classes);
+    settle(layer);
+    layer.pick?.(0);
+    const numbers = numbersOf(everyMesh(layer)[1]);
+    expect(numbers).not.toContain(0);
+    expect(numbers).toHaveLength(25);
+    // The neighbours of the block that is not there show the faces that were against it, so they are still there.
+    expect(numbers).toContain(1);
+  });
+});

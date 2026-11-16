@@ -35,6 +35,7 @@ import {
 import type { LayerObject } from './layer-set.js';
 import { AMBIENT } from './light.js';
 import { MAX_CLASSES, NO_VALUE, colourOf } from './look.js';
+import { PICK_FRAGMENT_GLSL, pickMaterial } from './pick.js';
 import type { ClassColouring, FrameInfo, LayerLook } from './look.js';
 import { sinCos } from './rotation.js';
 
@@ -65,6 +66,11 @@ uniform vec2 uTurn;
 uniform float uMasked;
 varying float vClass;
 varying vec3 vNormal;
+#ifdef PICK
+// The number of the block that the instance is.
+attribute float aElement;
+flat varying float vElement;
+#endif
 
 void main() {
   if (uMasked > 0.5) {
@@ -89,6 +95,9 @@ void main() {
     normal.z
   );
   vClass = aClass;
+#ifdef PICK
+  vElement = aElement;
+#endif
   vNormal = normalize(normalMatrix * facing);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(aCentre + turned, 1.0);
 }
@@ -108,15 +117,23 @@ uniform vec3 uLight;
 uniform float uAmbient;
 varying float vClass;
 varying vec3 vNormal;
+#ifdef PICK
+flat varying float vElement;
+${PICK_FRAGMENT_GLSL}
+#endif
 
 void main() {
   float block = floor(vClass + 0.5);
   if (block >= uCount) {
     discard;
   }
+#ifdef PICK
+  gl_FragColor = pickColour(vElement);
+#else
   float lit = max(dot(normalize(vNormal), uLight), 0.0);
   float shade = uAmbient + (1.0 - uAmbient) * lit;
   gl_FragColor = vec4(uPalette[int(block)] * shade, uOpacity);
+#endif
 }
 `;
 
@@ -165,6 +182,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     uLight: { value: new Vector3(0, 0, 1) },
     uAmbient: { value: AMBIENT },
     uMasked: { value: buffers.dims === undefined ? 0 : 1 },
+    uPickLayer: { value: 0 },
   };
   const material = new ShaderMaterial({
     uniforms,
@@ -190,6 +208,8 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     depthWrite: true,
     side: DoubleSide,
   });
+  /** The material that picks, made when the first pick wants it: one pass, with the depth of the layer's own, whatever its opacity. */
+  let picking: ShaderMaterial | undefined;
   // One box, with its triangles and corners, that every part uses: the blocks are the instances.
   const box = new BoxGeometry(1, 1, 1);
   const top = box.groups[TOP_FACE] ?? { start: 0, count: box.getIndex()?.count ?? 0 };
@@ -256,6 +276,8 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     readonly centres: Float32Array;
     readonly kinds: Uint8Array;
     readonly masks: Uint8Array;
+    /** The number of the block that each instance is: the instances are those that are drawn, and not all the blocks. */
+    readonly numbers: Float32Array;
   }
   let working: Work | undefined;
 
@@ -271,6 +293,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       centres: new Float32Array(part.count * 3),
       kinds: new Uint8Array(part.count),
       masks: new Uint8Array(part.count),
+      numbers: new Float32Array(part.count),
     };
   }
 
@@ -305,6 +328,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
             work.centres[at * 3 + 2] = buffers.centres[from + 2] ?? NaN;
             work.kinds[at] = own;
             work.masks[at] = mask;
+            work.numbers[at] = n;
             at += 1;
           }
         }
@@ -334,6 +358,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     next.setAttribute('aCentre', new InstancedBufferAttribute(work.centres.subarray(0, at * 3), 3));
     next.setAttribute('aClass', new InstancedBufferAttribute(work.kinds.subarray(0, at), 1));
     next.setAttribute('aExposed', new InstancedBufferAttribute(work.masks.subarray(0, at), 1));
+    next.setAttribute('aElement', new InstancedBufferAttribute(work.numbers.subarray(0, at), 1));
     next.instanceCount = at;
     drawRange(next);
     const old = part.geometry;
@@ -409,6 +434,17 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     group.visible = shown && classes !== undefined;
   }
 
+  /** Gives the instances of a part of a sparse model their numbers (they are the blocks, in order), for picking: made when the first pick wants it, and kept. */
+  function elementsOf(part: Part): void {
+    if (dims === undefined && !part.geometry.hasAttribute('aElement')) {
+      const numbers = new Float32Array(part.count);
+      for (let i = 0; i < part.count; i += 1) {
+        numbers[i] = part.first + i;
+      }
+      part.geometry.setAttribute('aElement', new InstancedBufferAttribute(numbers, 1));
+    }
+  }
+
   const layer: LayerObject = {
     object: group,
     setLook(next) {
@@ -422,6 +458,29 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       }
       shown = next.visible;
       show();
+    },
+    // Picking draws the colour pass of each part with a material that writes the number of the block, in one pass (the nearest block wins, as when the
+    // layer is opaque), and not the depth pass, which has no colour to speak of. The faces that are not drawn (the hidden faces of a dense model, the
+    // sides in the view from above) are not drawn, and the blocks whose class has no colour are discarded, as they are in the drawing.
+    pick(rank) {
+      uniforms.uPickLayer.value = rank + 1;
+      picking ??= pickMaterial({
+        uniforms,
+        vertexShader: VERTEX,
+        fragmentShader: FRAGMENT,
+        side: DoubleSide,
+      });
+      for (const part of parts) {
+        elementsOf(part);
+        part.mesh.material = picking;
+        part.depth.visible = false;
+      }
+      return () => {
+        for (const part of parts) {
+          part.mesh.material = material;
+          visibility(part);
+        }
+      };
     },
     // In the view from above (flat) only the tops are seen, and only they are drawn; seen from another way, all the faces are.
     prepareFrame(info: FrameInfo) {
@@ -465,6 +524,7 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
       box.dispose();
       material.dispose();
       depthMaterial.dispose();
+      picking?.dispose();
     },
   };
   layer.setLook(look);
