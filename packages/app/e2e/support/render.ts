@@ -193,6 +193,38 @@ export function dispatch(page: Page, ...commands: readonly unknown[]): Promise<v
   }, commands);
 }
 
+/**
+ * From now on the picks that the viewer's renderer is asked for are counted (`pickCount`), and the answer of each is given `delay` milliseconds after the card
+ * has said it: for a click whose answer comes late.
+ */
+export function watchPicks(page: Page, delay = 0): Promise<void> {
+  return page.evaluate((ms) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+      renderer?: { pick(x: number, y: number): Promise<unknown> };
+    };
+    const renderer = viewer.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is no renderer.');
+    }
+    const counted = window as unknown as { karmaniaPicks?: number };
+    counted.karmaniaPicks = 0;
+    const original = renderer.pick.bind(renderer);
+    renderer.pick = async (x, y) => {
+      counted.karmaniaPicks = (counted.karmaniaPicks ?? 0) + 1;
+      const answer = await original(x, y);
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return answer;
+    };
+  }, delay);
+}
+
+/** The number of picks asked for since `watchPicks`. */
+export function pickCount(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { karmaniaPicks?: number }).karmaniaPicks ?? 0);
+}
+
 /** Lets a number of milliseconds pass in the page. */
 export const pause = (page: Page, ms: number): Promise<void> =>
   page.evaluate((time) => new Promise<void>((resolve) => setTimeout(resolve, time)), ms);

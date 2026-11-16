@@ -653,6 +653,11 @@ export class KarmaniaViewer extends LitElement {
   /** The pick that was asked for last: the answer of an older one that comes after is not taken. */
   private pickSerial = 0;
 
+  /** What a person decided after a click on the map (Escape, a row of the table, the popover closed) stands over the click's answer, which is not taken when it comes. */
+  private overtakePick(): void {
+    this.pickSerial += 1;
+  }
+
   /**
    * A click on the map selects what is at that point of it (the renderer's pick), or nothing when nothing is: a click on the empty map clears the
    * selection. The answer comes from the card a little later, and one that a later click has overtaken is dropped.
@@ -740,11 +745,7 @@ export class KarmaniaViewer extends LitElement {
    * that nothing else has used. The popover's own Escape is taken before it gets here, and a field or a dialog that wants Escape has it first.
    */
   private readonly onEscape = (event: KeyboardEvent): void => {
-    if (
-      event.key !== 'Escape' ||
-      event.defaultPrevented ||
-      this.store.getState().selection === null
-    ) {
+    if (event.key !== 'Escape' || event.defaultPrevented) {
       return;
     }
     // Where the keyboard is: the map, or the table (the fields of the Legend and the buttons of the panel have their own uses of the key).
@@ -756,7 +757,11 @@ export class KarmaniaViewer extends LitElement {
           (node.localName === 'main' || node.localName === 'k-table'),
       );
     if (onMapOrTable) {
-      this.store.dispatch({ type: 'setSelection', selection: null });
+      // (A click that was just made and has not been answered is cleared with the rest.)
+      this.overtakePick();
+      if (this.store.getState().selection !== null) {
+        this.store.dispatch({ type: 'setSelection', selection: null });
+      }
     }
   };
 
@@ -780,6 +785,7 @@ export class KarmaniaViewer extends LitElement {
       (each) => each.datasetId === dataset,
     );
     if (layer !== undefined) {
+      this.overtakePick();
       this.store.dispatch({
         type: 'setSelection',
         selection: { layerId: layer.id, element: event.detail.row },
@@ -801,6 +807,7 @@ export class KarmaniaViewer extends LitElement {
 
   /** The popover is closed with its button (the element stays selected) or with Escape (the selection is cleared too); focus goes back to the map. */
   private readonly onIdentifyClose = (event: CustomEvent<IdentifyClose>): void => {
+    this.overtakePick();
     this.identified = undefined;
     if (event.detail.escape) {
       this.store.dispatch({ type: 'setSelection', selection: null });
