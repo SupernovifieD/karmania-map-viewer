@@ -49,6 +49,11 @@ export function recording(): Recording {
     fillRect: call('fillRect'),
     strokeRect: call('strokeRect'),
     fillText: call('fillText'),
+    putImageData: (image: { width: number; height: number }, x: number, y: number): void => {
+      log.push(
+        `putImageData(${String(image.width)}x${String(image.height)}, ${round(x)}, ${round(y)})`,
+      );
+    },
     measureText: (text: string) => ({
       width: text.length * fontSize(fontNow()) * 0.5,
     }),

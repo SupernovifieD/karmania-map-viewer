@@ -20,6 +20,7 @@ export interface Canvas2d {
   fillRect(x: number, y: number, width: number, height: number): void;
   strokeRect(x: number, y: number, width: number, height: number): void;
   fillText(text: string, x: number, y: number): void;
+  putImageData(image: ImageData, x: number, y: number): void;
   measureText(text: string): { readonly width: number };
   fillStyle: string | CanvasGradient | CanvasPattern;
   strokeStyle: string | CanvasGradient | CanvasPattern;
