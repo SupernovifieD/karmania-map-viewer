@@ -13,6 +13,13 @@
  */
 export const AMBIENT = 0.25;
 
+/**
+ * How much of its colour a round marker keeps where the light does not reach it: a point in 3D, lit as a sphere, and a line in 3D, lit as a tube.
+ * More than `AMBIENT`, because a marker is a few pixels across and its colour is what tells its layer from the others (and the swatch in the
+ * legend): the side away from the light is half as bright, not a quarter.
+ */
+export const ROUND_AMBIENT = 0.5;
+
 /** A direction, `[x, y, z]`, of length 1. */
 export type Direction = readonly [number, number, number];
 
