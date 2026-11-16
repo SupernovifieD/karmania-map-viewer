@@ -19,6 +19,7 @@ import {
   WebGLRenderTarget,
 } from 'three';
 import { bufferSize } from './buffer-size.js';
+import { applyOrthographic, applyPerspective } from './camera-apply.js';
 import { orthographicFrame } from './camera-2d.js';
 import type { OrthographicFrame } from './camera-2d.js';
 import { perspectiveFrame } from './camera-3d.js';
@@ -337,17 +338,10 @@ export async function createRenderer(
 
   /** Puts both cameras where the scene says, for the box that the canvas has now. */
   function placeCameras(): void {
-    const box = orthographicFrame(look, origin, { width: cssWidth, height: cssHeight }, depth);
-    camera2d.left = box.left;
-    camera2d.right = box.right;
-    camera2d.top = box.top;
-    camera2d.bottom = box.bottom;
-    camera2d.near = box.near;
-    camera2d.far = box.far;
-    camera2d.position.set(...box.position);
-    camera2d.rotation.z = box.rotation;
-    camera2d.updateProjectionMatrix();
-
+    applyOrthographic(
+      camera2d,
+      orthographicFrame(look, origin, { width: cssWidth, height: cssHeight }, depth),
+    );
     perspective = perspectiveFrame(
       orbit,
       origin,
@@ -355,16 +349,7 @@ export async function createRenderer(
       extent,
       verticalExaggeration,
     );
-    camera3d.fov = perspective.fov;
-    camera3d.aspect = perspective.aspect;
-    camera3d.near = perspective.near;
-    camera3d.far = perspective.far;
-    camera3d.position.set(...perspective.position);
-    camera3d.up.set(...perspective.up);
-    camera3d.lookAt(...perspective.target);
-    camera3d.updateProjectionMatrix();
-    // The view matrix is kept for the light of the frame (`frameLight`), which is worked out before three would update it in its own draw.
-    camera3d.updateMatrixWorld();
+    applyPerspective(camera3d, perspective);
   }
 
   const activeCamera = () => (viewMode === '3d' ? camera3d : camera2d);
