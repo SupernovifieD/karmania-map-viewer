@@ -166,6 +166,8 @@ interface Part {
   readonly depth: Mesh;
   readonly mesh: Mesh;
   ready: boolean;
+  /** Of a dense model: the number of the block that each instance is, which goes to the card when the first pick wants it (and not for the drawing). */
+  numbers?: Float32Array;
 }
 
 /** The layer of the blocks of `buffers`, looking as `look` says. */
@@ -358,9 +360,9 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     next.setAttribute('aCentre', new InstancedBufferAttribute(work.centres.subarray(0, at * 3), 3));
     next.setAttribute('aClass', new InstancedBufferAttribute(work.kinds.subarray(0, at), 1));
     next.setAttribute('aExposed', new InstancedBufferAttribute(work.masks.subarray(0, at), 1));
-    next.setAttribute('aElement', new InstancedBufferAttribute(work.numbers.subarray(0, at), 1));
     next.instanceCount = at;
     drawRange(next);
+    part.numbers = work.numbers.subarray(0, at);
     const old = part.geometry;
     part.geometry = next;
     part.mesh.geometry = next;
@@ -434,15 +436,25 @@ export function createBlocksLayer(buffers: BlockBuffers, look: LayerLook): Layer
     group.visible = shown && classes !== undefined;
   }
 
-  /** Gives the instances of a part of a sparse model their numbers (they are the blocks, in order), for picking: made when the first pick wants it, and kept. */
+  /**
+   * Gives the instances of a part their numbers, for picking: made when the first pick wants it, and kept. A sparse model's instances are the blocks, in
+   * order; a dense model's are the blocks that are drawn and show a face, whose numbers were written down as the instances were made.
+   */
   function elementsOf(part: Part): void {
-    if (dims === undefined && !part.geometry.hasAttribute('aElement')) {
-      const numbers = new Float32Array(part.count);
-      for (let i = 0; i < part.count; i += 1) {
-        numbers[i] = part.first + i;
-      }
-      part.geometry.setAttribute('aElement', new InstancedBufferAttribute(numbers, 1));
+    if (part.geometry.hasAttribute('aElement')) {
+      return;
     }
+    if (dims !== undefined) {
+      if (part.numbers !== undefined) {
+        part.geometry.setAttribute('aElement', new InstancedBufferAttribute(part.numbers, 1));
+      }
+      return;
+    }
+    const numbers = new Float32Array(part.count);
+    for (let i = 0; i < part.count; i += 1) {
+      numbers[i] = part.first + i;
+    }
+    part.geometry.setAttribute('aElement', new InstancedBufferAttribute(numbers, 1));
   }
 
   const layer: LayerObject = {

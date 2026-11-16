@@ -722,4 +722,20 @@ describe('createBlocksLayer: picking', () => {
     // The neighbours of the block that is not there show the faces that were against it, so they are still there.
     expect(numbers).toContain(1);
   });
+
+  it('keeps the numbers of the blocks of a dense model off the card until a pick wants them, and not for the drawing', () => {
+    const layer = createBlocksLayer(dense(3, 3, 3), LOOK);
+    layer.setClasses?.(every(27));
+    settle(layer);
+    const mesh = everyMesh(layer)[1];
+    expect(geometryOf(mesh)?.hasAttribute('aElement')).toBe(false);
+    layer.pick?.(0);
+    expect(geometryOf(mesh)?.hasAttribute('aElement')).toBe(true);
+    // Made again for other classes, the instances have none until the next pick.
+    layer.setClasses?.({ indices: new Uint8Array(27).fill(1), colours: ['#ff0000', '#00ff00'] });
+    settle(layer);
+    expect(geometryOf(everyMesh(layer)[1])?.hasAttribute('aElement')).toBe(false);
+    layer.pick?.(0);
+    expect(numbersOf(everyMesh(layer)[1])).toHaveLength(26);
+  });
 });

@@ -127,4 +127,40 @@ describe('createTrianglePicker', () => {
     expect(places.slice(0, 6)).toEqual([0, 0, 0, 1, 0, 0]);
     expect(places.slice(6).every(Number.isNaN)).toBe(true);
   });
+
+  it('grows by whole parts while the layer is being built, keeping the parts that are made, and is made again whole for anything else', () => {
+    // 250,000 triangles on a strip: three parts of 100,000, the last of 50,000.
+    const count = 250_000;
+    const strip = Uint32Array.from({ length: count * 3 }, (_, i) => Math.floor(i / 3) + (i % 3));
+    const positions = Float32Array.from({ length: (count + 2) * 3 }, (_, i) => i);
+    const parent = new Group();
+    const picker = createTrianglePicker(
+      { positions, triangles: strip, parent, depthWrite: false },
+      { value: 0 },
+    );
+    const parts = (): Mesh[] => (parent.children[0] as Group).children as Mesh[];
+    picker.show(undefined, 100_000);
+    expect(parts()).toHaveLength(1);
+    const first = parts()[0]?.geometry;
+    picker.show(undefined, 200_000);
+    expect(parts()).toHaveLength(2);
+    expect(parts()[0]?.geometry).toBe(first);
+    picker.show(undefined, count);
+    expect(parts()).toHaveLength(3);
+    expect(parts()[0]?.geometry).toBe(first);
+    expect(parts()[2]?.geometry.getAttribute('position').count).toBe(50_000 * 3);
+    // The numbers of the triangles in the part that was added go on from the ones before it.
+    expect((parts()[2]?.geometry.getAttribute('aElement') as BufferAttribute).array[0]).toBe(
+      200_000,
+    );
+    // The same number again changes nothing; a layer by class, or fewer triangles than there were, is made again.
+    picker.show(undefined, count);
+    expect(parts()[0]?.geometry).toBe(first);
+    picker.show({ order: Uint32Array.of(5, 4), version: 1 }, count);
+    expect(parts()).toHaveLength(1);
+    expect(parts()[0]?.geometry).not.toBe(first);
+    const second = parts()[0]?.geometry;
+    picker.show(undefined, 100_000);
+    expect(parts()[0]?.geometry).not.toBe(second);
+  });
 });
