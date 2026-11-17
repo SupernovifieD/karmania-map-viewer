@@ -167,3 +167,68 @@ describe('the library build of the viewer', () => {
     }
   });
 });
+
+describe('what the library build carries of the licences of what is in it', () => {
+  const repo = fileURLToPath(new URL('../../../', import.meta.url));
+  const notices = readFileSync(join(repo, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  /** A text as a reader sees it: the white space of its layout is one space. */
+  const squash = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+  it('keeps the licence comments of three.js (MIT) and of Lit (BSD-3-Clause) in the code, which the minifier drops by default', () => {
+    expect(has('karmania-viewer.js', /SPDX-License-Identifier: MIT/), 'MIT').toBe(true);
+    expect(has('karmania-viewer.js', /Copyright 20\d\d-20\d\d Three\.js Authors/), 'three.js').toBe(
+      true,
+    );
+    expect(has('karmania-viewer.js', /SPDX-License-Identifier: BSD-3-Clause/), 'BSD').toBe(true);
+    expect(has('karmania-viewer.js', /Copyright 20\d\d Google LLC/), 'Google').toBe(true);
+  });
+
+  it('has in THIRD_PARTY_NOTICES.md every package whose code is in the build: its name and version on one line, and its licence text', () => {
+    const sources = (JSON.parse(text('karmania-viewer.js.map')) as { sources: string[] }).sources;
+    const shipped = new Map<string, { name: string; version: string; license: string }>();
+    for (const source of sources) {
+      const found = /node_modules\/\.pnpm\/([^/]+)\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(
+        source,
+      );
+      if (found?.[1] === undefined || found[2] === undefined) {
+        continue;
+      }
+      const version = /@([^@_/]+)(?:_.*)?$/.exec(found[1])?.[1] ?? '';
+      shipped.set(found[2], {
+        name: found[2],
+        version,
+        license: join(repo, 'node_modules', '.pnpm', found[1], 'node_modules', found[2], 'LICENSE'),
+      });
+    }
+    // Three.js and Lit (lit-html, lit-element, @lit/reactive-element): a scan that finds none would find no fault.
+    expect([...shipped.keys()].sort()).toEqual([
+      '@lit/reactive-element',
+      'lit-element',
+      'lit-html',
+      'three',
+    ]);
+    const lines = notices.split('\n');
+    for (const { name, version, license } of shipped.values()) {
+      expect(version, `the version of ${name}`).toMatch(/^\d+\.\d+\.\d+/);
+      expect(
+        lines.some((line) => line.includes(name) && line.includes(version)),
+        `${name} ${version} is not named in THIRD_PARTY_NOTICES.md`,
+      ).toBe(true);
+      expect(
+        squash(notices).includes(squash(readFileSync(license, 'utf8'))),
+        `the licence of ${name} ${version} is not in THIRD_PARTY_NOTICES.md`,
+      ).toBe(true);
+    }
+    // The icons are in the code as text, each with the version of the package that has them.
+    const icons = new Set(
+      [...text('karmania-viewer.js').matchAll(/@license lucide-static v(\d+\.\d+\.\d+)/g)].map(
+        (match) => match[1],
+      ),
+    );
+    expect(icons.size, 'the versions of lucide-static in the code').toBe(1);
+    const [version] = [...icons];
+    expect(
+      lines.some((line) => line.includes('lucide-static') && line.includes(String(version))),
+    ).toBe(true);
+  });
+});

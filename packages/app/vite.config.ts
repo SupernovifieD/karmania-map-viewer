@@ -12,6 +12,8 @@ export default defineConfig({
         gallery: new URL('./gallery.html', import.meta.url).pathname,
         embed: new URL('./embed.html', import.meta.url).pathname,
       },
+      // The licence comments of three.js and Lit are kept in the code (the minifier drops them otherwise); THIRD_PARTY_NOTICES.md, which is copied into the build, has the texts.
+      output: { comments: { legal: true } },
     },
   },
   // The screenshot tests' browser runs in Docker and reaches this server by that name.

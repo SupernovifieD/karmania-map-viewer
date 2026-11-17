@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const viewer = fileURLToPath(new URL('../../viewer/', import.meta.url));
 const script = fileURLToPath(new URL('../../../scripts/emit-declarations.mjs', import.meta.url));
+const copyNotices = fileURLToPath(new URL('../../../scripts/copy-notices.mjs', import.meta.url));
 let out = '';
 
 /** The files under `folder` that end in `.d.ts`, as paths from it. */
@@ -120,6 +121,7 @@ beforeAll(() => {
     build: { outDir: out, emptyOutDir: true },
   }).then(() => {
     execFileSync('node', [script, out], { stdio: 'pipe' });
+    execFileSync('node', [copyNotices, out], { stdio: 'pipe' });
     mkdirSync(join(out, 'consumer'));
     writeFileSync(join(out, 'consumer', 'embed.ts'), consumer);
   });
@@ -138,6 +140,32 @@ function diagnostics(program: ts.Program): string[] {
         : `${item.file.fileName.replace(out, '')}:${String(item.file.getLineAndCharacterOfPosition(item.start).line + 1)} `;
     return `${where}TS${String(item.code)} ${ts.flattenDiagnosticMessageText(item.messageText, '\n')}`;
   });
+}
+
+/**
+ * The compiler's program for files of a page that has the declarations and `lit` (a dependency of the package, which the page's installer brings), and nothing of the repository
+ * besides: strict, as an embedder who cares would have it.
+ */
+function pageProgram(rootNames: string[]): ts.Program {
+  const lit = dirname(createRequire(join(viewer, 'package.json')).resolve('lit'));
+  const { options, errors } = ts.convertCompilerOptionsFromJson(
+    {
+      strict: true,
+      noEmit: true,
+      target: 'ES2022',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+      types: [],
+      skipLibCheck: false,
+      exactOptionalPropertyTypes: true,
+      noUncheckedIndexedAccess: true,
+      paths: { lit: [lit] },
+    },
+    out,
+  );
+  expect(errors.map((item) => ts.flattenDiagnosticMessageText(item.messageText, '\n'))).toEqual([]);
+  return ts.createProgram({ rootNames, options });
 }
 
 describe('the declarations of the library build of the viewer', () => {
@@ -164,29 +192,7 @@ describe('the declarations of the library build of the viewer', () => {
   });
 
   it('let a page that has only them use the whole of the API, and refuse what is not in it', () => {
-    // The page has the declarations and `lit` (a dependency of the package, which the page's installer brings); nothing of the repository besides.
-    const lit = dirname(createRequire(join(viewer, 'package.json')).resolve('lit'));
-    const { options, errors } = ts.convertCompilerOptionsFromJson(
-      {
-        strict: true,
-        noEmit: true,
-        target: 'ES2022',
-        module: 'ESNext',
-        moduleResolution: 'Bundler',
-        lib: ['ES2022', 'DOM', 'DOM.Iterable'],
-        types: [],
-        skipLibCheck: false,
-        exactOptionalPropertyTypes: true,
-        noUncheckedIndexedAccess: true,
-        paths: { lit: [lit] },
-      },
-      out,
-    );
-    expect(errors.map((item) => ts.flattenDiagnosticMessageText(item.messageText, '\n'))).toEqual(
-      [],
-    );
-    const program = ts.createProgram({ rootNames: [join(out, 'consumer', 'embed.ts')], options });
-    expect(diagnostics(program)).toEqual([]);
+    expect(diagnostics(pageProgram([join(out, 'consumer', 'embed.ts')]))).toEqual([]);
   });
 });
 
@@ -225,5 +231,36 @@ describe('what the package publishes', () => {
 
   it('needs of the workspace nothing, since the build has it all in it: a package of it that is a dependency could not be installed', () => {
     expect(Object.keys(manifest.dependencies ?? {})).toEqual(['lit']);
+  });
+});
+
+describe('the licences that go with the build', () => {
+  const repo = fileURLToPath(new URL('../../../', import.meta.url));
+
+  it('are in the folder of the build as the files of the repository are: the notices and the licence next to the code, and the licence of the font next to the font files', () => {
+    const same = (built: string, original: string): void => {
+      expect(
+        readFileSync(join(out, built), 'utf8') === readFileSync(join(repo, original), 'utf8'),
+        `${built} is not ${original}`,
+      ).toBe(true);
+    };
+    same('THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md');
+    same('LICENSE', 'LICENSE');
+    same('assets/OFL.txt', 'packages/ui/src/fonts/OFL.txt');
+    // The font files are where the licence is.
+    expect(readdirSync(join(out, 'assets')).filter((name) => name.endsWith('.woff2'))).toHaveLength(
+      2,
+    );
+  });
+
+  it('are made by the builds of the library and of the app: both call the script that copies them', () => {
+    for (const name of ['viewer', 'app']) {
+      const scripts = (
+        JSON.parse(readFileSync(join(repo, 'packages', name, 'package.json'), 'utf8')) as {
+          scripts: Record<string, string>;
+        }
+      ).scripts;
+      expect(scripts['build'], `the build of ${name}`).toContain('scripts/copy-notices.mjs');
+    }
   });
 });
