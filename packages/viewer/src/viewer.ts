@@ -311,7 +311,9 @@ export class KarmaniaViewer extends LitElement {
     }
     const before = this.datasets;
     this.datasets = list;
+    this.followContours();
     syncDatasets(this.store, list);
+    this.followContours();
     const kept =
       this.removing === undefined
         ? selectionAfterChange(before, list, this.selected)
@@ -910,6 +912,17 @@ export class KarmaniaViewer extends LitElement {
    */
   private contours: ContoursManager | undefined;
 
+  /**
+   * Brings the contours of the layers to the engine's contour lines, whoever made them (a viewer that shares the engine, say): they are shown here too. Called before the layers
+   * are brought to the engine's datasets, so that lines that were made again keep the layer that shows them and its style, and after, so that a layer that is new has the
+   * contours that the engine has.
+   */
+  private followContours(): void {
+    if (this.engine !== undefined) {
+      this.contoursFor(this.engine).followEngine();
+    }
+  }
+
   private contoursFor(engine: Engine): ContoursManager {
     this.contours ??= new ContoursManager({
       engine,
@@ -917,7 +930,9 @@ export class KarmaniaViewer extends LitElement {
       adopt: (list) => {
         const before = this.datasets;
         this.datasets = list;
+        this.followContours();
         syncDatasets(this.store, this.datasets);
+        this.followContours();
         this.selected = selectionAfterChange(before, list, this.selected);
       },
       onChange: () => {

@@ -264,8 +264,8 @@ What is shared, and what you may not expect:
 - **The panel's state** (its width, whether it is folded and the tab it is on) is kept in the browser's `localStorage` under `karmania.panel`: one preference of the page's origin, which
   every viewer reads when it starts and writes when it changes. Two viewers do not follow each other live; the last to write wins at the next start. A viewer made with `panel: false`
   neither reads nor writes it.
-- **Contour lines are a viewer's.** The lines that one viewer makes for a layer are datasets of the shared engine, so another viewer on it lists them in its Data tab, but it does not draw
-  them: the contours are a setting of the layer of the viewer that turned them on.
+- **Contour lines are the engine's.** The lines that one viewer makes for a layer are datasets of the shared engine, and every viewer on it shows them, with the same settings: when one
+  viewer turns the contours on, changes their interval or turns them off, the others follow. Each viewer keeps its own choice of whether they are shown, and the style of their layer.
 - **A dialog is modal to the whole page.** The import wizard, the export dialog and the coordinate-system dialog are `<dialog>` elements shown with `showModal()`: while one is open,
   everything else on the page is inert (the other viewer too).
 - **Dropping files** on a viewer's map imports them. A file dropped elsewhere in the viewer, where nothing takes it, is refused (the browser would otherwise open it in place of the page).
@@ -312,7 +312,7 @@ and counts the workers, the WebGL contexts, the animation frames, the observers 
 Two things that follow from it:
 
 - **Moving a viewer's container in the document takes the viewer out of the page and puts it back**, and it then starts again: its layers are made again from what its engine holds, in their
-  default styles, and a person's styling, contours and selection are not kept. Do not move the container of a viewer that is in use; make a new viewer in the new place instead.
+  default styles, and a person's styling and selection are not kept (the contours come back, since the engine has the lines). Do not move the container of a viewer that is in use; make a new viewer in the new place instead.
 - **A `load` or `importFiles` that is still running when the viewer is taken out shows nothing**: with an engine that you gave, the dataset is in the engine all the same; with the viewer's own,
   the call rejects, since the engine has been let go.
 

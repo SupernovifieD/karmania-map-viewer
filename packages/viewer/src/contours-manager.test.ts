@@ -591,3 +591,139 @@ describe('the contours of a layer', () => {
     expect(w.pending).toHaveLength(1);
   });
 });
+
+/** The contour lines of the grid of `world()` as an engine holds them when a viewer that shares it has made them: a dataset of lines, made from dataset 1 with `params`. */
+function linesFrom(id: number, params: ContourParams): Summary {
+  return summary(id, `Contours of Surface (every ${String(params.interval)})`, 'lines', {
+    id: 1,
+    kind: 'contours',
+    params,
+  });
+}
+
+const THEIRS: ContourParams = { column: 'height', interval: 10, base: 0, indexEvery: 4 };
+
+describe('the contour lines that another viewer of the engine made', () => {
+  it("are shown by a layer that has none: the settings are the engine's, the contours are shown, and nothing is asked of the engine", () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toEqual({ ...THEIRS, visible: true });
+    expect(w.derived()).toMatchObject({
+      datasetId: 50,
+      derived: { kind: 'contours', sourceLayer: 'layer-1' },
+    });
+    expect(w.pending).toHaveLength(0);
+    expect(w.removed).toEqual([]);
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
+  });
+
+  it('replace the settings of a layer that has others, and the layer of the lines is given the new lines and keeps its style and its place', () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    const before = w.derived();
+    expect(before).toBeDefined();
+    if (before === undefined) return;
+    w.scene.dispatch({ type: 'setStyle', layerId: before.id, patch: { opacity: 0.4 } });
+    // A viewer made them again with other settings: the old lines are gone from the engine and new ones are there.
+    const other: ContourParams = { column: 'height', interval: 25, base: 5, indexEvery: 2 };
+    w.datasets().splice(
+      0,
+      w.datasets().length,
+      summary(1, 'Surface', 'grid'),
+      linesFrom(51, other),
+    );
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toEqual({ ...other, visible: true });
+    const after = w.derived();
+    expect(after).toMatchObject({ id: before.id, datasetId: 51, style: { opacity: 0.4 } });
+    expect(w.pending).toHaveLength(0);
+    expect(w.removed).toEqual([]);
+  });
+
+  it('are shown by the layer of the lines when they are made again with the same settings and have another number', () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    w.datasets().splice(
+      0,
+      w.datasets().length,
+      summary(1, 'Surface', 'grid'),
+      linesFrom(60, THEIRS),
+    );
+    w.manager.followEngine();
+    expect(w.derived()).toMatchObject({ datasetId: 60 });
+    expect(w.pending).toHaveLength(0);
+  });
+
+  it('take the contours of a layer away when the engine has no lines any more that it showed, without taking anything out of the engine', () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    w.datasets().splice(0, w.datasets().length, summary(1, 'Surface', 'grid'));
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toBeUndefined();
+    expect(w.derived()).toBeUndefined();
+    expect(w.removed).toEqual([]);
+    expect(w.pending).toHaveLength(0);
+  });
+
+  it('are not shown by a layer for which the contours are being made here: its own answer decides', () => {
+    const w = world();
+    w.contours();
+    expect(w.pending).toHaveLength(1);
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toMatchObject({ interval: 2.5 });
+    expect(w.derived()).toBeUndefined();
+    expect(w.pending).toHaveLength(1);
+  });
+
+  it("keep whether they are shown, which is a viewer's own", () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    w.scene.dispatch({
+      type: 'setContours',
+      layerId: 'layer-1',
+      contours: { ...THEIRS, visible: false },
+    });
+    const other: ContourParams = { column: 'height', interval: 25, base: 5, indexEvery: 2 };
+    w.datasets().splice(
+      0,
+      w.datasets().length,
+      summary(1, 'Surface', 'grid'),
+      linesFrom(51, other),
+    );
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toEqual({ ...other, visible: false });
+    expect(w.derived()).toMatchObject({ datasetId: 51, visible: false });
+  });
+
+  it('are what a layer shows when its settings come to be what the engine has lines for: nothing is asked of the engine', async () => {
+    const w = world();
+    w.add(linesFrom(50, THEIRS));
+    w.scene.dispatch({
+      type: 'setContours',
+      layerId: 'layer-1',
+      contours: { ...THEIRS, visible: true },
+    });
+    await settle();
+    expect(w.pending).toHaveLength(0);
+    expect(w.derived()).toMatchObject({ datasetId: 50 });
+    // And other settings are asked for, as they were.
+    w.contours({ interval: 7 });
+    expect(w.pending).toHaveLength(1);
+  });
+
+  it('do nothing for a layer that is not a layer of a dataset that has lines, and none for the layer of lines', () => {
+    const w = world();
+    w.add(summary(2, 'Other', 'points'));
+    w.add({ ...linesFrom(50, THEIRS), derivedFrom: { id: 2, kind: 'contours', params: THEIRS } });
+    const before = w.scene.getState();
+    w.manager.followEngine();
+    // The scene is the same document: the lines of dataset 2 are for a layer that this viewer has not.
+    expect(w.scene.getState()).toBe(before);
+  });
+});

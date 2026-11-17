@@ -75,6 +75,220 @@ test.describe('a page that embeds the viewer', () => {
 const HOST = 'width: 800px; height: 500px';
 
 test.describe('a viewer that is given an engine by the page', () => {
+  test('has its contours again when it is put back in a page (its container was moved), since the engine still has the lines', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const outcome = await page.evaluate(async () => {
+      const engine = window.embed.createEngine();
+      window.engine = engine;
+      const box = document.createElement('div');
+      box.style.cssText = 'width: 600px; height: 400px';
+      document.body.append(box);
+      const viewer = window.embed.createViewer(box, { engine });
+      window.first = viewer;
+      await viewer.load(
+        window.embed.grid({
+          name: 'Surface',
+          origin: [0, 0, 0],
+          spacing: [10, 10, 1],
+          dims: [8, 8, 1],
+          values: { z: Array.from({ length: 64 }, (_, i) => (i % 8) * 3 + Math.floor(i / 8) * 2) },
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+      const [layerId] = Object.keys(viewer.scene().layers);
+      viewer.dispatch({
+        type: 'setContours',
+        layerId: layerId ?? '',
+        contours: { column: 'z', interval: 5, base: 0, indexEvery: 5, visible: true },
+      });
+      const have = (): { settings: unknown; lines: number | null } => {
+        const layers = Object.values(viewer.scene().layers);
+        return {
+          settings: layers.find((layer) => layer.derived === undefined)?.contours ?? null,
+          lines: layers.find((layer) => layer.derived !== undefined)?.datasetId ?? null,
+        };
+      };
+      for (let tries = 0; tries < 100 && have().lines === null; tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const before = have();
+      // The page moves the container: the viewer is taken out of the page and put back.
+      const element = box.querySelector('karmania-viewer');
+      const elsewhere = document.createElement('div');
+      elsewhere.style.cssText = 'width: 600px; height: 400px';
+      document.body.append(elsewhere);
+      if (element !== null) {
+        elsewhere.append(element);
+      }
+      for (let tries = 0; tries < 100 && have().lines === null; tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return { before, after: have(), held: engine.datasets().length };
+    });
+    expect(outcome.before.lines).not.toBeNull();
+    expect(outcome.after).toEqual(outcome.before);
+    // The engine had the grid and its lines all the time, and was asked for nothing more.
+    expect(outcome.held).toBe(2);
+  });
+
+  test('shows the contour lines that another viewer of the engine made, follows them when they are made again or taken away, and keeps whether they are shown as its own', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(async () => {
+      const engine = window.embed.createEngine();
+      window.engine = engine;
+      const place = (id: string): HTMLElement => {
+        const box = document.createElement('div');
+        box.id = id;
+        box.style.cssText = 'width: 600px; height: 400px';
+        document.body.append(box);
+        return box;
+      };
+      window.first = window.embed.createViewer(place('a'), { engine });
+      window.second = window.embed.createViewer(place('b'), { engine });
+      await window.first.load(
+        window.embed.grid({
+          name: 'Surface',
+          origin: [0, 0, 0],
+          spacing: [10, 10, 1],
+          dims: [8, 8, 1],
+          values: { z: Array.from({ length: 64 }, (_, i) => (i % 8) * 3 + Math.floor(i / 8) * 2) },
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+    });
+    /** What a viewer has of the contours of its one layer of the grid: its settings, and the layer of the lines. */
+    const contours = (which: 'first' | 'second') =>
+      page.evaluate((viewer) => {
+        const layers = Object.values(window[viewer]?.scene().layers ?? {});
+        const source = layers.find((layer) => layer.derived === undefined);
+        const lines = layers.find((layer) => layer.derived !== undefined);
+        return {
+          settings: source?.contours ?? null,
+          lines:
+            lines === undefined ? null : { datasetId: lines.datasetId, visible: lines.visible },
+        };
+      }, which);
+    /** Whether the layer of the lines of a viewer is on the card (drawn), as the pipeline of that viewer says. */
+    const linesDrawn = (box: string) =>
+      page.evaluate((selector) => {
+        const element = document.querySelector(selector) as unknown as {
+          layerStates: () => [string, { status: string }][];
+          scene: () => { layers: Record<string, { derived?: unknown }> };
+        } | null;
+        if (element === null) {
+          return false;
+        }
+        const lines = Object.entries(element.scene().layers).find(
+          ([, layer]) => layer.derived !== undefined,
+        );
+        return (
+          lines !== undefined &&
+          element.layerStates().some(([id, state]) => id === lines[0] && state.status === 'drawn')
+        );
+      }, `${box} karmania-viewer`);
+    const params = { column: 'z', interval: 5, base: 0, indexEvery: 5 };
+    const sourceId = await page.evaluate(() => Object.keys(window.first?.scene().layers ?? {})[0]);
+    expect(sourceId).toBeDefined();
+    // Nothing yet, in either.
+    expect(await contours('second')).toEqual({ settings: null, lines: null });
+
+    // The first viewer turns the contours on: the second shows the same lines, with the same settings, and draws them.
+    await page.evaluate(
+      ([layerId, settings]) => {
+        window.first?.dispatch({
+          type: 'setContours',
+          layerId: layerId ?? '',
+          contours: { ...settings, visible: true },
+        });
+      },
+      [sourceId, params] as const,
+    );
+    await expect.poll(async () => (await contours('first')).lines !== null).toBe(true);
+    await expect
+      .poll(async () => (await contours('second')).settings)
+      .toEqual({ ...params, visible: true });
+    const first = await contours('first');
+    await expect.poll(async () => (await contours('second')).lines).toEqual(first.lines);
+    await expect.poll(() => linesDrawn('#b')).toBe(true);
+
+    // Made again with other settings: the second follows.
+    await page.evaluate(
+      ([layerId, settings]) => {
+        window.first?.dispatch({
+          type: 'setContours',
+          layerId: layerId ?? '',
+          contours: { ...settings, interval: 8, visible: true },
+        });
+      },
+      [sourceId, params] as const,
+    );
+    await expect.poll(async () => (await contours('second')).settings?.interval).toBe(8);
+    await expect
+      .poll(async () => (await contours('second')).lines?.datasetId)
+      .toBe((await contours('first')).lines?.datasetId);
+    await expect.poll(() => linesDrawn('#b')).toBe(true);
+
+    // Whether the lines are shown is a viewer's own: the second hides them, the first still shows them.
+    await page.evaluate(
+      ([layerId, settings]) => {
+        window.second?.dispatch({
+          type: 'setContours',
+          layerId: layerId ?? '',
+          contours: { ...settings, interval: 8, visible: false },
+        });
+      },
+      [sourceId, params] as const,
+    );
+    await expect.poll(async () => (await contours('second')).lines?.visible).toBe(false);
+    expect((await contours('first')).lines?.visible).toBe(true);
+    expect((await contours('first')).settings?.visible).toBe(true);
+
+    // The first makes them again while the second has them hidden: the second follows the settings and keeps its own choice.
+    await page.evaluate(
+      ([layerId, settings]) => {
+        window.first?.dispatch({
+          type: 'setContours',
+          layerId: layerId ?? '',
+          contours: { ...settings, interval: 12, visible: true },
+        });
+      },
+      [sourceId, params] as const,
+    );
+    await expect
+      .poll(async () => (await contours('second')).settings)
+      .toEqual({ ...params, interval: 12, visible: false });
+    expect((await contours('second')).lines?.visible).toBe(false);
+
+    // The first turns them off: the lines go from the engine, and from the second.
+    await page.evaluate((layerId) => {
+      window.first?.dispatch({ type: 'setContours', layerId: layerId ?? '', contours: null });
+    }, sourceId);
+    await expect.poll(async () => (await contours('second')).lines).toBeNull();
+    expect((await contours('second')).settings).toBeNull();
+    expect(await page.evaluate(() => window.engine?.datasets().length)).toBe(1);
+
+    // And the other way: the second turns them on, the first shows them.
+    await page.evaluate(
+      ([layerId, settings]) => {
+        window.second?.dispatch({
+          type: 'setContours',
+          layerId: layerId ?? '',
+          contours: { ...settings, visible: true },
+        });
+      },
+      [sourceId, params] as const,
+    );
+    await expect
+      .poll(async () => (await contours('first')).settings)
+      .toEqual({ ...params, visible: true });
+    await expect.poll(async () => (await contours('first')).lines !== null).toBe(true);
+    await expect.poll(() => linesDrawn('#a')).toBe(true);
+  });
+
   test('takes back what the import wizard loaded and was not told to keep, when it is taken out on the review step: a viewer of the same engine is not left with it', async ({
     page,
   }) => {
