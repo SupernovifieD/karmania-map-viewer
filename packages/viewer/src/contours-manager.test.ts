@@ -727,3 +727,102 @@ describe('the contour lines that another viewer of the engine made', () => {
     expect(w.scene.getState()).toBe(before);
   });
 });
+
+describe('what the engine changes under a viewer that shares it, seen from a scene change', () => {
+  const SAME: ContourParams = { column: 'height', interval: 2.5, base: 0, indexEvery: 5 };
+
+  it('is not asked for again when lines that were shown are gone, or made again with other settings, and something else of the scene changes: the layer is brought to what the engine holds', async () => {
+    const w = world();
+    w.contours();
+    await w.finish(0);
+    expect(w.pending).toHaveLength(1);
+    // Another viewer took the lines out of the engine, and this one, busy with something else, has not been told.
+    w.datasets().splice(0, w.datasets().length, summary(1, 'Surface', 'grid'));
+    // The scene changes (a person hid a layer, say): the manager looks again, and does not ask for what another viewer turned off.
+    w.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    expect(w.pending).toHaveLength(1);
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toBeUndefined();
+    // Or made others, which this one is not to ask for again either.
+    const w2 = world();
+    w2.contours();
+    await w2.finish(0);
+    w2.datasets().splice(
+      0,
+      w2.datasets().length,
+      summary(1, 'Surface', 'grid'),
+      linesFrom(70, THEIRS),
+    );
+    w2.scene.dispatch({ type: 'setStyle', layerId: 'layer-1', patch: { opacity: 0.5 } });
+    expect(w2.pending).toHaveLength(1);
+    w2.manager.followEngine();
+    expect(w2.scene.getState().layers['layer-1']?.contours).toEqual({ ...THEIRS, visible: true });
+  });
+
+  it('show lines that were made for the settings that it could not make them for, instead of staying failed', async () => {
+    const w = world();
+    w.contours();
+    w.pending[0]?.reject(new Error('The worker failed.'));
+    await settle();
+    expect(w.manager.state('layer-1')).toMatchObject({ status: 'failed' });
+    // Another viewer made them, with the very settings.
+    w.add(linesFrom(50, SAME));
+    w.manager.followEngine();
+    expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
+    expect(w.derived()).toMatchObject({ datasetId: 50 });
+    expect(w.pending).toHaveLength(1);
+  });
+
+  it('are not turned on again by the answer of a job that was stopped: the engine answers it all the same, and the lines of it are taken out', async () => {
+    const w = world('grid', false);
+    w.contours();
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.pending[0]?.signal?.aborted).toBe(true);
+    // The engine had finished: its registry has the lines, and the viewer is told before the answer reaches the manager.
+    const lines = linesFrom(50, SAME);
+    w.add(lines);
+    w.manager.followEngine();
+    expect(w.scene.getState().layers['layer-1']?.contours).toBeUndefined();
+    expect(w.derived()).toBeUndefined();
+    w.pending[0]?.resolve({ status: 'loaded', summaries: [lines] });
+    await settle();
+    expect(w.removed).toEqual([50]);
+    expect(w.scene.getState().layers['layer-1']?.contours).toBeUndefined();
+  });
+
+  it('ask the engine for settings that it has lines for when the layer is being made for others: the lines are adopted when nothing is under way, and not while it is', () => {
+    const w = world();
+    w.contours();
+    expect(w.pending).toHaveLength(1);
+    w.add(linesFrom(50, { ...SAME, interval: 7 }));
+    w.contours({ interval: 7 });
+    // A job was under way for the other settings: it is stopped and the new settings are asked for.
+    expect(w.pending).toHaveLength(2);
+    expect(w.pending[0]?.signal?.aborted).toBe(true);
+  });
+
+  it('give the style of a layer of lines that went to the next one that follows the engine', async () => {
+    const w = world();
+    w.contours();
+    await w.finish(0);
+    const lines = w.derived();
+    expect(lines).toBeDefined();
+    if (lines === undefined) return;
+    w.scene.dispatch({ type: 'setStyle', layerId: lines.id, patch: { opacity: 0.3 } });
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    await settle();
+    expect(w.derived()).toBeUndefined();
+    w.add(linesFrom(60, THEIRS));
+    w.manager.followEngine();
+    expect(w.derived()).toMatchObject({ datasetId: 60, style: { opacity: 0.3 } });
+  });
+
+  it('do nothing for the engine once the manager is let go of', () => {
+    const w = world();
+    w.manager.dispose();
+    const before = w.scene.getState();
+    w.add(linesFrom(50, THEIRS));
+    w.manager.followEngine();
+    expect(w.scene.getState()).toBe(before);
+  });
+});

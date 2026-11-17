@@ -94,6 +94,11 @@ export class ContoursManager {
   private readonly shown = new Map<LayerId, boolean>();
   /** The style of the layer of the lines of each layer, from when that layer was taken away, for the one that is made next. */
   private readonly styles = new Map<LayerId, LayerStyle>();
+  /**
+   * The jobs that were stopped and that the engine has not answered yet, for each layer: the engine may answer a stopped job all the same (it had finished when it was told), and its
+   * lines are in the engine, and in the engine's change, before the manager has the answer, so they are not the layer's contours (`followEngine` leaves the layer alone until then).
+   */
+  private readonly stopped = new Map<LayerId, number>();
   private disposed = false;
 
   constructor(private readonly options: ContoursOptions) {}
@@ -197,6 +202,25 @@ export class ContoursManager {
     this.styles.clear();
   }
 
+  /** Stops a job, and notes that its answer is still to come. */
+  private stopJob(layerId: LayerId, job: Job): void {
+    job.controller.abort();
+    this.stopped.set(layerId, (this.stopped.get(layerId) ?? 0) + 1);
+  }
+
+  /** The engine has answered a job that was stopped (with lines or with an error). */
+  private settled(layerId: LayerId): void {
+    const waiting = this.stopped.get(layerId);
+    if (waiting === undefined) {
+      return;
+    }
+    if (waiting <= 1) {
+      this.stopped.delete(layerId);
+    } else {
+      this.stopped.set(layerId, waiting - 1);
+    }
+  }
+
   /** The layer has contours: the lines are made if they are not what they ask for, and the layer of the lines follows whether they are shown. */
   private keep(doc: SceneDocument, layer: Layer): void {
     const params = paramsOf(layer);
@@ -214,11 +238,8 @@ export class ContoursManager {
       this.followVisibility(doc, layer);
       return;
     }
-    // A failure is told again only when the settings are changed: the same settings are not asked again.
-    if (running?.key === key || this.failed.get(layer.id)?.key === key) {
-      return;
-    }
-    // The engine has lines for these very settings (a viewer that shares it made them, or this one did, and the record of it is gone): they are shown, and nothing is asked.
+    // The engine has lines for these very settings (a viewer that shares it made them, or this one did, and the record of it is gone): they are shown, and nothing is asked (also
+    // where they could not be made here before: they are there).
     if (
       running === undefined &&
       lines !== undefined &&
@@ -229,7 +250,19 @@ export class ContoursManager {
       this.followVisibility(doc, layer);
       return;
     }
-    running?.controller.abort();
+    // A failure is told again only when the settings are changed: the same settings are not asked again.
+    if (running?.key === key || this.failed.get(layer.id)?.key === key) {
+      return;
+    }
+    // The settings are the ones the layer's lines were made with, and the lines are not what the engine has now (they are gone, or are others): it is the engine that has changed, a viewer
+    // that shares it having turned the contours off or made them again, and not a person who asked. That is for `followEngine` to bring the layer to, when this viewer is told: asking
+    // for the settings again here would undo what the other viewer did.
+    if (running === undefined && made !== undefined && made.key === key) {
+      return;
+    }
+    if (running !== undefined) {
+      this.stopJob(layer.id, running);
+    }
     void this.make(layer.id, layer.datasetId, params, key);
   }
 
@@ -270,7 +303,7 @@ export class ContoursManager {
     const { scene, engine } = this.options;
     const held = engine.datasets();
     for (const layer of Object.values(scene.getState().layers)) {
-      if (layer.derived !== undefined || this.jobs.has(layer.id)) {
+      if (layer.derived !== undefined || this.jobs.has(layer.id) || this.stopped.has(layer.id)) {
         continue;
       }
       const lines = held.find(
@@ -314,6 +347,7 @@ export class ContoursManager {
         return;
       }
       if (this.jobs.get(layerId) !== job) {
+        this.settled(layerId);
         this.dropStray(layerId, result);
         return;
       }
@@ -335,7 +369,11 @@ export class ContoursManager {
       this.followVisibility(scene.getState(), scene.getState().layers[layerId]);
       this.changed();
     } catch (error) {
-      if (this.disposed || this.jobs.get(layerId) !== job) {
+      if (this.disposed) {
+        return;
+      }
+      if (this.jobs.get(layerId) !== job) {
+        this.settled(layerId);
         return;
       }
       this.jobs.delete(layerId);
@@ -371,7 +409,10 @@ export class ContoursManager {
     const forgetsFailure = failure !== undefined && failure.key !== '';
     const hadJob = this.jobs.has(layerId);
     const hadState = hadJob || forgetsFailure;
-    this.jobs.get(layerId)?.controller.abort();
+    const job = this.jobs.get(layerId);
+    if (job !== undefined) {
+      this.stopJob(layerId, job);
+    }
     this.jobs.delete(layerId);
     if (forgetsFailure) {
       this.failed.delete(layerId);
@@ -482,7 +523,10 @@ export class ContoursManager {
   }
 
   private forget(layerId: LayerId): void {
-    this.jobs.get(layerId)?.controller.abort();
+    const job = this.jobs.get(layerId);
+    if (job !== undefined) {
+      this.stopJob(layerId, job);
+    }
     this.jobs.delete(layerId);
     this.made.delete(layerId);
     this.failed.delete(layerId);
