@@ -140,6 +140,10 @@ describe('the width of the panel', () => {
     // So small a window that half of it is under the least: the least stands.
     expect(panelWidthLimits(400)).toEqual({ min: 280, max: 280 });
     expect(panelWidthLimits(0)).toEqual({ min: 280, max: 280 });
+    // A box under the least (a viewer in a narrow place of a page): the panel is all of it, and is never wider than what the page gave.
+    expect(panelWidthLimits(200)).toEqual({ min: 200, max: 200 });
+    expect(panelWidthLimits(279)).toEqual({ min: 279, max: 279 });
+    expect(panelWidthLimits(280)).toEqual({ min: 280, max: 280 });
   });
 
   it('is kept between the limits, in whole pixels', () => {
@@ -148,6 +152,8 @@ describe('the width of the panel', () => {
     expect(clampPanelWidth(700, 1440)).toBe(640);
     expect(clampPanelWidth(700, 1024)).toBe(512);
     expect(clampPanelWidth(280, 1024)).toBe(280);
+    expect(clampPanelWidth(360, 200)).toBe(200);
+    expect(clampPanelWidth(100, 200)).toBe(200);
     expect(clampPanelWidth(512, 1024)).toBe(512);
     expect(clampPanelWidth(300.4, 1440)).toBe(300);
     expect(clampPanelWidth(300.5, 1440)).toBe(301);

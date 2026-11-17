@@ -5,7 +5,8 @@
   "description": "Karmania render: the three.js renderer of the map, its cameras and controllers, behind one small interface",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./export-error": "./src/export-error.ts"
   },
   "scripts": {
     "lint": "eslint .",

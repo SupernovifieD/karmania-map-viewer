@@ -18,6 +18,8 @@ import './mapping-step.js';
 import './nodata-step.js';
 import { buildMapping, groupFindings, IDLE, loadBlocker, loadLabel } from './import-run.js';
 import type { RunState } from './import-run.js';
+import { holdImport } from './pending-imports.js';
+import type { ImportHold } from './pending-imports.js';
 import './review-step.js';
 import { describeStep, FIRST_STEP, IMPORT_STEPS, stepAfter, stepBefore } from './import-steps.js';
 import type { ImportStep } from './import-steps.js';
@@ -123,6 +125,8 @@ export class KarmaniaImportDialog extends LitElement {
   private controller: AbortController | undefined;
   /** The datasets the import has loaded into the engine, which are taken out again if it is not kept. */
   private loadedIds: readonly number[] = [];
+  /** What keeps the viewers from showing what the import has loaded until it is kept: it lasts as long as the loaded datasets wait for the person's choice. */
+  private held: ImportHold | undefined;
 
   constructor() {
     super();
@@ -136,6 +140,15 @@ export class KarmaniaImportDialog extends LitElement {
     this.run = IDLE;
     this.returning = false;
     this.position = 0;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    // The viewer was taken out of the page with the wizard open. The review step loads the data to show what it is, and takes it out again when it is not kept: left open,
+    // that data would stay in the engine, which may be the page's and shared with other viewers.
+    if (this.open) {
+      this.close();
+    }
   }
 
   /** The files that can be imported, in the order they were given: one is imported at a time. */
@@ -227,6 +240,9 @@ export class KarmaniaImportDialog extends LitElement {
     const controller = new AbortController();
     this.controller = controller;
     this.run = { status: 'running', phase: undefined, fraction: undefined };
+    // The viewers of the engine do not show what this loads until the person keeps it.
+    const hold = holdImport(engine);
+    let waiting = false;
     try {
       const result = await engine.importFiles(
         [entry.group.file, ...entry.group.sidecars],
@@ -243,12 +259,18 @@ export class KarmaniaImportDialog extends LitElement {
       if (run !== this.runs) {
         // Another import was started, or the step was left, while this one was going on.
         if (result.status === 'loaded') {
-          this.unload(result.summaries.map((summary) => summary.id));
+          const ids = result.summaries.map((summary) => summary.id);
+          hold.loaded(ids);
+          await this.unload(ids);
         }
         return;
       }
       if (result.status === 'loaded') {
         this.loadedIds = result.summaries.map((summary) => summary.id);
+        hold.loaded(this.loadedIds);
+        // Until it is kept, or taken out.
+        this.held = hold;
+        waiting = true;
         this.run = {
           status: 'loaded',
           summaries: result.summaries,
@@ -263,6 +285,10 @@ export class KarmaniaImportDialog extends LitElement {
           ? { status: 'cancelled' }
           : { status: 'failed', message: error instanceof Error ? error.message : String(error) };
       }
+    } finally {
+      if (!waiting) {
+        hold.release();
+      }
     }
   }
 
@@ -273,17 +299,18 @@ export class KarmaniaImportDialog extends LitElement {
     this.controller = undefined;
     const ids = this.loadedIds;
     this.loadedIds = [];
-    this.unload(ids);
+    // What was loaded is shown again only if it is still in the engine when it is let go, which is after it was taken out.
+    const { held } = this;
+    this.held = undefined;
+    void this.unload(ids).then(() => held?.release());
     this.run = IDLE;
   }
 
-  /** Takes datasets out of the engine. */
-  private unload(ids: readonly number[]): void {
+  /** Takes datasets out of the engine, and says when it is done (or has failed to, which is not told). */
+  private async unload(ids: readonly number[]): Promise<void> {
     const engine = this.engine;
     if (engine !== undefined) {
-      for (const id of ids) {
-        engine.remove(id).catch(() => undefined);
-      }
+      await Promise.all(ids.map((id) => engine.remove(id).catch(() => undefined)));
     }
   }
 
@@ -310,6 +337,9 @@ export class KarmaniaImportDialog extends LitElement {
     }
     const { summaries } = this.run;
     this.loadedIds = [];
+    // Kept: the viewers show it.
+    this.held?.release();
+    this.held = undefined;
     this.dispatchEvent(
       new CustomEvent<ImportLoaded>(IMPORT_LOADED, {
         detail: { summaries },

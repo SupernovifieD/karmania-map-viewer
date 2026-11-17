@@ -1,5 +1,5 @@
 import type { ScaleBarModel } from '@karmania/scene';
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 
 /**
@@ -66,7 +66,7 @@ export class KarmaniaScaleBar extends LitElement {
     const width = String(Math.round(model.widthPx));
     return html`
       <div class="scale" role="img" aria-label=${`Scale bar, ${model.label}`}>
-        <span class="bar" style=${`width: ${width}px`} aria-hidden="true"></span>
+        <span class="bar" style=${setStyle({ width: `${width}px` })} aria-hidden="true"></span>
         <span aria-hidden="true">${model.label}</span>
       </div>
     `;

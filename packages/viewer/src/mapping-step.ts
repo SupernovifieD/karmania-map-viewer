@@ -1,4 +1,4 @@
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import type { InputChange, SelectChange, SelectOption } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
@@ -454,7 +454,7 @@ export class KarmaniaMappingStep extends LitElement {
       </p>
       ${kind === 'blocks' ? this.blockSize(draft.blockSize) : nothing}
       <div class="viewport" data-scroll-region>
-        <table style=${`--columns: ${String(draft.columns.length)}`}>
+        <table style=${setStyle({ '--columns': String(draft.columns.length) })}>
           <thead>
             <tr>
               ${draft.columns.map((column, index) =>

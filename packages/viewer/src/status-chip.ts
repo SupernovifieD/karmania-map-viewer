@@ -1,4 +1,4 @@
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { MapCrsText } from './map-crs-text.js';
 import type { Readout } from './pointer-readout.js';
@@ -143,7 +143,7 @@ export class KarmaniaStatusChip extends LitElement {
         <div
           class="coordinates"
           ?data-off=${readout === undefined}
-          style=${`--_room: ${String(Math.max(this.chars, 1))}ch`}
+          style=${setStyle({ '--_room': `${String(Math.max(this.chars, 1))}ch` })}
         >
           <span class="axis">X</span><span class="value">${readout?.x ?? ''}</span
           ><span class="axis">Y</span><span class="value">${readout?.y ?? ''}</span>

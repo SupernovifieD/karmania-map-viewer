@@ -1,4 +1,4 @@
-import { kButton, sharedStyles } from '@karmania/ui';
+import { kButton, setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
@@ -72,6 +72,8 @@ export class KarmaniaMapArea extends LitElement {
     interactive: { type: Boolean },
     identify: { attribute: false },
     identifyAt: { attribute: false },
+    importUi: { type: Boolean },
+    hasLegend: { type: Boolean },
     dragging: { state: true },
     size: { state: true },
   };
@@ -267,6 +269,10 @@ export class KarmaniaMapArea extends LitElement {
   declare identify: IdentifyModel | undefined;
   declare identifyAt: Point;
   /** How big the area is, which the popover is kept inside of. */
+  /** Whether files can be brought to the map: dropped on it, or asked for by its Import button. Without it the empty map only says there is no data. */
+  declare importUi: boolean;
+  /** Whether there is a Legend to send people to, which says why a layer cannot be drawn. */
+  declare hasLegend: boolean;
   declare private size: Size;
   /** Whether files are being dragged over the area. */
   declare private dragging: boolean;
@@ -299,6 +305,8 @@ export class KarmaniaMapArea extends LitElement {
     this.identifyAt = { x: 0, y: 0 };
     this.size = { width: 0, height: 0 };
     this.dragging = false;
+    this.importUi = true;
+    this.hasLegend = true;
   }
 
   override connectedCallback(): void {
@@ -481,7 +489,7 @@ export class KarmaniaMapArea extends LitElement {
   }
 
   private readonly onDragEnter = (event: DragEvent): void => {
-    if (carriesFiles(event)) {
+    if (this.importUi && carriesFiles(event)) {
       event.preventDefault();
       this.depth += 1;
       this.dragging = true;
@@ -490,7 +498,7 @@ export class KarmaniaMapArea extends LitElement {
 
   /** Agrees to take the files, which is what makes dropping them possible. */
   private readonly onDragOver = (event: DragEvent): void => {
-    if (carriesFiles(event)) {
+    if (this.importUi && carriesFiles(event)) {
       event.preventDefault();
       if (event.dataTransfer !== null) {
         event.dataTransfer.dropEffect = 'copy';
@@ -507,7 +515,7 @@ export class KarmaniaMapArea extends LitElement {
 
   /** Takes the files away from the browser, which would otherwise open one and leave the app. */
   private readonly onDrop = (event: DragEvent): void => {
-    if (carriesFiles(event)) {
+    if (this.importUi && carriesFiles(event)) {
       event.preventDefault();
       this.depth = 0;
       this.dragging = false;
@@ -530,6 +538,9 @@ export class KarmaniaMapArea extends LitElement {
   };
 
   private empty() {
+    if (!this.importUi) {
+      return html`<k-empty-state icon="map" heading="No data yet"></k-empty-state>`;
+    }
     return html`
       <k-empty-state icon="map" heading="No data yet">
         Drop files here or use Import
@@ -552,9 +563,17 @@ export class KarmaniaMapArea extends LitElement {
     return html`
       <k-empty-state icon="map" heading="Nothing can be drawn yet">
         ${text}
-        <span slot="action"
-          >${kButton({ icon: 'layers', children: 'Show the Legend', onClick: this.onShowLegend })}</span
-        >
+        ${
+          this.hasLegend
+            ? html`<span slot="action"
+                >${kButton({
+                  icon: 'layers',
+                  children: 'Show the Legend',
+                  onClick: this.onShowLegend,
+                })}</span
+              >`
+            : nothing
+        }
       </k-empty-state>
     `;
   }
@@ -573,7 +592,11 @@ export class KarmaniaMapArea extends LitElement {
   private chip() {
     const percent = Math.round(Math.min(1, Math.max(0, this.progress)) * 100);
     const layers = this.preparing === 1 ? '1 layer' : `${formatCount(this.preparing)} layers`;
-    return html`<div class="notice chip" role="status" style=${`--k-progress: ${String(percent)}%`}>
+    return html`<div
+      class="notice chip"
+      role="status"
+      style=${setStyle({ '--k-progress': `${String(percent)}%` })}
+    >
       Preparing ${layers}…
       <span class="bar" aria-hidden="true"></span>
     </div>`;

@@ -3,6 +3,8 @@ import type {
   CrsInfo,
   DatasetInput,
   Engine,
+  ImportMapping,
+  ImportOptions,
   LoadOptions,
   LoadResult,
   Page,
@@ -49,8 +51,9 @@ import type {
   Size,
   ViewMode,
 } from '@karmania/scene';
-import { sharedStyles } from '@karmania/ui';
-import { css, html, LitElement } from 'lit';
+import { setStyle, sharedStyles } from '@karmania/ui';
+import { css, html, LitElement, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { CrsNames } from './crs-names.js';
 import { browserEnv, composeExport, planOnly } from './export-compose.js';
 import type {
@@ -68,10 +71,11 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import type { ContoursTurnOn, LegendCommand } from './legend-tab.js';
-import { selectionAfterChange, selectionAfterRemoved } from './datasets.js';
+import { listedDatasets, selectionAfterChange, selectionAfterRemoved } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
+import { onHeldBackChange, shownOf } from './pending-imports.js';
 import './map-area.js';
 import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
@@ -88,6 +92,7 @@ import type { PanelChange } from './panel.js';
 import {
   browserStorage,
   clampPanelWidth,
+  DEFAULT_PANEL_STATE,
   loadPanelState,
   PANEL_WIDTH,
   panelWidthLimits,
@@ -112,6 +117,10 @@ import { syncDatasets } from './scene-datasets.js';
 /** The elevation the 3D view is put at by "Reset view", in degrees above the horizon: that of the first view of the data (`fitCamera3d` and the empty scene). */
 const RESET_ELEVATION = 45;
 
+/** How long a picture waits for the map to have a size, in tries a little apart (two seconds): see `mapMeasured`. */
+const MAP_SIZE_TRIES = 40;
+const MAP_SIZE_WAIT_MS = 50;
+
 /**
  * The viewer, `<karmania-viewer>`: the map area and the side panel, side by side, and the import wizard that opens
  * over them. It fills the element it is in and never scrolls. It is what a page embeds (`createViewer`), and what the
@@ -127,8 +136,10 @@ const RESET_ELEVATION = 45;
  */
 export class KarmaniaViewer extends LitElement {
   static override properties = {
+    withPanel: { attribute: false },
+    withImportUi: { attribute: false },
     panel: { state: true },
-    viewportWidth: { state: true },
+    hostWidth: { state: true },
     datasets: { state: true },
     layerChanges: { state: true },
     cannotDraw: { state: true },
@@ -147,6 +158,18 @@ export class KarmaniaViewer extends LitElement {
         height: 100%;
         min-height: 0;
         min-width: 0;
+        /* What the page of the app has from base.css, on the page's own element (html). A page that embeds the viewer has not that file, and an inherited
+           font is the page's: the viewer would be in whatever the page is in. These are the same tokens and values, so in the app nothing changes. */
+        background: var(--k-surface);
+        color: var(--k-text);
+        font-family: var(--k-font-sans);
+        font-size: var(--k-font-size-body);
+        font-weight: var(--k-weight-regular);
+        /* Digits are the same width everywhere, so columns of numbers line up. */
+        font-variant-numeric: tabular-nums;
+        line-height: var(--k-line-height-body);
+        scrollbar-color: var(--k-border-strong) transparent;
+        scrollbar-width: thin;
       }
 
       /* The map takes what the panel leaves. The panel's width is --k-panel-width, which the viewer
@@ -162,13 +185,33 @@ export class KarmaniaViewer extends LitElement {
       .workspace[data-collapsed] {
         grid-template-columns: minmax(0, 1fr) var(--k-panel-rail-width);
       }
+
+      /* Without the panel the map has the whole viewer. */
+      .workspace[data-no-panel] {
+        grid-template-columns: minmax(0, 1fr);
+      }
     `,
   ];
 
+  /**
+   * Whether the viewer has its right panel (the Legend and Data tabs). Set before the viewer is put in a page, by `createViewer`'s `panel`. Without it
+   * the map has the whole viewer, and what the panel is kept in the browser is neither read nor written.
+   */
+  declare withPanel: boolean;
+  /**
+   * Whether the viewer has what brings files in: the Import buttons, dropping files on the map, and the import wizard. Set before the viewer is put in
+   * a page, by `createViewer`'s `importUi`. Without it `openImport` is a mistake; `load` still takes what a page makes with a builder.
+   */
+  declare withImportUi: boolean;
   /** How the panel is: folded away or open, the tab it is on, and the width it was given. */
   declare private panel: PanelState;
-  /** How wide the window is, which limits how wide the panel can be. */
-  declare private viewportWidth: number;
+  /** Whether the panel's kept state has been read (once, when the viewer is first put in a page with a panel). */
+  private panelRead = false;
+  /**
+   * How wide the viewer is, which is what the panel's width is limited by (half of it, up to 640): the width of the element itself, and not of the window, since
+   * a page can put the viewer in a box of any size. It is the window's width until the viewer is in a page and measured, and it follows the element's size.
+   */
+  declare private hostWidth: number;
   /** The datasets that have been loaded and kept, in the order they were loaded. */
   declare private datasets: readonly Summary[];
   /** Counts the changes of where the layers are (being prepared, drawn, not drawn): what the map area says of them is made again for each. */
@@ -185,8 +228,10 @@ export class KarmaniaViewer extends LitElement {
 
   constructor() {
     super();
-    this.panel = loadPanelState(browserStorage());
-    this.viewportWidth = document.documentElement.clientWidth;
+    this.withPanel = true;
+    this.withImportUi = true;
+    this.panel = DEFAULT_PANEL_STATE;
+    this.hostWidth = document.documentElement.clientWidth;
     this.datasets = [];
     this.layerChanges = 0;
     this.cannotDraw = false;
@@ -194,8 +239,102 @@ export class KarmaniaViewer extends LitElement {
     this.furniture = furnitureOf(this.store.getState(), undefined);
   }
 
-  /** The engine, which is started when the first files arrive, not before. */
+  /**
+   * The engine: the one the page gave (`useEngine`), which is the page's, or the one this viewer makes when the first files arrive, not before,
+   * which is the viewer's own.
+   */
   private engine: Engine | undefined;
+  /** Whether the viewer made its engine, which it lets go with itself; an engine that a page gave is the page's to let go. */
+  private ownsEngine = false;
+  /** Stops listening to what the engine holds. */
+  private unfollowEngine: (() => void) | undefined;
+  /** The dataset that is being removed, which is waited for: the selection that its going leaves is the one next to it. */
+  private removing: number | undefined;
+
+  /**
+   * Gives the viewer an engine that is not its own: it shows what the engine holds, and what is loaded into it or removed from it after, by
+   * whoever does it (another viewer that has the same engine, or the page), and it does not let the engine go when it is taken out of the page.
+   * It has to come before the viewer has made an engine of its own, which is when the first files arrive.
+   *
+   * @throws Error if the viewer has an engine already.
+   */
+  useEngine(engine: Engine): void {
+    if (this.engine !== undefined) {
+      throw new Error(
+        'The viewer has an engine already: give it one before anything is loaded or imported.',
+      );
+    }
+    this.engine = engine;
+    if (this.isConnected) {
+      this.follow(engine);
+    }
+  }
+
+  /**
+   * The engine of the viewer: the one the page gave, or the viewer's own, made now if it has none (it is started when it is first asked for, not
+   * when the viewer is made, so a viewer that nothing is loaded into has no worker).
+   *
+   * @throws Error if the viewer is not in a page: the engine belongs to the time it is in one.
+   */
+  getEngine(): Engine {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before asking for its engine.');
+    }
+    return this.acquireEngine();
+  }
+
+  /** The engine of the viewer: made now, as the viewer's own, if it has none. */
+  private acquireEngine(): Engine {
+    if (this.engine === undefined) {
+      this.engine = createEngine();
+      this.ownsEngine = true;
+      this.follow(this.engine);
+    }
+    return this.engine;
+  }
+
+  /** Shows what the engine holds, and follows it. */
+  private follow(engine: Engine): void {
+    this.unfollowEngine?.();
+    const stopEvents = engine.on('datasets', this.onEngineDatasets);
+    // What a wizard of the engine holds back changes what is shown though what the engine holds does not: it was loaded to be looked at, and it is kept or not.
+    const stopHeldBack = onHeldBackChange(engine, () => {
+      try {
+        this.onEngineDatasets(engine.datasets());
+      } catch {
+        // The page let the engine go.
+      }
+    });
+    this.unfollowEngine = () => {
+      stopEvents();
+      stopHeldBack();
+    };
+    this.onEngineDatasets(engine.datasets());
+  }
+
+  /**
+   * What the engine holds has changed (something was loaded, removed, or made again by whoever did it): the layers are what it holds, and a selection
+   * that is gone is the one that takes its place. The first of what is held is selected while nothing is.
+   */
+  private readonly onEngineDatasets = (list: readonly Summary[]): void => {
+    // While the contour lines are being made the manager brings the layers to what the engine holds when it has the answer (and after the layer of the
+    // lines has taken the new lines, which keeps its style): that is what it takes from the engine, and this list with it.
+    if (this.contours?.busy() === true) {
+      return;
+    }
+    // What an import wizard has loaded to show what it found is not shown until it is kept.
+    const shown = this.engine === undefined ? list : shownOf(this.engine, list, this.datasets);
+    const before = this.datasets;
+    this.datasets = shown;
+    this.followContours();
+    syncDatasets(this.store, shown);
+    this.followContours();
+    const kept =
+      this.removing === undefined
+        ? selectionAfterChange(before, shown, this.selected)
+        : selectionAfterRemoved(before, shown, this.removing, this.selected);
+    this.selected = kept ?? listedDatasets(shown)[0]?.id;
+  };
 
   /**
    * The scene: what there is to draw and how, the one place that says so. It has a layer for each dataset that is
@@ -216,6 +355,21 @@ export class KarmaniaViewer extends LitElement {
   /** Calls `listener` after each change of the scene, with the document that came of it and the one it replaced; gives the way to stop. */
   subscribeToScene(listener: SceneListener): () => void {
     return this.store.subscribe(listener);
+  }
+
+  /** What is listening for the datasets that the viewer shows to change. */
+  private readonly datasetsListeners = new Set<(datasets: readonly Summary[]) => void>();
+
+  /**
+   * Calls `listener` with the datasets the viewer shows (what its engine holds, in the order they were loaded) each time they change: one is loaded or
+   * removed, by this viewer or by another that has the same engine, or the contour lines of one are made again. Changes that come together are one
+   * call. Gives the function that stops it, which may be called more than once.
+   */
+  subscribeToDatasets(listener: (datasets: readonly Summary[]) => void): () => void {
+    this.datasetsListeners.add(listener);
+    return () => {
+      this.datasetsListeners.delete(listener);
+    };
   }
 
   /**
@@ -345,7 +499,10 @@ export class KarmaniaViewer extends LitElement {
   /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
   private renderer: Renderer | undefined;
 
-  /** A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer. */
+  /**
+   * A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer.
+   * @internal
+   */
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined {
     return this.renderer?.readPixels(x, y, width, height);
   }
@@ -353,6 +510,7 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Which element of which layer is at a point of the map (`x` and `y` in CSS pixels from the top left of the canvas), as the renderer picks it
    * (see `Renderer.pick`); `null` where there is none, and `undefined` without a renderer. For tests, and for what a click does.
+   * @internal
    */
   async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
     return this.renderer?.pick(x, y);
@@ -361,12 +519,16 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Draws the map again for the picture of an export, band by band (see `Renderer.renderExport`); `undefined` without a renderer. The export of the viewer is made
    * with this (22.6), and the drawing of it is tested through it.
+   * @internal
    */
   async renderExport(options: ExportRenderOptions): Promise<ExportRendered | undefined> {
     return this.renderer?.renderExport(options);
   }
 
-  /** What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`). */
+  /**
+   * What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`).
+   * @internal
+   */
   exportLimits(): ExportLimits | undefined {
     return this.renderer?.exportLimits();
   }
@@ -378,6 +540,7 @@ export class KarmaniaViewer extends LitElement {
    * @throws Error if the map has not been drawn yet (there is no renderer), which is a mistake of the caller: nothing is exported before something is drawn.
    * @throws RangeError for a size or dpi that is not a number above 0.
    * Rejects with an `ExportError`, a `ComposeError`, an `ExportFontError`, or the signal's reason (see `composeExport`).
+   * @internal
    */
   async composePicture(options: PictureOptions): Promise<Composed<HTMLCanvasElement>> {
     const renderer = this.renderer;
@@ -385,6 +548,7 @@ export class KarmaniaViewer extends LitElement {
       throw new Error('There is nothing to export: the map has not been drawn.');
     }
     const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
+    await this.mapMeasured(renderer, options.signal);
     return composeExport(browserEnv(this.ownerDocument), {
       ...this.pictureInput(options, renderer),
       heading: headingOf(this.store.getState()),
@@ -424,6 +588,35 @@ export class KarmaniaViewer extends LitElement {
     }
   }
 
+  /**
+   * Waits until the map has a size. The browser tells the renderer the size of the map when it has laid it out, a frame after the renderer is made, so a picture that is asked
+   * for in that frame (the moment `exportable()` first says yes, for one) has no size to work from yet: it waits for it, two seconds at the most, rather than fail for a map of
+   * no size.
+   *
+   * @throws ExportError `not_ready` if the map still has none (it is not shown), and `interrupted` if the map is taken away while it waits.
+   */
+  private async mapMeasured(renderer: Renderer, signal: AbortSignal | undefined): Promise<void> {
+    for (let tries = 0; ; tries += 1) {
+      const { cssWidth, cssHeight } = renderer.stats();
+      if (cssWidth > 0 && cssHeight > 0) {
+        return;
+      }
+      if (tries === MAP_SIZE_TRIES) {
+        throw new ExportError('not_ready', 'The map has no size: it is not shown.');
+      }
+      signal?.throwIfAborted();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, MAP_SIZE_WAIT_MS);
+      });
+      if (this.renderer !== renderer) {
+        throw new ExportError(
+          'interrupted',
+          'The map was taken away while the picture waited for it.',
+        );
+      }
+    }
+  }
+
   /** What the layout of a picture is worked out from, for the scene as it is now. */
   private pictureInput(options: PictureOptions, renderer: Renderer): PlanInput {
     const state = this.store.getState();
@@ -445,6 +638,7 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Where everything would go in the picture, with nothing drawn and no canvas of the picture's size made: what the export dialog warns from before it exports. Rejects as
    * `composePicture` does for the fonts and for a legend that leaves no room for the map (`ComposeError`).
+   * @internal
    */
   async planPicture(options: PictureOptions): Promise<ExportPlan> {
     const renderer = this.renderer;
@@ -482,11 +676,34 @@ export class KarmaniaViewer extends LitElement {
     run: (options, run) => this.exportPng(options, run),
   };
 
-  /** Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. */
+  /**
+   * Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. The dialog starts from the size of the map on screen, so in the
+   * frame in which the renderer is made, when the map has no size yet, it opens a moment later, when it has one (and not at all if it never does: the map is not shown).
+   */
   openExport(): void {
-    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
     const renderer = this.renderer;
-    if (dialog === null || renderer === undefined || !this.exportable()) {
+    if (renderer === undefined || !this.exportable()) {
+      return;
+    }
+    const { cssWidth, cssHeight } = renderer.stats();
+    if (cssWidth > 0 && cssHeight > 0) {
+      this.showExportDialog(renderer);
+      return;
+    }
+    void this.mapMeasured(renderer, undefined).then(
+      () => {
+        if (this.renderer === renderer && this.exportable()) {
+          this.showExportDialog(renderer);
+        }
+      },
+      () => undefined,
+    );
+  }
+
+  /** Opens the export dialog, for a map that has a size. */
+  private showExportDialog(renderer: Renderer): void {
+    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
+    if (dialog === null) {
       return;
     }
     const screen = renderer.stats();
@@ -532,7 +749,10 @@ export class KarmaniaViewer extends LitElement {
     });
   }
 
-  /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
+  /**
+   * How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one.
+   * @internal
+   */
   renderStats(): RenderStats | undefined {
     return this.renderer?.stats();
   }
@@ -707,15 +927,29 @@ export class KarmaniaViewer extends LitElement {
    */
   private contours: ContoursManager | undefined;
 
+  /**
+   * Brings the contours of the layers to the engine's contour lines, whoever made them (a viewer that shares the engine, say): they are shown here too. Called before the layers
+   * are brought to the engine's datasets, so that lines that were made again keep the layer that shows them and its style, and after, so that a layer that is new has the
+   * contours that the engine has.
+   */
+  private followContours(): void {
+    if (this.engine !== undefined) {
+      this.contoursFor(this.engine).followEngine();
+    }
+  }
+
   private contoursFor(engine: Engine): ContoursManager {
     this.contours ??= new ContoursManager({
       engine,
       scene: this.store,
       adopt: (list) => {
+        const shown = shownOf(engine, list, this.datasets);
         const before = this.datasets;
-        this.datasets = list;
+        this.datasets = shown;
+        this.followContours();
         syncDatasets(this.store, this.datasets);
-        this.selected = selectionAfterChange(before, list, this.selected);
+        this.followContours();
+        this.selected = selectionAfterChange(before, shown, this.selected);
       },
       onChange: () => {
         this.layerChanges += 1;
@@ -724,7 +958,10 @@ export class KarmaniaViewer extends LitElement {
     return this.contours;
   }
 
-  /** Whether the contours of a layer are being made, are there, or could not be made (and why), for the style editor. */
+  /**
+   * Whether the contours of a layer are being made, are there, or could not be made (and why), for the style editor.
+   * @internal
+   */
   contoursState(layerId: string): ContoursState {
     return this.contours?.state(layerId) ?? { status: 'idle' };
   }
@@ -801,7 +1038,10 @@ export class KarmaniaViewer extends LitElement {
     return this.legend;
   }
 
-  /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
+  /**
+   * Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics.
+   * @internal
+   */
   layerStates(): [string, LayerState][] {
     return [...(this.pipeline?.states() ?? [])];
   }
@@ -1057,7 +1297,12 @@ export class KarmaniaViewer extends LitElement {
   /** Stops listening to the scene; set while the viewer is in a page. */
   private unlistenScene: (() => void) | undefined;
 
-  /** Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away). */
+  /**
+   * Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away), and of the viewer
+   * itself, and takes the viewer's width again, which limits how wide its panel can be: the map area has what the viewer has, less the panel, so it changes whenever
+   * the box a page puts the viewer in does, unless it has no width at all (a box narrower than the panel), which is why the viewer is watched too (a panel that is
+   * made wider or narrower for it changes the map area again, until the two agree).
+   */
   private sizeWatch: ResizeObserver | undefined;
 
   private watchSize(): void {
@@ -1066,9 +1311,13 @@ export class KarmaniaViewer extends LitElement {
       return;
     }
     this.sizeWatch = new ResizeObserver(() => {
+      this.measureWidth();
       this.updateReadout();
     });
     this.sizeWatch.observe(area);
+    // The viewer too: the map area is what is left of it after the panel, and has no width at all in a box that is narrower than the panel, so a box that shrinks
+    // further changes nothing the map area can tell.
+    this.sizeWatch.observe(this);
   }
 
   protected override firstUpdated(): void {
@@ -1080,7 +1329,18 @@ export class KarmaniaViewer extends LitElement {
   }
 
   /** Says to those who watch whether there is something to export now, after each update (the layers being drawn or not changes it, and it changes the viewer's render). */
-  protected override updated(): void {
+  protected override updated(changed: PropertyValues): void {
+    // The datasets that were shown are not the ones that are (the first draw, which has no datasets before it, is not a change).
+    const before = changed.get('datasets') as readonly Summary[] | undefined;
+    if (
+      before !== undefined &&
+      (before.length !== this.datasets.length ||
+        before.some((dataset, at) => dataset !== this.datasets[at]))
+    ) {
+      for (const listener of [...this.datasetsListeners]) {
+        listener(this.datasets);
+      }
+    }
     const now = this.exportable();
     if (now !== this.exportableNow) {
       this.exportableNow = now;
@@ -1092,21 +1352,31 @@ export class KarmaniaViewer extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    // What a person had the panel as is read when the viewer is put in a page, and only if it has a panel: `createViewer` says that it has none after the element is made, so a
+    // viewer without one must not have read it by then (the page may not want a viewer to touch the browser's storage at all).
+    if (this.withPanel && !this.panelRead) {
+      this.panelRead = true;
+      this.panel = loadPanelState(browserStorage());
+    }
     // Put back in a page, the viewer's first render has been made already.
     if (this.hasUpdated) {
       this.watchSize();
     }
-    window.addEventListener('dragover', this.refuseStrayFiles);
-    window.addEventListener('drop', this.refuseStrayFiles);
-    window.addEventListener('resize', this.onWindowResize);
+    // Measured before the first render, so that the panel is not made for the window's width and then changed.
+    this.measureWidth();
+    this.addEventListener('dragover', this.refuseStrayFiles);
+    this.addEventListener('drop', this.refuseStrayFiles);
     this.unlistenScene = this.store.subscribe(this.onScene);
+    // An engine that was given stays with the viewer while it is out of the page, and what it holds is shown again when it is put back.
+    if (this.engine !== undefined) {
+      this.follow(this.engine);
+    }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    window.removeEventListener('dragover', this.refuseStrayFiles);
-    window.removeEventListener('drop', this.refuseStrayFiles);
-    window.removeEventListener('resize', this.onWindowResize);
+    this.removeEventListener('dragover', this.refuseStrayFiles);
+    this.removeEventListener('drop', this.refuseStrayFiles);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
     this.sizeWatch?.disconnect();
@@ -1124,31 +1394,46 @@ export class KarmaniaViewer extends LitElement {
     this.renderer?.dispose();
     this.renderer = undefined;
     this.cannotDraw = false;
-    this.engine?.dispose();
-    this.engine = undefined;
-    // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer
-    // that is put back in a page starts again, and does not list datasets that no engine can give rows of.
+    this.unfollowEngine?.();
+    this.unfollowEngine = undefined;
+    if (this.ownsEngine) {
+      this.engine?.dispose();
+      this.engine = undefined;
+      this.ownsEngine = false;
+    }
+    // What the viewer's own engine held is gone with it (and a viewer is not in a page to show what another's holds), so the list of datasets, the
+    // selection and the layers are emptied: a viewer that is put back in a page starts again, and does not list datasets that no engine can give rows of.
     this.datasets = [];
     this.selected = undefined;
     this.names.clear();
     syncDatasets(this.store, this.datasets);
   }
 
-  private readonly onWindowResize = (): void => {
-    this.viewportWidth = document.documentElement.clientWidth;
-  };
+  /** Takes the viewer's width as it is now, unless it has none (it is not shown: its last width is what its panel keeps to). */
+  private measureWidth(): void {
+    if (this.clientWidth > 0) {
+      this.hostWidth = this.clientWidth;
+    }
+  }
 
   /** Opens the file picker, which is an input that is not shown. */
   private readonly chooseFiles = (): void => {
     this.renderRoot.querySelector('input')?.click();
   };
 
-  /** Opens the import wizard on `files`, or the file picker when there are none to give (no list, or an empty one). */
+  /**
+   * Opens the import wizard on `files`, or the file picker when there are none to give (no list, or an empty one).
+   *
+   * @throws Error if the viewer was made without import (`withImportUi` is false), which is a mistake of the caller.
+   */
   openImport(files?: readonly File[]): void {
+    if (!this.withImportUi) {
+      throw new Error('This viewer has no import: it was made with importUi set to false.');
+    }
     if (files === undefined || files.length === 0) {
       this.chooseFiles();
     } else {
-      this.importFiles(files);
+      this.openWizard(files);
     }
   }
 
@@ -1157,22 +1442,28 @@ export class KarmaniaViewer extends LitElement {
     const input = event.target as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = '';
-    this.importFiles(files);
+    this.openWizard(files);
   };
 
   private readonly onFilesDropped = (event: CustomEvent<DroppedFiles>): void => {
-    this.importFiles(event.detail.files);
+    this.openWizard(event.detail.files);
   };
 
   /**
    * Opens the import wizard on `files`, if there are any and the viewer is in a page. The engine belongs to the time it is in one (see `load`), and
    * the wizard of a viewer that was taken out is still in its shadow root, so one made here would never be let go.
    */
-  private importFiles(files: readonly File[]): void {
+  private openWizard(files: readonly File[]): void {
+    // Asked for before the viewer has first been drawn, as a page that makes a viewer and asks at once does, there is no dialog yet: it is opened when there is.
+    if (!this.hasUpdated) {
+      void this.updateComplete.then(() => {
+        this.openWizard(files);
+      });
+      return;
+    }
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
     if (this.isConnected && files.length > 0 && wizard) {
-      this.engine ??= createEngine();
-      wizard.engine = this.engine;
+      wizard.engine = this.acquireEngine();
       wizard.show(files);
     }
   }
@@ -1314,8 +1605,13 @@ export class KarmaniaViewer extends LitElement {
     }
     const { id } = event.detail;
     const before = this.datasets;
-    await engine.remove(id);
-    this.datasets = engine.datasets();
+    this.removing = id;
+    try {
+      await engine.remove(id);
+    } finally {
+      this.removing = undefined;
+    }
+    this.datasets = shownOf(engine, engine.datasets(), this.datasets);
     syncDatasets(this.store, this.datasets);
     // What is selected is what it is now, and not what it was when the removal was asked for.
     this.selected = selectionAfterRemoved(before, this.datasets, id, this.selected);
@@ -1323,7 +1619,9 @@ export class KarmaniaViewer extends LitElement {
 
   private changePanel(change: PanelChange): void {
     this.panel = { ...this.panel, ...change };
-    savePanelState(browserStorage(), this.panel);
+    if (this.withPanel) {
+      savePanelState(browserStorage(), this.panel);
+    }
   }
 
   /**
@@ -1331,7 +1629,8 @@ export class KarmaniaViewer extends LitElement {
    * the panel shows the Data tab, open, whatever it was showing.
    */
   private adopt(summaries: readonly Summary[]): void {
-    this.datasets = this.engine?.datasets() ?? [];
+    this.datasets =
+      this.engine === undefined ? [] : shownOf(this.engine, this.engine.datasets(), this.datasets);
     syncDatasets(this.store, this.datasets);
     this.selected = summaries[0]?.id;
     this.changePanel({ tab: 'data', collapsed: false });
@@ -1352,23 +1651,57 @@ export class KarmaniaViewer extends LitElement {
     if (!this.isConnected) {
       throw new Error('The viewer is not in a page: put it in one before loading a dataset.');
     }
-    this.engine ??= createEngine();
-    const result = await this.engine.load(input, options);
-    if (result.status === 'loaded') {
+    const result = await this.acquireEngine().load(input, options);
+    // A viewer that was taken out of the page while the engine was reading has nothing to show it in, and no business writing what a person's panel is kept as.
+    if (result.status === 'loaded' && this.inPage()) {
       this.adopt(result.summaries);
     }
     return result;
   }
 
+  /**
+   * Imports a file with a mapping, as the wizard does but without it: the dataset is listed in the Data tab, selected, and drawn. `files` is one data
+   * file and its sidecars (a `.prj`). Resolves with what the engine says: `loaded` with the summaries, or `blocked` with the findings, and then nothing
+   * is added. Rejects when the viewer is not in a page (as `load` does), and for misuse of the engine (two data files). Needs no import UI: it works
+   * for a viewer made with `importUi: false`.
+   */
+  async importFiles(
+    files: readonly File[],
+    mapping: ImportMapping,
+    options?: ImportOptions,
+  ): Promise<LoadResult> {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before importing files.');
+    }
+    const result = await this.acquireEngine().importFiles(files, mapping, options);
+    if (result.status === 'loaded' && this.inPage()) {
+      this.adopt(result.summaries);
+    }
+    return result;
+  }
+
+  /**
+   * Opens the dialog for the map's coordinate system, with nothing chosen. Nothing happens while nothing is loaded: the map has no coordinate system
+   * to change yet (and the chip that opens the dialog is not there either).
+   */
+  openMapCrs(): void {
+    if (this.datasets.length > 0) {
+      this.onMapCrsRequest();
+    }
+  }
+
   /** Gives the panel the width that was asked for, as far as the window allows. */
   private readonly onResize = (event: CustomEvent<ResizeRequest>): void => {
-    this.panel = { ...this.panel, width: clampPanelWidth(event.detail.width, this.viewportWidth) };
-    savePanelState(browserStorage(), this.panel);
+    this.panel = { ...this.panel, width: clampPanelWidth(event.detail.width, this.hostWidth) };
+    if (this.withPanel) {
+      savePanelState(browserStorage(), this.panel);
+    }
   };
 
   /**
-   * Files dropped anywhere but the map area do nothing. Left alone, the browser would open the file
-   * in place of the page, so what nobody has taken is taken here, and the pointer says no.
+   * Files dropped in the viewer, anywhere but the map area, do nothing. Left alone, the browser would open the file in place of the page, so what nobody has taken
+   * is taken here, and the pointer says no. This is for the viewer's own box: what a page does with a drop outside it is the page's business (the app refuses
+   * them over its whole window, as it did when the viewer did).
    */
   private readonly refuseStrayFiles = (event: DragEvent): void => {
     if (carriesFiles(event) && !event.defaultPrevented) {
@@ -1381,8 +1714,8 @@ export class KarmaniaViewer extends LitElement {
 
   override render() {
     // The width that was asked for, or what the window allows of it.
-    const width = clampPanelWidth(this.panel.width, this.viewportWidth);
-    const limits = panelWidthLimits(this.viewportWidth);
+    const width = clampPanelWidth(this.panel.width, this.hostWidth);
+    const limits = panelWidthLimits(this.hostWidth);
     const states = this.pipeline?.states() ?? new Map();
     const layers = summariseLayers(states.values());
     const found = datasetNotices(states, this.store.getState().layers);
@@ -1396,11 +1729,14 @@ export class KarmaniaViewer extends LitElement {
     return html`
       <div
         class="workspace"
-        ?data-collapsed=${this.panel.collapsed}
-        style=${`--k-panel-width: ${String(width)}px`}
+        ?data-collapsed=${this.panel.collapsed && this.withPanel}
+        ?data-no-panel=${!this.withPanel}
+        style=${setStyle({ '--k-panel-width': `${String(width)}px` })}
       >
         <karmania-map-area
           .datasets=${this.datasets.length}
+          .importUi=${this.withImportUi}
+          .hasLegend=${this.withPanel}
           .unavailable=${this.cannotDraw}
           .heading=${this.furniture.heading}
           .scale=${this.furniture.scale}
@@ -1422,43 +1758,56 @@ export class KarmaniaViewer extends LitElement {
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
-        <karmania-panel
-          .collapsed=${this.panel.collapsed}
-          .width=${width}
-          .min=${limits.min}
-          .max=${limits.max}
-          .reset=${PANEL_WIDTH.default}
-          .tab=${this.panel.tab}
-          .legend=${legend}
-          .styles=${styles}
-          .datasets=${this.datasets}
-          .selected=${this.selected}
-          .selectedElement=${this.selectedElementOfDataset()}
-          .rows=${this.rows}
-          .crsInfo=${this.crsInfo}
-          .notices=${notices}
-          @karmania-import-request=${this.chooseFiles}
-          @karmania-legend-command=${this.onLegendCommand}
-          @karmania-contours-turn-on=${this.onContoursTurnOn}
-          @k-table-select=${this.onTableSelect}
-          @keydown=${this.onEscape}
-          @karmania-dataset-select=${this.onDatasetSelect}
-          @karmania-dataset-remove=${this.onDatasetRemove}
-          @karmania-panel-change=${this.onPanelChange}
-          @karmania-resize=${this.onResize}
-        ></karmania-panel>
+        ${
+          this.withPanel
+            ? html`
+                <karmania-panel
+                  .collapsed=${this.panel.collapsed}
+                  .width=${width}
+                  .min=${limits.min}
+                  .max=${limits.max}
+                  .reset=${PANEL_WIDTH.default}
+                  .tab=${this.panel.tab}
+                  .legend=${legend}
+                  .styles=${styles}
+                  .datasets=${this.datasets}
+                  .selected=${this.selected}
+                  .selectedElement=${this.selectedElementOfDataset()}
+                  .rows=${this.rows}
+                  .crsInfo=${this.crsInfo}
+                  .notices=${notices}
+                  .importUi=${this.withImportUi}
+                  @karmania-import-request=${this.chooseFiles}
+                  @karmania-legend-command=${this.onLegendCommand}
+                  @karmania-contours-turn-on=${this.onContoursTurnOn}
+                  @k-table-select=${this.onTableSelect}
+                  @keydown=${this.onEscape}
+                  @karmania-dataset-select=${this.onDatasetSelect}
+                  @karmania-dataset-remove=${this.onDatasetRemove}
+                  @karmania-panel-change=${this.onPanelChange}
+                  @karmania-resize=${this.onResize}
+                ></karmania-panel>
+              `
+            : nothing
+        }
       </div>
-      <input
-        type="file"
-        multiple
-        hidden
-        accept=${IMPORT_FILE_ACCEPT}
-        aria-label="Choose files to import"
-        @change=${this.onFilesChosen}
-      />
-      <karmania-import-dialog
-        @karmania-import-loaded=${this.onImportLoaded}
-      ></karmania-import-dialog>
+      ${
+        this.withImportUi
+          ? html`
+              <input
+                type="file"
+                multiple
+                hidden
+                accept=${IMPORT_FILE_ACCEPT}
+                aria-label="Choose files to import"
+                @change=${this.onFilesChosen}
+              />
+              <karmania-import-dialog
+                @karmania-import-loaded=${this.onImportLoaded}
+              ></karmania-import-dialog>
+            `
+          : nothing
+      }
       <karmania-export-dialog
         .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
       ></karmania-export-dialog>

@@ -1,4 +1,4 @@
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { rampPreview } from './legend-style.js';
 import type { RampOption } from './legend-style.js';
@@ -232,7 +232,7 @@ export class KarmaniaRampSelect extends LitElement {
     return html`<span
       class="strip"
       aria-hidden="true"
-      style=${`background: ${rampPreview(option.colours, option.kind, this.reverse)}`}
+      style=${setStyle({ background: rampPreview(option.colours, option.kind, this.reverse) })}
     ></span>`;
   }
 

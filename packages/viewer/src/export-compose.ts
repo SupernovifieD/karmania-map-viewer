@@ -110,10 +110,13 @@ export interface PictureOptions {
 
 /** What `exportPng` is asked for (brief 11.8): the size of the picture in pixels, its dpi, and whether the legend is put to the right of the map. */
 export interface ExportPngOptions {
+  /** The width of the picture in pixels, a whole number from 1 up to the most the browser and the card allow (8,192 at the most); a picture larger than that rejects with `ExportError` `too_large`. */
   readonly widthPx: number;
+  /** The height of the picture in pixels, under the same limit as the width. */
   readonly heightPx: number;
   /** Dots to the inch, above 0: written in the file, and the scale that the sizes of the screen are drawn at (`dpi / 96`). The dialog offers 96, 150 and 300. */
   readonly dpi: number;
+  /** Whether the legend is put to the right of the map (the map takes the width that is left: half of it at the least, or the export rejects with `ComposeError` `no_room_for_map`). */
   readonly legend: boolean;
 }
 
