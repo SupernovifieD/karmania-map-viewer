@@ -91,6 +91,17 @@ export interface ComposeInput {
   readonly onProgress?: (done: number) => void;
 }
 
+/** What a person (or the dialog) asks of a picture: its size and dpi, whether it has a legend, and the way to stop it and to hear how far it is. */
+export interface PictureOptions {
+  /** The size of the picture, in pixels. */
+  readonly size: Size;
+  readonly dpi: number;
+  /** Whether the legend is put to the right of the map. */
+  readonly legend: boolean;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (done: number) => void;
+}
+
 /** What is made. */
 export interface Composed<C> {
   readonly canvas: C;

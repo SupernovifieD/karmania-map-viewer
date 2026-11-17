@@ -29,16 +29,20 @@ import type {
   RenderStats,
 } from '@karmania/render';
 import {
+  EXPORT_COLOURS,
   cameraTo2d,
   cameraTo3d,
   createSceneStore,
   firstNumericColumn,
   legendModel,
+  parseHex,
 } from '@karmania/scene';
 import type { Command, LegendModel, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
+import { browserEnv, composeExport } from './export-compose.js';
+import type { Composed, PictureOptions } from './export-compose.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -52,7 +56,9 @@ import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
+import { headingOf } from './heading.js';
 import { identifyModel } from './identify.js';
+import { unitsOf } from './map-units.js';
 import './identify-popover.js';
 import type { IdentifyClose, IdentifyShow } from './identify-popover.js';
 import type { TableSelect } from '@karmania/ui';
@@ -342,6 +348,45 @@ export class KarmaniaViewer extends LitElement {
   /** What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`). */
   exportLimits(): ExportLimits | undefined {
     return this.renderer?.exportLimits();
+  }
+
+  /**
+   * Puts the picture of the map together on a canvas of `size` pixels at `dpi` (see `composeExport`): the map drawn again by the renderer in the light theme, the north arrow, the
+   * scale bar and, with `legend`, the legend, from the scene as it is now. This is what the exported file is made from (22.6), and what the dialog's preview is a small copy of.
+   *
+   * @throws Error if the map has not been drawn yet (there is no renderer), which is a mistake of the caller: nothing is exported before something is drawn.
+   * @throws RangeError for a size or dpi that is not a number above 0.
+   * Rejects with an `ExportError`, a `ComposeError`, an `ExportFontError`, or the signal's reason (see `composeExport`).
+   */
+  async composePicture(options: PictureOptions): Promise<Composed<HTMLCanvasElement>> {
+    const renderer = this.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is nothing to export: the map has not been drawn.');
+    }
+    const state = this.store.getState();
+    const screen = renderer.stats();
+    const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
+    return composeExport(browserEnv(this.ownerDocument), {
+      size: options.size,
+      dpi: options.dpi,
+      legend: options.legend ? this.currentLegend() : null,
+      viewMode: state.viewMode,
+      camera2d: state.camera2d,
+      camera3d: state.camera3d,
+      heading: headingOf(state),
+      units: unitsOf(state.frame, this.mapCrsInfo()),
+      screen: { width: screen.cssWidth, height: screen.cssHeight },
+      fonts: this.ownerDocument.fonts,
+      renderMap: async (request) => {
+        await renderer.renderExport({
+          ...request,
+          background: bytes(EXPORT_COLOURS.map),
+          ink: bytes(EXPORT_COLOURS.text),
+        });
+      },
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    });
   }
 
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
