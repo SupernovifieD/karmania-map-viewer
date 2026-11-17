@@ -113,13 +113,16 @@ export function warningText(warning: ExportWarning): string {
   }
 }
 
+/** The names of the devices that Windows will not make a file of: the whole name before the first dot, in any case. */
+const DEVICE_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
 /** Characters that no file name can have on some system (the separators of paths, the marks of drives and wildcards) and control characters. */
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN = /[\\/:*?"<>|\u0000-\u001f]/g;
 
 /**
  * The name of the file for what was typed, without the ".png" (the dialog shows that after the field): the forbidden characters become hyphens (so `../../etc/passwd` is
- * `etc-passwd`), a ".png" the person typed is not doubled, spaces, dots and hyphens at the ends go, it is at most `MAX_FILE_NAME` characters, and nothing is `DEFAULT_FILE_NAME`.
+ * `etc-passwd`), a ".png" the person typed is not doubled, spaces, dots and hyphens at the ends go, it is at most `MAX_FILE_NAME` characters, a name that Windows keeps for a device (`CON`, `NUL`, `COM1`...) has an underscore put in front, and nothing is `DEFAULT_FILE_NAME`.
  */
 export function fileNameOf(typed: string): string {
   const cleaned = typed
@@ -128,7 +131,12 @@ export function fileNameOf(typed: string): string {
     .replace(/^[.\s-]+|[.\s-]+$/g, '')
     .slice(0, MAX_FILE_NAME)
     .replace(/[.\s-]+$/g, '');
-  return cleaned === '' ? DEFAULT_FILE_NAME : cleaned;
+  if (cleaned === '') {
+    return DEFAULT_FILE_NAME;
+  }
+  // Windows cannot create a file named for one of its devices (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9), with any extension after the name: `CON.png` is refused, and
+  // so is `con.txt`. A name that begins with one of them, up to its first dot, is given a mark in front.
+  return DEVICE_NAMES.test(cleaned.split('.')[0] ?? '') ? `_${cleaned}` : cleaned;
 }
 
 /** What an export that did not come to an end says to a person, from what it rejected with: the code of an `ExportError` or a `ComposeError`, a font that did not load, anything else. */

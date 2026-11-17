@@ -108,6 +108,38 @@ describe('fileNameOf', () => {
     expect(fileNameOf('-rf')).toBe('rf');
   });
 
+  it('puts an underscore in front of a name that Windows keeps for a device, in any case and with anything after a dot, and of nothing else', () => {
+    for (const name of [
+      'CON',
+      'con',
+      'Nul',
+      'AUX',
+      'prn',
+      'COM1',
+      'com9',
+      'LPT3',
+      'CON.v2',
+      'nul.txt.backup',
+    ]) {
+      expect(fileNameOf(name), name).toBe(`_${name}`);
+    }
+    // Not devices: a longer name, COM0 and COM10, a name with the word inside.
+    for (const name of [
+      'CONSOLE',
+      'COM0',
+      'COM10',
+      'my CON',
+      'LPT',
+      'AUXILIARY',
+      'communication',
+    ]) {
+      expect(fileNameOf(name), name).toBe(name);
+    }
+    // And what makes a device name after the cleaning is caught after it: `con.png` has lost its .png, `.con` its dot.
+    expect(fileNameOf('con.png')).toBe('_con');
+    expect(fileNameOf('.con')).toBe('_con');
+  });
+
   it('takes spaces and dots off the ends and keeps the ones inside', () => {
     expect(fileNameOf('  .map. v2 . ')).toBe('map. v2');
   });
