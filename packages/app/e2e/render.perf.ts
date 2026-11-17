@@ -13,6 +13,11 @@
  *     the main thread over 50 ms while it is made (step 22.11);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
+ * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
+ * a task over 50 ms, which these tests then report as a failure: in the gate of M22 a callback of 197 ms in the export and one of 1,195 ms in the first draw of the
+ * million points, none of them in the runs after (and 55 ms in one of nine warm runs of the export). Its cause was not shown. The first draw of a layer is not made
+ * smaller for it and the targets are not changed; the owner will decide with more testing on real machines (`docs/perf.md`, M22).
+ *
  * It needs a quiet machine, so it is a project of its own, like `performance.perf.ts`: `pnpm perf` runs both. The numbers are for
  * `docs/perf.md`. The browser draws with the software driver of the Playwright image unless the machine gives it a card (the
  * brief's figures are for the real GPU): the number that the page reports as its renderer is printed with them.
