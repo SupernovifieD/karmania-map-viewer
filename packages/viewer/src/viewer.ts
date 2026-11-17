@@ -115,6 +115,10 @@ import { syncDatasets } from './scene-datasets.js';
 /** The elevation the 3D view is put at by "Reset view", in degrees above the horizon: that of the first view of the data (`fitCamera3d` and the empty scene). */
 const RESET_ELEVATION = 45;
 
+/** How long a picture waits for the map to have a size, in tries a little apart (two seconds): see `mapMeasured`. */
+const MAP_SIZE_TRIES = 40;
+const MAP_SIZE_WAIT_MS = 50;
+
 /**
  * The viewer, `<karmania-viewer>`: the map area and the side panel, side by side, and the import wizard that opens
  * over them. It fills the element it is in and never scrolls. It is what a page embeds (`createViewer`), and what the
@@ -524,6 +528,7 @@ export class KarmaniaViewer extends LitElement {
       throw new Error('There is nothing to export: the map has not been drawn.');
     }
     const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
+    await this.mapMeasured(renderer, options.signal);
     return composeExport(browserEnv(this.ownerDocument), {
       ...this.pictureInput(options, renderer),
       heading: headingOf(this.store.getState()),
@@ -560,6 +565,35 @@ export class KarmaniaViewer extends LitElement {
           ? `The ${problem.side} of the picture has to be at least ${String(problem.least)} pixels.`
           : 'The picture has to be whole pixels.',
       );
+    }
+  }
+
+  /**
+   * Waits until the map has a size. The browser tells the renderer the size of the map when it has laid it out, a frame after the renderer is made, so a picture that is asked
+   * for in that frame (the moment `exportable()` first says yes, for one) has no size to work from yet: it waits for it, two seconds at the most, rather than fail for a map of
+   * no size.
+   *
+   * @throws ExportError `not_ready` if the map still has none (it is not shown), and `interrupted` if the map is taken away while it waits.
+   */
+  private async mapMeasured(renderer: Renderer, signal: AbortSignal | undefined): Promise<void> {
+    for (let tries = 0; ; tries += 1) {
+      const { cssWidth, cssHeight } = renderer.stats();
+      if (cssWidth > 0 && cssHeight > 0) {
+        return;
+      }
+      if (tries === MAP_SIZE_TRIES) {
+        throw new ExportError('not_ready', 'The map has no size: it is not shown.');
+      }
+      signal?.throwIfAborted();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, MAP_SIZE_WAIT_MS);
+      });
+      if (this.renderer !== renderer) {
+        throw new ExportError(
+          'interrupted',
+          'The map was taken away while the picture waited for it.',
+        );
+      }
     }
   }
 
@@ -622,11 +656,34 @@ export class KarmaniaViewer extends LitElement {
     run: (options, run) => this.exportPng(options, run),
   };
 
-  /** Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. */
+  /**
+   * Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. The dialog starts from the size of the map on screen, so in the
+   * frame in which the renderer is made, when the map has no size yet, it opens a moment later, when it has one (and not at all if it never does: the map is not shown).
+   */
   openExport(): void {
-    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
     const renderer = this.renderer;
-    if (dialog === null || renderer === undefined || !this.exportable()) {
+    if (renderer === undefined || !this.exportable()) {
+      return;
+    }
+    const { cssWidth, cssHeight } = renderer.stats();
+    if (cssWidth > 0 && cssHeight > 0) {
+      this.showExportDialog(renderer);
+      return;
+    }
+    void this.mapMeasured(renderer, undefined).then(
+      () => {
+        if (this.renderer === renderer && this.exportable()) {
+          this.showExportDialog(renderer);
+        }
+      },
+      () => undefined,
+    );
+  }
+
+  /** Opens the export dialog, for a map that has a size. */
+  private showExportDialog(renderer: Renderer): void {
+    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
+    if (dialog === null) {
       return;
     }
     const screen = renderer.stats();

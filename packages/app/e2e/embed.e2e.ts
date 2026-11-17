@@ -733,6 +733,167 @@ test.describe('the events of a viewer', () => {
 });
 
 test.describe('a viewer in a box of a page', () => {
+  test('makes a picture when it is asked for in the very frame that exportable() says it can, and does not fail for a map that has no size yet', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    // `onExportable` is called as the viewer's update ends, in the frame in which its renderer is made: the browser has not told the renderer the size of the map yet.
+    const outcome = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const box = document.createElement('div');
+          box.style.cssText = 'width: 600px; height: 400px';
+          document.body.append(box);
+          const viewer = window.embed.createViewer(box);
+          let asked = false;
+          viewer.onExportable((available) => {
+            if (!available || asked) {
+              return;
+            }
+            asked = true;
+            viewer.exportPng({ widthPx: 300, heightPx: 200, dpi: 96, legend: false }).then(
+              (blob) => {
+                resolve(`made ${String(blob.size > 0)}`);
+              },
+              (error: unknown) => {
+                resolve(`${(error as Error).name}: ${(error as Error).message}`);
+              },
+            );
+          });
+          void viewer.load(
+            window.embed.points({
+              name: 'wells',
+              x: [1, 2, 3],
+              y: [4, 5, 6],
+              crs: { kind: 'local', units: 'm' },
+            }),
+          );
+        }),
+    );
+    expect(outcome).toBe('made true');
+  });
+
+  test('says it is not ready, after a wait, for a picture of a map that was shown and is not now, and has no size', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(async () => {
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 600px; height: 400px';
+      document.body.append(box);
+      const viewer = window.embed.createViewer(box);
+      await viewer.load(
+        window.embed.points({
+          name: 'wells',
+          x: [1, 2, 3],
+          y: [4, 5, 6],
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+    });
+    // Drawn at a size: then the box is hidden, and the renderer is told that the map has none.
+    await expect.poll(() => page.locator('#box canvas').boundingBox()).not.toBeNull();
+    await page.locator('#box').evaluate((box) => {
+      box.style.display = 'none';
+    });
+    await expect.poll(() => page.locator('#box canvas').boundingBox()).toBeNull();
+    const outcome = await page.evaluate(async () => {
+      const viewer = document.querySelector('#box karmania-viewer') as unknown as {
+        exportPng: (options: object) => Promise<Blob>;
+      };
+      const started = performance.now();
+      try {
+        await viewer.exportPng({ widthPx: 300, heightPx: 200, dpi: 96, legend: false });
+        return { result: 'made', waited: 0 };
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        return {
+          result: code === undefined ? (error as Error).name : `${(error as Error).name} ${code}`,
+          waited: performance.now() - started,
+        };
+      }
+    });
+    expect(outcome.result).toBe('ExportError not_ready');
+    // It waited for the map (about two seconds), and did not fail at once.
+    expect(outcome.waited).toBeGreaterThan(1500);
+  });
+
+  test('opens its export dialog in the very frame that exportable() says it can, and has the preview of it, with no error', async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/embed.html');
+    await page.evaluate(() => {
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 800px; height: 600px';
+      document.body.append(box);
+      const viewer = window.embed.createViewer(box);
+      let asked = false;
+      viewer.onExportable((available) => {
+        if (available && !asked) {
+          asked = true;
+          viewer.openExport();
+        }
+      });
+      void viewer.load(
+        window.embed.points({
+          name: 'wells',
+          x: [1, 2, 3],
+          y: [4, 5, 6],
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+    });
+    await expect(page.locator('#box karmania-export-dialog .frame canvas')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('says the map was taken away, for a picture that waited for the map and the viewer was taken out meanwhile', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const outcome = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const box = document.createElement('div');
+          box.style.cssText = 'width: 600px; height: 400px';
+          document.body.append(box);
+          const viewer = window.embed.createViewer(box);
+          let asked = false;
+          viewer.onExportable((available) => {
+            if (!available || asked) {
+              return;
+            }
+            asked = true;
+            // Asked in the frame in which the renderer is made, so it waits for the map's size; the viewer is taken out before the wait is over.
+            viewer.exportPng({ widthPx: 300, heightPx: 200, dpi: 96, legend: false }).then(
+              () => {
+                resolve('made');
+              },
+              (error: unknown) => {
+                resolve(
+                  `${(error as Error).name} ${(error as { code?: string }).code ?? (error as Error).message}`,
+                );
+              },
+            );
+            viewer.dispose();
+          });
+          void viewer.load(
+            window.embed.points({
+              name: 'wells',
+              x: [1, 2, 3],
+              y: [4, 5, 6],
+              crs: { kind: 'local', units: 'm' },
+            }),
+          );
+        }),
+    );
+    expect(outcome).toBe('ExportError interrupted');
+  });
+
   test('keeps its panel to what its own box allows, and follows the box and not the window', async ({
     page,
   }) => {
