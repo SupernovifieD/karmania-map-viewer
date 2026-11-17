@@ -296,6 +296,9 @@ test.describe('the button', () => {
         (window as unknown as { presses: number }).presses += 1;
       });
     });
+    // The mouse clicks at places of the window, so the button has to be inside it: it is scrolled to before its place is read (the gallery above it grows when an icon is added, and
+    // a corner of the button that is below the window is a click on nothing).
+    await button.scrollIntoViewIfNeeded();
     const box = await button.boundingBox();
     if (box === null) {
       throw new Error('no box');
