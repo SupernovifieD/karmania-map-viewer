@@ -22,6 +22,23 @@ import { dispatch } from './support/render.js';
 const FIRST = '#440154';
 const LAST = '#fde725';
 
+/** `#rrggbb` as the browser gives a colour it has parsed: `rgb(r, g, b)`. */
+const rgb = (hex: string): string => {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return `rgb(${String(value >> 16)}, ${String((value >> 8) & 255)}, ${String(value & 255)})`;
+};
+
+/**
+ * The background of a ramp swatch as the browser computed it. The stripes are set through the element's style (what a strict policy allows) and not written as
+ * the text of an attribute, so the colours are the ones the browser parsed (`rgb()`, not the hex that the code wrote), and each stripe is two stops: its colour at
+ * both of its ends.
+ */
+const stripesOf = (ramp: Locator): Promise<string> =>
+  ramp.evaluate((element) => getComputedStyle(element).backgroundImage);
+
+/** How many stripes a computed background has: two stops of one colour for each. */
+const stripeCount = (image: string): number => (image.match(/rgb\(/g)?.length ?? 0) / 2;
+
 const layerName = (page: Page, id: string): Locator => layerRow(page, id).locator('.name');
 const groupName = (page: Page, id: string): Locator => groupRow(page, id).locator('.name');
 
@@ -242,10 +259,10 @@ test.describe('the Legend tab', () => {
     const rampBox = await ramp.boundingBox();
     expect([rampBox?.width, rampBox?.height]).toEqual([24, 12]);
     // Seven classes of equal intervals, from the first colour of the ramp to its last, in stripes with hard edges.
-    const style = (await ramp.getAttribute('style')) ?? '';
-    expect(style.match(/#[0-9a-f]{6}/g)?.length).toBe(7);
-    expect(style).toContain(`linear-gradient(to right, ${FIRST} 0%`);
-    expect(style).toMatch(new RegExp(`${LAST} [0-9.]+% 100%\\)`));
+    const image = await stripesOf(ramp);
+    expect(stripeCount(image)).toBe(7);
+    expect(image.startsWith(`linear-gradient(to right, ${rgb(FIRST)} 0%`)).toBe(true);
+    expect(image.endsWith(`${rgb(LAST)} 100%)`)).toBe(true);
     // Both rooms are 24 wide, so the names are where they are whichever the layer has (the alignment test above); the swatches are left-aligned in them.
     expect(rampBox?.x).toBe(box?.x);
     // The swatches are in the middle of the row, and decorative.
@@ -307,9 +324,7 @@ test.describe('the Legend tab', () => {
         },
       },
     });
-    await expect
-      .poll(async () => ((await ramp.getAttribute('style')) ?? '').match(/#[0-9a-f]{6}/g)?.length)
-      .toBe(3);
+    await expect.poll(async () => stripeCount(await stripesOf(ramp))).toBe(3);
     const datasetId = await datasetOf(page, 'layer-1');
     expect(datasetId).toBeDefined();
     await dispatch(page, { type: 'removeLayersOfDataset', datasetId });

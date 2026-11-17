@@ -6,7 +6,7 @@ import type {
   LegendLayerEntry,
   LegendModel,
 } from '@karmania/scene';
-import { kButton, sharedStyles } from '@karmania/ui';
+import { kButton, setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
@@ -585,8 +585,12 @@ export class KarmaniaLegendTab extends LitElement {
     if (drop === undefined || tree === undefined) {
       return nothing;
     }
-    const style = `top: ${String(drop.y - tree.top)}px; left: ${String(drop.left - tree.left)}px; width: ${String(tree.right - drop.left)}px`;
-    return html`<div class="drop-line" aria-hidden="true" style=${style}></div>`;
+    const style = {
+      top: `${String(drop.y - tree.top)}px`,
+      left: `${String(drop.left - tree.left)}px`,
+      width: `${String(tree.right - drop.left)}px`,
+    };
+    return html`<div class="drop-line" aria-hidden="true" style=${setStyle(style)}></div>`;
   }
 
   /** A row that was moved is in its new place now, and has the keyboard again (moving it in the page took it away). */
@@ -828,12 +832,12 @@ export class KarmaniaLegendTab extends LitElement {
       ? html`<span
           class="swatch"
           aria-hidden="true"
-          style=${`background: ${safeColour(swatch.colour)}`}
+          style=${setStyle({ background: safeColour(swatch.colour) })}
         ></span>`
       : html`<span
           class="swatch ramp"
           aria-hidden="true"
-          style=${`background: ${rampGradient(swatch.colours)}`}
+          style=${setStyle({ background: rampGradient(swatch.colours) })}
         ></span>`;
   }
 
@@ -859,7 +863,7 @@ export class KarmaniaLegendTab extends LitElement {
       <span
         class="dot"
         aria-hidden="true"
-        style=${entry.colour === null ? nothing : `background: ${safeColour(entry.colour)}`}
+        style=${setStyle(entry.colour === null ? {} : { background: safeColour(entry.colour) })}
       ></span>
       <span class="label name" data-truncate title=${entry.label}>${entry.label}</span>
       <span class="visually-hidden">, </span>

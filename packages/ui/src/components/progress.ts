@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit';
+import { setStyle } from '../set-style.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
 
@@ -124,7 +125,7 @@ export class KProgress extends LitElement {
       >
         <div
           class="bar ${known ? '' : 'unknown'}"
-          style=${`--_fraction: ${String(fraction)}`}
+          style=${setStyle({ '--_fraction': String(fraction) })}
         ></div>
       </div>
     `;
