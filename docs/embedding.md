@@ -268,6 +268,9 @@ What is shared, and what you may not expect:
   viewer turns the contours on, changes their interval or turns them off, the others follow. Each viewer keeps its own choice of whether they are shown, and the style of their layer.
   Two viewers that change the contours of a layer at the same moment end up with the same ones: the settings of the last answer that the engine gives win in both. A viewer that is making
   lines takes in what the other viewers did to the engine when it has its own answer, not before.
+- **An import that is being reviewed is not shown until it is kept.** The wizard loads a file into the engine as soon as its last step is shown, to say what it found, and takes it out again if the
+  person goes back or cancels. Until the person presses Load, no viewer of the engine draws it, lists it in its Data tab or tells `on('datasets')` of it, though `engine.datasets()` has it (the
+  engine is the page's, and holds what is loaded into it). While an import is running, what other code loads into the same engine appears when it has finished. After Load every viewer shows it.
 - **A dialog is modal to the whole page.** The import wizard, the export dialog and the coordinate-system dialog are `<dialog>` elements shown with `showModal()`: while one is open,
   everything else on the page is inert (the other viewer too).
 - **Dropping files** on a viewer's map imports them. A file dropped elsewhere in the viewer, where nothing takes it, is refused (the browser would otherwise open it in place of the page).

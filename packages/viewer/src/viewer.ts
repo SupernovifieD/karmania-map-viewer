@@ -75,6 +75,7 @@ import { listedDatasets, selectionAfterChange, selectionAfterRemoved } from './d
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
+import { onHeldBackChange, shownOf } from './pending-imports.js';
 import './map-area.js';
 import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
@@ -295,7 +296,19 @@ export class KarmaniaViewer extends LitElement {
   /** Shows what the engine holds, and follows it. */
   private follow(engine: Engine): void {
     this.unfollowEngine?.();
-    this.unfollowEngine = engine.on('datasets', this.onEngineDatasets);
+    const stopEvents = engine.on('datasets', this.onEngineDatasets);
+    // What a wizard of the engine holds back changes what is shown though what the engine holds does not: it was loaded to be looked at, and it is kept or not.
+    const stopHeldBack = onHeldBackChange(engine, () => {
+      try {
+        this.onEngineDatasets(engine.datasets());
+      } catch {
+        // The page let the engine go.
+      }
+    });
+    this.unfollowEngine = () => {
+      stopEvents();
+      stopHeldBack();
+    };
     this.onEngineDatasets(engine.datasets());
   }
 
@@ -309,16 +322,18 @@ export class KarmaniaViewer extends LitElement {
     if (this.contours?.busy() === true) {
       return;
     }
+    // What an import wizard has loaded to show what it found is not shown until it is kept.
+    const shown = this.engine === undefined ? list : shownOf(this.engine, list, this.datasets);
     const before = this.datasets;
-    this.datasets = list;
+    this.datasets = shown;
     this.followContours();
-    syncDatasets(this.store, list);
+    syncDatasets(this.store, shown);
     this.followContours();
     const kept =
       this.removing === undefined
-        ? selectionAfterChange(before, list, this.selected)
-        : selectionAfterRemoved(before, list, this.removing, this.selected);
-    this.selected = kept ?? listedDatasets(list)[0]?.id;
+        ? selectionAfterChange(before, shown, this.selected)
+        : selectionAfterRemoved(before, shown, this.removing, this.selected);
+    this.selected = kept ?? listedDatasets(shown)[0]?.id;
   };
 
   /**
@@ -928,12 +943,13 @@ export class KarmaniaViewer extends LitElement {
       engine,
       scene: this.store,
       adopt: (list) => {
+        const shown = shownOf(engine, list, this.datasets);
         const before = this.datasets;
-        this.datasets = list;
+        this.datasets = shown;
         this.followContours();
         syncDatasets(this.store, this.datasets);
         this.followContours();
-        this.selected = selectionAfterChange(before, list, this.selected);
+        this.selected = selectionAfterChange(before, shown, this.selected);
       },
       onChange: () => {
         this.layerChanges += 1;
@@ -1595,7 +1611,7 @@ export class KarmaniaViewer extends LitElement {
     } finally {
       this.removing = undefined;
     }
-    this.datasets = engine.datasets();
+    this.datasets = shownOf(engine, engine.datasets(), this.datasets);
     syncDatasets(this.store, this.datasets);
     // What is selected is what it is now, and not what it was when the removal was asked for.
     this.selected = selectionAfterRemoved(before, this.datasets, id, this.selected);
@@ -1613,7 +1629,8 @@ export class KarmaniaViewer extends LitElement {
    * the panel shows the Data tab, open, whatever it was showing.
    */
   private adopt(summaries: readonly Summary[]): void {
-    this.datasets = this.engine?.datasets() ?? [];
+    this.datasets =
+      this.engine === undefined ? [] : shownOf(this.engine, this.engine.datasets(), this.datasets);
     syncDatasets(this.store, this.datasets);
     this.selected = summaries[0]?.id;
     this.changePanel({ tab: 'data', collapsed: false });
