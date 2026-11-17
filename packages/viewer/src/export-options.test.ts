@@ -66,6 +66,8 @@ describe('words', () => {
   it('says what a layout warns of', () => {
     expect(warningText('map_narrow')).toMatch(/more than half/);
     expect(warningText('no_room_for_map')).toMatch(/no room for the map/);
+    expect(warningText('legend_too_tall')).toMatch(/taller than this picture/);
+    expect(warningText('legend_too_tall')).toMatch(/still export it/);
   });
 
   it('finds the problems of a size against what the card allows, or against 8,192 when the card is not known', () => {

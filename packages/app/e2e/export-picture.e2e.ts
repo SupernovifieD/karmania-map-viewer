@@ -325,6 +325,36 @@ test.describe('the picture put together', () => {
     expect(out.layout.lines[0]?.rect.height).toBe(100);
   });
 
+  test('never leaves a group heading or the name of a layer with classes at the end of a column, at any height of picture, and says when the legend runs past the bottom margin', async ({
+    page,
+  }) => {
+    // A strip, as wide as a picture may be, from the height at which a column holds one line to a height at which the legend fits: 120 is where the owner saw a heading alone.
+    for (const height of [96, 110, 120, 135, 150, 200]) {
+      const out = made(await composePicture(page, { width: 8192, height, legend: true }));
+      const columns = out.layout.columns;
+      for (const [index, column] of columns.entries()) {
+        const lines = out.layout.lines.filter(
+          (l) => l.rect.x >= column.x && l.rect.x < column.x + column.width,
+        );
+        const last = lines.at(-1);
+        expect(
+          last?.kind === 'group',
+          `the picture is ${String(height)} high: column ${String(index)} ends with the heading ${last?.text ?? ''}`,
+        ).toBe(false);
+      }
+      const beyond = columns.some((c) => c.y + c.height > height - 24);
+      expect(out.layout.warnings.includes('legend_too_tall'), `${String(height)} high`).toBe(
+        beyond,
+      );
+    }
+    // The strip of 120 has the heading with its layer and first class in a column of its own, 88 high, which is more than the 72 between the margins.
+    const strip = made(await composePicture(page, { width: 8192, height: 120, legend: true }));
+    const first = strip.layout.lines.filter((l) => l.rect.x === strip.layout.columns[0]?.x);
+    expect(first.map((l) => l.kind)).toEqual(['group', 'layer', 'class']);
+    expect(strip.layout.columns[0]?.height).toBe(88);
+    expect(strip.layout.warnings).toContain('legend_too_tall');
+  });
+
   test('says there is no room for the map, and draws nothing, when the legend takes the width', async ({
     page,
   }) => {

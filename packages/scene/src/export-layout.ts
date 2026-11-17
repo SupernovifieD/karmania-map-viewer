@@ -46,7 +46,7 @@ export interface LegendColumn {
 }
 
 /** What the export dialog tells the person before it exports. */
-export type ExportWarning = 'map_narrow' | 'no_room_for_map';
+export type ExportWarning = 'map_narrow' | 'no_room_for_map' | 'legend_too_tall';
 
 /** The layout of the picture. */
 export interface ExportLayout {
@@ -64,8 +64,9 @@ export interface ExportLayout {
   /** The one rectangle that all the columns are in, or `null` if there are none. */
   readonly legend: Rect | null;
   /**
-   * `map_narrow` when the map is less than half of the picture wide (section 10.6: the dialog warns), and
-   * `no_room_for_map` when the legend leaves no width for a map at all.
+   * `map_narrow` when the map is less than half of the picture wide (section 10.6: the dialog warns),
+   * `no_room_for_map` when the legend leaves no width for a map at all, and `legend_too_tall` when a column of the legend is taller than the space
+   * between the margins (the picture is too short for it: that column runs past the bottom margin, and past the edge of the picture if it is much taller).
    */
   readonly warnings: readonly ExportWarning[];
 }
@@ -90,13 +91,13 @@ function keepsWithNext(line: ExportLine): boolean {
 
 /**
  * The lines in columns of at most `height` pixels: top to bottom, then the next column. **A line that is a heading
- * (a group, or a layer that has lines of classes under it) is never the last of a column**, with two exceptions: it
- * is alone in its column, where nothing can be done, or it, what goes with it and the line that is waiting are together
- * taller than a column, where moving them would only make the next column too tall. The brief asks for this of group
- * headings, and the same is done for layers with classes, whose name would otherwise be left at the bottom with its
- * classes at the top of the next column (where both rules apply and only one can be kept, the one for group headings
- * is kept: a layer's name is left at the end of its column before a group's heading is). A line that is taller than a
- * column has a column of its own.
+ * (a group, or a layer that has lines of classes under it) is never the last of a column**: the heading, and the headings
+ * under it, go on to the next column with the line that does not fit. The brief asks this of group headings, and the same is
+ * done for layers with classes, whose name would otherwise be left at the bottom with its classes at the top of the next column.
+ * When keeping the rule makes a column taller than `height` (the lines that go together are taller than a column, or they
+ * are all that the column has, so that moving them would move the column itself) the column is taller: it runs past the
+ * bottom margin, and the layout says so (`legend_too_tall`) so that the person is told before the picture is made. A line that
+ * is taller than a column has a column of its own, which is taller too.
  */
 function inColumns(
   lines: readonly { line: ExportLine; size: Size }[],
@@ -107,27 +108,18 @@ function inColumns(
   let used = 0;
   for (const item of lines) {
     if (column.length > 0 && used + item.size.height > height) {
-      // The lines at the end that go with the line that is next move with it, one after the other (a group heading
-      // and then the name of the layer under it), but never all of the column.
-      const moved: { line: ExportLine; size: Size }[] = [];
-      for (
-        let last = column.at(-1);
-        column.length > 1 && last !== undefined && keepsWithNext(last.line);
-        last = column.at(-1)
-      ) {
-        const taken = column.pop();
-        if (taken !== undefined) {
-          moved.unshift(taken);
-        }
+      // Where the lines at the end that go with the line that is waiting begin (a group heading and then the name of the layer under it).
+      let from = column.length;
+      while (from > 0 && keepsWithNext(column[from - 1]?.line ?? item.line)) {
+        from -= 1;
       }
-      // They go only if they fit in the next column together with the line that is waiting: a heading that would make
-      // that column taller than the space between the margins stays where it is, which is the one thing the rule gives way to.
-      const together =
-        moved.reduce((sum, placed) => sum + placed.size.height, 0) + item.size.height;
-      if (together > height) {
-        column.push(...moved);
-        moved.length = 0;
+      if (from === 0) {
+        // They are all of the column: moving them would only move the column, so the line that is waiting joins them, and the column is taller than the space.
+        column.push(item);
+        used += item.size.height;
+        continue;
       }
+      const moved = column.splice(from);
       columns.push(column);
       column = moved;
       used = column.reduce((sum, placed) => sum + placed.size.height, 0);
@@ -222,6 +214,9 @@ export function exportLayout(input: ExportLayoutInput): ExportLayout {
     warnings.push('no_room_for_map');
   } else if (mapWidth < size.width / 2) {
     warnings.push('map_narrow');
+  }
+  if (columns.some((column) => column.rect.height > height)) {
+    warnings.push('legend_too_tall');
   }
   return {
     size,
