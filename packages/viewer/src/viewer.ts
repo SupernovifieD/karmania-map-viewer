@@ -53,6 +53,7 @@ import type {
 } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { CrsNames } from './crs-names.js';
 import { browserEnv, composeExport, planOnly } from './export-compose.js';
 import type {
@@ -315,6 +316,21 @@ export class KarmaniaViewer extends LitElement {
   /** Calls `listener` after each change of the scene, with the document that came of it and the one it replaced; gives the way to stop. */
   subscribeToScene(listener: SceneListener): () => void {
     return this.store.subscribe(listener);
+  }
+
+  /** What is listening for the datasets that the viewer shows to change. */
+  private readonly datasetsListeners = new Set<(datasets: readonly Summary[]) => void>();
+
+  /**
+   * Calls `listener` with the datasets the viewer shows (what its engine holds, in the order they were loaded) each time they change: one is loaded or
+   * removed, by this viewer or by another that has the same engine, or the contour lines of one are made again. Changes that come together are one
+   * call. Gives the function that stops it, which may be called more than once.
+   */
+  subscribeToDatasets(listener: (datasets: readonly Summary[]) => void): () => void {
+    this.datasetsListeners.add(listener);
+    return () => {
+      this.datasetsListeners.delete(listener);
+    };
   }
 
   /**
@@ -1179,7 +1195,18 @@ export class KarmaniaViewer extends LitElement {
   }
 
   /** Says to those who watch whether there is something to export now, after each update (the layers being drawn or not changes it, and it changes the viewer's render). */
-  protected override updated(): void {
+  protected override updated(changed: PropertyValues): void {
+    // The datasets that were shown are not the ones that are (the first draw, which has no datasets before it, is not a change).
+    const before = changed.get('datasets') as readonly Summary[] | undefined;
+    if (
+      before !== undefined &&
+      (before.length !== this.datasets.length ||
+        before.some((dataset, at) => dataset !== this.datasets[at]))
+    ) {
+      for (const listener of [...this.datasetsListeners]) {
+        listener(this.datasets);
+      }
+    }
     const now = this.exportable();
     if (now !== this.exportableNow) {
       this.exportableNow = now;
