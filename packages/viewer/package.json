@@ -9,6 +9,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
