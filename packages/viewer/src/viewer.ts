@@ -915,15 +915,39 @@ export class KarmaniaViewer extends LitElement {
         if (this.identified === found) {
           found.page = page;
           this.refreshIdentify();
+          this.moveToPopover(found);
         }
       },
       () => {
         if (this.identified === found) {
           found.page = gone;
           this.refreshIdentify();
+          this.moveToPopover(found);
         }
       },
     );
+  }
+
+  /**
+   * The keyboard goes to the popover when it says what the click found (its name and what it says are then read out by a screen reader, as a dialog's are), but only if it is
+   * still where the click put it, on the map: a person who has moved on to something else is not taken from it. It is done once for a click, and not at each change of
+   * what the popover says (a pan of the map moves it, and must not take the keyboard).
+   */
+  private moveToPopover(found: object): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null) {
+      return;
+    }
+    void area.updateComplete.then(async () => {
+      const popover = area.renderRoot.querySelector('karmania-identify');
+      if (popover === null) {
+        return;
+      }
+      await popover.updateComplete;
+      if (this.identified === found && area.shadowRoot?.activeElement === area.focusTarget) {
+        popover.takeFocus();
+      }
+    });
   }
 
   /** Gives the map area what the popover says now, or nothing when what was identified is not the selection any more (or its layer or dataset is gone). */
@@ -943,6 +967,10 @@ export class KarmaniaViewer extends LitElement {
       layer === undefined ? undefined : this.datasets.find((each) => each.id === layer.datasetId);
     if (!same || summary === undefined) {
       this.identified = undefined;
+      // A popover that has the keyboard is not taken away from under it: the map has it again (its own keys), as when the popover is closed.
+      if (area.renderRoot.querySelector('karmania-identify')?.matches(':focus-within') === true) {
+        area.focusTarget?.focus();
+      }
       area.identify = undefined;
       return;
     }
