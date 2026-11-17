@@ -175,3 +175,48 @@ test('is in the font and the colours of the app on a page that has only its styl
     await site.close();
   }
 });
+
+test('rejects an export that cannot be made with the ExportError that the module exports, so that a page can tell it from another', async ({
+  page,
+}) => {
+  const site = await serveSite({
+    pages: libraryPages('/lib/'),
+    folders: { '/lib/': library.folder },
+  });
+  try {
+    await page.goto(`${site.origin}/`);
+    await page.waitForFunction(() => 'library' in window);
+    const outcome = await page.evaluate(async () => {
+      const place = document.querySelector<HTMLElement>('#first');
+      if (place === null) {
+        throw new Error('The page has no place for a viewer.');
+      }
+      const viewer = window.library.createViewer(place, {});
+      await viewer.load(
+        window.library.points({
+          name: 'p',
+          x: [1, 2],
+          y: [2, 1],
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+      for (let tries = 0; tries < 100 && !viewer.exportable(); tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      try {
+        // A side that no card draws.
+        await viewer.exportPng({ widthPx: 100_000, heightPx: 100, dpi: 96, legend: false });
+        return { made: true, instance: false, code: '' };
+      } catch (error) {
+        return {
+          made: false,
+          instance: error instanceof window.library.ExportError,
+          code: error instanceof window.library.ExportError ? error.code : '',
+        };
+      }
+    });
+    expect(outcome).toEqual({ made: false, instance: true, code: 'too_large' });
+  } finally {
+    await site.close();
+  }
+});

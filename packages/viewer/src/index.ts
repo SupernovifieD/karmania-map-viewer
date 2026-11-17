@@ -7,6 +7,14 @@
 export { createViewer } from './create-viewer.js';
 export type { ExportPngOptions, ExportPngRun } from './export-compose.js';
 export type { Viewer, ViewerEvent, ViewerEvents, ViewerOptions } from './create-viewer.js';
+
+// What `exportPng` rejects with, for a page that tells one from another: `ExportError` (its `code` is an `ExportErrorCode`), `ComposeError`, `ExportFontError` and `PngError`. The
+// first is taken from its own module, which has nothing of three.js in it, so that the declarations of this package do not need the types of three.js.
+export { ComposeError } from './export-compose.js';
+export { ExportFontError } from './export-fonts.js';
+export { PngError } from './png-encode.js';
+export { ExportError } from '@karmania/render/export-error';
+export type { ExportErrorCode } from '@karmania/render/export-error';
 export { KarmaniaViewer } from './viewer.js';
 
 // The engine, and what loads a dataset into it.

@@ -12,9 +12,13 @@ test.describe('a page that embeds the viewer', () => {
     await page.goto('/embed.html');
     const names = await page.evaluate(() => Object.keys(window.embed).sort());
     expect(names).toEqual([
+      'ComposeError',
       'EngineDisposedError',
       'EngineError',
+      'ExportError',
+      'ExportFontError',
       'KarmaniaViewer',
+      'PngError',
       'blocks',
       'createEngine',
       'createViewer',
