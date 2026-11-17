@@ -55,9 +55,9 @@ export interface ExportLayout {
   readonly scale: number;
   /** The frame of the map, border included. */
   readonly map: Rect;
-  /** Inside the map, at the top right. */
-  readonly northArrow: Rect;
-  /** Inside the map, at the bottom left; `null` if there is none. */
+  /** Inside the map, at the top right; `null` if the map is too small to hold it (with its inset all round). */
+  readonly northArrow: Rect | null;
+  /** Inside the map, at the bottom left; `null` if there is none, if the map is too small to hold it, or if it would be over the north arrow. */
   readonly scaleBar: Rect | null;
   /** The columns of the legend, left to right; none if there is nothing to list. */
   readonly columns: readonly LegendColumn[];
@@ -145,7 +145,7 @@ function inColumns(
  * The layout of the picture: a margin of 24 all round, the map on the left with its north arrow (40) at the top right and
  * its scale bar at the bottom left (both 16 in), and to the right of it, 24 away and from the same top, the
  * legend in columns of the width of the widest line (not less than 200 nor more than 320) 16 apart, which take the
- * height between the margins. The map has the width that is left. All the lengths are in pixels of a screen and
+ * height between the margins. The map has the width that is left, and the furniture that does not fit in it (with its 16 all round) is left out. All the lengths are in pixels of a screen and
  * are multiplied by `dpi / 96`, rounded to whole pixels; the sizes that `measure` gives are rounded up.
  *
  * @throws RangeError if the picture or the dpi is not a number above 0: the export dialog limits both, so it is a mistake.
@@ -189,6 +189,34 @@ export function exportLayout(input: ExportLayoutInput): ExportLayout {
   const arrow = px(NORTH_ARROW_SIZE);
   const inset = px(FURNITURE_INSET);
   const bar = input.scaleBar;
+  /** Whether a rectangle is inside the map with the inset left all round it: furniture that does not fit is left out, and never spills over the map's line or into the legend. */
+  const inside = (r: Rect): boolean =>
+    r.x >= map.x + inset &&
+    r.y >= map.y + inset &&
+    r.x + r.width <= map.x + map.width - inset &&
+    r.y + r.height <= map.y + map.height - inset;
+  const arrowRect: Rect = {
+    x: map.x + map.width - inset - arrow,
+    y: map.y + inset,
+    width: arrow,
+    height: arrow,
+  };
+  const northArrow = inside(arrowRect) ? arrowRect : null;
+  const barRect: Rect | null =
+    bar === null
+      ? null
+      : {
+          x: map.x + inset,
+          y: map.y + map.height - inset - Math.ceil(bar.height),
+          width: Math.ceil(bar.width),
+          height: Math.ceil(bar.height),
+        };
+  const overlaps = (a: Rect, b: Rect): boolean =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const scaleBarRect =
+    barRect !== null && inside(barRect) && !(northArrow !== null && overlaps(barRect, northArrow))
+      ? barRect
+      : null;
   const warnings: ExportWarning[] = [];
   if (mapWidth <= 0) {
     warnings.push('no_room_for_map');
@@ -199,21 +227,8 @@ export function exportLayout(input: ExportLayoutInput): ExportLayout {
     size,
     scale,
     map,
-    northArrow: {
-      x: map.x + map.width - inset - arrow,
-      y: map.y + inset,
-      width: arrow,
-      height: arrow,
-    },
-    scaleBar:
-      bar === null
-        ? null
-        : {
-            x: map.x + inset,
-            y: map.y + map.height - inset - Math.ceil(bar.height),
-            width: Math.ceil(bar.width),
-            height: Math.ceil(bar.height),
-          },
+    northArrow,
+    scaleBar: scaleBarRect,
     columns,
     legend:
       columns.length === 0

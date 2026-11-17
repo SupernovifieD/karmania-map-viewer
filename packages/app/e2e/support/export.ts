@@ -262,7 +262,7 @@ export type PictureOutcome =
       readonly height: number;
       readonly layout: {
         readonly map: Box;
-        readonly northArrow: Box;
+        readonly northArrow: Box | null;
         readonly scaleBar: Box | null;
         readonly legend: Box | null;
         readonly columns: readonly Box[];
@@ -313,7 +313,7 @@ export function composePicture(page: Page, request: PictureRequest): Promise<Pic
       | { kind: 'class'; entry: { label: string } };
     type PictureOutcomeLayout = {
       map: Box;
-      northArrow: Box;
+      northArrow: Box | null;
       scaleBar: Box | null;
       legend: Box | null;
       columns: { rect: Box; lines: { line: Line; rect: Box }[] }[];

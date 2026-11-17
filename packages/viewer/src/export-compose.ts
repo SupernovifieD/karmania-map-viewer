@@ -68,26 +68,31 @@ export interface MapRequest {
   readonly onProgress?: (done: number) => void;
 }
 
-/** What a picture is put together from. */
-export interface ComposeInput {
+/** What the layout of a picture is worked out from (see `planExport`): everything but the drawing of the map. */
+export interface PlanInput {
   /** The size of the picture, in pixels. */
   readonly size: Size;
   readonly dpi: number;
   /** The legend model, or `null` for a picture with no legend (the map takes all the width). */
   readonly legend: LegendModel | null;
-  /** The view and the two cameras of the scene, and the heading of the view that is shown (what the north arrow turns by). */
+  /** The view and the two cameras of the scene. */
   readonly viewMode: ViewMode;
   readonly camera2d: Camera2d;
   readonly camera3d: Camera3d;
-  readonly heading: number;
   /** The units of the map's coordinate system, for the scale bar (see `scaleBar`). */
   readonly units: Parameters<typeof scaleBar>[0]['units'];
   /** The size of the map on screen, in CSS pixels: the picture shows at least what is visible there. */
   readonly screen: Size;
   readonly fonts: FontSet;
+  readonly signal?: AbortSignal;
+}
+
+/** What a picture is put together from. */
+export interface ComposeInput extends PlanInput {
+  /** The heading of the view that is shown (what the north arrow turns by). */
+  readonly heading: number;
   /** Draws the map for a picture: the renderer's `renderExport`, with the colours of the light theme. */
   readonly renderMap: (request: MapRequest) => Promise<void>;
-  readonly signal?: AbortSignal;
   /** How far the whole picture is, from 0 to 1 (counted in steps, never in time). */
   readonly onProgress?: (done: number) => void;
 }
@@ -168,7 +173,7 @@ export interface ExportPlan {
  *
  * @throws ComposeError `no_room_for_map` if the legend leaves no room for the map; RangeError for a size or dpi that is not a number above 0 (`exportLayout`).
  */
-export function planExport(ctx: Canvas2d, input: ComposeInput): ExportPlan {
+export function planExport(ctx: Canvas2d, input: PlanInput): ExportPlan {
   const { size, dpi } = input;
   const scale = dpi / 96;
   const lines = input.legend === null ? [] : exportLegendLines(input.legend);
@@ -206,7 +211,7 @@ export function planExport(ctx: Canvas2d, input: ComposeInput): ExportPlan {
  * The plan of a picture for a page that has not made it yet (the export dialog, which warns before it exports): the fonts are loaded, and then `planExport` is made on a context
  * that is only measured with. Rejects as `composeExport` does for the fonts and for no room for the map.
  */
-export async function planOnly(measure: Canvas2d, input: ComposeInput): Promise<ExportPlan> {
+export async function planOnly(measure: Canvas2d, input: PlanInput): Promise<ExportPlan> {
   input.signal?.throwIfAborted();
   await loadExportFonts(input.fonts, input.dpi / 96);
   input.signal?.throwIfAborted();
@@ -261,7 +266,9 @@ export async function composeExport<C>(
   signal?.throwIfAborted();
 
   // The furniture is over the map, and the legend beside it.
-  drawNorthArrow(ctx, layout.northArrow, northArrow(input.heading).angle, scale);
+  if (layout.northArrow !== null) {
+    drawNorthArrow(ctx, layout.northArrow, northArrow(input.heading).angle, scale);
+  }
   if (layout.scaleBar !== null && bar.kind === 'bar') {
     drawScaleBar(ctx, layout.scaleBar, bar, scale);
   }
