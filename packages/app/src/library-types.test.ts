@@ -194,6 +194,29 @@ describe('the declarations of the library build of the viewer', () => {
   it('let a page that has only them use the whole of the API, and refuse what is not in it', () => {
     expect(diagnostics(pageProgram([join(out, 'consumer', 'embed.ts')]))).toEqual([]);
   });
+
+  it('are what the examples of docs/embedding.md are written against: each is a page that compiles', () => {
+    const guide = readFileSync(
+      fileURLToPath(new URL('../../../docs/embedding.md', import.meta.url)),
+      'utf8',
+    );
+    // The TypeScript examples, each of them whole (a page's own file), as the guide has them in fenced blocks.
+    const examples = [...guide.matchAll(/^```ts\n([\s\S]*?)^```$/gm)].map(
+      (match) => match[1] ?? '',
+    );
+    expect(examples.length, 'the guide has no TypeScript example').toBeGreaterThanOrEqual(6);
+    mkdirSync(join(out, 'guide'));
+    const files = examples.map((example, index) => {
+      const file = join(out, 'guide', `example-${String(index + 1)}.ts`);
+      // The guide imports the module from where it says a page keeps it; here it is next to the declarations.
+      const code = example
+        .replaceAll("'/vendor/karmania/karmania-viewer.js'", "'../karmania-viewer.js'")
+        .replaceAll("'./karmania-viewer.js'", "'../karmania-viewer.js'");
+      writeFileSync(file, `${code}\nexport {};\n`);
+      return file;
+    });
+    expect(diagnostics(pageProgram(files))).toEqual([]);
+  });
 });
 
 describe('what the package publishes', () => {
