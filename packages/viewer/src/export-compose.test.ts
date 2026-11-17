@@ -2,7 +2,7 @@ import { EXPORT_COLOURS, LEGEND_ROW } from '@karmania/scene';
 import type { LegendModel } from '@karmania/scene';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recording } from './canvas-recording.js';
-import { ComposeError, composeExport } from './export-compose.js';
+import { ComposeError, composeExport, planExport, planOnly } from './export-compose.js';
 import type { ComposeEnv, ComposeInput, MapRequest } from './export-compose.js';
 import { ExportFontError } from './export-fonts.js';
 
@@ -314,5 +314,53 @@ describe('composeExport', () => {
     expect((ys[1] ?? 0) - (ys[0] ?? 0)).toBe(
       LEGEND_ROW.layer / 2 + LEGEND_ROW.class + LEGEND_ROW.layer / 2,
     );
+  });
+});
+
+describe('planExport and planOnly', () => {
+  it('give the layout and the map’s rectangle of the picture without drawing anything: only the fonts are set, to measure with', async () => {
+    const { ctx, log } = recording();
+    const plan = await planOnly(ctx, input());
+    expect(plan.layout.map).toEqual({ x: 24, y: 24, width: 728, height: 552 });
+    expect(plan.inner).toEqual({ x: 25, y: 25, width: 726, height: 550 });
+    expect(plan.scale).toBe(1);
+    expect(plan.border).toBe(1);
+    expect(plan.bar).toMatchObject({ kind: 'bar' });
+    expect(log.every((line) => line.startsWith('font = '))).toBe(true);
+  });
+
+  it('say that the map is narrow when the legend takes more than half of the width, and still give the plan', async () => {
+    const { ctx } = recording();
+    const wide = {
+      ...MODEL,
+      entries: [{ ...MODEL.entries[0], name: 'N'.repeat(60) }],
+    } as LegendModel;
+    const plan = await planOnly(ctx, input({ legend: wide, size: { width: 560, height: 600 } }));
+    expect(plan.layout.warnings).toEqual(['map_narrow']);
+    expect(plan.layout.map.width).toBeLessThan(280);
+  });
+
+  it('throw ComposeError when there is no room for the map, as composeExport does', () => {
+    const { ctx } = recording();
+    expect(() => planExport(ctx, input({ size: { width: 240, height: 600 } }))).toThrow(
+      ComposeError,
+    );
+  });
+
+  it('load the fonts first and reject when they are not there, and stop when aborted', async () => {
+    const { ctx } = recording();
+    await expect(
+      planOnly(ctx, input({ fonts: { load: () => Promise.resolve([]), check: () => false } })),
+    ).rejects.toBeInstanceOf(ExportFontError);
+    await expect(planOnly(ctx, input({ signal: AbortSignal.abort() }))).rejects.toBeDefined();
+  });
+
+  it('are what composeExport draws: the same layout for the same input', async () => {
+    const { ctx } = recording();
+    const plan = await planOnly(ctx, input());
+    const { env } = environment();
+    const composed = await composeExport(env, input());
+    expect(composed.layout).toEqual(plan.layout);
+    expect(composed.map).toEqual(plan.inner);
   });
 });
