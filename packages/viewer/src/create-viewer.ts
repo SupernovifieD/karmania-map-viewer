@@ -91,7 +91,7 @@ export interface Viewer {
   /**
    * The map as a PNG file: `widthPx` by `heightPx` pixels at `dpi` (written into the file, and the scale the map's points, lines and furniture are drawn at), with the legend to
    * the right of the map if `legend`, the north arrow, and the scale bar in 2D, always in the light theme. It shows at least what is visible on screen, with the same centre,
-   * heading and view. The same scene and options give the same bytes twice in a row, in one browser. `onProgress` says how far it is, from 0 to 1.
+   * heading and view. The same scene and options give the same bytes twice in a row, in one browser. `onProgress` says how far it is, from 0 to 1. Asked for in the frame in which the map is first drawn, when the browser has not told it its size yet, it waits for the size (two seconds at the most; `not_ready` if the map has none).
    *
    * It rejects with an `Error` named `ExportError` (its `code` says why: `busy`, `interrupted` when the map was changed meanwhile, `context_lost`, `too_large`, `point_size`,
    * `out_of_memory`, `not_ready`), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
@@ -102,7 +102,7 @@ export interface Viewer {
    * the map has no coordinate system to change yet.
    */
   openMapCrs(): void;
-  /** Opens the export dialog (size, resolution, legend, file name and a preview, and Export). Nothing happens while there is nothing drawn to export (`exportable`). */
+  /** Opens the export dialog (size, resolution, legend, file name and a preview, and Export). Nothing happens while there is nothing drawn to export (`exportable`). In the frame in which the map is first drawn it opens a moment later, when the map has a size. */
   openExport(): void;
   /** Whether there is something drawn to export: at least one layer is shown on the map and has been drawn. The Export button is disabled while it is not. */
   exportable(): boolean;
@@ -123,8 +123,8 @@ export interface Viewer {
    */
   openImport(files?: readonly File[]): void;
   /**
-   * Takes the viewer out of the page and frees what it holds: the engine and its worker, and the listeners on the
-   * window. Calling it again does nothing; nothing else may be called after it.
+   * Takes the viewer out of the page and frees what it holds: its engine and the engine's worker (not an engine that the page gave it), its WebGL context, and what it listens
+   * to, observes and asks the browser for. Calling it again does nothing; nothing else may be called after it.
    */
   dispose(): void;
 }
