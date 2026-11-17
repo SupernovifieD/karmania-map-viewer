@@ -3,6 +3,8 @@ import type {
   CrsInfo,
   DatasetInput,
   Engine,
+  ImportMapping,
+  ImportOptions,
   LoadOptions,
   LoadResult,
   Page,
@@ -242,6 +244,19 @@ export class KarmaniaViewer extends LitElement {
     if (this.isConnected) {
       this.follow(engine);
     }
+  }
+
+  /**
+   * The engine of the viewer: the one the page gave, or the viewer's own, made now if it has none (it is started when it is first asked for, not
+   * when the viewer is made, so a viewer that nothing is loaded into has no worker).
+   *
+   * @throws Error if the viewer is not in a page: the engine belongs to the time it is in one.
+   */
+  getEngine(): Engine {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before asking for its engine.');
+    }
+    return this.acquireEngine();
   }
 
   /** The engine of the viewer: made now, as the viewer's own, if it has none. */
@@ -1248,7 +1263,7 @@ export class KarmaniaViewer extends LitElement {
     if (files === undefined || files.length === 0) {
       this.chooseFiles();
     } else {
-      this.importFiles(files);
+      this.openWizard(files);
     }
   }
 
@@ -1257,18 +1272,18 @@ export class KarmaniaViewer extends LitElement {
     const input = event.target as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = '';
-    this.importFiles(files);
+    this.openWizard(files);
   };
 
   private readonly onFilesDropped = (event: CustomEvent<DroppedFiles>): void => {
-    this.importFiles(event.detail.files);
+    this.openWizard(event.detail.files);
   };
 
   /**
    * Opens the import wizard on `files`, if there are any and the viewer is in a page. The engine belongs to the time it is in one (see `load`), and
    * the wizard of a viewer that was taken out is still in its shadow root, so one made here would never be let go.
    */
-  private importFiles(files: readonly File[]): void {
+  private openWizard(files: readonly File[]): void {
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
     if (this.isConnected && files.length > 0 && wizard) {
       wizard.engine = this.acquireEngine();
@@ -1463,6 +1478,37 @@ export class KarmaniaViewer extends LitElement {
       this.adopt(result.summaries);
     }
     return result;
+  }
+
+  /**
+   * Imports a file with a mapping, as the wizard does but without it: the dataset is listed in the Data tab, selected, and drawn. `files` is one data
+   * file and its sidecars (a `.prj`). Resolves with what the engine says: `loaded` with the summaries, or `blocked` with the findings, and then nothing
+   * is added. Rejects when the viewer is not in a page (as `load` does), and for misuse of the engine (two data files). Needs no import UI: it works
+   * for a viewer made with `importUi: false`.
+   */
+  async importFiles(
+    files: readonly File[],
+    mapping: ImportMapping,
+    options?: ImportOptions,
+  ): Promise<LoadResult> {
+    if (!this.isConnected) {
+      throw new Error('The viewer is not in a page: put it in one before importing files.');
+    }
+    const result = await this.acquireEngine().importFiles(files, mapping, options);
+    if (result.status === 'loaded') {
+      this.adopt(result.summaries);
+    }
+    return result;
+  }
+
+  /**
+   * Opens the dialog for the map's coordinate system, with nothing chosen. Nothing happens while nothing is loaded: the map has no coordinate system
+   * to change yet (and the chip that opens the dialog is not there either).
+   */
+  openMapCrs(): void {
+    if (this.datasets.length > 0) {
+      this.onMapCrsRequest();
+    }
   }
 
   /** Gives the panel the width that was asked for, as far as the window allows. */
