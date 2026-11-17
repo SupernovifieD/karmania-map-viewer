@@ -171,6 +171,8 @@ describe('the export of the map', () => {
       'compile b',
       'unbind',
       'screen',
+      // A turn of the page, in which it looks whether the programs are made and whether it has to stop (see untilMade); they are made already here.
+      'yield',
       // The clear is a slice; and then each layer, with the depth cleared before it in 2D. After each slice the screen is told.
       'prepare',
       'bind',
@@ -343,6 +345,73 @@ describe('the export of the map', () => {
     });
     expect(dispose).toHaveBeenCalledTimes(1);
     expectLeftClean(made);
+  });
+
+  it('says the card took the map away when that happens while the programs are made, and does not wait for a program that the card will never finish', async () => {
+    const dispose = vi.spyOn(WebGLRenderTarget.prototype, 'dispose');
+    const made = fake();
+    // Three waits for a program by asking the card whether it is ready; a card that has lost its context says no for ever, and that wait never ends.
+    made.host.gl.compileAsync = () => new Promise<never>(() => undefined);
+    const yieldTask = made.host.yieldTask.bind(made.host);
+    let turns = 0;
+    made.host.yieldTask = () => {
+      turns += 1;
+      if (turns === 3) {
+        made.state.status = 'lost';
+      }
+      return yieldTask();
+    };
+    await expect(createExporter(made.host)(options())).rejects.toMatchObject({
+      code: 'context_lost',
+    });
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expectLeftClean(made);
+    // And the exporter is free again: the next picture is not refused as busy.
+    made.state.status = 'ok';
+    made.host.gl.compileAsync = (scene) => Promise.resolve(scene);
+    await expect(createExporter(made.host)(options())).resolves.toBeDefined();
+  });
+
+  it('stops with the signal’s reason, at once, when it is aborted while the programs are made', async () => {
+    const controller = new AbortController();
+    const made = fake();
+    made.host.gl.compileAsync = () => new Promise<never>(() => undefined);
+    const yieldTask = made.host.yieldTask.bind(made.host);
+    let turns = 0;
+    made.host.yieldTask = () => {
+      turns += 1;
+      if (turns === 2) {
+        controller.abort(new DOMException('Stopped', 'AbortError'));
+      }
+      return yieldTask();
+    };
+    await expect(
+      createExporter(made.host)(options({ signal: controller.signal })),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(made.log.some((line) => line.startsWith('render'))).toBe(false);
+  });
+
+  it('draws once the programs are made, however many turns they take, and not before', async () => {
+    const made = fake();
+    // A turn of the page that is a task of its own, as the renderer's is (a turn that is only a promise would leave the timer below no chance).
+    made.host.yieldTask = () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    let programsMade = false;
+    made.host.gl.compileAsync = (scene) =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          programsMade = true;
+          resolve(scene);
+        }, 30);
+      });
+    const render = made.host.gl.render.bind(made.host.gl);
+    made.host.gl.render = (scene, camera) => {
+      expect(programsMade, 'drawn before the programs were made').toBe(true);
+      render(scene, camera);
+    };
+    await expect(createExporter(made.host)(options())).resolves.toBeDefined();
   });
 
   it('says so when the map was taken out of the page, before it touches the card', async () => {

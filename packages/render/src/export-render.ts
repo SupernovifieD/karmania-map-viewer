@@ -215,6 +215,28 @@ export async function settleUntilReady(
   throw new ExportError('not_ready', 'The map is still being put on the graphics card.');
 }
 
+/**
+ * Waits until the programs are made, and stops (by what `stop` throws) as soon as the export cannot go on. Three's own wait asks the card, every 10 ms, whether each program is
+ * ready, and a card that has lost its context says no for ever: waiting for it alone would leave the export, and its guard against a second one, hanging after the map was taken away.
+ * The check costs a turn of the page and nothing else, and it is not a time limit: a program that the card is still making is waited for as long as it takes.
+ */
+export async function untilMade(
+  compiling: readonly Promise<unknown>[],
+  host: { yieldTask(): Promise<void> },
+  stop: () => void,
+): Promise<void> {
+  let made = false;
+  // (Read through a function: the promise sets it during an await, which the checker's narrowing cannot see.)
+  const isMade = (): boolean => made;
+  const all = Promise.allSettled(compiling).then(() => {
+    made = true;
+  });
+  while (!isMade()) {
+    stop();
+    await Promise.race([all, host.yieldTask()]);
+  }
+}
+
 /** What the card says of its limits, as `getParameter` gives them: the numbers of each, which may be missing or not numbers. */
 export interface CardParameters {
   readonly renderbuffer: unknown;
@@ -389,7 +411,9 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
     }
     host.restoreScreen();
     // (A program that cannot be made is the card's to say, in the drawing; it does not stop the picture here.)
-    await Promise.allSettled(compiling);
+    await untilMade(compiling, host, () => {
+      guard(false);
+    });
     guard(true);
     onProgress?.(DONE_COMPILING);
 
