@@ -17,6 +17,7 @@ import type {
   Camera2d,
   Camera3d,
   ExportLayout,
+  ExportLine,
   LegendModel,
   ScaleBarModel,
   Size,
@@ -138,32 +139,42 @@ export interface Composed<C> {
 const DONE_FONTS = 0.02;
 const DONE_MAP = 0.95;
 
-/**
- * Puts the picture together. The scale is `dpi / 96`. The layout is made twice: the map's rectangle does not depend on the scale bar, but the scale bar depends on the map (the
- * units to a pixel are those of the camera that shows it, which are worked out for the map's rectangle), so the first layout gives the map and the second gives
- * the scale bar its place.
- *
- * @throws ComposeError `no_room_for_map` if the legend leaves no room for the map; `ExportFontError` if the font is not there; whatever `renderMap` rejects with
- * (an `ExportError`, an abort); the signal's reason if it is aborted. A size or dpi that is not a number above 0 is a RangeError (`exportLayout`).
- */
-export async function composeExport<C>(
-  env: ComposeEnv<C>,
-  input: ComposeInput,
-): Promise<Composed<C>> {
-  const { size, dpi, signal, onProgress } = input;
-  const scale = dpi / 96;
-  const at = atScale(scale);
-  signal?.throwIfAborted();
-  await loadExportFonts(input.fonts, scale);
-  signal?.throwIfAborted();
-  onProgress?.(DONE_FONTS);
+/** What is worked out before anything is drawn: where everything goes, and what the map is asked for. */
+export interface ExportPlan {
+  /** `dpi / 96`. */
+  readonly scale: number;
+  readonly layout: ExportLayout;
+  /** The map's own rectangle, inside its line, in pixels of the picture. */
+  readonly inner: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  /** The cameras of the picture for the map's rectangle. */
+  readonly camera2d: Camera2d;
+  readonly camera3d: Camera3d;
+  /** The scale bar, or why there is none. */
+  readonly bar: ScaleBarModel;
+  readonly lines: readonly ExportLine[];
+  /** The line round the map, in pixels. */
+  readonly border: number;
+}
 
-  const { canvas, ctx } = env.createCanvas(size.width, size.height);
+/**
+ * Works out the picture: its layout, the map's rectangle and cameras, and the scale bar. `ctx` is only used to measure text, in the fonts of the picture, which are to be loaded
+ * already. The layout is made twice: the map's rectangle does not depend on the scale bar, but the scale bar depends on the map (the units to a pixel are those of the camera
+ * that shows it, which are worked out for the map's rectangle), so the first layout gives the map and the second gives the bar its place.
+ *
+ * @throws ComposeError `no_room_for_map` if the legend leaves no room for the map; RangeError for a size or dpi that is not a number above 0 (`exportLayout`).
+ */
+export function planExport(ctx: Canvas2d, input: ComposeInput): ExportPlan {
+  const { size, dpi } = input;
+  const scale = dpi / 96;
   const lines = input.legend === null ? [] : exportLegendLines(input.legend);
-  const measure = (line: Parameters<typeof measureLegendLine>[1]): Size =>
-    measureLegendLine(ctx, line, scale);
+  const measure = (line: ExportLine): Size => measureLegendLine(ctx, line, scale);
   const first = exportLayout({ size, dpi, lines, measure, scaleBar: null });
-  const border = Math.max(1, at(1));
+  const border = Math.max(1, atScale(scale)(1));
   const inner = {
     x: first.map.x + border,
     y: first.map.y + border,
@@ -173,11 +184,9 @@ export async function composeExport<C>(
   if (inner.width < 1 || inner.height < 1) {
     throw new ComposeError('no_room_for_map', 'The legend leaves no room for the map.');
   }
-
   // The cameras of the picture, for the map's rectangle, and so the units to a pixel that the scale bar is measured in (a pixel of the screen).
-  const screen = input.screen;
-  const camera2d = exportCamera2d(input.camera2d, screen, inner, scale);
-  const camera3d = exportCamera3d(input.camera3d, screen, inner);
+  const camera2d = exportCamera2d(input.camera2d, input.screen, inner, scale);
+  const camera3d = exportCamera3d(input.camera3d, input.screen, inner);
   const bar = scaleBar({
     viewMode: input.viewMode,
     units: input.units,
@@ -190,6 +199,38 @@ export async function composeExport<C>(
     measure,
     scaleBar: bar.kind === 'bar' ? measureScaleBar(ctx, bar, scale) : null,
   });
+  return { scale, layout, inner, camera2d, camera3d, bar, lines, border };
+}
+
+/**
+ * The plan of a picture for a page that has not made it yet (the export dialog, which warns before it exports): the fonts are loaded, and then `planExport` is made on a context
+ * that is only measured with. Rejects as `composeExport` does for the fonts and for no room for the map.
+ */
+export async function planOnly(measure: Canvas2d, input: ComposeInput): Promise<ExportPlan> {
+  input.signal?.throwIfAborted();
+  await loadExportFonts(input.fonts, input.dpi / 96);
+  input.signal?.throwIfAborted();
+  return planExport(measure, input);
+}
+
+/**
+ * Puts the picture together (see `planExport` for how it is laid out). The scale is `dpi / 96`.
+ *
+ * @throws ComposeError `no_room_for_map` if the legend leaves no room for the map; `ExportFontError` if the font is not there; whatever `renderMap` rejects with
+ * (an `ExportError`, an abort); the signal's reason if it is aborted. A size or dpi that is not a number above 0 is a RangeError (`exportLayout`).
+ */
+export async function composeExport<C>(
+  env: ComposeEnv<C>,
+  input: ComposeInput,
+): Promise<Composed<C>> {
+  const { size, signal, onProgress } = input;
+  signal?.throwIfAborted();
+  await loadExportFonts(input.fonts, input.dpi / 96);
+  signal?.throwIfAborted();
+  onProgress?.(DONE_FONTS);
+
+  const { canvas, ctx } = env.createCanvas(size.width, size.height);
+  const { scale, layout, inner, camera2d, camera3d, bar, border } = planExport(ctx, input);
 
   // The page, the line round the map, and the map as its bands come.
   ctx.fillStyle = EXPORT_COLOURS.surface;
