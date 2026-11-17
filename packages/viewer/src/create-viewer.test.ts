@@ -1,3 +1,4 @@
+import type { Engine } from '@karmania/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createViewer } from './create-viewer.js';
 
@@ -6,6 +7,7 @@ function page() {
   const scene = { version: 1 };
   const made: {
     openImport: ReturnType<typeof vi.fn>;
+    useEngine: ReturnType<typeof vi.fn>;
     remove: ReturnType<typeof vi.fn>;
     scene: ReturnType<typeof vi.fn>;
     dispatch: ReturnType<typeof vi.fn>;
@@ -16,10 +18,13 @@ function page() {
     stopped: ReturnType<typeof vi.fn>;
   }[] = [];
   const tags: string[] = [];
+  /** What happened to the elements and the containers, in order. */
+  const steps: string[] = [];
   const createElement = vi.fn((tag: string) => {
     tags.push(tag);
     const element = {
       openImport: vi.fn(),
+      useEngine: vi.fn(() => steps.push('engine given')),
       remove: vi.fn(),
       scene: vi.fn(() => scene),
       dispatch: vi.fn((command: unknown) => ({ command })),
@@ -40,10 +45,15 @@ function page() {
     const children: unknown[] = [];
     return {
       children,
-      element: { append: (child: unknown) => children.push(child) } as unknown as HTMLElement,
+      element: {
+        append: (child: unknown) => {
+          steps.push('put in the container');
+          return children.push(child);
+        },
+      } as unknown as HTMLElement,
     };
   };
-  return { made, tags, scene, container };
+  return { made, tags, steps, scene, container };
 }
 
 afterEach(() => {
@@ -57,6 +67,22 @@ describe('createViewer', () => {
     createViewer(where.element);
     expect(tags).toEqual(['karmania-viewer']);
     expect(where.children).toEqual([made[0]]);
+  });
+
+  it('gives the engine it was given to the viewer before the viewer is put in the container, so that the viewer shows what the engine holds from the start', () => {
+    const { made, steps, container } = page();
+    const engine = { name: 'an engine' } as unknown as Engine;
+    createViewer(container().element, { engine });
+    expect(made[0]?.useEngine.mock.calls).toEqual([[engine]]);
+    expect(steps).toEqual(['engine given', 'put in the container']);
+  });
+
+  it('gives the viewer no engine when it was given none: the viewer makes its own', () => {
+    const { made, container } = page();
+    createViewer(container().element);
+    createViewer(container().element, {});
+    expect(made[0]?.useEngine).not.toHaveBeenCalled();
+    expect(made[1]?.useEngine).not.toHaveBeenCalled();
   });
 
   it('opens the import wizard on the files it is given, or the file picker with none', () => {

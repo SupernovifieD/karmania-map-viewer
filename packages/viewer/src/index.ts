@@ -6,7 +6,7 @@
  */
 export { createViewer } from './create-viewer.js';
 export type { ExportPngOptions, ExportPngRun } from './export-compose.js';
-export type { Viewer, ViewerEvent } from './create-viewer.js';
+export type { Viewer, ViewerEvent, ViewerOptions } from './create-viewer.js';
 export { KarmaniaViewer } from './viewer.js';
 
 // The engine, and what loads a dataset into it.

@@ -176,6 +176,25 @@ describe('the contours of a layer', () => {
     expect(w.pending).toHaveLength(1);
   });
 
+  it('say whether the manager is busy: from the request to the engine until its answer is taken, when it has brought the layers to what the engine holds', async () => {
+    const w = world();
+    expect(w.manager.busy()).toBe(false);
+    w.contours();
+    expect(w.manager.busy()).toBe(true);
+    await w.finish(0);
+    expect(w.manager.busy()).toBe(false);
+    // Made again: busy again while the new lines are made, and idle when they are in.
+    w.contours({ interval: 5 });
+    expect(w.manager.busy()).toBe(true);
+    await w.finish(1);
+    expect(w.manager.busy()).toBe(false);
+    // Stopped by the contours going: nothing is under way.
+    w.contours({ interval: 10 });
+    expect(w.manager.busy()).toBe(true);
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    expect(w.manager.busy()).toBe(false);
+  });
+
   it('are made again when the settings change, and the layer of the lines keeps its place and its style', async () => {
     const w = world();
     w.contours();

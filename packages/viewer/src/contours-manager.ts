@@ -113,6 +113,15 @@ export class ContoursManager {
         };
   }
 
+  /**
+   * Whether the manager is waiting for the engine to make lines. The engine's datasets change while it is (the lines replace the old), and the manager
+   * brings the layers to what the engine holds when it has the answer, after the layer of the lines has taken the new lines, which keeps its style:
+   * layers brought to the engine's datasets before that would take the layer away with the old lines.
+   */
+  busy(): boolean {
+    return this.jobs.size > 0;
+  }
+
   /** Looks at the scene again: call it whenever the scene changes. Nothing is done for a change that needs nothing. */
   update(): void {
     if (this.disposed) {
