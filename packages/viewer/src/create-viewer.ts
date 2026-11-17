@@ -9,13 +9,27 @@ import type {
   ImportOptions,
   LoadOptions,
   LoadResult,
+  Summary,
 } from '@karmania/engine';
-import type { Command, SceneDocument, ViewMode } from '@karmania/scene';
+import type { Command, SceneDocument, SceneSelection, ViewMode } from '@karmania/scene';
 import type { ExportPngOptions, ExportPngRun } from './export-compose.js';
 import './viewer.js';
 
-/** What a page can listen to: the scene (more arrive with the rest of the API). */
-export type ViewerEvent = 'scene';
+/** What a page can listen to, by the name that `on` takes, and what the listener of each is given. */
+export interface ViewerEvents {
+  /** The scene after each change of it (a command, the camera moving, a layer being drawn is not one). */
+  readonly scene: SceneDocument;
+  /**
+   * The datasets that the viewer shows, in the order they were loaded, when they change: one was loaded or removed (by this viewer or by another that
+   * has the same engine), or the contour lines of one were made again.
+   */
+  readonly datasets: readonly Summary[];
+  /** What is selected on the map, which a click on a feature or a row of the Data tab changes: the layer and the element in it, or `null` when nothing is. */
+  readonly selection: SceneSelection | null;
+}
+
+/** The name of something a page can listen to. */
+export type ViewerEvent = keyof ViewerEvents;
 
 /** What a page can ask of the viewer it creates. */
 export interface ViewerOptions {
@@ -95,10 +109,14 @@ export interface Viewer {
   /** Calls `listener` when `exportable()` changes, with the new answer; gives the function that stops that (which may be called more than once). */
   onExportable(listener: (available: boolean) => void): () => void;
   /**
-   * Calls `listener` with the scene after each change of it, and gives the function that stops that (which may be called more than once,
-   * also after the viewer was disposed).
+   * Calls `listener` each time `event` happens, with what `ViewerEvents` says of it: `scene` (the document after each change of it), `datasets` (what
+   * the viewer shows, when it changes) or `selection` (what is selected on the map, when it changes). Nothing is called for what was so before
+   * `on`: read `scene()`, `engine.datasets()` or `scene().selection` for that. Gives the function that stops listening, which may be called
+   * more than once, also after the viewer was disposed; disposing the viewer stops every listener.
+   *
+   * @throws RangeError for an event that is not one of those, which is a mistake of the caller.
    */
-  on(event: ViewerEvent, listener: (scene: SceneDocument) => void): () => void;
+  on<E extends ViewerEvent>(event: E, listener: (payload: ViewerEvents[E]) => void): () => void;
   /**
    * Opens the import wizard on `files`, or the browser's file picker when there are none to give (no list, or an empty one).
    * Throws if the viewer was made with `importUi: false`.
@@ -109,6 +127,13 @@ export interface Viewer {
    * window. Calling it again does nothing; nothing else may be called after it.
    */
   dispose(): void;
+}
+
+/** An event that `on` does not know is a mistake of the page. */
+function refuse(event: string): never {
+  throw new RangeError(
+    `The viewer has no event "${event}": it has "scene", "datasets" and "selection".`,
+  );
 }
 
 /**
@@ -132,6 +157,26 @@ export function createViewer(container: HTMLElement, options: ViewerOptions = {}
     if (disposed) {
       throw new Error('The viewer has been disposed.');
     }
+  };
+  /** How each event is listened to on the element. */
+  const subscribers: {
+    readonly [E in ViewerEvent]: (listener: (payload: ViewerEvents[E]) => void) => () => void;
+  } = {
+    scene: (listener) =>
+      element.subscribeToScene((scene) => {
+        listener(scene);
+      }),
+    datasets: (listener) =>
+      element.subscribeToDatasets((datasets) => {
+        listener(datasets);
+      }),
+    // The selection is a part of the scene, which keeps the object while it is the same: a different one is a change.
+    selection: (listener) =>
+      element.subscribeToScene((scene, previous) => {
+        if (scene.selection !== previous.selection) {
+          listener(scene.selection);
+        }
+      }),
   };
   return {
     get engine() {
@@ -189,11 +234,11 @@ export function createViewer(container: HTMLElement, options: ViewerOptions = {}
       listening.add(stop);
       return stop;
     },
-    on(_event, listener) {
+    on(event, listener) {
       alive();
-      const unsubscribe = element.subscribeToScene((scene) => {
-        listener(scene);
-      });
+      const unsubscribe = Object.hasOwn(subscribers, event)
+        ? (subscribers[event] as (listen: typeof listener) => () => void)(listener)
+        : refuse(event);
       const stop = (): void => {
         // Once: stopping a listener that is stopped already (by the caller, or by the disposal) does nothing.
         if (listening.delete(stop)) {

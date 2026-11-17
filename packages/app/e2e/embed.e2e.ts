@@ -569,3 +569,165 @@ test.describe('the API of a viewer', () => {
     ]);
   });
 });
+
+test.describe('the events of a viewer', () => {
+  test('tells of the datasets each time they change, whoever changed them, and not of other changes', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const heard = await page.evaluate(async (style) => {
+      const { createEngine, createViewer, points } = window.embed;
+      const wells = (name: string) =>
+        points({ name, x: [1, 2], y: [3, 4], crs: { kind: 'local', units: 'm' } });
+      const make = () => {
+        const host = document.createElement('div');
+        host.style.cssText = style;
+        document.body.append(host);
+        return { host, viewer: createViewer(host, { engine }) };
+      };
+      const engine = createEngine();
+      const here = make();
+      const there = make();
+      const element = here.host.querySelector('karmania-viewer');
+      // The viewer tells from the update that follows a change: wait for it.
+      const settle = async () => {
+        await element?.updateComplete;
+      };
+      await settle();
+      const events: string[][] = [];
+      const stop = here.viewer.on('datasets', (datasets) => {
+        events.push(datasets.map((dataset) => dataset.name));
+      });
+      await here.viewer.load(wells('first'));
+      await settle();
+      await there.viewer.load(wells('second'));
+      await settle();
+      // A change of the scene, which is not one of the datasets.
+      here.viewer.dispatch({ type: 'setVerticalExaggeration', factor: 5 });
+      await settle();
+      const second = engine.datasets().find((dataset) => dataset.name === 'second');
+      await engine.remove(second?.id ?? -1);
+      await settle();
+      stop();
+      await here.viewer.load(wells('third'));
+      await settle();
+      here.viewer.dispose();
+      there.viewer.dispose();
+      engine.dispose();
+      return events;
+    }, HOST);
+    expect(heard).toEqual([['first'], ['first', 'second'], ['first']]);
+  });
+
+  test('does not tell of the datasets when nothing changed: the engine that is made for it holds none', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const heard = await page.evaluate(async (style) => {
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const viewer = window.embed.createViewer(host);
+      const element = host.querySelector('karmania-viewer');
+      await element?.updateComplete;
+      let events = 0;
+      viewer.on('datasets', () => {
+        events += 1;
+      });
+      // The viewer's own engine is made when it is first asked for, and the viewer looks at what it holds: nothing, as before.
+      viewer.engine.datasets();
+      await element?.updateComplete;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      viewer.dispose();
+      return events;
+    }, HOST);
+    expect(heard).toBe(0);
+  });
+
+  test('tells of the selection when it changes: a layer and an element, or none; not of other changes or of the same selection again', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const heard = await page.evaluate(async (style) => {
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const viewer = window.embed.createViewer(host);
+      await viewer.load(
+        window.embed.points({
+          name: 'wells',
+          x: [1, 2],
+          y: [3, 4],
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+      const [layerId = ''] = Object.keys(viewer.scene().layers);
+      const events: ({ layerId: string; element: number } | null)[] = [];
+      viewer.on('selection', (selection) => {
+        events.push(
+          selection === null ? null : { layerId: selection.layerId, element: selection.element },
+        );
+      });
+      viewer.dispatch({ type: 'setSelection', selection: { layerId, element: 1 } });
+      viewer.dispatch({ type: 'setSelection', selection: { layerId, element: 1 } });
+      viewer.setViewMode('3d');
+      viewer.dispatch({ type: 'setVerticalExaggeration', factor: 5 });
+      viewer.dispatch({ type: 'setSelection', selection: { layerId, element: 0 } });
+      viewer.dispatch({ type: 'setSelection', selection: null });
+      viewer.dispatch({ type: 'setSelection', selection: null });
+      viewer.dispose();
+      return { layerId, events };
+    }, HOST);
+    expect(heard.events).toEqual([
+      { layerId: heard.layerId, element: 1 },
+      { layerId: heard.layerId, element: 0 },
+      null,
+    ]);
+  });
+
+  test('tells of the scene as it did, and nothing after the viewer was disposed; an event it does not have is a mistake', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const seen = await page.evaluate(async (style) => {
+      const { createEngine, createViewer, points } = window.embed;
+      const engine = createEngine();
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const viewer = createViewer(host, { engine });
+      let scenes = 0;
+      let datasets = 0;
+      viewer.on('scene', () => {
+        scenes += 1;
+      });
+      viewer.on('datasets', () => {
+        datasets += 1;
+      });
+      viewer.dispatch({ type: 'setVerticalExaggeration', factor: 5 });
+      const during = scenes;
+      viewer.dispose();
+      // What happens to the engine after the viewer is gone is not told to it.
+      await engine.load(
+        points({ name: 'late', x: [1], y: [2], crs: { kind: 'local', units: 'm' } }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      engine.dispose();
+      let refused = '';
+      const other = createViewer(host);
+      try {
+        (other.on as (event: string, listener: () => void) => unknown)('pointer', () => undefined);
+      } catch (error) {
+        refused = error instanceof RangeError ? error.message : String(error);
+      }
+      other.dispose();
+      return { during, scenes, datasets, refused };
+    }, HOST);
+    expect(seen).toEqual({
+      during: 1,
+      scenes: 1,
+      datasets: 0,
+      refused: 'The viewer has no event "pointer": it has "scene", "datasets" and "selection".',
+    });
+  });
+});
