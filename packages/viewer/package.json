@@ -8,20 +8,35 @@
     ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "main": "./dist/karmania-viewer.js",
+    "types": "./dist/karmania-viewer.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/karmania-viewer.d.ts",
+        "default": "./dist/karmania-viewer.js"
+      },
+      "./style.css": "./dist/style.css"
+    }
+  },
   "scripts": {
     "build": "vite build && node ../../scripts/emit-declarations.mjs",
+    "prepack": "pnpm run build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
     "@karmania/engine": "workspace:*",
     "@karmania/render": "workspace:*",
     "@karmania/scene": "workspace:*",
     "@karmania/ui": "workspace:*",
-    "lit": "^3.3.3"
-  },
-  "devDependencies": {
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }
