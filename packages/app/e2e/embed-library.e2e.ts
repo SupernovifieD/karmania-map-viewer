@@ -116,3 +116,70 @@ for (const mount of ['/lib/', '/vendor/karmania/1.2/']) {
     }
   });
 }
+
+test('is in the font and the colours of the app on a page that has only its style sheet, whatever the font of the page', async ({
+  page,
+}) => {
+  const site = await serveSite({
+    pages: libraryPages('/lib/'),
+    folders: { '/lib/': library.folder },
+  });
+  try {
+    await page.goto(`${site.origin}/`);
+    await page.waitForFunction(() => 'library' in window);
+    const look = await page.evaluate(() => {
+      const slot = document.querySelector<HTMLElement>('#first');
+      if (slot === null) {
+        throw new Error('The page has no place for a viewer.');
+      }
+      window.library.createViewer(slot, {});
+      const host = slot.querySelector('karmania-viewer');
+      if (host === null) {
+        throw new Error('The viewer is not in the page.');
+      }
+      // What the tokens give, on an element of the page that nothing else styles.
+      const probe = document.createElement('div');
+      document.body.append(probe);
+      const given = [
+        ['font-family', '--k-font-sans'],
+        ['font-size', '--k-font-size-body'],
+        ['font-weight', '--k-weight-regular'],
+        ['line-height', '--k-line-height-body'],
+        ['color', '--k-text'],
+        ['background-color', '--k-surface'],
+      ] as const;
+      for (const [property, token] of given) {
+        probe.style.setProperty(property, `var(${token})`);
+      }
+      const read = (element: Element): Record<string, string> =>
+        Object.fromEntries(
+          [...given.map(([property]) => property), 'font-variant-numeric'].map((property) => [
+            property,
+            getComputedStyle(element).getPropertyValue(property),
+          ]),
+        );
+      return { host: read(host), probe: read(probe), page: read(document.body) };
+    });
+    // The page's own font is not Inter (so that the viewer is in it because it says so, and not because the page does).
+    expect(look.page['font-family']).not.toContain('Inter');
+    expect(look.host['font-family']).toContain('Inter');
+    for (const property of [
+      'font-family',
+      'font-size',
+      'font-weight',
+      'line-height',
+      'color',
+      'background-color',
+    ]) {
+      expect(look.host[property], property).toBe(look.probe[property]);
+    }
+    expect(look.host['font-variant-numeric']).toBe('tabular-nums');
+    // The text inside it is in that font too (it inherits it into the shadow root).
+    const tab = page.locator('#first').getByRole('tab', { name: 'Data' });
+    expect(await tab.evaluate((element) => getComputedStyle(element).fontFamily)).toContain(
+      'Inter',
+    );
+  } finally {
+    await site.close();
+  }
+});

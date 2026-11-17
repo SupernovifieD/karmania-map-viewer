@@ -152,6 +152,18 @@ export class KarmaniaViewer extends LitElement {
         height: 100%;
         min-height: 0;
         min-width: 0;
+        /* What the page of the app has from base.css, on the page's own element (html). A page that embeds the viewer has not that file, and an inherited
+           font is the page's: the viewer would be in whatever the page is in. These are the same tokens and values, so in the app nothing changes. */
+        background: var(--k-surface);
+        color: var(--k-text);
+        font-family: var(--k-font-sans);
+        font-size: var(--k-font-size-body);
+        font-weight: var(--k-weight-regular);
+        /* Digits are the same width everywhere, so columns of numbers line up. */
+        font-variant-numeric: tabular-nums;
+        line-height: var(--k-line-height-body);
+        scrollbar-color: var(--k-border-strong) transparent;
+        scrollbar-width: thin;
       }
 
       /* The map takes what the panel leaves. The panel's width is --k-panel-width, which the viewer
