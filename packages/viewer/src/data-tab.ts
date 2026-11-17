@@ -21,6 +21,7 @@ export class KarmaniaDataTab extends LitElement {
     rows: { attribute: false },
     crsInfo: { attribute: false },
     notices: { attribute: false },
+    importUi: { type: Boolean },
   };
 
   static override styles = [
@@ -63,6 +64,8 @@ export class KarmaniaDataTab extends LitElement {
   declare crsInfo: CrsLookup | undefined;
   /** Why each dataset that is not drawn is not, by the dataset's number: its summary says so. */
   declare notices: ReadonlyMap<number, string>;
+  /** Whether the empty tab has an Import button. */
+  declare importUi: boolean;
 
   /**
    * What each dataset's table asks for rows with. The table starts again when it is given another,
@@ -78,6 +81,7 @@ export class KarmaniaDataTab extends LitElement {
     this.rows = undefined;
     this.crsInfo = undefined;
     this.notices = new Map();
+    this.importUi = true;
   }
 
   /** The function the table of dataset `id` gets its rows with. */
@@ -164,9 +168,13 @@ export class KarmaniaDataTab extends LitElement {
     }
     return html`
       <k-empty-state icon="table" heading="No data loaded">
-        <span slot="action"
-          >${kButton({ icon: 'upload', children: 'Import', onClick: this.onImport })}</span
-        >
+        ${
+          this.importUi
+            ? html`<span slot="action"
+                >${kButton({ icon: 'upload', children: 'Import', onClick: this.onImport })}</span
+              >`
+            : nothing
+        }
       </k-empty-state>
     `;
   }

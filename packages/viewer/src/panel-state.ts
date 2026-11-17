@@ -27,8 +27,11 @@ export const DEFAULT_PANEL_STATE: PanelState = {
 
 /** The least and the most the panel can be wide in a window `viewportWidth` pixels wide. */
 export function panelWidthLimits(viewportWidth: number): { min: number; max: number } {
-  const { min, max, maxShare } = PANEL_WIDTH;
-  // The least wins if the window is so narrow that half of it is less.
+  const { max, maxShare } = PANEL_WIDTH;
+  // The least wins if the window is so narrow that half of it is less, but it is never more than what there is: in a box that is narrower than the least, the panel is all of
+  // the box, and does not go outside it into the page that has the box.
+  // (A width that is not known, 0, leaves the least as it is.)
+  const min = viewportWidth > 0 ? Math.min(PANEL_WIDTH.min, viewportWidth) : PANEL_WIDTH.min;
   return { min, max: Math.max(min, Math.min(viewportWidth * maxShare, max)) };
 }
 

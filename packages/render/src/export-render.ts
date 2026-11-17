@@ -35,36 +35,10 @@ import { readBands } from './export-bands.js';
 import type { TakeBand } from './export-bands.js';
 import { frameLight } from './light.js';
 import type { FrameInfo } from './look.js';
+import { ExportError } from './export-error.js';
 
-/** Why an export did not come to an end: what a person is told is from the code (an abort is the signal's own reason, not one of these). */
-export type ExportErrorCode =
-  /** Another export is being made. */
-  | 'busy'
-  /** The layers or the view changed while it was being made, so what is drawn is not what was asked for. */
-  | 'interrupted'
-  /** The graphics card took the map away while it was being made. */
-  | 'context_lost'
-  /** The map was taken out of the page. */
-  | 'disposed'
-  /** The map was still being put on the card, or the card did not give the picture. */
-  | 'not_ready'
-  /** The picture is larger than the card draws. */
-  | 'too_large'
-  /** A point of the map, at the size of the picture, is larger than the card draws a point. */
-  | 'point_size'
-  /** The card has not the memory for a picture of this size. */
-  | 'out_of_memory';
-
-/** What goes wrong with an export that is not a mistake of the caller. */
-export class ExportError extends Error {
-  readonly code: ExportErrorCode;
-
-  constructor(code: ExportErrorCode, message: string) {
-    super(message);
-    this.name = 'ExportError';
-    this.code = code;
-  }
-}
+export { ExportError } from './export-error.js';
+export type { ExportErrorCode } from './export-error.js';
 
 /** Three numbers from 0 to 255: a colour as bytes. */
 export type Bytes = readonly [number, number, number];

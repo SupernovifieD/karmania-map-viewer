@@ -120,8 +120,24 @@ export class KarmaniaApp extends LitElement {
     this.canExport = false;
   }
 
+  /**
+   * Files dropped anywhere on the page do nothing. Left alone, the browser would open the file in place of the app. The viewer does this inside its own box (what a
+   * page does outside it is the page's business), and the app is the page: its toolbar and everything else are refused here. A drop that something took (the
+   * viewer's map area) has been prevented already, and is left as it is.
+   */
+  private readonly refuseStrayFiles = (event: DragEvent): void => {
+    if (event.dataTransfer?.types.includes('Files') === true && !event.defaultPrevented) {
+      event.preventDefault();
+      if (event.type === 'dragover') {
+        event.dataTransfer.dropEffect = 'none';
+      }
+    }
+  };
+
   override connectedCallback(): void {
     super.connectedCallback();
+    window.addEventListener('dragover', this.refuseStrayFiles);
+    window.addEventListener('drop', this.refuseStrayFiles);
     // The first time, the container is not rendered yet: `firstUpdated` puts the viewer in it.
     if (this.hasUpdated) {
       this.mount();
@@ -134,6 +150,8 @@ export class KarmaniaApp extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    window.removeEventListener('dragover', this.refuseStrayFiles);
+    window.removeEventListener('drop', this.refuseStrayFiles);
     this.unfollow?.();
     this.unfollow = undefined;
     this.unfollowExport?.();

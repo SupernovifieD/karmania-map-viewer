@@ -1,3 +1,4 @@
+import type { DatasetInput, Engine, ImportMapping, LoadOptions } from '@karmania/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createViewer } from './create-viewer.js';
 
@@ -6,6 +7,16 @@ function page() {
   const scene = { version: 1 };
   const made: {
     openImport: ReturnType<typeof vi.fn>;
+    useEngine: ReturnType<typeof vi.fn>;
+    getEngine: ReturnType<typeof vi.fn>;
+    subscribeToDatasets: ReturnType<typeof vi.fn>;
+    heardDatasets: ((datasets: unknown) => void)[];
+    stoppedDatasets: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    importFiles: ReturnType<typeof vi.fn>;
+    openMapCrs: ReturnType<typeof vi.fn>;
+    withPanel?: boolean;
+    withImportUi?: boolean;
     remove: ReturnType<typeof vi.fn>;
     scene: ReturnType<typeof vi.fn>;
     dispatch: ReturnType<typeof vi.fn>;
@@ -16,10 +27,23 @@ function page() {
     stopped: ReturnType<typeof vi.fn>;
   }[] = [];
   const tags: string[] = [];
+  /** What happened to the elements and the containers, in order. */
+  const steps: string[] = [];
   const createElement = vi.fn((tag: string) => {
     tags.push(tag);
     const element = {
       openImport: vi.fn(),
+      useEngine: vi.fn(() => steps.push('engine given')),
+      getEngine: vi.fn(() => ({ name: 'the viewer’s engine' })),
+      heardDatasets: [] as ((datasets: unknown) => void)[],
+      stoppedDatasets: vi.fn(),
+      subscribeToDatasets: vi.fn((listener: (datasets: unknown) => void) => {
+        element.heardDatasets.push(listener);
+        return element.stoppedDatasets;
+      }),
+      load: vi.fn((input: unknown) => Promise.resolve({ status: 'loaded', input })),
+      importFiles: vi.fn(() => Promise.resolve({ status: 'loaded' })),
+      openMapCrs: vi.fn(),
       remove: vi.fn(),
       scene: vi.fn(() => scene),
       dispatch: vi.fn((command: unknown) => ({ command })),
@@ -40,10 +64,15 @@ function page() {
     const children: unknown[] = [];
     return {
       children,
-      element: { append: (child: unknown) => children.push(child) } as unknown as HTMLElement,
+      element: {
+        append: (child: unknown) => {
+          steps.push('put in the container');
+          return children.push(child);
+        },
+      } as unknown as HTMLElement,
     };
   };
-  return { made, tags, scene, container };
+  return { made, tags, steps, scene, container };
 }
 
 afterEach(() => {
@@ -57,6 +86,36 @@ describe('createViewer', () => {
     createViewer(where.element);
     expect(tags).toEqual(['karmania-viewer']);
     expect(where.children).toEqual([made[0]]);
+  });
+
+  it('gives the engine it was given to the viewer before the viewer is put in the container, so that the viewer shows what the engine holds from the start', () => {
+    const { made, steps, container } = page();
+    const engine = { name: 'an engine' } as unknown as Engine;
+    createViewer(container().element, { engine });
+    expect(made[0]?.useEngine.mock.calls).toEqual([[engine]]);
+    expect(steps).toEqual(['engine given', 'put in the container']);
+  });
+
+  it('has the panel and the import by default, and without either when the page says so', () => {
+    const { made, container } = page();
+    createViewer(container().element);
+    createViewer(container().element, { panel: false });
+    createViewer(container().element, { importUi: false });
+    createViewer(container().element, { panel: true, importUi: true });
+    expect(made.map((element) => [element.withPanel, element.withImportUi])).toEqual([
+      [true, true],
+      [false, true],
+      [true, false],
+      [true, true],
+    ]);
+  });
+
+  it('gives the viewer no engine when it was given none: the viewer makes its own', () => {
+    const { made, container } = page();
+    createViewer(container().element);
+    createViewer(container().element, {});
+    expect(made[0]?.useEngine).not.toHaveBeenCalled();
+    expect(made[1]?.useEngine).not.toHaveBeenCalled();
   });
 
   it('opens the import wizard on the files it is given, or the file picker with none', () => {
@@ -132,6 +191,69 @@ describe('createViewer', () => {
     expect(made[0]?.stopped).toHaveBeenCalledTimes(1);
   });
 
+  it('tells a listener of the datasets what the viewer shows each time it changes, and stops when asked', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const listener = vi.fn();
+    const stop = viewer.on('datasets', listener);
+    expect(made[0]?.subscribeToDatasets).toHaveBeenCalledTimes(1);
+    expect(made[0]?.subscribeToScene).not.toHaveBeenCalled();
+    const wells = [{ id: 1, name: 'wells' }];
+    made[0]?.heardDatasets[0]?.(wells);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(wells);
+    stop();
+    expect(made[0]?.stoppedDatasets).toHaveBeenCalledTimes(1);
+    stop();
+    expect(made[0]?.stoppedDatasets).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells a listener of the selection what is selected only when it is a different selection, with the new one or none', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const listener = vi.fn();
+    viewer.on('selection', listener);
+    const pick = { layerId: 'layer-1', element: 3 };
+    const heard = made[0]?.heard[0];
+    // A change of the scene that leaves the selection as it was (the same object, or none and none) is not told.
+    heard?.({ version: 1, selection: null }, { version: 0, selection: null });
+    heard?.({ version: 2, selection: pick }, { version: 1, selection: pick });
+    expect(listener).not.toHaveBeenCalled();
+    heard?.({ version: 3, selection: pick }, { version: 2, selection: null });
+    expect(listener).toHaveBeenLastCalledWith(pick);
+    heard?.({ version: 4, selection: null }, { version: 3, selection: pick });
+    expect(listener).toHaveBeenLastCalledWith(null);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses an event it does not know, and listens to nothing', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    expect(() =>
+      (viewer.on as (event: string, listener: () => void) => unknown)('pointer', () => undefined),
+    ).toThrow(
+      new RangeError(
+        'The viewer has no event "pointer": it has "scene", "datasets" and "selection".',
+      ),
+    );
+    expect(() =>
+      (viewer.on as (event: string, listener: () => void) => unknown)('toString', () => undefined),
+    ).toThrow(RangeError);
+    expect(made[0]?.subscribeToScene).not.toHaveBeenCalled();
+    expect(made[0]?.subscribeToDatasets).not.toHaveBeenCalled();
+  });
+
+  it('stops the listeners of every event when it is disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.on('scene', () => undefined);
+    viewer.on('datasets', () => undefined);
+    viewer.on('selection', () => undefined);
+    viewer.dispose();
+    // The scene and the selection are listened to through the scene (one stop each), and the datasets through theirs.
+    expect(made[0]?.stopped).toHaveBeenCalledTimes(2);
+    expect(made[0]?.stoppedDatasets).toHaveBeenCalledTimes(1);
+  });
+
   it('stops every listener when it is disposed, and only the ones that were not stopped already', () => {
     const { made, container } = page();
     const viewer = createViewer(container().element);
@@ -171,6 +293,53 @@ describe('createViewer', () => {
       viewer.openImport();
     }).toThrow('The viewer has been disposed.');
     expect(made[0]?.openImport).not.toHaveBeenCalled();
+  });
+
+  it('gives the engine of the element, whenever it is read, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    expect(made[0]?.getEngine).not.toHaveBeenCalled();
+    expect(viewer.engine).toEqual({ name: 'the viewer’s engine' });
+    expect(viewer.engine).toBeDefined();
+    expect(made[0]?.getEngine).toHaveBeenCalledTimes(2);
+    viewer.dispose();
+    expect(() => viewer.engine).toThrow('The viewer has been disposed.');
+  });
+
+  it('loads what a builder made through the element, with its options, and refuses once it was disposed', async () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const input = { kind: 'points' } as unknown as DatasetInput;
+    const options = { signal: new AbortController().signal } as unknown as LoadOptions;
+    await expect(viewer.load(input, options)).resolves.toEqual({ status: 'loaded', input });
+    expect(made[0]?.load.mock.calls).toEqual([[input, options]]);
+    viewer.dispose();
+    expect(() => viewer.load(input)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('imports files with a mapping through the element, and refuses once it was disposed', async () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const files = [new Uint8Array(0)] as unknown as File[];
+    const mapping = { datasetName: 'wells' } as unknown as ImportMapping;
+    await expect(viewer.importFiles(files, mapping)).resolves.toEqual({ status: 'loaded' });
+    expect(made[0]?.importFiles.mock.calls).toEqual([[files, mapping, undefined]]);
+    viewer.dispose();
+    expect(() => viewer.importFiles(files, mapping)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.importFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the dialog of the map’s coordinate system through the element, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.openMapCrs();
+    expect(made[0]?.openMapCrs).toHaveBeenCalledTimes(1);
+    viewer.dispose();
+    expect(() => {
+      viewer.openMapCrs();
+    }).toThrow('The viewer has been disposed.');
+    expect(made[0]?.openMapCrs).toHaveBeenCalledTimes(1);
   });
 
   it('keeps two viewers apart: disposing one leaves the other', () => {
