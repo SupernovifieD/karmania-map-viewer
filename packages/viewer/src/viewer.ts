@@ -1282,9 +1282,10 @@ export class KarmaniaViewer extends LitElement {
   private unlistenScene: (() => void) | undefined;
 
   /**
-   * Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away), and takes the
-   * viewer's width again, which limits how wide its panel can be: the map area has what the viewer has, less the panel, so it changes whenever the box a page puts the
-   * viewer in does (a panel that is made wider or narrower for it changes the map area again, until the two agree).
+   * Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away), and of the viewer
+   * itself, and takes the viewer's width again, which limits how wide its panel can be: the map area has what the viewer has, less the panel, so it changes whenever
+   * the box a page puts the viewer in does, unless it has no width at all (a box narrower than the panel), which is why the viewer is watched too (a panel that is
+   * made wider or narrower for it changes the map area again, until the two agree).
    */
   private sizeWatch: ResizeObserver | undefined;
 
@@ -1298,6 +1299,9 @@ export class KarmaniaViewer extends LitElement {
       this.updateReadout();
     });
     this.sizeWatch.observe(area);
+    // The viewer too: the map area is what is left of it after the panel, and has no width at all in a box that is narrower than the panel, so a box that shrinks
+    // further changes nothing the map area can tell.
+    this.sizeWatch.observe(this);
   }
 
   protected override firstUpdated(): void {

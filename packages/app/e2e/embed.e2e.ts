@@ -1291,6 +1291,39 @@ test.describe('a viewer in a box of a page', () => {
     await expect.poll(width).toBe(200);
   });
 
+  test('keeps its panel inside a box that gets narrower while the map has no width at all', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'karmania.panel',
+        JSON.stringify({ collapsed: false, tab: 'legend', width: 640 }),
+      );
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 250px; height: 400px';
+      document.body.append(box);
+      window.embed.createViewer(box);
+    });
+    const panel = page.locator('#box karmania-panel');
+    const width = async (): Promise<number | undefined> => (await panel.boundingBox())?.width;
+    // The box is narrower than the panel's least from the start: the panel is all of it, and the map is left with no width.
+    await expect.poll(width).toBe(250);
+    await expect
+      .poll(() =>
+        page
+          .locator('#box karmania-map-area')
+          .evaluate((area) => area.getBoundingClientRect().width),
+      )
+      .toBe(0);
+    // The box shrinks, and the map area, which has no width before and after, says nothing: the viewer has to know its own box, not the map's.
+    await page.locator('#box').evaluate((box) => {
+      box.style.width = '200px';
+    });
+    await expect.poll(width).toBe(200);
+  });
+
   test('refuses files dropped in its own box, where nothing takes them, and leaves the page outside it alone', async ({
     page,
   }) => {
