@@ -266,6 +266,8 @@ What is shared, and what you may not expect:
   neither reads nor writes it.
 - **Contour lines are the engine's.** The lines that one viewer makes for a layer are datasets of the shared engine, and every viewer on it shows them, with the same settings: when one
   viewer turns the contours on, changes their interval or turns them off, the others follow. Each viewer keeps its own choice of whether they are shown, and the style of their layer.
+  Two viewers that change the contours of a layer at the same moment end up with the same ones: the settings of the last answer that the engine gives win in both. A viewer that is making
+  lines takes in what the other viewers did to the engine when it has its own answer, not before.
 - **A dialog is modal to the whole page.** The import wizard, the export dialog and the coordinate-system dialog are `<dialog>` elements shown with `showModal()`: while one is open,
   everything else on the page is inert (the other viewer too).
 - **Dropping files** on a viewer's map imports them. A file dropped elsewhere in the viewer, where nothing takes it, is refused (the browser would otherwise open it in place of the page).

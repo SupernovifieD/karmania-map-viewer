@@ -170,6 +170,7 @@ test.describe('a viewer that is given an engine by the page', () => {
           settings: source?.contours ?? null,
           lines:
             lines === undefined ? null : { datasetId: lines.datasetId, visible: lines.visible },
+          layer: lines === undefined ? null : { id: lines.id, opacity: lines.style.opacity },
         };
       }, which);
     /** Whether the layer of the lines of a viewer is on the card (drawn), as the pipeline of that viewer says. */
@@ -194,7 +195,7 @@ test.describe('a viewer that is given an engine by the page', () => {
     const sourceId = await page.evaluate(() => Object.keys(window.first?.scene().layers ?? {})[0]);
     expect(sourceId).toBeDefined();
     // Nothing yet, in either.
-    expect(await contours('second')).toEqual({ settings: null, lines: null });
+    expect(await contours('second')).toEqual({ settings: null, lines: null, layer: null });
 
     // The first viewer turns the contours on: the second shows the same lines, with the same settings, and draws them.
     await page.evaluate(
@@ -215,6 +216,18 @@ test.describe('a viewer that is given an engine by the page', () => {
     await expect.poll(async () => (await contours('second')).lines).toEqual(first.lines);
     await expect.poll(() => linesDrawn('#b')).toBe(true);
 
+    // The second gives its layer of lines a style of its own.
+    const layerOfLines = (await contours('second')).layer;
+    expect(layerOfLines).not.toBeNull();
+    await page.evaluate((layerId) => {
+      window.second?.dispatch({
+        type: 'setStyle',
+        layerId: layerId ?? '',
+        patch: { opacity: 0.4 },
+      });
+    }, layerOfLines?.id);
+    await expect.poll(async () => (await contours('second')).layer?.opacity).toBe(0.4);
+
     // Made again with other settings: the second follows.
     await page.evaluate(
       ([layerId, settings]) => {
@@ -227,6 +240,10 @@ test.describe('a viewer that is given an engine by the page', () => {
       [sourceId, params] as const,
     );
     await expect.poll(async () => (await contours('second')).settings?.interval).toBe(8);
+    // ...with the layer that showed the old lines, and its style: it is given the new lines and is not made again.
+    await expect
+      .poll(async () => (await contours('second')).layer)
+      .toEqual(layerOfLines === null ? null : { ...layerOfLines, opacity: 0.4 });
     await expect
       .poll(async () => (await contours('second')).lines?.datasetId)
       .toBe((await contours('first')).lines?.datasetId);
