@@ -2,7 +2,14 @@
  * `createViewer`: puts a viewer in an element of a page, and gives back what the page needs of it. The page owns
  * the container (its size and place); the viewer fills it.
  */
-import type { Engine } from '@karmania/engine';
+import type {
+  DatasetInput,
+  Engine,
+  ImportMapping,
+  ImportOptions,
+  LoadOptions,
+  LoadResult,
+} from '@karmania/engine';
 import type { Command, SceneDocument, ViewMode } from '@karmania/scene';
 import type { ExportPngOptions, ExportPngRun } from './export-compose.js';
 import './viewer.js';
@@ -34,6 +41,28 @@ export interface ViewerOptions {
 
 /** A viewer that has been put in a page. */
 export interface Viewer {
+  /**
+   * The engine of the viewer: the one the page gave in the options, or the viewer's own, which is started when this is first read or when the first
+   * data arrives (a viewer that has none has no worker) and is disposed with the viewer. Read it to ask what is loaded (`engine.datasets()`), for the
+   * rows of a dataset, or to give the same engine to another viewer.
+   */
+  readonly engine: Engine;
+  /**
+   * Loads a dataset made with a builder (`points`, `lines`, `polygons`, `grid`, `mesh`, `blocks`), as a file that is imported is: it is listed in the
+   * Data tab, selected, and drawn. The engine takes the input's arrays, which are empty afterwards, so an input is loaded once. Resolves with what the
+   * engine says: `loaded` with the summaries, or `blocked` with the findings (a problem with the data is a result, not a rejection), and then nothing
+   * is added.
+   */
+  load(input: DatasetInput, options?: LoadOptions): Promise<LoadResult>;
+  /**
+   * Imports a file with a mapping, as the import wizard does but without it: the dataset is listed, selected and drawn. `files` is one data file and
+   * its sidecars (a `.prj`); two data files are a mistake. Resolves like `load`. It works for a viewer made with `importUi: false`.
+   */
+  importFiles(
+    files: readonly File[],
+    mapping: ImportMapping,
+    options?: ImportOptions,
+  ): Promise<LoadResult>;
   /** The scene as it is now: a layer for each loaded dataset, the camera, the legend. */
   scene(): SceneDocument;
   /** Shows the data: the camera goes where all the visible layers that are prepared fit in the map area. */
@@ -54,6 +83,11 @@ export interface Viewer {
    * `out_of_memory`, `not_ready`), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
    */
   exportPng(options: ExportPngOptions, run?: ExportPngRun): Promise<Blob>;
+  /**
+   * Opens the dialog for the map's coordinate system (the one the map is drawn in), with nothing chosen. Nothing happens while nothing is loaded:
+   * the map has no coordinate system to change yet.
+   */
+  openMapCrs(): void;
   /** Opens the export dialog (size, resolution, legend, file name and a preview, and Export). Nothing happens while there is nothing drawn to export (`exportable`). */
   openExport(): void;
   /** Whether there is something drawn to export: at least one layer is shown on the map and has been drawn. The Export button is disabled while it is not. */
@@ -80,7 +114,7 @@ export interface Viewer {
 /**
  * Puts a viewer in `container`, which has to have a size: the viewer is as tall and as wide as it is.
  *
- * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng`, `openExport`, `exportable`, `onExportable` and `on` if the viewer has been disposed, which is a mistake of the caller;
+ * @throws Error from `engine`, `load`, `importFiles`, `openMapCrs`, `openImport` (also if the viewer was made with `importUi: false`), `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng`, `openExport`, `exportable`, `onExportable` and `on` if the viewer has been disposed, which is a mistake of the caller;
  * `setViewMode` also throws a RangeError for a mode that is not `2d` or `3d`. Disposing stops every listener that `on` gave.
  */
 export function createViewer(container: HTMLElement, options: ViewerOptions = {}): Viewer {
@@ -100,6 +134,22 @@ export function createViewer(container: HTMLElement, options: ViewerOptions = {}
     }
   };
   return {
+    get engine() {
+      alive();
+      return element.getEngine();
+    },
+    load(input, loadOptions) {
+      alive();
+      return element.load(input, loadOptions);
+    },
+    importFiles(files, mapping, importOptions) {
+      alive();
+      return element.importFiles(files, mapping, importOptions);
+    },
+    openMapCrs() {
+      alive();
+      element.openMapCrs();
+    },
     scene() {
       alive();
       return element.scene();

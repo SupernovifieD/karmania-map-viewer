@@ -1,4 +1,4 @@
-import type { Engine } from '@karmania/engine';
+import type { DatasetInput, Engine, ImportMapping, LoadOptions } from '@karmania/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createViewer } from './create-viewer.js';
 
@@ -8,6 +8,10 @@ function page() {
   const made: {
     openImport: ReturnType<typeof vi.fn>;
     useEngine: ReturnType<typeof vi.fn>;
+    getEngine: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    importFiles: ReturnType<typeof vi.fn>;
+    openMapCrs: ReturnType<typeof vi.fn>;
     withPanel?: boolean;
     withImportUi?: boolean;
     remove: ReturnType<typeof vi.fn>;
@@ -27,6 +31,10 @@ function page() {
     const element = {
       openImport: vi.fn(),
       useEngine: vi.fn(() => steps.push('engine given')),
+      getEngine: vi.fn(() => ({ name: 'the viewer’s engine' })),
+      load: vi.fn((input: unknown) => Promise.resolve({ status: 'loaded', input })),
+      importFiles: vi.fn(() => Promise.resolve({ status: 'loaded' })),
+      openMapCrs: vi.fn(),
       remove: vi.fn(),
       scene: vi.fn(() => scene),
       dispatch: vi.fn((command: unknown) => ({ command })),
@@ -213,6 +221,53 @@ describe('createViewer', () => {
       viewer.openImport();
     }).toThrow('The viewer has been disposed.');
     expect(made[0]?.openImport).not.toHaveBeenCalled();
+  });
+
+  it('gives the engine of the element, whenever it is read, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    expect(made[0]?.getEngine).not.toHaveBeenCalled();
+    expect(viewer.engine).toEqual({ name: 'the viewer’s engine' });
+    expect(viewer.engine).toBeDefined();
+    expect(made[0]?.getEngine).toHaveBeenCalledTimes(2);
+    viewer.dispose();
+    expect(() => viewer.engine).toThrow('The viewer has been disposed.');
+  });
+
+  it('loads what a builder made through the element, with its options, and refuses once it was disposed', async () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const input = { kind: 'points' } as unknown as DatasetInput;
+    const options = { signal: new AbortController().signal } as unknown as LoadOptions;
+    await expect(viewer.load(input, options)).resolves.toEqual({ status: 'loaded', input });
+    expect(made[0]?.load.mock.calls).toEqual([[input, options]]);
+    viewer.dispose();
+    expect(() => viewer.load(input)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.load).toHaveBeenCalledTimes(1);
+  });
+
+  it('imports files with a mapping through the element, and refuses once it was disposed', async () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    const files = [new Uint8Array(0)] as unknown as File[];
+    const mapping = { datasetName: 'wells' } as unknown as ImportMapping;
+    await expect(viewer.importFiles(files, mapping)).resolves.toEqual({ status: 'loaded' });
+    expect(made[0]?.importFiles.mock.calls).toEqual([[files, mapping, undefined]]);
+    viewer.dispose();
+    expect(() => viewer.importFiles(files, mapping)).toThrow('The viewer has been disposed.');
+    expect(made[0]?.importFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the dialog of the map’s coordinate system through the element, and refuses once it was disposed', () => {
+    const { made, container } = page();
+    const viewer = createViewer(container().element);
+    viewer.openMapCrs();
+    expect(made[0]?.openMapCrs).toHaveBeenCalledTimes(1);
+    viewer.dispose();
+    expect(() => {
+      viewer.openMapCrs();
+    }).toThrow('The viewer has been disposed.');
+    expect(made[0]?.openMapCrs).toHaveBeenCalledTimes(1);
   });
 
   it('keeps two viewers apart: disposing one leaves the other', () => {

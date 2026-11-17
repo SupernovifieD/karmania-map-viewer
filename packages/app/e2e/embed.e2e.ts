@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { trackLeaks } from './support/leaks';
 
 /**
  * The embedding page (`embed.html`) puts viewers in itself with only what `@karmania/viewer` exports, as the page of an embedder would. These
@@ -368,5 +369,203 @@ test.describe('a viewer made with the panel or the import left out', () => {
     };
     expect(await kept({ panel: false })).toBe(0);
     expect(await kept({})).toBeGreaterThan(0);
+  });
+});
+
+test.describe('the API of a viewer', () => {
+  /** A CSV of two points and the mapping that makes them a dataset, which a page that has no wizard gives to `importFiles`. */
+  const WELLS = {
+    name: 'wells.csv',
+    text: 'X,Y\n1,2\n3,4\n',
+  } as const;
+
+  test('loads a dataset made by a builder, lists it in the engine and the scene, and gives the engine it is loaded into', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const seen = await page.evaluate(async (style) => {
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const viewer = window.embed.createViewer(host);
+      const result = await viewer.load(
+        window.embed.points({
+          name: 'wells',
+          x: [1, 2],
+          y: [3, 4],
+          crs: { kind: 'local', units: 'm' },
+        }),
+      );
+      const engine = viewer.engine;
+      const same = engine === viewer.engine;
+      const listed = engine.datasets().map((dataset) => dataset.name);
+      const layers = Object.keys(viewer.scene().layers).length;
+      // What a load does besides: the panel shows the Data tab, with the new dataset.
+      const tab = host
+        .querySelector('karmania-viewer')
+        ?.shadowRoot?.querySelector('karmania-panel')?.tab;
+      viewer.dispose();
+      return { status: result.status, same, listed, layers, tab };
+    }, HOST);
+    expect(seen).toEqual({
+      status: 'loaded',
+      same: true,
+      listed: ['wells'],
+      layers: 1,
+      tab: 'data',
+    });
+  });
+
+  test('has the engine it was given as its engine', async ({ page }) => {
+    await page.goto('/embed.html');
+    const same = await page.evaluate((style) => {
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const engine = window.embed.createEngine();
+      const viewer = window.embed.createViewer(host, { engine });
+      const answer = viewer.engine === engine;
+      viewer.dispose();
+      engine.dispose();
+      return answer;
+    }, HOST);
+    expect(same).toBe(true);
+  });
+
+  test('starts a worker only when its engine is first asked for, and stops it with the viewer', async ({
+    page,
+  }) => {
+    const read = await trackLeaks(page);
+    await page.goto('/embed.html');
+    const make = () =>
+      page.evaluate((style) => {
+        const host = document.createElement('div');
+        host.style.cssText = style;
+        host.id = 'own';
+        document.body.append(host);
+        (window as unknown as { own: unknown }).own = window.embed.createViewer(host);
+      }, HOST);
+    await make();
+    expect((await read()).workers).toEqual({ started: 0, terminated: 0 });
+    await page.evaluate(() => {
+      return (window as unknown as { own: { engine: unknown } }).own.engine !== undefined;
+    });
+    expect((await read()).workers).toEqual({ started: 1, terminated: 0 });
+    await page.evaluate(() => {
+      (window as unknown as { own: { dispose(): void } }).own.dispose();
+    });
+    expect((await read()).workers).toEqual({ started: 1, terminated: 1 });
+  });
+
+  test('imports a file with a mapping, with no wizard, and shows the dataset', async ({ page }) => {
+    await page.goto('/embed.html');
+    const seen = await page.evaluate(
+      async ([style, file]) => {
+        const host = document.createElement('div');
+        host.style.cssText = style;
+        document.body.append(host);
+        const viewer = window.embed.createViewer(host, { importUi: false });
+        const result = await viewer.importFiles([new File([file.text], file.name)], {
+          datasetName: 'wells',
+          kind: 'points',
+          columns: [
+            { source: 'X', role: 'x' },
+            { source: 'Y', role: 'y' },
+          ],
+          nodata: { tokens: [], numbers: [] },
+          emptyCoordinates: 'error',
+          decimalSeparator: '.',
+          crs: { kind: 'local', units: 'm' },
+        });
+        const listed = viewer.engine.datasets().map((dataset) => dataset.name);
+        const layers = Object.keys(viewer.scene().layers).length;
+        // The panel shows the Data tab, as it does for a file that the wizard imported.
+        const tab = host
+          .querySelector('karmania-viewer')
+          ?.shadowRoot?.querySelector('karmania-panel')?.tab;
+        viewer.dispose();
+        return { status: result.status, listed, layers, tab };
+      },
+      [HOST, WELLS] as const,
+    );
+    expect(seen).toEqual({ status: 'loaded', listed: ['wells'], layers: 1, tab: 'data' });
+  });
+
+  test('opens the dialog of the map’s coordinate system once there is data, and not before', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const asked = async (loadFirst: boolean) =>
+      page.evaluate(
+        async ([style, load]) => {
+          const host = document.createElement('div');
+          host.style.cssText = style;
+          document.body.append(host);
+          const viewer = window.embed.createViewer(host);
+          // The dialog is in the viewer once it has been drawn: before that, there is nothing to open, whatever the viewer holds.
+          const element = host.querySelector('karmania-viewer');
+          await element?.updateComplete;
+          if (load) {
+            await viewer.load(
+              window.embed.points({
+                name: 'wells',
+                x: [1, 2],
+                y: [3, 4],
+                crs: { kind: 'local', units: 'm' },
+              }),
+            );
+          }
+          viewer.openMapCrs();
+          await element?.updateComplete;
+          const dialog = element?.shadowRoot?.querySelector('karmania-map-crs-dialog');
+          await dialog?.updateComplete;
+          const open = dialog?.open;
+          viewer.dispose();
+          return open;
+        },
+        [HOST, loadFirst] as const,
+      );
+    expect(await asked(false)).toBe(false);
+    expect(await asked(true)).toBe(true);
+  });
+
+  test('refuses what needs a page when it is not in one: its engine, a load and an import', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const said = await page.evaluate(async () => {
+      const element = document.createElement('karmania-viewer');
+      const messages: string[] = [];
+      const note = (error: unknown): void => {
+        messages.push(error instanceof Error ? error.message : String(error));
+      };
+      try {
+        element.getEngine();
+      } catch (error) {
+        note(error);
+      }
+      await element
+        .load(
+          window.embed.points({ name: 'p', x: [1], y: [2], crs: { kind: 'local', units: 'm' } }),
+        )
+        .catch(note);
+      await element
+        .importFiles([new File(['X,Y\n1,2\n'], 'p.csv')], {
+          datasetName: 'p',
+          kind: 'points',
+          columns: [],
+          nodata: { tokens: [], numbers: [] },
+          emptyCoordinates: 'error',
+          decimalSeparator: '.',
+          crs: null,
+        })
+        .catch(note);
+      return messages;
+    });
+    expect(said).toEqual([
+      'The viewer is not in a page: put it in one before asking for its engine.',
+      'The viewer is not in a page: put it in one before loading a dataset.',
+      'The viewer is not in a page: put it in one before importing files.',
+    ]);
   });
 });
