@@ -31,6 +31,12 @@ export interface Viewer {
    * `out_of_memory`, `not_ready`), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
    */
   exportPng(options: ExportPngOptions, run?: ExportPngRun): Promise<Blob>;
+  /** Opens the export dialog (size, resolution, legend, file name and a preview, and Export). Nothing happens while there is nothing drawn to export (`exportable`). */
+  openExport(): void;
+  /** Whether there is something drawn to export: at least one layer is shown on the map and has been drawn. The Export button is disabled while it is not. */
+  exportable(): boolean;
+  /** Calls `listener` when `exportable()` changes, with the new answer; gives the function that stops that (which may be called more than once). */
+  onExportable(listener: (available: boolean) => void): () => void;
   /**
    * Calls `listener` with the scene after each change of it, and gives the function that stops that (which may be called more than once,
    * also after the viewer was disposed).
@@ -48,7 +54,7 @@ export interface Viewer {
 /**
  * Puts a viewer in `container`, which has to have a size: the viewer is as tall and as wide as it is.
  *
- * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng` and `on` if the viewer has been disposed, which is a mistake of the caller;
+ * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng`, `openExport`, `exportable`, `onExportable` and `on` if the viewer has been disposed, which is a mistake of the caller;
  * `setViewMode` also throws a RangeError for a mode that is not `2d` or `3d`. Disposing stops every listener that `on` gave.
  */
 export function createViewer(container: HTMLElement): Viewer {
@@ -82,6 +88,25 @@ export function createViewer(container: HTMLElement): Viewer {
     exportPng(options, run) {
       alive();
       return element.exportPng(options, run);
+    },
+    openExport() {
+      alive();
+      element.openExport();
+    },
+    exportable() {
+      alive();
+      return element.exportable();
+    },
+    onExportable(listener) {
+      alive();
+      const unsubscribe = element.subscribeToExportable(listener);
+      const stop = (): void => {
+        if (listening.delete(stop)) {
+          unsubscribe();
+        }
+      };
+      listening.add(stop);
+      return stop;
     },
     on(_event, listener) {
       alive();

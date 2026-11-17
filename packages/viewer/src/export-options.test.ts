@@ -3,10 +3,12 @@ import {
   DEFAULT_FILE_NAME,
   MAX_FILE_NAME,
   defaultOptions,
+  errorText,
   fileNameOf,
   pictureSize,
   problemText,
   problemsOf,
+  progressText,
   sizeCaption,
   warningText,
   withCommas,
@@ -115,5 +117,54 @@ describe('fileNameOf', () => {
     expect(long.length).toBeLessThanOrEqual(MAX_FILE_NAME);
     expect(long.endsWith(' ')).toBe(false);
     expect(fileNameOf('x'.repeat(500))).toHaveLength(MAX_FILE_NAME);
+  });
+});
+
+describe('errorText', () => {
+  it('has words for each code an export can end with, that say what to do', () => {
+    const codes = [
+      'busy',
+      'interrupted',
+      'context_lost',
+      'too_large',
+      'point_size',
+      'out_of_memory',
+      'not_ready',
+      'no_room_for_map',
+    ];
+    const texts = codes.map((code) => errorText({ name: 'ExportError', code }));
+    expect(new Set(texts).size).toBe(codes.length);
+    for (const text of texts) {
+      expect(text.endsWith('.')).toBe(true);
+      expect(text).not.toMatch(/undefined|null|_/);
+    }
+    expect(errorText({ name: 'ExportError', code: 'too_large' })).toMatch(
+      /smaller size or a lower resolution/,
+    );
+    expect(errorText({ name: 'ComposeError', code: 'no_room_for_map' })).toBe(
+      warningText('no_room_for_map'),
+    );
+  });
+
+  it('says the font when the font did not load, and the plain failure for anything else, however odd', () => {
+    expect(errorText({ name: 'ExportFontError' })).toMatch(/font/);
+    expect(errorText(new Error('boom'))).toBe('The picture could not be made.');
+    expect(errorText(undefined)).toBe('The picture could not be made.');
+    expect(errorText('text')).toBe('The picture could not be made.');
+  });
+});
+
+describe('progressText', () => {
+  it('says "Rendering…" with a per cent for the picture and "Writing the file…" for the file, the split being 70 %', () => {
+    expect(progressText(0)).toBe('Rendering… 0 %');
+    expect(progressText(0.4 * 0.7)).toBe('Rendering… 28 %');
+    expect(progressText(0.69)).toBe('Rendering… 69 %');
+    expect(progressText(0.7)).toBe('Writing the file… 70 %');
+    expect(progressText(1)).toBe('Writing the file… 100 %');
+  });
+
+  it('keeps to 0 and 100 per cent', () => {
+    expect(progressText(-1)).toBe('Rendering… 0 %');
+    expect(progressText(7)).toBe('Writing the file… 100 %');
   });
 });

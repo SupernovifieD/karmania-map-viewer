@@ -131,5 +131,43 @@ export function fileNameOf(typed: string): string {
   return cleaned === '' ? DEFAULT_FILE_NAME : cleaned;
 }
 
+/** What an export that did not come to an end says to a person, from what it rejected with: the code of an `ExportError` or a `ComposeError`, a font that did not load, anything else. */
+export function errorText(error: unknown): string {
+  // (A promise can be rejected with anything, `undefined` included, which three's readback does when the card gives up.)
+  const named: { name?: unknown; code?: unknown } =
+    typeof error === 'object' && error !== null ? error : {};
+  switch (named.code) {
+    case 'busy':
+      return 'Another picture is being made. Try again in a moment.';
+    case 'interrupted':
+      return 'The map changed while the picture was being made. Export it again.';
+    case 'context_lost':
+      return 'The graphics card stopped drawing the map. Wait a moment, then export again.';
+    case 'too_large':
+      return 'The picture is larger than this computer can draw. Use a smaller size or a lower resolution.';
+    case 'point_size':
+      return 'At this size the points of the map would be larger than this computer can draw. Use a lower resolution.';
+    case 'out_of_memory':
+      return 'This computer does not have the memory for a picture this large. Use a smaller size or a lower resolution.';
+    case 'not_ready':
+      return 'The map is still being drawn. Try again in a moment.';
+    case 'no_room_for_map':
+      return warningText('no_room_for_map');
+    default:
+      return named.name === 'ExportFontError'
+        ? 'The font of the picture could not be loaded, so the picture was not made.'
+        : 'The picture could not be made.';
+  }
+}
+
+/**
+ * What the footer says while a picture is made, from how far it is (0 to 1): the picture is the first 70 % (`exportPng`'s own split), and the file the rest. A whole number of
+ * per cent, with a space before the sign, as the brief writes it ("Rendering… 40 %").
+ */
+export function progressText(done: number): string {
+  const percent = Math.round(Math.min(1, Math.max(0, done)) * 100);
+  return done < 0.7 ? `Rendering… ${String(percent)} %` : `Writing the file… ${String(percent)} %`;
+}
+
 /** The least a custom side is, for the field's hint. */
 export { MIN_EXPORT_SIDE };

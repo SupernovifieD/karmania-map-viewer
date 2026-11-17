@@ -33,6 +33,7 @@ import {
   cameraTo2d,
   cameraTo3d,
   createSceneStore,
+  exportLegendLines,
   firstNumericColumn,
   legendModel,
   parseHex,
@@ -41,8 +42,17 @@ import type { Command, LegendModel, SceneDocument, SceneListener, ViewMode } fro
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
-import { browserEnv, composeExport } from './export-compose.js';
-import type { Composed, ExportPngOptions, ExportPngRun, PictureOptions } from './export-compose.js';
+import { browserEnv, composeExport, planOnly } from './export-compose.js';
+import type {
+  Composed,
+  ExportPlan,
+  ExportPngOptions,
+  ExportPngRun,
+  PictureOptions,
+  PlanInput,
+} from './export-compose.js';
+import './export-dialog.js';
+import type { ExportDialogWork } from './export-dialog.js';
 import { encodePng } from './png-encode.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
@@ -364,20 +374,10 @@ export class KarmaniaViewer extends LitElement {
     if (renderer === undefined) {
       throw new Error('There is nothing to export: the map has not been drawn.');
     }
-    const state = this.store.getState();
-    const screen = renderer.stats();
     const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
     return composeExport(browserEnv(this.ownerDocument), {
-      size: options.size,
-      dpi: options.dpi,
-      legend: options.legend ? this.currentLegend() : null,
-      viewMode: state.viewMode,
-      camera2d: state.camera2d,
-      camera3d: state.camera3d,
-      heading: headingOf(state),
-      units: unitsOf(state.frame, this.mapCrsInfo()),
-      screen: { width: screen.cssWidth, height: screen.cssHeight },
-      fonts: this.ownerDocument.fonts,
+      ...this.pictureInput(options, renderer),
+      heading: headingOf(this.store.getState()),
       renderMap: async (request) => {
         await renderer.renderExport({
           ...request,
@@ -385,9 +385,80 @@ export class KarmaniaViewer extends LitElement {
           ink: bytes(EXPORT_COLOURS.text),
         });
       },
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
     });
+  }
+
+  /** What the layout of a picture is worked out from, for the scene as it is now. */
+  private pictureInput(options: PictureOptions, renderer: Renderer): PlanInput {
+    const state = this.store.getState();
+    const screen = renderer.stats();
+    return {
+      size: options.size,
+      dpi: options.dpi,
+      legend: options.legend ? this.currentLegend() : null,
+      viewMode: state.viewMode,
+      camera2d: state.camera2d,
+      camera3d: state.camera3d,
+      units: unitsOf(state.frame, this.mapCrsInfo()),
+      screen: { width: screen.cssWidth, height: screen.cssHeight },
+      fonts: this.ownerDocument.fonts,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    };
+  }
+
+  /**
+   * Where everything would go in the picture, with nothing drawn and no canvas of the picture's size made: what the export dialog warns from before it exports. Rejects as
+   * `composePicture` does for the fonts and for a legend that leaves no room for the map (`ComposeError`).
+   */
+  async planPicture(options: PictureOptions): Promise<ExportPlan> {
+    const renderer = this.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is nothing to export: the map has not been drawn.');
+    }
+    const measure = this.ownerDocument.createElement('canvas').getContext('2d');
+    if (measure === null) {
+      throw new Error('The browser gave no canvas to measure the picture with.');
+    }
+    return planOnly(measure, this.pictureInput(options, renderer));
+  }
+
+  /** Whether there is something drawn to export: the map is there and at least one layer of it is shown and drawn. */
+  exportable(): boolean {
+    return this.renderer !== undefined && exportLegendLines(this.currentLegend()).length > 0;
+  }
+
+  /** What listens for `exportable()` changing, and what it was last. */
+  private readonly exportableListeners = new Set<(available: boolean) => void>();
+  private exportableNow = false;
+
+  /** Calls `listener` when `exportable()` changes, with the new answer; gives the way to stop. */
+  subscribeToExportable(listener: (available: boolean) => void): () => void {
+    this.exportableListeners.add(listener);
+    return () => {
+      this.exportableListeners.delete(listener);
+    };
+  }
+
+  /** What the export dialog makes pictures with. */
+  private readonly exportWork: ExportDialogWork = {
+    plan: (options) => this.planPicture(options),
+    preview: async (options) => (await this.composePicture(options)).canvas,
+    run: (options, run) => this.exportPng(options, run),
+  };
+
+  /** Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. */
+  openExport(): void {
+    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
+    const renderer = this.renderer;
+    if (dialog === null || renderer === undefined || !this.exportable()) {
+      return;
+    }
+    const screen = renderer.stats();
+    dialog.screen = { width: screen.cssWidth, height: screen.cssHeight };
+    dialog.limits = renderer.exportLimits();
+    dialog.work = this.exportWork;
+    dialog.show();
   }
 
   /**
@@ -941,6 +1012,17 @@ export class KarmaniaViewer extends LitElement {
     }
   }
 
+  /** Says to those who watch whether there is something to export now, after each update (the layers being drawn or not changes it, and it changes the viewer's render). */
+  protected override updated(): void {
+    const now = this.exportable();
+    if (now !== this.exportableNow) {
+      this.exportableNow = now;
+      for (const listener of [...this.exportableListeners]) {
+        listener(now);
+      }
+    }
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
     // Put back in a page, the viewer's first render has been made already.
@@ -1310,6 +1392,9 @@ export class KarmaniaViewer extends LitElement {
       <karmania-import-dialog
         @karmania-import-loaded=${this.onImportLoaded}
       ></karmania-import-dialog>
+      <karmania-export-dialog
+        .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
+      ></karmania-export-dialog>
       <karmania-map-crs-dialog
         @karmania-map-crs-apply=${this.onMapCrsApply}
         .engine=${this.engine}
