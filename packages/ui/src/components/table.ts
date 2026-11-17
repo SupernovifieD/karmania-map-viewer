@@ -3,6 +3,7 @@ import type { PropertyValues } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
+import { setStyle } from '../set-style.js';
 import { defineOnce } from '../define.js';
 import { sharedStyles } from '../shared-styles.js';
 import { columnWidth, rowNumberWidth, SAMPLE_ROWS, scrollLeftToReveal } from './table-columns.js';
@@ -835,7 +836,10 @@ export class KTable extends LitElement {
     return html`
       <div
         class="sizer"
-        style="--columns: ${columns}; height: ${this.headerHeight + scrollHeight}px"
+        style=${setStyle({
+          '--columns': columns,
+          height: `${String(this.headerHeight + scrollHeight)}px`,
+        })}
       >
         <div class="header" role="row" aria-rowindex="1">
           <div class="cell head number" role="columnheader">
@@ -853,7 +857,7 @@ export class KTable extends LitElement {
               ></div>`,
           )}
         </div>
-        <div class="rows" style="top: ${this.headerHeight + layerTop}px">
+        <div class="rows" style=${setStyle({ top: `${String(this.headerHeight + layerTop)}px` })}>
           ${repeat(
             rows,
             (row) => row,

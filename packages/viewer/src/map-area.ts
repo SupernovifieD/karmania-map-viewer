@@ -1,4 +1,4 @@
-import { kButton, sharedStyles } from '@karmania/ui';
+import { kButton, setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import { carriesFiles } from './drag.js';
 import { formatCount } from './import-files.js';
@@ -592,7 +592,11 @@ export class KarmaniaMapArea extends LitElement {
   private chip() {
     const percent = Math.round(Math.min(1, Math.max(0, this.progress)) * 100);
     const layers = this.preparing === 1 ? '1 layer' : `${formatCount(this.preparing)} layers`;
-    return html`<div class="notice chip" role="status" style=${`--k-progress: ${String(percent)}%`}>
+    return html`<div
+      class="notice chip"
+      role="status"
+      style=${setStyle({ '--k-progress': `${String(percent)}%` })}
+    >
       Preparing ${layers}…
       <span class="bar" aria-hidden="true"></span>
     </div>`;

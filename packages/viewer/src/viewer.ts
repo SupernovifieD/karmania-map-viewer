@@ -51,7 +51,7 @@ import type {
   Size,
   ViewMode,
 } from '@karmania/scene';
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
 import { CrsNames } from './crs-names.js';
@@ -1597,7 +1597,7 @@ export class KarmaniaViewer extends LitElement {
         class="workspace"
         ?data-collapsed=${this.panel.collapsed && this.withPanel}
         ?data-no-panel=${!this.withPanel}
-        style=${`--k-panel-width: ${String(width)}px`}
+        style=${setStyle({ '--k-panel-width': `${String(width)}px` })}
       >
         <karmania-map-area
           .datasets=${this.datasets.length}

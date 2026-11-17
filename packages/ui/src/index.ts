@@ -2,6 +2,8 @@
 export const PACKAGE_NAME = '@karmania/ui';
 
 export { sharedStyles } from './shared-styles.js';
+export { setStyle } from './set-style.js';
+export type { StyleProperties } from './set-style.js';
 export { KIcon } from './components/icon.js';
 export type { IconSize } from './components/icon.js';
 export { ICON_NAMES, isIconName } from './components/icons.js';

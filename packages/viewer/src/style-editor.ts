@@ -1,5 +1,5 @@
 import type { ClassColour, LayerContours, StylePatch } from '@karmania/scene';
-import { sharedStyles } from '@karmania/ui';
+import { setStyle, sharedStyles } from '@karmania/ui';
 import type { CheckboxChange, SelectChange } from '@karmania/ui';
 import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues } from 'lit';
@@ -555,7 +555,11 @@ export class KarmaniaStyleEditor extends LitElement {
                   this.onSwatchKey(event, index);
                 }}
               >
-                <span class="chip" aria-hidden="true" style=${`background: ${colour}`}></span>
+                <span
+                  class="chip"
+                  aria-hidden="true"
+                  style=${setStyle({ background: colour })}
+                ></span>
               </button>
             `,
           )}
