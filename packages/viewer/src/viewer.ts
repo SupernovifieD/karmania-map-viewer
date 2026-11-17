@@ -460,7 +460,10 @@ export class KarmaniaViewer extends LitElement {
   /** What draws the map on the canvas of the map area: there from just after the first render until the viewer is taken out. */
   private renderer: Renderer | undefined;
 
-  /** A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer. */
+  /**
+   * A rectangle of what the renderer has drawn, as it reads it back (see `Renderer.readPixels`), for tests; none without a renderer.
+   * @internal
+   */
   renderPixels(x: number, y: number, width: number, height: number): Uint8Array | undefined {
     return this.renderer?.readPixels(x, y, width, height);
   }
@@ -468,6 +471,7 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Which element of which layer is at a point of the map (`x` and `y` in CSS pixels from the top left of the canvas), as the renderer picks it
    * (see `Renderer.pick`); `null` where there is none, and `undefined` without a renderer. For tests, and for what a click does.
+   * @internal
    */
   async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
     return this.renderer?.pick(x, y);
@@ -476,12 +480,16 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Draws the map again for the picture of an export, band by band (see `Renderer.renderExport`); `undefined` without a renderer. The export of the viewer is made
    * with this (22.6), and the drawing of it is tested through it.
+   * @internal
    */
   async renderExport(options: ExportRenderOptions): Promise<ExportRendered | undefined> {
     return this.renderer?.renderExport(options);
   }
 
-  /** What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`). */
+  /**
+   * What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`).
+   * @internal
+   */
   exportLimits(): ExportLimits | undefined {
     return this.renderer?.exportLimits();
   }
@@ -493,6 +501,7 @@ export class KarmaniaViewer extends LitElement {
    * @throws Error if the map has not been drawn yet (there is no renderer), which is a mistake of the caller: nothing is exported before something is drawn.
    * @throws RangeError for a size or dpi that is not a number above 0.
    * Rejects with an `ExportError`, a `ComposeError`, an `ExportFontError`, or the signal's reason (see `composeExport`).
+   * @internal
    */
   async composePicture(options: PictureOptions): Promise<Composed<HTMLCanvasElement>> {
     const renderer = this.renderer;
@@ -560,6 +569,7 @@ export class KarmaniaViewer extends LitElement {
   /**
    * Where everything would go in the picture, with nothing drawn and no canvas of the picture's size made: what the export dialog warns from before it exports. Rejects as
    * `composePicture` does for the fonts and for a legend that leaves no room for the map (`ComposeError`).
+   * @internal
    */
   async planPicture(options: PictureOptions): Promise<ExportPlan> {
     const renderer = this.renderer;
@@ -647,7 +657,10 @@ export class KarmaniaViewer extends LitElement {
     });
   }
 
-  /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
+  /**
+   * How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one.
+   * @internal
+   */
   renderStats(): RenderStats | undefined {
     return this.renderer?.stats();
   }
@@ -839,7 +852,10 @@ export class KarmaniaViewer extends LitElement {
     return this.contours;
   }
 
-  /** Whether the contours of a layer are being made, are there, or could not be made (and why), for the style editor. */
+  /**
+   * Whether the contours of a layer are being made, are there, or could not be made (and why), for the style editor.
+   * @internal
+   */
   contoursState(layerId: string): ContoursState {
     return this.contours?.state(layerId) ?? { status: 'idle' };
   }
@@ -916,7 +932,10 @@ export class KarmaniaViewer extends LitElement {
     return this.legend;
   }
 
-  /** Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics. */
+  /**
+   * Where each layer is (`preparing`, `drawn`, `not_drawn` with why, ...), for tests and diagnostics.
+   * @internal
+   */
   layerStates(): [string, LayerState][] {
     return [...(this.pipeline?.states() ?? [])];
   }

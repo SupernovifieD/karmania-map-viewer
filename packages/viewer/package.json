@@ -9,7 +9,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node ../../scripts/emit-declarations.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
