@@ -287,12 +287,65 @@ describe('exportLayout: the size of the picture', () => {
       odd.map.y,
       odd.map.width,
       odd.map.height,
-      odd.northArrow.x,
-      odd.northArrow.y,
-      odd.northArrow.width,
+      odd.northArrow?.x,
+      odd.northArrow?.y,
+      odd.northArrow?.width,
     ]) {
       expect(Number.isInteger(value), String(value)).toBe(true);
     }
+  });
+
+  it('leaves out the north arrow and the scale bar when the map is too small to hold them with their 16 all round, and never puts them outside the map', () => {
+    const bar = { width: 100, height: 24 };
+    // The legend is one line, 200 wide (the least) at 96 dpi, so the map is the picture less 48 + 24 + 200.
+    const roomy = layout([layer('A')], 800, 600, 96, bar);
+    expect(roomy.northArrow).not.toBeNull();
+    expect(roomy.scaleBar).not.toBeNull();
+    // A map 70 wide holds the arrow (40 and 16 each side is 72): no; 72 is the least.
+    const justNot = layout([layer('A')], 48 + 24 + 200 + 71, 600, 96, bar);
+    expect(justNot.map.width).toBe(71);
+    expect(justNot.northArrow).toBeNull();
+    const just = layout([layer('A')], 48 + 24 + 200 + 72, 600, 96, bar);
+    expect(just.northArrow).toEqual({
+      x: just.map.x + 16,
+      y: just.map.y + 16,
+      width: 40,
+      height: 40,
+    });
+    // The scale bar, 100 wide, needs 132; the arrow is there at 72 and the bar is not.
+    expect(just.scaleBar).toBeNull();
+    // 120 is room for the bar (100) and the inset on its left but not on its right: it is left out.
+    expect(layout([layer('A')], 48 + 24 + 200 + 120, 600, 96, bar).scaleBar).toBeNull();
+    const wide = layout([layer('A')], 48 + 24 + 200 + 132, 600, 96, bar);
+    expect(wide.scaleBar).not.toBeNull();
+    // Everything that is there is inside the map, with the inset all round.
+    for (const l of [roomy, just, wide]) {
+      for (const r of [l.northArrow, l.scaleBar]) {
+        if (r !== null) {
+          expect(r.x).toBeGreaterThanOrEqual(l.map.x + 16);
+          expect(r.y).toBeGreaterThanOrEqual(l.map.y + 16);
+          expect(r.x + r.width).toBeLessThanOrEqual(l.map.x + l.map.width - 16);
+          expect(r.y + r.height).toBeLessThanOrEqual(l.map.y + l.map.height - 16);
+        }
+      }
+    }
+  });
+
+  it('leaves out the scale bar and keeps the north arrow when they would be one over the other, and leaves out both when the map is too short', () => {
+    const bar = { width: 100, height: 24 };
+    // A map 132 wide holds both side by side, and 90 high is room for each (72 and 56) but not for one over the other: the arrow's bottom is at 16 + 40 = 56 and the bar's top
+    // at 90 - 16 - 24 = 50, so they would overlap. The arrow is kept.
+    const crowded = layout([layer('A')], 48 + 24 + 200 + 132, 48 + 90, 96, bar);
+    expect(crowded.map.height).toBe(90);
+    expect(crowded.northArrow).not.toBeNull();
+    expect(crowded.scaleBar).toBeNull();
+    // At 100 high they do not overlap, and both are there.
+    const roomy = layout([layer('A')], 48 + 24 + 200 + 132, 48 + 100, 96, bar);
+    expect(roomy.northArrow).not.toBeNull();
+    expect(roomy.scaleBar).not.toBeNull();
+    const short = layout([layer('A')], 800, 48 + 50, 96, bar);
+    expect(short.northArrow).toBeNull();
+    expect(short.scaleBar).toBeNull();
   });
 
   it('is a mistake to give a picture or a dpi that is not above 0', () => {

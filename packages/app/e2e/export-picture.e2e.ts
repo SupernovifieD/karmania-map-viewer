@@ -64,10 +64,9 @@ test.describe('the picture put together', () => {
     expect(out.layout.map).toEqual({ x: 24, y: 24, width: 802, height: 602 });
     expect(out.inner).toEqual({ x: 25, y: 25, width: 800, height: 600 });
     // Everything of the screen's canvas but under the north arrow and the scale bar, which the picture draws over its map (on the screen they are DOM over the canvas).
-    const furniture = [
-      out.layout.northArrow,
-      ...(out.layout.scaleBar === null ? [] : [out.layout.scaleBar]),
-    ];
+    const furniture = [out.layout.northArrow, out.layout.scaleBar].filter(
+      (box): box is Box => box !== null,
+    );
     const same = await pictureAgainstScreen(page, { x: 25, y: 25 }, furniture);
     expect(
       same.first,
@@ -225,7 +224,8 @@ test.describe('the picture put together', () => {
       width: 40,
       height: 40,
     });
-    const arrow = await pictureRegion(page, northArrow);
+    expect(northArrow).not.toBeNull();
+    const arrow = await pictureRegion(page, northArrow as Box);
     let head = 0;
     for (let i = 0; i < arrow.length; i += 4) {
       if (near([arrow[i] ?? 0, arrow[i + 1] ?? 0, arrow[i + 2] ?? 0], ACCENT, 6)) {
@@ -254,8 +254,47 @@ test.describe('the picture put together', () => {
     const out = made(await composePicture(page, { width: 1100, height: 700 }));
     expect(out.layout.scaleBar).toBeNull();
     expect(out.scaleBarLabel).toBeNull();
-    const arrow = await pictureNotWhite(page, out.layout.northArrow, 4);
+    expect(out.layout.northArrow).not.toBeNull();
+    const arrow = await pictureNotWhite(page, out.layout.northArrow as Box, 4);
     expect(arrow).not.toBeNull();
+  });
+
+  test('leaves out the north arrow and the scale bar when the map is too narrow to hold them, and nothing spills out of the map into the gap before the legend', async ({
+    page,
+  }) => {
+    // A width at which the map is a strip of less than 72 pixels (what a north arrow and its inset need), found by asking the viewer for the plan of pictures 1,000 high, narrower
+    // and narrower: the case that showed the furniture over the legend's column in the dialog's preview.
+    const strip = await page.evaluate(async () => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        planPicture(o: object): Promise<{ layout: { map: { width: number } } }>;
+      };
+      for (let width = 900; width >= 300; width -= 4) {
+        const plan = await viewer
+          .planPicture({ size: { width, height: 1000 }, dpi: 96, legend: true })
+          .catch(() => undefined);
+        if (plan !== undefined && plan.layout.map.width >= 8 && plan.layout.map.width < 72) {
+          return width;
+        }
+      }
+      return undefined;
+    });
+    expect(strip, 'a width at which the map is a strip').toBeDefined();
+    const out = made(await composePicture(page, { width: strip ?? 0, height: 1000, legend: true }));
+    expect(out.layout.warnings).toContain('map_narrow');
+    expect(out.layout.northArrow).toBeNull();
+    expect(out.layout.scaleBar).toBeNull();
+    const { map, legend } = out.layout;
+    expect(legend).not.toBeNull();
+    const gap = {
+      x: map.x + map.width,
+      y: 0,
+      width: (legend?.x ?? 0) - (map.x + map.width),
+      height: 400,
+    };
+    expect(gap.width).toBe(24);
+    expect(await pictureNotWhite(page, gap, 4)).toBeNull();
   });
 
   test('is A4 landscape at 300 dpi when asked: 3,508 by 2,480, with the margins, line and rows at 3.125 times the size', async ({
