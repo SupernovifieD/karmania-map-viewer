@@ -384,7 +384,6 @@ export class KarmaniaViewer extends LitElement {
     if (renderer === undefined) {
       throw new Error('There is nothing to export: the map has not been drawn.');
     }
-    this.checkSize(options.size, renderer);
     const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
     return composeExport(browserEnv(this.ownerDocument), {
       ...this.pictureInput(options, renderer),
@@ -508,6 +507,10 @@ export class KarmaniaViewer extends LitElement {
   async exportPng(options: ExportPngOptions, run: ExportPngRun = {}): Promise<Blob> {
     const { signal, onProgress } = run;
     const size = { width: options.widthPx, height: options.heightPx };
+    // Only the picture that is the file is held to the sizes of a picture: the dialog's preview is a small copy of it, and may be under the least.
+    if (this.renderer !== undefined) {
+      this.checkSize(size, this.renderer);
+    }
     const composed = await this.composePicture({
       size,
       dpi: options.dpi,

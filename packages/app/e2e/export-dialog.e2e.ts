@@ -202,6 +202,28 @@ test.describe('the export dialog', () => {
     await expect(exportAction(page)).not.toHaveAttribute('disabled', '');
   });
 
+  test('makes a preview of a picture whose short side is the least there is, the preview being smaller than that least', async ({
+    page,
+  }) => {
+    // 1,000 by 64 without a legend: the preview is 560 by 36, under the 64 pixel least that a PICTURE has to be, which does not apply to a preview.
+    await chooseSize(page, 'Custom');
+    await legendBox(page).uncheck();
+    await widthInput(page).fill('1000');
+    await heightInput(page).fill('64');
+    await expect(caption(page)).toHaveText('1,000 × 64 px · 96 dpi');
+    // The preview is made again after a moment: wait for the one that is of this size (the one before it, of the map's own shape, stays until then).
+    await expect
+      .poll(() =>
+        previewCanvas(page).evaluate((e) => [
+          (e as HTMLCanvasElement).width,
+          (e as HTMLCanvasElement).height,
+        ]),
+      )
+      .toEqual([560, 36]);
+    await expect(dialog(page).locator('.frame')).toHaveAttribute('aria-busy', 'false');
+    await expect(dialog(page).locator('.frame .hint')).toHaveCount(0);
+  });
+
   test('says there is no room for the map, and does not export, when the legend takes the width; and that the map is narrow when it takes more than half', async ({
     page,
   }) => {
