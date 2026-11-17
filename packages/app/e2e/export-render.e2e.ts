@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import { fixture, projectionFor } from './support/fixtures.js';
 import { exportPicture, pictureBox, restoreContext, screenHash } from './support/export.js';
 import { sizeMap } from './support/golden.js';
-import { dispatch, drawn, layerStatuses, stats, withData } from './support/render.js';
+import { dispatch, drawn, layerStatuses, pixels, stats, withData } from './support/render.js';
 import { importAndLoad } from './support/wizard.js';
 
 /**
@@ -94,8 +94,23 @@ test.describe('the picture of the map for an export', () => {
         expect(out.height).toBe(600);
         expect(out.first, 'the first pixel that is not the screen’s').toBeNull();
         expect(out.differences).toBe(0);
-        // A picture of this size is more than one band, which is what the reading in bands has to be tested with.
-        expect(out.bands).toBeGreaterThanOrEqual(1);
+      }
+    });
+  }
+
+  for (const mode of ['2d', '3d'] as const) {
+    test(`is what the screen shows, to the byte, when it is read off the card in many small bands, in ${mode}: the bands are put where they belong`, async ({
+      page,
+    }) => {
+      await loadScene(page);
+      await lookAtScene(page, mode);
+      // 600 rows in bands of 64: ten bands, the last of 24 rows. A band put one row off, or turned over, or in the wrong place would show in a byte for byte comparison.
+      const out = await exportPicture(page, { compareWithScreen: true, bandRows: 64 });
+      expect(out.ok, JSON.stringify(out)).toBe(true);
+      if (out.ok) {
+        expect(out.bands).toBe(10);
+        expect(out.first, 'the first pixel that is not the screen’s').toBeNull();
+        expect(out.differences).toBe(0);
       }
     });
   }
@@ -172,6 +187,31 @@ test.describe('the picture of the map for an export', () => {
       });
       expect(out.ok, JSON.stringify(out)).toBe(true);
       expect(out.ok && out.differences).toBe(0);
+    });
+
+    test('leaves the screen cleared to the page’s colour when the theme changes while a picture is made, and not to the picture’s or the old theme’s', async ({
+      page,
+    }) => {
+      // The page goes dark while the picture is being read off the card in many small bands (so that the screen draws meanwhile, as it does when a theme changes).
+      const out = await exportPicture(page, { bandRows: 16, at: { done: 0.55, do: 'dark' } });
+      expect(out.ok, JSON.stringify(out)).toBe(true);
+      // A frame of the screen now (reading a pixel draws one): its corner is the dark map's colour (14, 16, 19), which is what the page says, and not the light one that the picture
+      // is drawn on, nor the light one that was the page's before: the screen sets its colour from the page when it draws, whatever the export did to the card meanwhile.
+      expect((await pixels(page, [0, 0, 1, 1])).slice(0, 3)).toEqual([14, 16, 19]);
+      expect((await stats(page))?.background).toBe('#0e1013');
+    });
+
+    test('leaves the screen of a dark page cleared to the dark map’s colour after a picture is made, which is drawn on the light one', async ({
+      page,
+    }) => {
+      await page.goto('/?theme=dark');
+      await withData(page);
+      await settle(page, 1);
+      expect((await pixels(page, [0, 0, 1, 1])).slice(0, 3)).toEqual([14, 16, 19]);
+      const out = await exportPicture(page);
+      expect(out.ok, JSON.stringify(out)).toBe(true);
+      // A frame of the screen now: dark again. (The picture's own map is the light colour, which the card was left cleared to if the screen did not set its own.)
+      expect((await pixels(page, [0, 0, 1, 1])).slice(0, 3)).toEqual([14, 16, 19]);
     });
 
     test('stops, and says so, when the map changes while it is drawn: a picture of half of one thing and half of another is not made', async ({

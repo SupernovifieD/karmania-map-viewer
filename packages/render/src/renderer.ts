@@ -26,7 +26,7 @@ import { perspectiveFrame } from './camera-3d.js';
 import type { PerspectiveFrame } from './camera-3d.js';
 import { CompiledLayers } from './compiled-layers.js';
 import { parseCssColour } from './css-colour.js';
-import { createExporter, ExportError } from './export-render.js';
+import { createExporter, ExportError, limitsOf, settleUntilReady } from './export-render.js';
 import type { ExportLimits, ExportRenderOptions, ExportRendered } from './export-render.js';
 import { makeLayer } from './layer-kinds.js';
 import { LayerSet } from './layer-set.js';
@@ -738,45 +738,36 @@ export async function createRenderer(
       : { layerId, element: found.element };
   }
 
-  /** How many turns of the page an export gives the screen's drawing to finish what it has begun (the layers built, the programs made) before it says it is not ready. */
-  const MAX_SETTLE_TURNS = 3000;
   const nextTask = (): Promise<void> =>
     new Promise<void>((resolve) => {
       view.setTimeout(resolve, 0);
     });
 
-  /**
-   * Lets the screen's drawing finish what it has begun, a frame at a time as it would (a part of each layer put on the card, the programs of each made off this thread), so
-   * that an export does not put a million points on the card in one task. Nothing is waited for by the clock: it is a number of turns, after which it says it is not ready.
-   */
-  async function settle(): Promise<void> {
-    for (let turn = 0; turn < MAX_SETTLE_TURNS; turn += 1) {
-      if (unusable()) {
-        return;
-      }
-      if (!layers.pending && drawOrder().every((id) => programs.has(id))) {
-        return;
-      }
-      draw(false);
-      await nextTask();
-    }
-    throw new ExportError('not_ready', 'The map is still being put on the graphics card.');
-  }
+  /** Lets the screen's drawing finish what it has begun before an export draws (see `settleUntilReady`). */
+  const settle = (signal?: AbortSignal): Promise<void> =>
+    settleUntilReady(
+      {
+        unusable,
+        ready: () => !layers.pending && drawOrder().every((id) => programs.has(id)),
+        step: () => {
+          draw(false);
+        },
+        nextTask,
+      },
+      signal,
+    );
 
   /** What the card allows, as it says. */
   function exportLimits(): ExportLimits {
-    const number = (value: unknown, fallback: number): number =>
-      typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
-    const first = (value: unknown, at: number, fallback: number): number =>
-      value instanceof Int32Array || value instanceof Float32Array
-        ? number(value[at], fallback)
-        : fallback;
-    return {
-      renderbuffer: number(context.getParameter(context.MAX_RENDERBUFFER_SIZE), DEFAULT_MAX_BUFFER),
-      texture: number(context.getParameter(context.MAX_TEXTURE_SIZE), DEFAULT_MAX_BUFFER),
-      viewport: first(context.getParameter(context.MAX_VIEWPORT_DIMS), 0, DEFAULT_MAX_BUFFER),
-      pointSize: first(context.getParameter(context.ALIASED_POINT_SIZE_RANGE), 1, 1),
-    };
+    return limitsOf(
+      {
+        renderbuffer: context.getParameter(context.MAX_RENDERBUFFER_SIZE),
+        texture: context.getParameter(context.MAX_TEXTURE_SIZE),
+        viewport: context.getParameter(context.MAX_VIEWPORT_DIMS),
+        pointRange: context.getParameter(context.ALIASED_POINT_SIZE_RANGE),
+      },
+      DEFAULT_MAX_BUFFER,
+    );
   }
 
   const renderExport = createExporter({
@@ -819,6 +810,11 @@ export async function createRenderer(
       }
     },
     yieldTask: nextTask,
+    // The next frame of the screen sets its own clear colour from the page, before it clears (as it does after a context is restored). No frame is asked for: the screen is
+    // as it was, and an idle page draws nothing.
+    restoreScreen: () => {
+      background = '';
+    },
   });
 
   /** Gives the buffer the size of the box at the pixel ratio of the page now, and asks for a frame if it changed. */

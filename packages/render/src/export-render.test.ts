@@ -1,6 +1,13 @@
-import { Color, Scene, WebGLRenderTarget } from 'three';
+import { Scene, WebGLRenderTarget } from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GL_OUT_OF_MEMORY, ExportError, createExporter } from './export-render.js';
+import {
+  GL_OUT_OF_MEMORY,
+  ExportError,
+  MAX_SETTLE_TURNS,
+  createExporter,
+  limitsOf,
+  settleUntilReady,
+} from './export-render.js';
 import type { ExportGl, ExportHost, ExportRenderOptions } from './export-render.js';
 import type { FrameInfo } from './look.js';
 
@@ -36,7 +43,6 @@ function fake(
   const state: Fake['state'] = { status: 'ok', revision: 1, viewMode: mode };
   let bound = false;
   let prepared = false;
-  let colour = new Color(0.1, 0.2, 0.3);
   const scenes = names.map((id) => ({ id, scene: Object.assign(new Scene(), { name: id }) }));
   const notBound = (what: string): void => {
     if (bound) {
@@ -68,12 +74,7 @@ function fake(
     clearDepth() {
       log.push('clearDepth');
     },
-    getClearColor(target) {
-      return target.copy(colour);
-    },
-    getClearAlpha: () => 0.25,
     setClearColor(next, alpha = 1) {
-      colour = next.clone();
       clears.push({ colour: [next.r, next.g, next.b], alpha, bound });
       log.push(`clearColour ${bound ? 'bound' : 'unbound'}`);
     },
@@ -94,8 +95,9 @@ function fake(
       log.push('prepare');
       prepared = true;
     },
-    settle: () => {
+    settle: (signal) => {
       notBound('settled');
+      signal?.throwIfAborted();
       log.push('settle');
       return Promise.resolve();
     },
@@ -114,6 +116,11 @@ function fake(
       notBound('yielded');
       log.push('yield');
       return Promise.resolve();
+    },
+    // What the screen is told when the export has drawn: with no target bound, or the colour it would be written for would be the target's.
+    restoreScreen: () => {
+      notBound('the screen was restored');
+      log.push('screen');
     },
     ...overrides,
   };
@@ -141,13 +148,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** What has to be true of the card and the screen after an export that did not come to an end: nothing is left bound, and the screen was told to set its colour again, last. */
+function expectLeftClean(made: Fake): void {
+  expect(made.log.filter((line) => line === 'bind')).toHaveLength(
+    made.log.filter((line) => line === 'unbind').length,
+  );
+  expect(made.log.at(-1)).toBe('screen');
+}
+
 describe('the export of the map', () => {
   it('makes the programs with the target bound, then clears and draws each layer in a slice of its own that is told what is true first, never waiting while the target is bound', async () => {
     const { host, log } = fake();
     await createExporter(host)(options());
     expect(log).toEqual([
       'settle',
-      // The programs: told first, each made with the target bound.
+      // The programs: told first, each made with the target bound; the screen is told it has to set its colour again once the target is unbound.
       'prepare',
       'bind',
       'compile a',
@@ -155,18 +170,21 @@ describe('the export of the map', () => {
       'bind',
       'compile b',
       'unbind',
-      // The clear is a slice; and then each layer, with the depth cleared before it in 2D.
+      'screen',
+      // The clear is a slice; and then each layer, with the depth cleared before it in 2D. After each slice the screen is told.
       'prepare',
       'bind',
       'clearColour bound',
       'clear',
       'unbind',
+      'screen',
       'prepare',
       'bind',
       'place a',
       'clearDepth',
       'render a',
       'unbind',
+      'screen',
       'yield',
       'prepare',
       'bind',
@@ -174,10 +192,11 @@ describe('the export of the map', () => {
       'clearDepth',
       'render b',
       'unbind',
+      'screen',
       'yield',
       'read 0 6',
-      // And the screen's clear colour is put back last, with no target bound.
-      'clearColour unbound',
+      // And at the very end, once more.
+      'screen',
     ]);
   });
 
@@ -204,24 +223,23 @@ describe('the export of the map', () => {
     expect(log).not.toContain('clearDepth');
   });
 
-  it('clears to the bytes of the background as they are, and puts the clear colour that was there back', async () => {
+  it('clears to the bytes of the background as they are, with the target bound, and tells the screen to set its own colour again after every slice and at the end, never putting back a saved one', async () => {
     const { host, clears, log } = fake();
     await createExporter(host)(options());
     // The colour is made in the working space of three from the bytes: converted from sRGB it would be 0.81 for 233, and the picture would be darker than the screen.
+    expect(clears).toHaveLength(1);
     expect(clears[0]?.colour[0]).toBeCloseTo(233 / 255, 12);
     expect(clears[0]?.colour[1]).toBeCloseTo(236 / 255, 12);
     expect(clears[0]?.colour[2]).toBeCloseTo(240 / 255, 12);
     expect(clears[0]?.alpha).toBe(1);
-    expect(clears[1]?.colour[0]).toBeCloseTo(0.1, 12);
-    expect(clears[1]?.alpha).toBe(0.25);
-    // three writes a clear colour for the target that is bound when it is set, and writes it again on every render: the map's is set with the target bound (as it is,
-    // for the target), and the screen's is put back once, after the last render, with it unbound (as the screen's is made). Put back earlier, or with the target bound, the
-    // screen is cleared to a darker colour from then on (found by the byte-for-byte test of the browser).
-    expect(clears.map((clear) => clear.bound)).toEqual([true, false]);
-    const last = log.lastIndexOf('clearColour unbound');
-    expect(last).toBe(log.length - 1);
-    expect(last).toBeGreaterThan(log.lastIndexOf('render b'));
-    expect(clears).toHaveLength(2);
+    // three writes a clear colour for the target that is bound when it is set, and writes it again on every render, so the export's colour is in the card when it is done. The
+    // screen is told (with no target bound: the fake refuses otherwise) after every slice and at the end, and sets its own from the page when it next draws. It is not put back from a
+    // colour saved at the start: a theme that changed meanwhile would be put back to the old one for good (found by a reviewer; the browser test changes the theme meanwhile).
+    expect(log.at(-1)).toBe('screen');
+    // Two layers: the programs (two unbinds, one telling), the clear and the two layers (three slices, three tellings), and the end: five.
+    expect(log.filter((line) => line === 'unbind')).toHaveLength(5);
+    expect(log.filter((line) => line === 'screen')).toHaveLength(5);
+    expect(log.lastIndexOf('screen')).toBeGreaterThan(log.lastIndexOf('render b'));
   });
 
   it('gives the picture from its top row, says how far it is in steps and never goes back, and ends at 1', async () => {
@@ -240,25 +258,23 @@ describe('the export of the map', () => {
     expect(progress).toEqual([0.05, 0.275, 0.5, 1]);
   });
 
-  it('frees the target, and leaves it unbound, when it is aborted while the programs are made', async () => {
+  it('frees the target, leaves it unbound and tells the screen, when it is aborted while the programs are made', async () => {
     const dispose = vi.spyOn(WebGLRenderTarget.prototype, 'dispose');
     const controller = new AbortController();
-    const { host, log } = fake({
-      gl: {
-        ...fake().host.gl,
-        compileAsync: (scene) => {
-          controller.abort(new DOMException('Stopped', 'AbortError'));
-          return Promise.resolve(scene);
-        },
-      },
-    });
+    const made = fake();
+    const compile = made.host.gl.compileAsync.bind(made.host.gl);
+    made.host.gl.compileAsync = (scene, camera) => {
+      controller.abort(new DOMException('Stopped', 'AbortError'));
+      return compile(scene, camera);
+    };
     await expect(
-      createExporter(host)(options({ signal: controller.signal })),
+      createExporter(made.host)(options({ signal: controller.signal })),
     ).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(log).not.toContain('read 0 6');
+    expect(made.log).not.toContain('read 0 6');
+    expectLeftClean(made);
   });
 
   it('stops with `interrupted` when the layers change while it draws, reads nothing and frees the target', async () => {
@@ -274,6 +290,35 @@ describe('the export of the map', () => {
     });
     expect(made.log.some((line) => line.startsWith('read'))).toBe(false);
     expect(dispose).toHaveBeenCalledTimes(1);
+    expectLeftClean(made);
+  });
+
+  it('stops with `interrupted` when the layers change while it waits for them to be built: what it draws is what the caller saw when it asked', async () => {
+    const made = fake();
+    made.host.settle = () => {
+      made.state.revision += 1;
+      return Promise.resolve();
+    };
+    await expect(createExporter(made.host)(options())).rejects.toMatchObject({
+      code: 'interrupted',
+    });
+    expect(made.log).toEqual([]);
+  });
+
+  it('stops at once, with the signal’s reason, when it is aborted while it waits for the layers to be built: the wait is given the signal', async () => {
+    const controller = new AbortController();
+    const made = fake();
+    made.host.settle = (signal) =>
+      new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+        });
+        controller.abort(new DOMException('Stopped', 'AbortError'));
+      });
+    await expect(
+      createExporter(made.host)(options({ signal: controller.signal })),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(made.log).toEqual([]);
   });
 
   it('is not stopped by a change of the layers once the picture is drawn: what is read is final', async () => {
@@ -297,6 +342,7 @@ describe('the export of the map', () => {
       code: 'context_lost',
     });
     expect(dispose).toHaveBeenCalledTimes(1);
+    expectLeftClean(made);
   });
 
   it('says so when the map was taken out of the page, before it touches the card', async () => {
@@ -332,6 +378,7 @@ describe('the export of the map', () => {
     expect(errors).toEqual([]);
     expect(made.log.some((line) => line.startsWith('read'))).toBe(false);
     expect(dispose).toHaveBeenCalledTimes(1);
+    expectLeftClean(made);
     // Other errors of the card are not the memory, and the picture goes on.
     errors = [0x0500, 0];
     await expect(createExporter(made.host)(options())).resolves.toBeDefined();
@@ -381,5 +428,114 @@ describe('the export of the map', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.code).toBe('busy');
     expect(error.name).toBe('ExportError');
+  });
+});
+
+describe('settleUntilReady', () => {
+  /** A host that is ready after `turns` steps, and counts what is done to it. */
+  function waiting(turns: number) {
+    const done = { steps: 0, tasks: 0 };
+    return {
+      done,
+      host: {
+        unusable: () => false,
+        ready: () => done.steps >= turns,
+        step: () => {
+          done.steps += 1;
+        },
+        nextTask: () => {
+          done.tasks += 1;
+          return Promise.resolve();
+        },
+      },
+    };
+  }
+
+  it('returns at once when the layers are built, with no step and no turn of the page', async () => {
+    const { host, done } = waiting(0);
+    await settleUntilReady(host);
+    expect(done).toEqual({ steps: 0, tasks: 0 });
+  });
+
+  it('does a step and gives the page a turn until the layers are built', async () => {
+    const { host, done } = waiting(4);
+    await settleUntilReady(host);
+    expect(done).toEqual({ steps: 4, tasks: 4 });
+  });
+
+  it('stops with the signal’s reason as soon as it is aborted, between two turns, and does no more steps', async () => {
+    const controller = new AbortController();
+    const { host, done } = waiting(1000);
+    const next = host.nextTask;
+    host.nextTask = () => {
+      if (done.tasks === 2) {
+        controller.abort(new DOMException('Stopped', 'AbortError'));
+      }
+      return next();
+    };
+    await expect(settleUntilReady(host, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(done.steps).toBe(3);
+  });
+
+  it('is not started for a signal that is aborted already', async () => {
+    const { host, done } = waiting(3);
+    await expect(settleUntilReady(host, AbortSignal.abort())).rejects.toBeDefined();
+    expect(done.steps).toBe(0);
+  });
+
+  it('returns when the renderer cannot be drawn on, so that the export says why', async () => {
+    const { host, done } = waiting(1000);
+    host.unusable = () => true;
+    await settleUntilReady(host);
+    expect(done.steps).toBe(0);
+  });
+
+  it('says it is not ready, by ExportError, after the turns it is given, and never waits by the clock', async () => {
+    const { host, done } = waiting(Number.POSITIVE_INFINITY);
+    await expect(settleUntilReady(host, undefined, 7)).rejects.toMatchObject({
+      name: 'ExportError',
+      code: 'not_ready',
+    });
+    expect(done.steps).toBe(7);
+    expect(MAX_SETTLE_TURNS).toBe(3000);
+  });
+});
+
+describe('limitsOf', () => {
+  const card = {
+    renderbuffer: 16_384,
+    texture: 8192,
+    viewport: Int32Array.of(16_384, 16_384),
+    pointRange: Float32Array.of(1, 255),
+  };
+
+  it('is what the card says: the renderbuffer and texture, the point range’s largest, and the viewport', () => {
+    expect(limitsOf(card, 4096)).toEqual({
+      renderbuffer: 16_384,
+      texture: 8192,
+      viewport: 16_384,
+      pointSize: 255,
+    });
+  });
+
+  it('takes the least of the two numbers of the viewport: a card may allow a different width and height', () => {
+    expect(limitsOf({ ...card, viewport: Int32Array.of(16_384, 4096) }, 4096).viewport).toBe(4096);
+    expect(limitsOf({ ...card, viewport: Int32Array.of(2048, 16_384) }, 4096).viewport).toBe(2048);
+  });
+
+  it('is the fallback for what is missing or is not a number above 0, and 1 for a point range that is missing', () => {
+    expect(
+      limitsOf(
+        { renderbuffer: undefined, texture: 'big', viewport: null, pointRange: undefined },
+        4096,
+      ),
+    ).toEqual({ renderbuffer: 4096, texture: 4096, viewport: 4096, pointSize: 1 });
+    expect(limitsOf({ ...card, renderbuffer: 0, texture: Number.NaN }, 100)).toMatchObject({
+      renderbuffer: 100,
+      texture: 100,
+    });
+    expect(limitsOf({ ...card, viewport: Int32Array.of(0, 5000) }, 100).viewport).toBe(100);
   });
 });
