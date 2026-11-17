@@ -42,7 +42,8 @@ import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
 import { browserEnv, composeExport } from './export-compose.js';
-import type { Composed, PictureOptions } from './export-compose.js';
+import type { Composed, ExportPngOptions, ExportPngRun, PictureOptions } from './export-compose.js';
+import { encodePng } from './png-encode.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -386,6 +387,38 @@ export class KarmaniaViewer extends LitElement {
       },
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    });
+  }
+
+  /**
+   * The exported picture as a PNG file (brief 11.8): the picture put together (see `composePicture`) and encoded, with the dpi in the file (`pHYs`) and the colour space (`sRGB`).
+   * The same scene and options give the same bytes twice in a row (in one browser). `progress` is how far it is, from 0 to 1, counted in steps and never in time; the picture is the
+   * first 70 % of it and the encoding the rest.
+   *
+   * @throws Error if the map has not been drawn yet; RangeError for a size or dpi that is not a number above 0.
+   * Rejects with an `ExportError` (the card, the size, another export going on), a `ComposeError`, an `ExportFontError`, a `PngError`, or the signal's reason.
+   */
+  async exportPng(options: ExportPngOptions, run: ExportPngRun = {}): Promise<Blob> {
+    const { signal, onProgress } = run;
+    const size = { width: options.widthPx, height: options.heightPx };
+    const composed = await this.composePicture({
+      size,
+      dpi: options.dpi,
+      legend: options.legend,
+      ...(signal === undefined ? {} : { signal }),
+      onProgress: (done) => onProgress?.(0.7 * done),
+    });
+    const ctx = composed.canvas.getContext('2d', { willReadFrequently: true });
+    if (ctx === null) {
+      throw new Error('The picture has no canvas to read.');
+    }
+    return encodePng({
+      width: size.width,
+      height: size.height,
+      dpi: options.dpi,
+      readRows: (first, count) => ctx.getImageData(0, first, size.width, count).data,
+      ...(signal === undefined ? {} : { signal }),
+      onProgress: (done) => onProgress?.(0.7 + 0.3 * done),
     });
   }
 

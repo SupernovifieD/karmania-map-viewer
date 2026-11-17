@@ -476,3 +476,143 @@ export function pictureAgainstScreen(
     [at, except] as const,
   );
 }
+
+/** What a test asks of `exportPng`. */
+export interface PngRequest {
+  readonly widthPx: number;
+  readonly heightPx: number;
+  readonly dpi?: number;
+  readonly legend?: boolean;
+  /** Keeps the bytes of the file in the page for `pngPixelsAgainstCanvas`, and says its hash; with `base64` it also gives the file (for small pictures). */
+  readonly base64?: boolean;
+  /** Stops the export when it is this far (0 to 1). */
+  readonly abortAt?: number;
+}
+
+/** What came of it. */
+export type PngOutcome =
+  | {
+      readonly ok: true;
+      readonly size: number;
+      /** FNV-1a of the bytes of the file. */
+      readonly hash: string;
+      readonly type: string;
+      readonly progress: readonly number[];
+      readonly base64: string | null;
+    }
+  | {
+      readonly ok: false;
+      readonly name: string;
+      readonly code: string | null;
+      readonly message: string;
+      readonly progress: readonly number[];
+    };
+
+/** Makes the PNG file through the viewer's `exportPng`, and keeps the Blob in the page. */
+export function exportPngFile(page: Page, request: PngRequest): Promise<PngOutcome> {
+  return page.evaluate(async (req) => {
+    interface Viewer {
+      exportPng(
+        options: { widthPx: number; heightPx: number; dpi: number; legend: boolean },
+        run: { signal: AbortSignal; onProgress: (done: number) => void },
+      ): Promise<Blob>;
+    }
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer | null;
+    const progress: number[] = [];
+    const controller = new AbortController();
+    try {
+      if (viewer === null) {
+        throw new Error('There is no viewer.');
+      }
+      const blob = await viewer.exportPng(
+        {
+          widthPx: req.widthPx,
+          heightPx: req.heightPx,
+          dpi: req.dpi ?? 96,
+          legend: req.legend ?? true,
+        },
+        {
+          signal: controller.signal,
+          onProgress: (done) => {
+            progress.push(done);
+            if (req.abortAt !== undefined && done >= req.abortAt) {
+              controller.abort(new DOMException('Stopped by the test', 'AbortError'));
+            }
+          },
+        },
+      );
+      (window as unknown as { __png: Blob }).__png = blob;
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let hash = 0x811c9dc5;
+      for (const byte of bytes) {
+        hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+      }
+      let base64: string | null = null;
+      if (req.base64 === true) {
+        let text = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        base64 = btoa(text);
+      }
+      return {
+        ok: true,
+        size: bytes.length,
+        hash: hash.toString(16),
+        type: blob.type,
+        progress,
+        base64,
+      } as const;
+    } catch (error) {
+      const e = error as { name?: string; code?: string; message?: string };
+      return {
+        ok: false,
+        name: e.name ?? 'Error',
+        code: e.code ?? null,
+        message: e.message ?? '',
+        progress,
+      } as const;
+    }
+  }, request);
+}
+
+/**
+ * Decodes the file that `exportPngFile` made with the browser's own decoder (`createImageBitmap`: not the code that wrote it) and counts the pixels that are not what the
+ * composed picture's canvas has (the last `composePicture`'s): the file is the picture, to the byte.
+ */
+export function pngPixelsAgainstCanvas(
+  page: Page,
+): Promise<{ width: number; height: number; differences: number }> {
+  return page.evaluate(async () => {
+    const holder = window as unknown as { __png?: Blob; __composed?: HTMLCanvasElement };
+    if (holder.__png === undefined || holder.__composed === undefined) {
+      throw new Error('There is no file or no picture to compare.');
+    }
+    const bitmap = await createImageBitmap(holder.__png, { colorSpaceConversion: 'none' });
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true });
+    const own = holder.__composed.getContext('2d');
+    if (ctx === null || own === null) {
+      throw new Error('There is no canvas.');
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    const a = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    const b = own.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    let differences = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      if (
+        a[i] !== b[i] ||
+        a[i + 1] !== b[i + 1] ||
+        a[i + 2] !== b[i + 2] ||
+        a[i + 3] !== b[i + 3]
+      ) {
+        differences += 1;
+      }
+    }
+    return { width: bitmap.width, height: bitmap.height, differences };
+  });
+}

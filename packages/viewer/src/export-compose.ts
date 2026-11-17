@@ -102,6 +102,23 @@ export interface PictureOptions {
   readonly onProgress?: (done: number) => void;
 }
 
+/** What `exportPng` is asked for (brief 11.8): the size of the picture in pixels, its dpi, and whether the legend is put to the right of the map. */
+export interface ExportPngOptions {
+  readonly widthPx: number;
+  readonly heightPx: number;
+  /** Dots to the inch, above 0: written in the file, and the scale that the sizes of the screen are drawn at (`dpi / 96`). The dialog offers 96, 150 and 300. */
+  readonly dpi: number;
+  readonly legend: boolean;
+}
+
+/** How an export is stopped and watched. */
+export interface ExportPngRun {
+  /** Stops it; `exportPng` then rejects with the signal's reason. */
+  readonly signal?: AbortSignal;
+  /** Called with how far it is, from 0 to 1, in steps and never in time. */
+  readonly onProgress?: (done: number) => void;
+}
+
 /** What is made. */
 export interface Composed<C> {
   readonly canvas: C;
