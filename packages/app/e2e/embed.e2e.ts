@@ -71,6 +71,50 @@ test.describe('a page that embeds the viewer', () => {
 const HOST = 'width: 800px; height: 500px';
 
 test.describe('a viewer that is given an engine by the page', () => {
+  test('takes back what the import wizard loaded and was not told to keep, when it is taken out on the review step: a viewer of the same engine is not left with it', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(() => {
+      const engine = window.embed.createEngine();
+      window.engine = engine;
+      const place = (id: string): HTMLElement => {
+        const box = document.createElement('div');
+        box.id = id;
+        box.style.cssText = 'width: 800px; height: 600px';
+        document.body.append(box);
+        return box;
+      };
+      window.first = window.embed.createViewer(place('a'), { engine });
+      window.second = window.embed.createViewer(place('b'), { engine });
+      window.first.openImport([new File(['x,y\n1,2\n3,4\n'], 'wells.csv', { type: 'text/csv' })]);
+    });
+    const wizard = page.locator('#a karmania-import-dialog');
+    const step = wizard.locator('.step');
+    // On to the review step, with the coordinate system typed where the file has none.
+    for (let pressed = 0; pressed < 6; pressed += 1) {
+      const at = await step.getAttribute('data-step');
+      if (at === 'review') {
+        break;
+      }
+      if (at === 'crs') {
+        const crs = wizard.locator('karmania-crs-step');
+        await crs.locator('.choice k-select').first().locator('select').selectOption('epsg');
+        await crs.locator('k-input input').fill('32640');
+      }
+      const next = wizard.locator('k-button[slot="footer-end"]').nth(1).locator('button');
+      await expect(next).toBeEnabled();
+      await next.click();
+      await expect(step).not.toHaveAttribute('data-step', at ?? '');
+    }
+    await expect(wizard.locator('karmania-review-step .verdict')).toHaveText('Ready to load');
+    // The review loads it, to show what it is; it is in the engine, and not yet kept.
+    await expect.poll(() => page.evaluate(() => window.engine?.datasets().length)).toBe(1);
+    // The page takes the viewer out of the page with the wizard open.
+    await page.evaluate(() => window.first?.dispose());
+    await expect.poll(() => page.evaluate(() => window.second?.engine.datasets().length)).toBe(0);
+  });
+
   test('does not adopt what finishes loading after it was taken out: the engine has the dataset, and the saved state of the panel is left alone', async ({
     page,
   }) => {
@@ -242,6 +286,34 @@ const dropOnMap = (host: Locator) =>
   });
 
 test.describe('a viewer made with the panel or the import left out', () => {
+  test('does not read the saved state of the panel when it has no panel, and does when it has one (the control)', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const reads = await page.evaluate(() => {
+      const seen: string[] = [];
+      const storage = Storage.prototype as unknown as {
+        getItem: (this: Storage, key: string) => string | null;
+      };
+      const getItem = storage.getItem;
+      storage.getItem = function (this: Storage, key: string): string | null {
+        seen.push(key);
+        return getItem.call(this, key);
+      };
+      const made = (options: { panel: boolean }): number => {
+        seen.length = 0;
+        const box = document.createElement('div');
+        box.style.cssText = 'width: 800px; height: 600px';
+        document.body.append(box);
+        window.embed.createViewer(box, options);
+        return seen.filter((key) => key === 'karmania.panel').length;
+      };
+      return { without: made({ panel: false }), withPanel: made({ panel: true }) };
+    });
+    expect(reads.without).toBe(0);
+    expect(reads.withPanel).toBeGreaterThan(0);
+  });
+
   /** Puts a viewer made with `options` in a host, and says what is in it. */
   const inspect = (page: Page, options: { panel?: boolean; importUi?: boolean }) =>
     page.evaluate(
@@ -762,6 +834,25 @@ test.describe('the events of a viewer', () => {
 });
 
 test.describe('a viewer in a box of a page', () => {
+  test('opens the import wizard for files that are given the moment the viewer is made, and not only after it has first been drawn', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(() => {
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 800px; height: 600px';
+      document.body.append(box);
+      // As an embedder writes it: the viewer is made and asked at once.
+      window.embed
+        .createViewer(box)
+        .openImport([new File(['x,y\n1,2\n3,4\n'], 'wells.csv', { type: 'text/csv' })]);
+    });
+    const wizard = page.locator('#box karmania-import-dialog');
+    await expect(wizard.locator('karmania-file-step')).toBeVisible();
+    await expect(wizard.locator('.step')).toHaveAttribute('data-step', 'file');
+  });
+
   test('makes a picture when it is asked for in the very frame that exportable() says it can, and does not fail for a map that has no size yet', async ({
     page,
   }) => {
@@ -958,6 +1049,11 @@ test.describe('a viewer in a box of a page', () => {
       box.style.width = '400px';
     });
     await expect.poll(width).toBe(280);
+    // The box is narrower than the least of the panel: the panel does not go outside it into the page.
+    await page.locator('#box').evaluate((box) => {
+      box.style.width = '200px';
+    });
+    await expect.poll(width).toBe(200);
   });
 
   test('refuses files dropped in its own box, where nothing takes them, and leaves the page outside it alone', async ({

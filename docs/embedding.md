@@ -113,7 +113,7 @@ const viewer = createViewer(container, {
 viewer.dispose();
 ```
 
-- **The container has a size.** The viewer fills it: a container that is 0 high shows nothing. The panel's width is limited by the viewer's own width (at most half of it, up to 640 pixels, and at least 280), not by the window's.
+- **The container has a size.** The viewer fills it: a container that is 0 high shows nothing. The panel's width is limited by the viewer's own width (at most half of it, up to 640 pixels, and at least 280, or all of the viewer where that is less: a viewer in so narrow a box has no room left for the map, so give it `panel: false`), not by the window's.
 - **Theme.** The colours are tokens on `:root` (`style.css`). The viewer follows the system's light or dark setting; a page that wants one of them sets `data-theme="light"` or
   `data-theme="dark"` on `<html>`. The viewer has its own font, colour and background (Inter, from the tokens), so it looks the same on a page that has none of these.
 - **The element.** `createViewer` puts a `<karmania-viewer>` element in the container; the function is the supported way to use it.

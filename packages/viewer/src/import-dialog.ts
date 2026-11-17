@@ -138,6 +138,15 @@ export class KarmaniaImportDialog extends LitElement {
     this.position = 0;
   }
 
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    // The viewer was taken out of the page with the wizard open. The review step loads the data to show what it is, and takes it out again when it is not kept: left open,
+    // that data would stay in the engine, which may be the page's and shared with other viewers.
+    if (this.open) {
+      this.close();
+    }
+  }
+
   /** The files that can be imported, in the order they were given: one is imported at a time. */
   private get queue(): readonly FileEntry[] {
     return this.entries?.filter((entry) => isImportable(entry.preview)) ?? [];
