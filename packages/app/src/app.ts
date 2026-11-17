@@ -21,6 +21,9 @@ const EXAGGERATION_OPTIONS: readonly SelectOption[] = EXAGGERATIONS.map((factor)
 /** Why the select of the exaggeration cannot be used in 2D, for the tooltip of the disabled control. */
 const ONLY_IN_3D = 'Only in the 3D view';
 
+/** Why the Export PNG button cannot be used yet, for the tooltip of the disabled button. */
+const NOTHING_TO_EXPORT = 'There is nothing drawn on the map to export';
+
 /** The views the map can be shown in, as the toolbar's control offers them. */
 const VIEWS: readonly SegmentedOption[] = [
   { value: '2d', label: '2D' },
@@ -39,6 +42,7 @@ export class KarmaniaApp extends LitElement {
   static override properties = {
     view: { state: true },
     exaggeration: { state: true },
+    canExport: { state: true },
   };
 
   static override styles = [
@@ -102,13 +106,18 @@ export class KarmaniaApp extends LitElement {
   /** What the scene multiplies heights by, which the select shows. */
   declare private exaggeration: number;
 
-  /** Stops following the scene. */
+  /** Whether there is something drawn to export, which the Export PNG button follows. */
+  declare private canExport: boolean;
+
+  /** Stops following the scene, and whether there is something to export. */
   private unfollow: (() => void) | undefined;
+  private unfollowExport: (() => void) | undefined;
 
   constructor() {
     super();
     this.view = '2d';
     this.exaggeration = 1;
+    this.canExport = false;
   }
 
   override connectedCallback(): void {
@@ -127,6 +136,8 @@ export class KarmaniaApp extends LitElement {
     super.disconnectedCallback();
     this.unfollow?.();
     this.unfollow = undefined;
+    this.unfollowExport?.();
+    this.unfollowExport = undefined;
     this.viewer?.dispose();
     this.viewer = undefined;
   }
@@ -146,6 +157,10 @@ export class KarmaniaApp extends LitElement {
       this.unfollow = viewer.on('scene', (scene) => {
         this.view = scene.viewMode;
         this.exaggeration = scene.verticalExaggeration;
+      });
+      this.canExport = viewer.exportable();
+      this.unfollowExport = viewer.onExportable((available) => {
+        this.canExport = available;
       });
     }
   }
@@ -167,6 +182,11 @@ export class KarmaniaApp extends LitElement {
     this.viewer?.setViewMode(event.detail.value === '3d' ? '3d' : '2d');
     // The control shows the view the scene is in, which is what was chosen unless the scene did not take it: the control has changed itself already.
     (event.currentTarget as KSegmented).value = this.viewer?.scene().viewMode ?? this.view;
+  };
+
+  /** Opens the viewer's export dialog. */
+  private readonly openExport = (): void => {
+    this.viewer?.openExport();
   };
 
   /** Opens the viewer's file picker. */
@@ -199,6 +219,15 @@ export class KarmaniaApp extends LitElement {
             ></k-select>
           </k-tooltip>
         </div>
+        <!-- Always there, so that nothing moves; while nothing is drawn it is disabled, and the tooltip says why. -->
+        <k-tooltip text=${this.canExport ? '' : NOTHING_TO_EXPORT} placement="bottom">
+          ${kButton({
+            icon: 'download',
+            children: 'Export PNG',
+            disabled: !this.canExport,
+            onClick: this.openExport,
+          })}
+        </k-tooltip>
       </header>
       <div class="viewer"></div>
     `;

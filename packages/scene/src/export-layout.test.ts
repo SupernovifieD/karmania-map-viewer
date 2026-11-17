@@ -238,9 +238,9 @@ describe('exportLayout: a heading is never the last line of a column', () => {
     ]);
   });
 
-  it('does not move a heading that would be too tall, with what follows it, for a column of its own: it stays', () => {
-    // Found by the review of the milestone: A (10) and the name of Grade (54) fill a column, and the first class (40) does not
-    // fit. Moving the name takes it to the next column, where it and the class (94) are taller than the 73 there is.
+  it('moves a layer’s name with its first class to the next column even when the two are taller than a column: that column runs past the margin, and the layout says so', () => {
+    // A (10) and the name of Grade (54) fill a column of 73, and the first class (40) does not fit. The name goes on with the class to the next column, where the two (94)
+    // are taller than the 73 there is: it is better than a name left at the end of its column with its class at the top of the next.
     const heights: Record<string, number> = { A: 10, Grade: 54, '0 \u2013 10': 40 };
     const lines = [layer('A'), layer('Grade', true), klass('0 \u2013 10')];
     const l = layout(lines, 1012, 149, 150, null, (line) => ({
@@ -251,16 +251,93 @@ describe('exportLayout: a heading is never the last line of a column', () => {
         ] ?? 0,
     }));
     expect(l.map.height).toBe(73);
-    expect(l.columns.map((c) => names(c.lines))).toEqual([['L:A', 'L:Grade'], ['C:0 \u2013 10']]);
-    expect(l.columns.map((c) => c.rect.height)).toEqual([64, 40]);
+    expect(l.columns.map((c) => names(c.lines))).toEqual([['L:A'], ['L:Grade', 'C:0 \u2013 10']]);
+    expect(l.columns.map((c) => c.rect.height)).toEqual([10, 94]);
+    expect(l.warnings).toContain('legend_too_tall');
   });
 
-  it('cannot move a heading that is alone in its column, and does not loop for ever', () => {
+  it('keeps a heading with the line after it when that line is taller than a column: the two share a column that runs past the margin, and it does not loop for ever', () => {
     const lines = [group('Survey'), layer('tall')];
     const l = layout(lines, 1200, 148, 96, null, (line) =>
       line.kind === 'layer' ? { width: 50, height: 400 } : measure(line),
     );
-    expect(l.columns.map((c) => names(c.lines))).toEqual([['G:Survey'], ['L:tall']]);
+    expect(l.columns.map((c) => names(c.lines))).toEqual([['G:Survey', 'L:tall']]);
+    expect(l.columns[0]?.rect.height).toBe(430);
+    expect(l.warnings).toContain('legend_too_tall');
+  });
+
+  it('keeps a heading, the name of the layer under it and its first class together when they do not fit a column, at the top of the legend too', () => {
+    // 72 between the margins (120 - 48): the heading (30) and the name (40) fit, and the first class (20) does not.
+    const lines = [
+      group('Survey'),
+      layer('Grade', true),
+      klass('0 \u2013 10'),
+      klass('10 \u2013 20'),
+    ];
+    const l = layout(lines, 1200, 120);
+    expect(l.columns.map((c) => names(c.lines))).toEqual([
+      ['G:Survey', 'L:Grade', 'C:0 \u2013 10'],
+      ['C:10 \u2013 20'],
+    ]);
+    expect(l.warnings).toEqual(['legend_too_tall']);
+  });
+
+  it('never ends a column with a group heading or the name of a layer that has classes, at any height of picture', () => {
+    const legend = [
+      group('Surveys'),
+      layer('Seismic', true),
+      klass('1'),
+      klass('2'),
+      klass('3'),
+      layer('Wells'),
+      group('Samples'),
+      layer('Geology', true),
+      klass('1'),
+      klass('2'),
+      klass('3'),
+      klass('4'),
+      layer('Plain'),
+    ];
+    for (let height = 40; height <= 400; height += 1) {
+      const l = layout(legend, 6000, height);
+      for (const [index, column] of l.columns.entries()) {
+        const last = column.lines.at(-1)?.line;
+        expect(
+          last?.kind === 'group' || (last?.kind === 'layer' && last.hasClasses),
+          `the picture is ${String(height)} high: column ${String(index)} ends with ${last?.kind ?? 'nothing'}`,
+        ).toBe(false);
+      }
+      // Every line is in it once, in order.
+      expect(l.columns.flatMap((c) => names(c.lines))).toEqual(
+        names(legend.map((line) => ({ line, rect: { x: 0, y: 0, width: 0, height: 0 } }))),
+      );
+    }
+  });
+});
+
+describe('exportLayout: the legend that is taller than the picture', () => {
+  it('has no warning when every column fits between the margins, and one when a column does not', () => {
+    const lines = [layer('A'), layer('B')];
+    expect(layout(lines, 1200, 148).warnings).toEqual([]);
+    expect(layout(lines, 1200, 148).columns.map((c) => c.rect.height)).toEqual([80]);
+    // 30 between the margins: the two layers (80 together, 40 each) do not fit one column, and a layer is taller than it.
+    const short = layout(lines, 1200, 78);
+    expect(short.columns.every((c) => c.rect.height > 30)).toBe(true);
+    expect(short.warnings).toEqual(['legend_too_tall']);
+  });
+
+  it('is said after the warning about the map, when both are so', () => {
+    // Three columns (632 wide with their gaps) in a picture 1,000 wide leave a map of 296, which is under half.
+    const l = layout([layer('A'), layer('B'), layer('C')], 1000, 78);
+    expect(l.warnings).toEqual(['map_narrow', 'legend_too_tall']);
+  });
+
+  it('is said for a line that is taller than a column, as it runs past the margin', () => {
+    const l = layout([layer('A'), layer('tall'), layer('B')], 2000, 300, 96, null, (line) => ({
+      width: 50,
+      height: line.kind === 'layer' && line.name === 'tall' ? 400 : 40,
+    }));
+    expect(l.warnings).toEqual(['legend_too_tall']);
   });
 });
 
@@ -287,12 +364,65 @@ describe('exportLayout: the size of the picture', () => {
       odd.map.y,
       odd.map.width,
       odd.map.height,
-      odd.northArrow.x,
-      odd.northArrow.y,
-      odd.northArrow.width,
+      odd.northArrow?.x,
+      odd.northArrow?.y,
+      odd.northArrow?.width,
     ]) {
       expect(Number.isInteger(value), String(value)).toBe(true);
     }
+  });
+
+  it('leaves out the north arrow and the scale bar when the map is too small to hold them with their 16 all round, and never puts them outside the map', () => {
+    const bar = { width: 100, height: 24 };
+    // The legend is one line, 200 wide (the least) at 96 dpi, so the map is the picture less 48 + 24 + 200.
+    const roomy = layout([layer('A')], 800, 600, 96, bar);
+    expect(roomy.northArrow).not.toBeNull();
+    expect(roomy.scaleBar).not.toBeNull();
+    // A map 70 wide holds the arrow (40 and 16 each side is 72): no; 72 is the least.
+    const justNot = layout([layer('A')], 48 + 24 + 200 + 71, 600, 96, bar);
+    expect(justNot.map.width).toBe(71);
+    expect(justNot.northArrow).toBeNull();
+    const just = layout([layer('A')], 48 + 24 + 200 + 72, 600, 96, bar);
+    expect(just.northArrow).toEqual({
+      x: just.map.x + 16,
+      y: just.map.y + 16,
+      width: 40,
+      height: 40,
+    });
+    // The scale bar, 100 wide, needs 132; the arrow is there at 72 and the bar is not.
+    expect(just.scaleBar).toBeNull();
+    // 120 is room for the bar (100) and the inset on its left but not on its right: it is left out.
+    expect(layout([layer('A')], 48 + 24 + 200 + 120, 600, 96, bar).scaleBar).toBeNull();
+    const wide = layout([layer('A')], 48 + 24 + 200 + 132, 600, 96, bar);
+    expect(wide.scaleBar).not.toBeNull();
+    // Everything that is there is inside the map, with the inset all round.
+    for (const l of [roomy, just, wide]) {
+      for (const r of [l.northArrow, l.scaleBar]) {
+        if (r !== null) {
+          expect(r.x).toBeGreaterThanOrEqual(l.map.x + 16);
+          expect(r.y).toBeGreaterThanOrEqual(l.map.y + 16);
+          expect(r.x + r.width).toBeLessThanOrEqual(l.map.x + l.map.width - 16);
+          expect(r.y + r.height).toBeLessThanOrEqual(l.map.y + l.map.height - 16);
+        }
+      }
+    }
+  });
+
+  it('leaves out the scale bar and keeps the north arrow when they would be one over the other, and leaves out both when the map is too short', () => {
+    const bar = { width: 100, height: 24 };
+    // A map 132 wide holds both side by side, and 90 high is room for each (72 and 56) but not for one over the other: the arrow's bottom is at 16 + 40 = 56 and the bar's top
+    // at 90 - 16 - 24 = 50, so they would overlap. The arrow is kept.
+    const crowded = layout([layer('A')], 48 + 24 + 200 + 132, 48 + 90, 96, bar);
+    expect(crowded.map.height).toBe(90);
+    expect(crowded.northArrow).not.toBeNull();
+    expect(crowded.scaleBar).toBeNull();
+    // At 100 high they do not overlap, and both are there.
+    const roomy = layout([layer('A')], 48 + 24 + 200 + 132, 48 + 100, 96, bar);
+    expect(roomy.northArrow).not.toBeNull();
+    expect(roomy.scaleBar).not.toBeNull();
+    const short = layout([layer('A')], 800, 48 + 50, 96, bar);
+    expect(short.northArrow).toBeNull();
+    expect(short.scaleBar).toBeNull();
   });
 
   it('is a mistake to give a picture or a dpi that is not above 0', () => {
@@ -408,14 +538,40 @@ describe('exportLayout: for any legend and picture', () => {
           }
           y += placed.rect.height;
         }
-        // No column but one with a single line that is too tall goes beyond the bottom margin.
-        if (column.lines.length > 1 && column.rect.y + column.rect.height > size.height - margin) {
+        // A column goes beyond the bottom margin only for lines that have to stay together (a heading, the name of a layer with its classes) and the line that goes with them:
+        // every line of it but the last keeps with the next. And the layout says so.
+        const beyond = column.rect.y + column.rect.height > size.height - margin;
+        if (
+          beyond &&
+          column.lines.length > 1 &&
+          !column.lines
+            .slice(0, -1)
+            .every(
+              (placed) =>
+                placed.line.kind === 'group' ||
+                (placed.line.kind === 'layer' && placed.line.hasClasses),
+            )
+        ) {
           wrong.push(
-            `${here}: column ${String(index)} of ${String(column.lines.length)} lines is too tall`,
+            `${here}: column ${String(index)} of ${String(column.lines.length)} lines is too tall, and not for lines that have to stay together`,
+          );
+        }
+        if (beyond && !l.warnings.includes('legend_too_tall')) {
+          wrong.push(
+            `${here}: column ${String(index)} goes past the bottom margin with no warning`,
           );
         }
       }
     }
     expect(wrong).toEqual([]);
   }, 20_000);
+
+  it('warns of a legend that is too tall exactly when a column runs past the bottom margin', () => {
+    const legend = [group('G'), layer('A', true), klass('1'), klass('2'), klass('3'), layer('B')];
+    for (let height = 30; height <= 300; height += 1) {
+      const l = layout(legend, 6000, height);
+      const beyond = l.columns.some((c) => c.rect.y + c.rect.height > height - 24);
+      expect(l.warnings.includes('legend_too_tall'), `${String(height)} high`).toBe(beyond);
+    }
+  });
 });

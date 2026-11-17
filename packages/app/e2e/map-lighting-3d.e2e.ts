@@ -8,6 +8,7 @@ import {
   camera,
   dispatch,
   distance,
+  isLitRound,
   drawn,
   layerColour,
   layerStatuses,
@@ -377,13 +378,13 @@ function pixelCoordinates(
 }
 
 test.describe('points and lines in 3D', () => {
-  /** True if one of the nine pixels round `(x, y)` is the colour, to within 2 of a byte: the thing is a pixel or two wide, and the projection rounds. */
+  /** True if one of the nine pixels round `(x, y)` is of the colour, lit as a sphere or a tube is: the thing is a pixel or two wide, and the projection rounds. */
   async function isThere(page: Page, at: { x: number; y: number }, colour: number[]) {
     const block = await around(page, at.x, at.y, 1);
-    return block.all().some(([, , pixel]) => distance(pixel, colour) <= 2);
+    return block.all().some(([, , pixel]) => isLitRound(pixel, colour));
   }
 
-  test('are not lit: a point and a line are the colour of their layer from two different sides, as a lit face would not be', async ({
+  test('are lit as a sphere and a tube (22.R1, 22.R2): a point and a line are some part of the colour of their layer from two different sides, never more than it, as the map around them is not', async ({
     page,
   }) => {
     for (const [file, spot] of [

@@ -17,7 +17,7 @@ const MAKERS: { readonly [K in RenderBuffers['kind']]: LayerMaker | undefined } 
   points: (buffers, look) =>
     buffers.kind === 'points' ? createPointsLayer(buffers, look) : undefined,
   lines: (buffers, look) =>
-    buffers.kind === 'lines' ? createLinesLayer(buffers, look) : undefined,
+    buffers.kind === 'lines' ? createLinesLayer(buffers, look, { tube: true }) : undefined,
   polygons: (buffers, look) =>
     buffers.kind === 'polygons' ? createPolygonsLayer(buffers, look) : undefined,
   mesh: (buffers, look) => (buffers.kind === 'mesh' ? createMeshLayer(buffers, look) : undefined),

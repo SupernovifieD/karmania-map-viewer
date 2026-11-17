@@ -11,6 +11,7 @@ import type {
 import {
   DEFAULT_DISTANCE_LIMITS,
   DEFAULT_SCALE_LIMITS,
+  ExportError,
   KEY_ZOOM_FACTOR,
   attachController2d,
   attachController3d,
@@ -18,18 +19,51 @@ import {
   zoom3dAt,
   zoomAt,
 } from '@karmania/render';
-import type { Controller2d, Controller3d, PickHit, Renderer, RenderStats } from '@karmania/render';
+import type {
+  Controller2d,
+  Controller3d,
+  ExportLimits,
+  ExportRenderOptions,
+  ExportRendered,
+  PickHit,
+  Renderer,
+  RenderStats,
+} from '@karmania/render';
 import {
+  EXPORT_COLOURS,
   cameraTo2d,
   cameraTo3d,
   createSceneStore,
+  exportLegendLines,
   firstNumericColumn,
   legendModel,
+  maxSide,
+  parseHex,
+  sizeProblems,
 } from '@karmania/scene';
-import type { Command, LegendModel, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
+import type {
+  Command,
+  LegendModel,
+  SceneDocument,
+  SceneListener,
+  Size,
+  ViewMode,
+} from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
+import { browserEnv, composeExport, planOnly } from './export-compose.js';
+import type {
+  Composed,
+  ExportPlan,
+  ExportPngOptions,
+  ExportPngRun,
+  PictureOptions,
+  PlanInput,
+} from './export-compose.js';
+import './export-dialog.js';
+import type { ExportDialogWork } from './export-dialog.js';
+import { encodePng } from './png-encode.js';
 import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
@@ -43,7 +77,9 @@ import './map-crs-dialog.js';
 import type { MapCrsApply } from './map-crs-dialog.js';
 import type { Navigate } from './nav-group.js';
 import type { DroppedFiles, KarmaniaMapArea, PointerOnMap } from './map-area.js';
+import { headingOf } from './heading.js';
 import { identifyModel } from './identify.js';
+import { unitsOf } from './map-units.js';
 import './identify-popover.js';
 import type { IdentifyClose, IdentifyShow } from './identify-popover.js';
 import type { TableSelect } from '@karmania/ui';
@@ -320,6 +356,180 @@ export class KarmaniaViewer extends LitElement {
    */
   async renderPick(x: number, y: number): Promise<PickHit | null | undefined> {
     return this.renderer?.pick(x, y);
+  }
+
+  /**
+   * Draws the map again for the picture of an export, band by band (see `Renderer.renderExport`); `undefined` without a renderer. The export of the viewer is made
+   * with this (22.6), and the drawing of it is tested through it.
+   */
+  async renderExport(options: ExportRenderOptions): Promise<ExportRendered | undefined> {
+    return this.renderer?.renderExport(options);
+  }
+
+  /** What the graphics card allows an export, or `undefined` without a renderer (see `Renderer.exportLimits`). */
+  exportLimits(): ExportLimits | undefined {
+    return this.renderer?.exportLimits();
+  }
+
+  /**
+   * Puts the picture of the map together on a canvas of `size` pixels at `dpi` (see `composeExport`): the map drawn again by the renderer in the light theme, the north arrow, the
+   * scale bar and, with `legend`, the legend, from the scene as it is now. This is what the exported file is made from (22.6), and what the dialog's preview is a small copy of.
+   *
+   * @throws Error if the map has not been drawn yet (there is no renderer), which is a mistake of the caller: nothing is exported before something is drawn.
+   * @throws RangeError for a size or dpi that is not a number above 0.
+   * Rejects with an `ExportError`, a `ComposeError`, an `ExportFontError`, or the signal's reason (see `composeExport`).
+   */
+  async composePicture(options: PictureOptions): Promise<Composed<HTMLCanvasElement>> {
+    const renderer = this.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is nothing to export: the map has not been drawn.');
+    }
+    const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
+    return composeExport(browserEnv(this.ownerDocument), {
+      ...this.pictureInput(options, renderer),
+      heading: headingOf(this.store.getState()),
+      renderMap: async (request) => {
+        await renderer.renderExport({
+          ...request,
+          background: bytes(EXPORT_COLOURS.map),
+          ink: bytes(EXPORT_COLOURS.text),
+        });
+      },
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    });
+  }
+
+  /**
+   * Refuses a picture that cannot be made, as the dialog does before it asks: the **whole picture** is held to the most a side can be (8,192, or less where the card allows
+   * less), and not only the map inside it, which is smaller by its margins and its line.
+   *
+   * @throws RangeError for a size that is not whole pixels or is below the least (a mistake of the caller).
+   * @throws ExportError `too_large` for a side above the most this computer can draw.
+   */
+  private checkSize(size: Size, renderer: Renderer): void {
+    const limits = renderer.exportLimits();
+    const most = maxSide(limits);
+    for (const problem of sizeProblems(size, most)) {
+      if (problem.code === 'too_large') {
+        throw new ExportError(
+          'too_large',
+          `The ${problem.side} of the picture is more than this computer can draw (${String(problem.most)} pixels at most).`,
+        );
+      }
+      throw new RangeError(
+        problem.code === 'too_small'
+          ? `The ${problem.side} of the picture has to be at least ${String(problem.least)} pixels.`
+          : 'The picture has to be whole pixels.',
+      );
+    }
+  }
+
+  /** What the layout of a picture is worked out from, for the scene as it is now. */
+  private pictureInput(options: PictureOptions, renderer: Renderer): PlanInput {
+    const state = this.store.getState();
+    const screen = renderer.stats();
+    return {
+      size: options.size,
+      dpi: options.dpi,
+      legend: options.legend ? this.currentLegend() : null,
+      viewMode: state.viewMode,
+      camera2d: state.camera2d,
+      camera3d: state.camera3d,
+      units: unitsOf(state.frame, this.mapCrsInfo()),
+      screen: { width: screen.cssWidth, height: screen.cssHeight },
+      fonts: this.ownerDocument.fonts,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    };
+  }
+
+  /**
+   * Where everything would go in the picture, with nothing drawn and no canvas of the picture's size made: what the export dialog warns from before it exports. Rejects as
+   * `composePicture` does for the fonts and for a legend that leaves no room for the map (`ComposeError`).
+   */
+  async planPicture(options: PictureOptions): Promise<ExportPlan> {
+    const renderer = this.renderer;
+    if (renderer === undefined) {
+      throw new Error('There is nothing to export: the map has not been drawn.');
+    }
+    const measure = this.ownerDocument.createElement('canvas').getContext('2d');
+    if (measure === null) {
+      throw new Error('The browser gave no canvas to measure the picture with.');
+    }
+    return planOnly(measure, this.pictureInput(options, renderer));
+  }
+
+  /** Whether there is something drawn to export: the map is there and at least one layer of it is shown and drawn. */
+  exportable(): boolean {
+    return this.renderer !== undefined && exportLegendLines(this.currentLegend()).length > 0;
+  }
+
+  /** What listens for `exportable()` changing, and what it was last. */
+  private readonly exportableListeners = new Set<(available: boolean) => void>();
+  private exportableNow = false;
+
+  /** Calls `listener` when `exportable()` changes, with the new answer; gives the way to stop. */
+  subscribeToExportable(listener: (available: boolean) => void): () => void {
+    this.exportableListeners.add(listener);
+    return () => {
+      this.exportableListeners.delete(listener);
+    };
+  }
+
+  /** What the export dialog makes pictures with. */
+  private readonly exportWork: ExportDialogWork = {
+    plan: (options) => this.planPicture(options),
+    preview: async (options) => (await this.composePicture(options)).canvas,
+    run: (options, run) => this.exportPng(options, run),
+  };
+
+  /** Opens the export dialog, with the options at their start. Nothing happens if there is nothing drawn to export. */
+  openExport(): void {
+    const dialog = this.renderRoot.querySelector('karmania-export-dialog');
+    const renderer = this.renderer;
+    if (dialog === null || renderer === undefined || !this.exportable()) {
+      return;
+    }
+    const screen = renderer.stats();
+    dialog.screen = { width: screen.cssWidth, height: screen.cssHeight };
+    dialog.limits = renderer.exportLimits();
+    dialog.work = this.exportWork;
+    dialog.show();
+  }
+
+  /**
+   * The exported picture as a PNG file (brief 11.8): the picture put together (see `composePicture`) and encoded, with the dpi in the file (`pHYs`) and the colour space (`sRGB`).
+   * The same scene and options give the same bytes twice in a row (in one browser). `progress` is how far it is, from 0 to 1, counted in steps and never in time; the picture is the
+   * first 70 % of it and the encoding the rest.
+   *
+   * @throws Error if the map has not been drawn yet; RangeError for a size or dpi that is not a number above 0.
+   * Rejects with an `ExportError` (the card, the size, another export going on), a `ComposeError`, an `ExportFontError`, a `PngError`, or the signal's reason.
+   */
+  async exportPng(options: ExportPngOptions, run: ExportPngRun = {}): Promise<Blob> {
+    const { signal, onProgress } = run;
+    const size = { width: options.widthPx, height: options.heightPx };
+    // Only the picture that is the file is held to the sizes of a picture: the dialog's preview is a small copy of it, and may be under the least.
+    if (this.renderer !== undefined) {
+      this.checkSize(size, this.renderer);
+    }
+    const composed = await this.composePicture({
+      size,
+      dpi: options.dpi,
+      legend: options.legend,
+      ...(signal === undefined ? {} : { signal }),
+      onProgress: (done) => onProgress?.(0.7 * done),
+    });
+    const ctx = composed.canvas.getContext('2d', { willReadFrequently: true });
+    if (ctx === null) {
+      throw new Error('The picture has no canvas to read.');
+    }
+    return encodePng({
+      width: size.width,
+      height: size.height,
+      dpi: options.dpi,
+      readRows: (first, count) => ctx.getImageData(0, first, size.width, count).data,
+      ...(signal === undefined ? {} : { signal }),
+      onProgress: (done) => onProgress?.(0.7 + 0.3 * done),
+    });
   }
 
   /** How the renderer is (frames drawn, the size of its buffer, what is on the card), for tests and diagnostics; none without one. */
@@ -705,15 +915,39 @@ export class KarmaniaViewer extends LitElement {
         if (this.identified === found) {
           found.page = page;
           this.refreshIdentify();
+          this.moveToPopover(found);
         }
       },
       () => {
         if (this.identified === found) {
           found.page = gone;
           this.refreshIdentify();
+          this.moveToPopover(found);
         }
       },
     );
+  }
+
+  /**
+   * The keyboard goes to the popover when it says what the click found (its name and what it says are then read out by a screen reader, as a dialog's are), but only if it is
+   * still where the click put it, on the map: a person who has moved on to something else is not taken from it. It is done once for a click, and not at each change of
+   * what the popover says (a pan of the map moves it, and must not take the keyboard).
+   */
+  private moveToPopover(found: object): void {
+    const area = this.renderRoot.querySelector('karmania-map-area');
+    if (area === null) {
+      return;
+    }
+    void area.updateComplete.then(async () => {
+      const popover = area.renderRoot.querySelector('karmania-identify');
+      if (popover === null) {
+        return;
+      }
+      await popover.updateComplete;
+      if (this.identified === found && area.shadowRoot?.activeElement === area.focusTarget) {
+        popover.takeFocus();
+      }
+    });
   }
 
   /** Gives the map area what the popover says now, or nothing when what was identified is not the selection any more (or its layer or dataset is gone). */
@@ -733,6 +967,10 @@ export class KarmaniaViewer extends LitElement {
       layer === undefined ? undefined : this.datasets.find((each) => each.id === layer.datasetId);
     if (!same || summary === undefined) {
       this.identified = undefined;
+      // A popover that has the keyboard is not taken away from under it: the map has it again (its own keys), as when the popover is closed.
+      if (area.renderRoot.querySelector('karmania-identify')?.matches(':focus-within') === true) {
+        area.focusTarget?.focus();
+      }
       area.identify = undefined;
       return;
     }
@@ -838,6 +1076,17 @@ export class KarmaniaViewer extends LitElement {
     // element is still connected, and nothing would disconnect an observer made now.
     if (this.isConnected) {
       this.watchSize();
+    }
+  }
+
+  /** Says to those who watch whether there is something to export now, after each update (the layers being drawn or not changes it, and it changes the viewer's render). */
+  protected override updated(): void {
+    const now = this.exportable();
+    if (now !== this.exportableNow) {
+      this.exportableNow = now;
+      for (const listener of [...this.exportableListeners]) {
+        listener(now);
+      }
     }
   }
 
@@ -1210,6 +1459,9 @@ export class KarmaniaViewer extends LitElement {
       <karmania-import-dialog
         @karmania-import-loaded=${this.onImportLoaded}
       ></karmania-import-dialog>
+      <karmania-export-dialog
+        .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
+      ></karmania-export-dialog>
       <karmania-map-crs-dialog
         @karmania-map-crs-apply=${this.onMapCrsApply}
         .engine=${this.engine}

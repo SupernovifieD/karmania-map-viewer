@@ -86,6 +86,17 @@ export type {
   Rect,
   Size,
 } from './export-layout.js';
+export { MAX_EXPORT_FOV, exportCamera2d, exportCamera3d } from './export-frame.js';
+export {
+  EXPORT_DPIS,
+  MAX_EXPORT_SIDE,
+  MIN_EXPORT_SIDE,
+  SIZE_PRESETS,
+  maxSide,
+  sizeInPixels,
+  sizeProblems,
+} from './export-size.js';
+export type { ExportDpi, GpuSizes, SizePreset, SizeProblem } from './export-size.js';
 export { exportLegendLines } from './export-lines.js';
 export type { ExportLine } from './export-lines.js';
 export { cameraTo2d, cameraTo3d, fitCamera2d, fitCamera3d } from './cameras.js';
@@ -129,3 +140,18 @@ export type {
   VerticalExaggeration,
   ViewMode,
 } from './types.js';
+export {
+  EXPORT_COLOURS,
+  EXPORT_FURNITURE,
+  EXPORT_SCALE_BAR,
+  EXPORT_TYPE,
+  LEGEND_ROW,
+} from './export-theme.js';
+export {
+  NORTH_ARROW_BOX,
+  NORTH_ARROW_CENTRE,
+  NORTH_ARROW_HEAD,
+  NORTH_ARROW_LETTER,
+  NORTH_ARROW_STROKE,
+  NORTH_ARROW_TAIL,
+} from './north-arrow-paths.js';
