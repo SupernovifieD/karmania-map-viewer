@@ -19,6 +19,17 @@ export interface ViewerOptions {
    * arrives, and disposes it with itself.
    */
   readonly engine?: Engine;
+  /**
+   * Whether the viewer has its right panel, with the Legend and the Data tabs (default `true`). Without it the map has the whole viewer, and the page
+   * changes layers with `dispatch`. The panel's width and the tab it was on are kept in the browser (per origin, for every viewer of the page): a
+   * viewer without a panel neither reads nor writes them.
+   */
+  readonly panel?: boolean;
+  /**
+   * Whether the viewer has what brings files in: the Import buttons, dropping files on the map, and the import wizard (default `true`). Without it
+   * `openImport` throws; data comes in with `load` or through an engine the page gives.
+   */
+  readonly importUi?: boolean;
 }
 
 /** A viewer that has been put in a page. */
@@ -54,7 +65,10 @@ export interface Viewer {
    * also after the viewer was disposed).
    */
   on(event: ViewerEvent, listener: (scene: SceneDocument) => void): () => void;
-  /** Opens the import wizard on `files`, or the browser's file picker when there are none to give (no list, or an empty one). */
+  /**
+   * Opens the import wizard on `files`, or the browser's file picker when there are none to give (no list, or an empty one).
+   * Throws if the viewer was made with `importUi: false`.
+   */
   openImport(files?: readonly File[]): void;
   /**
    * Takes the viewer out of the page and frees what it holds: the engine and its worker, and the listeners on the
@@ -71,6 +85,8 @@ export interface Viewer {
  */
 export function createViewer(container: HTMLElement, options: ViewerOptions = {}): Viewer {
   const element = document.createElement('karmania-viewer');
+  element.withPanel = options.panel ?? true;
+  element.withImportUi = options.importUi ?? true;
   if (options.engine !== undefined) {
     element.useEngine(options.engine);
   }

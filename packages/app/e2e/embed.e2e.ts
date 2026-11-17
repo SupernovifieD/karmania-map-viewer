@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * The embedding page (`embed.html`) puts viewers in itself with only what `@karmania/viewer` exports, as the page of an embedder would. These
@@ -186,5 +186,187 @@ test.describe('a viewer that is given an engine by the page', () => {
       return said;
     }, HOST);
     expect(message).toContain('has an engine already');
+  });
+});
+
+/** Drags a file over the map of the viewer in `host` and drops it: whether the area showed the label of a drop, and whether it said files were dropped. */
+const dropOnMap = (host: Locator) =>
+  host.locator('karmania-map-area').evaluate(async (area) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['x,y\n1,2\n'], 'wells.csv', { type: 'text/csv' }));
+    let heard = false;
+    area.addEventListener('karmania-files-dropped', () => {
+      heard = true;
+    });
+    const main = area.shadowRoot?.querySelector('main');
+    main?.dispatchEvent(
+      new DragEvent('dragenter', { dataTransfer: transfer, bubbles: true, cancelable: true }),
+    );
+    await (area as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    const active =
+      area.shadowRoot?.querySelector('.drop-zone')?.hasAttribute('data-active') === true;
+    main?.dispatchEvent(
+      new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }),
+    );
+    return { heard, active };
+  });
+
+test.describe('a viewer made with the panel or the import left out', () => {
+  /** Puts a viewer made with `options` in a host, and says what is in it. */
+  const inspect = (page: Page, options: { panel?: boolean; importUi?: boolean }) =>
+    page.evaluate(
+      async ([style, given]) => {
+        const { createViewer, points } = window.embed;
+        const host = document.createElement('div');
+        host.style.cssText = style;
+        document.body.append(host);
+        const viewer = createViewer(host, given);
+        const element = host.querySelector('karmania-viewer');
+        await element?.updateComplete;
+        const root = element?.shadowRoot;
+        const area = root?.querySelector('karmania-map-area')?.getBoundingClientRect();
+        const found = {
+          panel: root?.querySelector('karmania-panel') != null,
+          input: root?.querySelector('input[type="file"]') != null,
+          wizard: root?.querySelector('karmania-import-dialog') != null,
+          mapWidth: Math.round(area?.width ?? 0),
+          hostWidth: Math.round(host.getBoundingClientRect().width),
+        };
+        let said = '';
+        try {
+          viewer.openImport();
+        } catch (error) {
+          said = error instanceof Error ? error.message : String(error);
+        }
+        const loaded = await element?.load(
+          points({ name: 'wells', x: [1, 2], y: [3, 4], crs: { kind: 'local', units: 'm' } }),
+        );
+        viewer.dispose();
+        return { ...found, said, loaded: loaded?.status };
+      },
+      [HOST, options] as const,
+    );
+
+  test('has both, with the map beside the panel, when nothing is left out', async ({ page }) => {
+    await page.goto('/embed.html');
+    const seen = await inspect(page, {});
+    expect(seen).toMatchObject({ panel: true, input: true, wizard: true, said: '' });
+    expect(seen.mapWidth).toBeLessThan(seen.hostWidth - 200);
+  });
+
+  test('has no panel when it is left out, and the map has the whole viewer', async ({ page }) => {
+    await page.goto('/embed.html');
+    const seen = await inspect(page, { panel: false });
+    expect(seen).toMatchObject({ panel: false, input: true, wizard: true, loaded: 'loaded' });
+    expect(seen.mapWidth).toBe(seen.hostWidth);
+  });
+
+  test('has no way to bring files in when the import is left out: openImport is a mistake, and load still works', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const seen = await inspect(page, { importUi: false });
+    expect(seen).toMatchObject({ panel: true, input: false, wizard: false, loaded: 'loaded' });
+    expect(seen.said).toBe('This viewer has no import: it was made with importUi set to false.');
+  });
+
+  test('says there is no data, without an Import button, on the map and in the Data tab, and takes no dropped file', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate((style) => {
+      const host = document.createElement('div');
+      host.id = 'bare';
+      host.style.cssText = style;
+      document.body.append(host);
+      window.embed.createViewer(host, { importUi: false });
+    }, HOST);
+    const bare = page.locator('#bare');
+    await expect(bare.locator('karmania-map-area k-empty-state')).toContainText('No data yet');
+    await expect(bare.locator('karmania-map-area k-empty-state k-button')).toHaveCount(0);
+    await bare.locator('karmania-panel k-tabs [role="tab"]').filter({ hasText: 'Data' }).click();
+    await expect(bare.locator('karmania-data-tab k-empty-state')).toContainText('No data loaded');
+    await expect(bare.locator('karmania-data-tab k-empty-state k-button')).toHaveCount(0);
+    // A file dropped on the map is not taken: no wizard opens (there is none), and the area does not show the label of a drop.
+    expect(await dropOnMap(bare)).toEqual({ heard: false, active: false });
+  });
+
+  test('takes a dropped file when the import is there (the control of the test above)', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate((style) => {
+      const host = document.createElement('div');
+      host.id = 'plain';
+      host.style.cssText = style;
+      document.body.append(host);
+      window.embed.createViewer(host);
+    }, HOST);
+    expect(await dropOnMap(page.locator('#plain'))).toEqual({ heard: true, active: true });
+  });
+
+  test('sends people to the Legend when nothing can be drawn only if there is a Legend', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    for (const [id, panel] of [
+      ['with', true],
+      ['without', false],
+    ] as const) {
+      await page.evaluate(
+        async ([name, style, withPanel]) => {
+          const host = document.createElement('div');
+          host.id = name;
+          host.style.cssText = style;
+          document.body.append(host);
+          const viewer = window.embed.createViewer(host, { panel: withPanel });
+          const element = host.querySelector('karmania-viewer');
+          await element?.load(
+            window.embed.blocks({
+              name: 'ore',
+              origin: [0, 0, 0],
+              spacing: [10, 10, 10],
+              dims: [2, 2, 1],
+              values: { grade: [1, 2, 3, 4] },
+              crs: { kind: 'epsg', code: 32640 },
+            }),
+          );
+          // The model is drawn first (the viewer chooses the map's coordinate system from the data), and then the map is made another system:
+          // a block model is drawn only in the map's own, so nothing can be drawn.
+          for (let turns = 0; turns < 400; turns += 1) {
+            const states = element?.layerStates() ?? [];
+            if (states.length > 0 && states.every(([, state]) => state.status === 'drawn')) {
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          viewer.dispatch({
+            type: 'setFrame',
+            frame: { mapCrs: { kind: 'epsg', code: 32641 }, origin: [0, 0, 0], source: 'user' },
+          });
+        },
+        [id, HOST, panel] as const,
+      );
+      const area = page.locator(`#${id} karmania-map-area k-empty-state`);
+      await expect(area.locator('.heading')).toHaveText('Nothing can be drawn yet');
+      await expect(area.getByRole('button', { name: 'Show the Legend' })).toHaveCount(
+        panel ? 1 : 0,
+      );
+    }
+  });
+
+  test('keeps nothing of the panel in the browser when it has none, and does when it has one', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const kept = async (options: { panel?: boolean }) => {
+      await page.evaluate(() => {
+        localStorage.clear();
+      });
+      await inspect(page, options);
+      return page.evaluate(() => localStorage.length);
+    };
+    expect(await kept({ panel: false })).toBe(0);
+    expect(await kept({})).toBeGreaterThan(0);
   });
 });
