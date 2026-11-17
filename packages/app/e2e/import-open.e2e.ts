@@ -9,7 +9,7 @@ const PROJECTION = { name: 'points.prj', mimeType: 'text/plain', buffer: Buffer.
 const wizard = (page: Page): Locator => page.locator('karmania-import-dialog');
 const dialog = (page: Page): Locator => wizard(page).locator('dialog');
 const toolbarImport = (page: Page): Locator =>
-  page.locator('karmania-app header.toolbar k-button button');
+  page.locator('karmania-app header.toolbar > k-button button');
 const mapImport = (page: Page): Locator =>
   page.locator('karmania-map-area k-empty-state k-button button');
 

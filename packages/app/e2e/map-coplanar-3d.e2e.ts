@@ -7,6 +7,7 @@ import {
   bytes,
   dispatch,
   distance,
+  isLitRound,
   drawn,
   layerColour,
   layerStatuses,
@@ -177,12 +178,15 @@ test.describe('layers in one plane, in 3D', () => {
       }
       for (const view of VIEWS.slice(0, 4)) {
         const here = await look(page, view);
-        // The middle of the marker: the plane or the marker, by where the legend puts them.
+        // The middle of the marker: the plane or the marker, by where the legend puts them. The marker is lit as a sphere, so it is some part of its colour.
         const seen = await colourAt(page, here, 50, 50);
-        expect(
-          distance(seen, order === 'marker on top' ? marker : plane),
-          `${order}, from heading ${String(view.heading)}, ${String(view.elevation)} degrees up`,
-        ).toBeLessThanOrEqual(3);
+        const label = `${order}, from heading ${String(view.heading)}, ${String(view.elevation)} degrees up`;
+        if (order === 'marker on top') {
+          expect(isLitRound(seen, marker), label).toBe(true);
+          expect(distance(seen, plane), label).toBeGreaterThan(3);
+        } else {
+          expect(distance(seen, plane), label).toBeLessThanOrEqual(3);
+        }
       }
     }
   });
@@ -234,12 +238,16 @@ test.describe('layers in one plane, in 3D', () => {
           const at = pixelOf3d(here.now, here.origin, [EAST + east, NORTH + north, 0]);
           expect(at).toBeDefined();
           const block = await around(page, at?.x ?? 0, at?.y ?? 0, 1);
+          // The line is lit as a tube, so it is some part of its colour; the plane is the colour of a flat face.
+          const isLine = (pixel: readonly number[]): boolean =>
+            isLitRound(pixel, line) && distance(pixel, plane) > 3;
+          const isPlane = (pixel: readonly number[]): boolean => distance(pixel, plane) <= 3;
           const found = block
             .all()
-            .some(([, , pixel]) => distance(pixel, order === 'line on top' ? line : plane) <= 3);
+            .some(([, , pixel]) => (order === 'line on top' ? isLine(pixel) : isPlane(pixel)));
           const other = block
             .all()
-            .some(([, , pixel]) => distance(pixel, order === 'line on top' ? plane : line) <= 3);
+            .some(([, , pixel]) => (order === 'line on top' ? isPlane(pixel) : isLine(pixel)));
           const label = `${order}, from heading ${String(view.heading)}, ${String(view.elevation)} degrees up, at ${String(east)},${String(north)}`;
           expect(found, label).toBe(true);
           // And when the plane is on top there is none of the line to be seen at all.

@@ -133,6 +133,11 @@ export class LayerSet {
     return this.layers.size;
   }
 
+  /** Whether any layer is still being built: a part of it is left for `step` to do. */
+  get pending(): boolean {
+    return this.building.size > 0;
+  }
+
   /** Does the next part of every layer that is still being built, and says whether any is left to do. */
   step(): boolean {
     for (const id of [...this.building]) {

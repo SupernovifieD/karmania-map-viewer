@@ -17,7 +17,7 @@ function parts(page: Page) {
     tabs: page.locator('karmania-panel k-tabs [role="tab"]'),
     next: host.locator('k-button[slot="footer-end"]').nth(1),
     cancel: host.locator('k-button[slot="footer-start"]'),
-    importButton: page.locator('karmania-app header.toolbar k-button button'),
+    importButton: page.locator('karmania-app header.toolbar > k-button button'),
   };
 }
 

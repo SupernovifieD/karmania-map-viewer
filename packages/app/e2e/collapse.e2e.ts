@@ -478,13 +478,13 @@ test.describe('collapsing the panel into a rail', () => {
 
   test('does not move the keyboard when the panel changes for another reason', async ({ page }) => {
     await page.goto('/');
-    await page.locator('karmania-app header.toolbar k-button').getByRole('button').focus();
+    await page.locator('karmania-app header.toolbar > k-button').getByRole('button').focus();
     await panel(page).evaluate((element) => {
       (element as unknown as { collapsed: boolean }).collapsed = true;
     });
     await expect(rail(page)).toBeVisible();
     await expect(
-      page.locator('karmania-app header.toolbar k-button').getByRole('button'),
+      page.locator('karmania-app header.toolbar > k-button').getByRole('button'),
     ).toBeFocused();
   });
 

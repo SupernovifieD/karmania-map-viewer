@@ -8,7 +8,9 @@
  * joined as a circle, and in the flat view the segments of a layer are all at one depth, so the depth test (strictly nearer) lets the first
  * of them draw a pixel that two cover and not the second: a half opaque line is not darker at a joint, whatever the heights of its
  * segments are (which, of one colour, could not show).
- * There is no outline: the brief gives lines none. A layer of a million segments is put on the card in parts, as points are.
+ * There is no outline: the brief gives lines none. In 3D a layer of lines (not the outline of polygons) is lit as a tube (`tube`): the light of the
+ * world, as for meshes, with a side that faces it brighter and never brighter than the layer's colour; the width is as the person chose it and does not
+ * shrink with distance, and from above a line is flat. A layer of a million segments is put on the card in parts, as points are.
  */
 import type { RenderBuffers } from '@karmania/engine/display';
 import {
@@ -26,6 +28,7 @@ import {
 } from 'three';
 import type { LayerObject } from './layer-set.js';
 import { classesOfPieces, coversOwners } from './class-map.js';
+import { ROUND_AMBIENT } from './light.js';
 import { MAX_CLASSES, colourOf } from './look.js';
 import { PICK_FRAGMENT_GLSL, PICK_MIN_LINE, pickMaterial } from './pick.js';
 import { PLANE_DEPTH_GLSL, RIBBON_GLSL } from './plane-depth.js';
@@ -96,15 +99,37 @@ void main() {
 `;
 
 /**
+ * A tube seen from the camera: the normal at a pixel leans away from the line of the segment as far as the pixel is from it (across the width, and
+ * round the end at the round caps, where it is that of a sphere), and for a segment that does not lie across the view the part of it along the segment is
+ * taken away, as a cylinder's normal has none. `uLight` is the light of the world in the space of the camera, and `uAmbient` is how much of the colour is kept where it does not reach.
+ */
+const TUBE = /* glsl */ `
+  vec2 across = (gl_FragCoord.xy - (vStart + along * t)) / max(vWidth * 0.5, 0.5);
+  across *= min(1.0, inversesqrt(max(dot(across, across), 1e-6)));
+  vec3 normal = vec3(across, sqrt(max(1.0 - dot(across, across), 0.0)));
+  float where = length2 > 0.0 ? dot(gl_FragCoord.xy - vStart, along) / length2 : 0.0;
+  vec3 axis = vEndV - vStartV;
+  if (where > 0.0 && where < 1.0 && length(axis) > 1e-9) {
+    axis = normalize(axis);
+    vec3 side = normal - axis * dot(normal, axis);
+    if (length(side) > 1e-3) {
+      normal = normalize(side);
+    }
+  }
+  colour *= uAmbient + (1.0 - uAmbient) * max(dot(normal, uLight), 0.0);
+`;
+
+/**
  * The fragment shader: the segment at the distance of each pixel from it. For 3D it also writes the depth of the plane the segment lies in at each
  * pixel of it (`plane-depth.ts`), where the depth of its ends would put it behind the plane of the layers under it over half of its width.
  */
-const fragment = (plane: boolean): string => /* glsl */ `
+const fragment = (plane: boolean, tube: boolean): string => /* glsl */ `
 uniform vec3 uColour;
 uniform float uOpacity;
 uniform vec3 uPalette[${String(MAX_CLASSES)}];
 uniform float uCount;
 uniform float uClassed;
+${plane && tube ? 'uniform vec3 uLight;\nuniform float uAmbient;' : ''}
 varying vec2 vStart;
 varying vec2 vEnd;
 varying float vClass;
@@ -140,6 +165,7 @@ void main() {
   // Where the layer is seen from above the segment nearest the pointer wins; in 3D the depth is the plane's, as it is drawn.
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : 'gl_FragDepth = clamp(away / (vWidth * 0.5 + 1.0), 0.0, 1.0);'}
 #else
+  ${plane && tube ? TUBE : ''}
   gl_FragColor = vec4(colour, inside * uOpacity);
   ${plane ? 'gl_FragDepth = tiedDepth(plane);' : ''}
 #endif
@@ -176,8 +202,19 @@ export function gatherSegments(
   return { starts, ends };
 }
 
+/** How a layer of lines is drawn besides how it looks. */
+export interface LinesOptions {
+  /** Whether the lines are lit as tubes in 3D (what a layer of lines is); the outline of a polygon is not, and is flat. */
+  readonly tube?: boolean;
+}
+
 /** The layer of `buffers`, looking as `look` says. */
-export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerObject {
+export function createLinesLayer(
+  buffers: LinesBuffers,
+  look: LayerLook,
+  options: LinesOptions = {},
+): LayerObject {
+  const tube = options.tube === true;
   const uniforms = {
     uViewport: { value: new Vector2(1, 1) },
     uWidth: { value: 0 },
@@ -189,6 +226,8 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     uCount: { value: 0 },
     uClassed: { value: 0 },
     uScales: { value: new Float32Array(MAX_CLASSES).fill(1) },
+    uLight: { value: new Vector3(0, 0, 1) },
+    uAmbient: { value: ROUND_AMBIENT },
     uPickLayer: { value: 0 },
     uPickMin: { value: 0 },
   };
@@ -197,7 +236,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     new ShaderMaterial({
       uniforms,
       vertexShader: vertex(plane),
-      fragmentShader: fragment(plane),
+      fragmentShader: fragment(plane, tube),
       transparent: true,
       blending: NormalBlending,
       depthTest: true,
@@ -212,7 +251,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
     pickMaterial({
       uniforms,
       vertexShader: vertex(plane),
-      fragmentShader: fragment(plane),
+      fragmentShader: fragment(plane, tube),
       // The quad of a segment faces whichever way the segment goes on the screen: it is never a back.
       side: DoubleSide,
     });
@@ -335,6 +374,7 @@ export function createLinesLayer(buffers: LinesBuffers, look: LayerLook): LayerO
       uniforms.uWidth.value = width * ratio;
       uniforms.uViewport.value.set(info.viewport[0], info.viewport[1]);
       uniforms.uDepthScale.value = info.flat ? 0 : 1;
+      uniforms.uLight.value.set(...info.light);
       // The view from above and the view in 3D draw a segment's depth differently, so each has its own material.
       if (info.flat) {
         current = material;

@@ -8,6 +8,7 @@ import chevronDown from 'lucide-static/icons/chevron-down.svg?raw';
 import chevronsLeft from 'lucide-static/icons/chevrons-left.svg?raw';
 import chevronsRight from 'lucide-static/icons/chevrons-right.svg?raw';
 import circleAlert from 'lucide-static/icons/circle-alert.svg?raw';
+import download from 'lucide-static/icons/download.svg?raw';
 import file from 'lucide-static/icons/file.svg?raw';
 import folderOpen from 'lucide-static/icons/folder-open.svg?raw';
 import folderPlus from 'lucide-static/icons/folder-plus.svg?raw';
@@ -41,6 +42,7 @@ export const ICON_NAMES = [
   'chevrons-left',
   'chevrons-right',
   'circle-alert',
+  'download',
   'file',
   'folder',
   'folder-open',
@@ -77,6 +79,7 @@ const DRAWINGS: Readonly<Record<IconName, string>> = {
   'chevrons-left': chevronsLeft,
   'chevrons-right': chevronsRight,
   'circle-alert': circleAlert,
+  download,
   file,
   folder,
   'folder-open': folderOpen,

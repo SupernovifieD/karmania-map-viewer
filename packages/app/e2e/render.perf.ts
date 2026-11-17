@@ -9,7 +9,14 @@
  *     orbit under 50 ms (step 18.9b);
  *   - the same grid with 20 levels of contour lines turned on: the lines made in the worker (the engine's answer) under 2 s, and drawn, with no task
  *     of the main thread over 50 ms (step 20.7);
+ *   - a picture of A4 landscape at 300 dpi (3,508 by 2,480) of the million points, with a legend: made and encoded as a PNG file in under 3 s, with no task of
+ *     the main thread over 50 ms while it is made (step 22.11);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
+ *
+ * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
+ * a task over 50 ms, which these tests then report as a failure: in the gate of M22 a callback of 197 ms in the export and one of 1,195 ms in the first draw of the
+ * million points, none of them in the runs after (and 55 ms in one of nine warm runs of the export). Its cause was not shown. The first draw of a layer is not made
+ * smaller for it and the targets are not changed; the owner will decide with more testing on real machines (`docs/perf.md`, M22).
  *
  * It needs a quiet machine, so it is a project of its own, like `performance.perf.ts`: `pnpm perf` runs both. The numbers are for
  * `docs/perf.md`. The browser draws with the software driver of the Playwright image unless the machine gives it a card (the
@@ -98,6 +105,8 @@ interface Measured {
     readonly lines: number;
     readonly vertices: number;
   };
+  /** A picture of A4 landscape at 300 dpi made and encoded: how long it took, the size of the file, and the longest task of the main thread while it was made. */
+  readonly export?: { readonly ms: number; readonly bytes: number; readonly longestTaskMs: number };
   /** The longest task of the main thread, from pressing Load to the end. */
   readonly longestTaskMs: number;
 }
@@ -115,6 +124,8 @@ interface Options {
   readonly contours?: boolean;
   /** After the first frame, the view is switched to 3D, fitted, and a scripted orbit is drawn: 300 frames of the camera going round and up and down. */
   readonly orbit?: boolean;
+  /** After the first frame, a picture of A4 landscape at 300 dpi with the legend is made and encoded as a PNG file (`viewer.exportPng`). */
+  readonly export?: boolean;
 }
 
 async function measure(browser: Browser, options: Options): Promise<Measured> {
@@ -355,6 +366,17 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     console.info(`CPU ${JSON.stringify(top)}`);
   }
 
+  let exportRun: { ms: number; bytes: number; start: number } | undefined;
+  if (options.export === true) {
+    // The picture and the file, through the viewer's own `exportPng` (brief 9.6: A4 landscape at 300 dpi, 3,508 by 2,480, under 3 s): the time is from asking to the Blob.
+    exportRun = await inPage<{ ms: number; bytes: number; start: number }>(
+      page,
+      `const v = perf.viewer();
+       const start = performance.now();
+       const blob = await v.exportPng({ widthPx: 3508, heightPx: 2480, dpi: 300, legend: true });
+       return { ms: performance.now() - start, bytes: blob.size, start };`,
+    );
+  }
   const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
   // The frames over 50 ms and the scripts in them, for what a long task was made of (printed, not asserted).
   const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
@@ -404,6 +426,23 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     ...(switchMs === undefined ? {} : { switchMs: Math.round(switchMs) }),
     ...(restyleMs === undefined ? {} : { restyleMs: Math.round(restyleMs) }),
     ...(contours === undefined ? {} : { contours }),
+    ...(exportRun === undefined
+      ? {}
+      : (() => {
+          const run = exportRun;
+          return {
+            export: {
+              ms: Math.round(run.ms),
+              bytes: run.bytes,
+              longestTaskMs: Math.round(
+                Math.max(
+                  0,
+                  ...tasks.filter((task) => task.start >= run.start).map((task) => task.duration),
+                ),
+              ),
+            },
+          };
+        })()),
     longestTaskMs: Math.round(
       Math.max(0, ...tasks.filter((task) => task.start >= started).map((task) => task.duration)),
     ),
@@ -461,6 +500,27 @@ test.describe('the 2D view with the large files', () => {
     ).toBeLessThanOrEqual((result.frames?.displayMs ?? 0) * 1.05);
     expect(result.frames?.p95, '95th percentile frame time').toBeLessThan(33);
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
+  });
+
+  test('1,000,000 points: a picture of A4 landscape at 300 dpi, made and encoded', async ({
+    browser,
+  }) => {
+    test.setTimeout(900_000);
+    const result = await measure(browser, {
+      data: 'points-1m.csv',
+      sidecar: 'points-1m.prj',
+      path: false,
+      restyle: false,
+      export: true,
+    });
+    RESULTS.push(result);
+    // Brief 9.6: the export at A4 landscape, 300 dpi, under 3 s, and no task of the main thread over 50 ms (the picture is read off the card in bands and the file is made in
+    // slices, with the page given a turn between them).
+    expect(result.export?.ms, 'A4 at 300 dpi made and encoded').toBeLessThan(3000);
+    expect(
+      result.export?.longestTaskMs,
+      'longest task of the main thread while it is made',
+    ).toBeLessThanOrEqual(50);
   });
 
   test('4,000,000 cells: the first frame, and new classes', async ({ browser }) => {

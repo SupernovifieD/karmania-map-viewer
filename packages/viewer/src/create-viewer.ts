@@ -3,6 +3,7 @@
  * the container (its size and place); the viewer fills it.
  */
 import type { Command, SceneDocument, ViewMode } from '@karmania/scene';
+import type { ExportPngOptions, ExportPngRun } from './export-compose.js';
 import './viewer.js';
 
 /** What a page can listen to: the scene (more arrive with the rest of the API). */
@@ -22,6 +23,21 @@ export interface Viewer {
    */
   setViewMode(mode: ViewMode): void;
   /**
+   * The map as a PNG file: `widthPx` by `heightPx` pixels at `dpi` (written into the file, and the scale the map's points, lines and furniture are drawn at), with the legend to
+   * the right of the map if `legend`, the north arrow, and the scale bar in 2D, always in the light theme. It shows at least what is visible on screen, with the same centre,
+   * heading and view. The same scene and options give the same bytes twice in a row, in one browser. `onProgress` says how far it is, from 0 to 1.
+   *
+   * It rejects with an `Error` named `ExportError` (its `code` says why: `busy`, `interrupted` when the map was changed meanwhile, `context_lost`, `too_large`, `point_size`,
+   * `out_of_memory`, `not_ready`), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
+   */
+  exportPng(options: ExportPngOptions, run?: ExportPngRun): Promise<Blob>;
+  /** Opens the export dialog (size, resolution, legend, file name and a preview, and Export). Nothing happens while there is nothing drawn to export (`exportable`). */
+  openExport(): void;
+  /** Whether there is something drawn to export: at least one layer is shown on the map and has been drawn. The Export button is disabled while it is not. */
+  exportable(): boolean;
+  /** Calls `listener` when `exportable()` changes, with the new answer; gives the function that stops that (which may be called more than once). */
+  onExportable(listener: (available: boolean) => void): () => void;
+  /**
    * Calls `listener` with the scene after each change of it, and gives the function that stops that (which may be called more than once,
    * also after the viewer was disposed).
    */
@@ -38,7 +54,7 @@ export interface Viewer {
 /**
  * Puts a viewer in `container`, which has to have a size: the viewer is as tall and as wide as it is.
  *
- * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode` and `on` if the viewer has been disposed, which is a mistake of the caller;
+ * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng`, `openExport`, `exportable`, `onExportable` and `on` if the viewer has been disposed, which is a mistake of the caller;
  * `setViewMode` also throws a RangeError for a mode that is not `2d` or `3d`. Disposing stops every listener that `on` gave.
  */
 export function createViewer(container: HTMLElement): Viewer {
@@ -68,6 +84,29 @@ export function createViewer(container: HTMLElement): Viewer {
     setViewMode(mode) {
       alive();
       element.setViewMode(mode);
+    },
+    exportPng(options, run) {
+      alive();
+      return element.exportPng(options, run);
+    },
+    openExport() {
+      alive();
+      element.openExport();
+    },
+    exportable() {
+      alive();
+      return element.exportable();
+    },
+    onExportable(listener) {
+      alive();
+      const unsubscribe = element.subscribeToExportable(listener);
+      const stop = (): void => {
+        if (listening.delete(stop)) {
+          unsubscribe();
+        }
+      };
+      listening.add(stop);
+      return stop;
     },
     on(_event, listener) {
       alive();

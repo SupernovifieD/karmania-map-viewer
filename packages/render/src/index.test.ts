@@ -6,6 +6,7 @@ describe('@karmania/render', () => {
     expect(Object.keys(render).sort()).toEqual([
       'DEFAULT_DISTANCE_LIMITS',
       'DEFAULT_SCALE_LIMITS',
+      'ExportError',
       'HIGHLIGHT_EDGE',
       'HIGHLIGHT_RING',
       'KEY_ORBIT_DEGREES',
