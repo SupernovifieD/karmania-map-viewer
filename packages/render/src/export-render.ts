@@ -86,6 +86,8 @@ export interface ExportRenderOptions {
   readonly ink: Bytes;
   /** Takes the picture a band at a time, from its top row (see `readBands`). */
   readonly onBand: TakeBand;
+  /** How many rows are read off the card at a time: about four megabytes if it is not given. A knob for tests, which read a small picture in many bands; the picture is the same whatever it is. */
+  readonly bandRows?: number;
   /** Stops the export between two steps; it then rejects with the signal's reason. */
   readonly signal?: AbortSignal;
   /** Called as the export goes, with the part that is done, from 0 to 1 (counted in steps, never in time). */
@@ -113,8 +115,6 @@ export interface ExportGl {
   render(scene: Scene, camera: Camera): void;
   clear(): void;
   clearDepth(): void;
-  getClearColor(target: Color): Color;
-  getClearAlpha(): number;
   setClearColor(color: Color, alpha?: number): void;
 }
 
@@ -138,7 +138,7 @@ export interface ExportHost {
   /** Tells every layer what is true of the frame that is about to be drawn. */
   prepare(info: FrameInfo): void;
   /** Waits until every layer is built, and on the card with its programs made for the screen; rejects with an `ExportError` if it does not come to that. */
-  settle(): Promise<void>;
+  settle(signal?: AbortSignal): Promise<void>;
   /** A number that is one more each time the layers or the view are changed. */
   revision(): number;
   status(): 'ok' | 'lost' | 'disposed';
@@ -151,6 +151,12 @@ export interface ExportHost {
   read(target: WebGLRenderTarget, y: number, rows: number, into: Uint8Array): Promise<void>;
   /** Gives the page a turn. */
   yieldTask(): Promise<void>;
+  /**
+   * Called with no target bound, after each slice of drawing and at the end: the export has used the card's clear colour for its own (three writes it again for the bound target on
+   * every render), so the screen is to set its own again from the page's colour when it next draws (no frame is asked for). It is *not* put back from a colour saved at the
+   * start: a theme that changed meanwhile would be put back to the old one, and the screen would be cleared to it for good.
+   */
+  restoreScreen(): void;
 }
 
 /** What `getError` says when the card has not the memory. */
@@ -170,6 +176,72 @@ function checkOptions(options: ExportRenderOptions): void {
   if (!(scale > 0) || !Number.isFinite(scale)) {
     throw new RangeError('The scale is not a positive number.');
   }
+}
+
+/** How many turns of the page an export gives the screen's drawing to finish what it has begun (the layers built, the programs made) before it says it is not ready. */
+export const MAX_SETTLE_TURNS = 3000;
+
+/** What waiting for the layers needs of the renderer. */
+export interface SettleHost {
+  /** Whether there is nothing to draw on (the renderer is disposed of, or the card has the context away): the wait ends, and the export says why when it asks. */
+  unusable(): boolean;
+  /** Whether every layer is built and has its programs made. */
+  ready(): boolean;
+  /** Does what the screen's frame would do to go on building (a part of each layer put on the card, the programs of each made off the page's thread). */
+  step(): void;
+  /** Gives the page a turn. */
+  nextTask(): Promise<void>;
+}
+
+/**
+ * Lets the screen's drawing finish what it has begun, a frame at a time as it would (a million points are not put on the card in one task by an export), until the layers are built.
+ * Nothing is waited for by the clock: it is a number of turns, after which it says it is not ready. It stops at once when aborted (with the signal's reason), and returns when the
+ * renderer is unusable (the export finds out why).
+ */
+export async function settleUntilReady(
+  host: SettleHost,
+  signal?: AbortSignal,
+  maxTurns = MAX_SETTLE_TURNS,
+): Promise<void> {
+  for (let turn = 0; turn < maxTurns; turn += 1) {
+    signal?.throwIfAborted();
+    if (host.unusable() || host.ready()) {
+      return;
+    }
+    host.step();
+    await host.nextTask();
+  }
+  signal?.throwIfAborted();
+  throw new ExportError('not_ready', 'The map is still being put on the graphics card.');
+}
+
+/** What the card says of its limits, as `getParameter` gives them: the numbers of each, which may be missing or not numbers. */
+export interface CardParameters {
+  readonly renderbuffer: unknown;
+  readonly texture: unknown;
+  /** `MAX_VIEWPORT_DIMS`: two numbers, the widest and the highest viewport. */
+  readonly viewport: unknown;
+  /** `ALIASED_POINT_SIZE_RANGE`: two numbers, the least and the largest point. */
+  readonly pointRange: unknown;
+}
+
+/**
+ * The limits that an export is held to, from what the card says. The viewport's is the **least of its two numbers** (a card may allow a different width and height, and the picture's
+ * longest side may be either); a number that is missing or is not above 0 is `fallback` (and 1 for the point range, which is then no point larger than the card's smallest).
+ */
+export function limitsOf(card: CardParameters, fallback: number): ExportLimits {
+  const number = (value: unknown, otherwise: number): number =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : otherwise;
+  const pair = (value: unknown, at: number, otherwise: number): number =>
+    value instanceof Int32Array || value instanceof Float32Array
+      ? number(value[at], otherwise)
+      : otherwise;
+  return {
+    renderbuffer: number(card.renderbuffer, fallback),
+    texture: number(card.texture, fallback),
+    viewport: Math.min(pair(card.viewport, 0, fallback), pair(card.viewport, 1, fallback)),
+    pointSize: pair(card.pointRange, 1, 1),
+  };
 }
 
 /** The export of a host: one function that draws the map into a picture and gives it, band by band, to the caller. Two at a time are refused. */
@@ -227,9 +299,11 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
       'A point of the map would be larger than the graphics card can draw at this size.',
     );
   }
-  await host.settle();
-  guard(false);
+  // What is drawn has to be what the caller saw when it asked (the cameras and the legend it made the plan from): the revision is taken before the wait for the layers, so a change
+  // during it is a change of what is drawn.
   revision = host.revision();
+  await host.settle(signal);
+  guard(true);
   const view = host.view();
   if (view.viewMode !== options.viewMode) {
     throw new ExportError('interrupted', 'The view of the map changed while the picture was made.');
@@ -297,14 +371,10 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
       draw();
     } finally {
       gl.setRenderTarget(null);
+      host.restoreScreen();
     }
   };
 
-  // The screen's clear colour, which every render of a layer asserts again for the target that is bound (three does that on each `render`), so it is put back
-  // once, after the last of them and with no target bound, where it is written for the screen: put back earlier, the screen would be cleared to a darker colour.
-  const kept = new Color();
-  gl.getClearColor(kept);
-  const keptAlpha = gl.getClearAlpha();
   try {
     // The programs, made with the target bound and together, and waited for.
     host.prepare(info);
@@ -317,6 +387,7 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
         gl.setRenderTarget(null);
       }
     }
+    host.restoreScreen();
     // (A program that cannot be made is the card's to say, in the drawing; it does not stop the picture here.)
     await Promise.allSettled(compiling);
     guard(true);
@@ -359,6 +430,7 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
       width,
       height,
       onBand: options.onBand,
+      ...(options.bandRows === undefined ? {} : { rows: options.bandRows }),
       ...(signal === undefined ? {} : { signal }),
       onProgress: (done) => onProgress?.(DONE_DRAWING + (1 - DONE_DRAWING) * done),
       read: async (y, rows, into) => {
@@ -369,7 +441,7 @@ async function run(host: ExportHost, options: ExportRenderOptions): Promise<Expo
     });
     return { viewMode: view.viewMode };
   } finally {
-    gl.setClearColor(kept, keptAlpha);
+    host.restoreScreen();
     target.dispose();
   }
 }

@@ -17,9 +17,14 @@ export interface ExportRequest {
   readonly compareWithScreen?: boolean;
   /**
    * Something that is done when the export has got as far as `done` (from 0 to 1): `abort` it, `restyle` a layer (which changes what is drawn), make the card
-   * `lose` the context, or `interfere` as the screen does (a draw of the screen and a pick), which is done every time it says how far it is, from `done` on.
+   * `lose` the context, make the page `dark` (its theme changes, as a person's setting may meanwhile), or `interfere` as the screen does (a draw of the screen and a pick), which is done every time it says how far it is, from `done` on.
    */
-  readonly at?: { readonly done: number; readonly do: 'abort' | 'restyle' | 'lose' | 'interfere' };
+  readonly at?: {
+    readonly done: number;
+    readonly do: 'abort' | 'restyle' | 'lose' | 'interfere' | 'dark';
+  };
+  /** How many rows are read off the card at a time (a test knob of `renderExport`): few, so that the picture is read in many bands, and takes time. */
+  readonly bandRows?: number;
 }
 
 /** What came of it. */
@@ -102,6 +107,7 @@ export function exportPicture(page: Page, request: ExportRequest = {}): Promise<
           background: map,
           ink,
           signal: controller.signal,
+          ...(req.bandRows === undefined ? {} : { bandRows: req.bandRows }),
           onBand: (rows: Uint8Array, first: number, count: number) => {
             bands += 1;
             picture.set(rows.subarray(0, count * width * 4), first * width * 4);
@@ -120,6 +126,8 @@ export function exportPicture(page: Page, request: ExportRequest = {}): Promise<
                 controller.abort(new DOMException('Stopped by the test', 'AbortError'));
               } else if (at.do === 'lose') {
                 loseContext();
+              } else if (at.do === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
               } else {
                 viewer.dispatch({
                   type: 'setStyle',
