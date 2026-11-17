@@ -516,9 +516,9 @@ test.describe('importing', () => {
         document
           .querySelector('karmania-app')
           ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
-          importFiles: (files: File[]) => void;
+          openImport: (files: File[]) => void;
         }
-      ).importFiles([file, prj]);
+      ).openImport([file, prj]);
     }, rows);
     await expect(w.host.locator('karmania-file-step')).toBeVisible({ timeout: 60_000 });
     await expect(w.host.locator('karmania-file-step .detail')).toContainText(
