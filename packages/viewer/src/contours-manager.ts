@@ -218,8 +218,82 @@ export class ContoursManager {
     if (running?.key === key || this.failed.get(layer.id)?.key === key) {
       return;
     }
+    // The engine has lines for these very settings (a viewer that shares it made them, or this one did, and the record of it is gone): they are shown, and nothing is asked.
+    if (
+      running === undefined &&
+      lines !== undefined &&
+      lines.derivedFrom !== undefined &&
+      keyOf(lines.derivedFrom.params) === key
+    ) {
+      this.showLines(layer.id, lines, key);
+      this.followVisibility(doc, layer);
+      return;
+    }
     running?.controller.abort();
     void this.make(layer.id, layer.datasetId, params, key);
+  }
+
+  /**
+   * The layer of the lines of `layerId` shows `lines`, which were made with the settings `key`: it is made, or given the new lines (it keeps its place and its style), and the
+   * record says so. The layer of the lines takes the new ones first, so that the layers of the datasets that are gone are taken away with it already there.
+   */
+  private showLines(layerId: LayerId, lines: Summary, key: string): void {
+    const { scene } = this.options;
+    this.made.set(layerId, { key, datasetId: lines.id });
+    this.failed.delete(layerId);
+    scene.dispatch({
+      type: 'setContoursLayer',
+      sourceLayer: layerId,
+      datasetId: lines.id,
+      name: lines.name,
+    });
+    // A layer that is new has the style of the one that was taken away, if there was one (and a layer that is not new is not given it again).
+    const style = this.styles.get(layerId);
+    const layer = this.linesLayerOf(scene.getState(), layerId);
+    if (style !== undefined && layer !== undefined) {
+      scene.dispatch({ type: 'setStyle', layerId: layer.id, patch: style });
+    }
+    this.styles.delete(layerId);
+    this.changed();
+  }
+
+  /**
+   * The engine's contour lines are the layers' contours, whoever made them: when it holds lines for the dataset of a layer, the layer has those settings (it keeps whether they are
+   * shown, which is its own) and its layer of lines shows them, and when the lines that it showed are gone (a viewer that shares the engine turned the contours off) the layer has no
+   * contours. Nothing is asked of the engine. A layer whose lines are being made here is left to its own answer. Call it when the engine's datasets have changed, before the scene's
+   * layers are brought to them (so that lines that were made again keep their layer and its style) and after (so that a layer that is new has the contours the engine has).
+   */
+  followEngine(): void {
+    if (this.disposed) {
+      return;
+    }
+    const { scene, engine } = this.options;
+    const held = engine.datasets();
+    for (const layer of Object.values(scene.getState().layers)) {
+      if (layer.derived !== undefined || this.jobs.has(layer.id)) {
+        continue;
+      }
+      const lines = held.find(
+        (dataset) =>
+          dataset.derivedFrom?.kind === 'contours' && dataset.derivedFrom.id === layer.datasetId,
+      );
+      const mine = paramsOf(layer);
+      if (lines?.derivedFrom !== undefined) {
+        const theirs = lines.derivedFrom.params;
+        if (mine === undefined || keyOf(mine) !== keyOf(theirs)) {
+          scene.dispatch({
+            type: 'setContours',
+            layerId: layer.id,
+            contours: { ...theirs, visible: layer.contours?.visible ?? true },
+          });
+        }
+      } else if (mine !== undefined && this.made.has(layer.id)) {
+        // The lines are gone from the engine: the contours go with them, and nothing is taken out of an engine that has no such lines (`removeLinesOf`).
+        scene.dispatch({ type: 'setContours', layerId: layer.id, contours: null });
+      }
+    }
+    // The layers whose settings are what the engine's lines say, and whose lines have a new number, are given them.
+    this.update();
   }
 
   private async make(
@@ -247,21 +321,7 @@ export class ContoursManager {
       const { scene, engine } = this.options;
       const lines = result.status === 'loaded' ? result.summaries[0] : undefined;
       if (lines !== undefined) {
-        this.made.set(layerId, { key, datasetId: lines.id });
-        // The layer of the lines takes the new ones first, so that the layers of the datasets that are gone are taken away with it already there.
-        scene.dispatch({
-          type: 'setContoursLayer',
-          sourceLayer: layerId,
-          datasetId: lines.id,
-          name: lines.name,
-        });
-        // A layer that is new has the style of the one that was taken away, if there was one (and a layer that is not new is not given it again).
-        const style = this.styles.get(layerId);
-        const layer = this.linesLayerOf(scene.getState(), layerId);
-        if (style !== undefined && layer !== undefined) {
-          scene.dispatch({ type: 'setStyle', layerId: layer.id, patch: style });
-        }
-        this.styles.delete(layerId);
+        this.showLines(layerId, lines, key);
       } else {
         // The engine took the lines made before out too: so does the scene.
         this.made.delete(layerId);
@@ -358,8 +418,12 @@ export class ContoursManager {
    * all the same, which no layer shows (an answer kept because another job was under way, and that job was then stopped, or failed).
    */
   private removeLinesOf(source: number | undefined, shown: number | undefined): void {
-    const ids = new Set(shown === undefined ? [] : [shown]);
-    for (const dataset of this.options.engine.datasets()) {
+    const held = this.options.engine.datasets();
+    // What the engine holds, and no more: a viewer that shares it may have taken the lines out already, and it is not asked for what is not there.
+    const ids = new Set(
+      shown !== undefined && held.some((dataset) => dataset.id === shown) ? [shown] : [],
+    );
+    for (const dataset of held) {
       if (dataset.derivedFrom?.id === source) {
         ids.add(dataset.id);
       }
