@@ -133,7 +133,7 @@ export class KarmaniaViewer extends LitElement {
     withPanel: { attribute: false },
     withImportUi: { attribute: false },
     panel: { state: true },
-    viewportWidth: { state: true },
+    hostWidth: { state: true },
     datasets: { state: true },
     layerChanges: { state: true },
     cannotDraw: { state: true },
@@ -199,8 +199,11 @@ export class KarmaniaViewer extends LitElement {
   declare withImportUi: boolean;
   /** How the panel is: folded away or open, the tab it is on, and the width it was given. */
   declare private panel: PanelState;
-  /** How wide the window is, which limits how wide the panel can be. */
-  declare private viewportWidth: number;
+  /**
+   * How wide the viewer is, which is what the panel's width is limited by (half of it, up to 640): the width of the element itself, and not of the window, since
+   * a page can put the viewer in a box of any size. It is the window's width until the viewer is in a page and measured, and it follows the element's size.
+   */
+  declare private hostWidth: number;
   /** The datasets that have been loaded and kept, in the order they were loaded. */
   declare private datasets: readonly Summary[];
   /** Counts the changes of where the layers are (being prepared, drawn, not drawn): what the map area says of them is made again for each. */
@@ -220,7 +223,7 @@ export class KarmaniaViewer extends LitElement {
     this.withPanel = true;
     this.withImportUi = true;
     this.panel = loadPanelState(browserStorage());
-    this.viewportWidth = document.documentElement.clientWidth;
+    this.hostWidth = document.documentElement.clientWidth;
     this.datasets = [];
     this.layerChanges = 0;
     this.cannotDraw = false;
@@ -1203,7 +1206,11 @@ export class KarmaniaViewer extends LitElement {
   /** Stops listening to the scene; set while the viewer is in a page. */
   private unlistenScene: (() => void) | undefined;
 
-  /** Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away). */
+  /**
+   * Watches the size of the map area, which changes the point under a pointer that is still (a resized window, a panel that is folded away), and takes the
+   * viewer's width again, which limits how wide its panel can be: the map area has what the viewer has, less the panel, so it changes whenever the box a page puts the
+   * viewer in does (a panel that is made wider or narrower for it changes the map area again, until the two agree).
+   */
   private sizeWatch: ResizeObserver | undefined;
 
   private watchSize(): void {
@@ -1212,6 +1219,7 @@ export class KarmaniaViewer extends LitElement {
       return;
     }
     this.sizeWatch = new ResizeObserver(() => {
+      this.measureWidth();
       this.updateReadout();
     });
     this.sizeWatch.observe(area);
@@ -1253,9 +1261,10 @@ export class KarmaniaViewer extends LitElement {
     if (this.hasUpdated) {
       this.watchSize();
     }
-    window.addEventListener('dragover', this.refuseStrayFiles);
-    window.addEventListener('drop', this.refuseStrayFiles);
-    window.addEventListener('resize', this.onWindowResize);
+    // Measured before the first render, so that the panel is not made for the window's width and then changed.
+    this.measureWidth();
+    this.addEventListener('dragover', this.refuseStrayFiles);
+    this.addEventListener('drop', this.refuseStrayFiles);
     this.unlistenScene = this.store.subscribe(this.onScene);
     // An engine that was given stays with the viewer while it is out of the page, and what it holds is shown again when it is put back.
     if (this.engine !== undefined) {
@@ -1265,9 +1274,8 @@ export class KarmaniaViewer extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    window.removeEventListener('dragover', this.refuseStrayFiles);
-    window.removeEventListener('drop', this.refuseStrayFiles);
-    window.removeEventListener('resize', this.onWindowResize);
+    this.removeEventListener('dragover', this.refuseStrayFiles);
+    this.removeEventListener('drop', this.refuseStrayFiles);
     this.unlistenScene?.();
     this.unlistenScene = undefined;
     this.sizeWatch?.disconnect();
@@ -1300,9 +1308,12 @@ export class KarmaniaViewer extends LitElement {
     syncDatasets(this.store, this.datasets);
   }
 
-  private readonly onWindowResize = (): void => {
-    this.viewportWidth = document.documentElement.clientWidth;
-  };
+  /** Takes the viewer's width as it is now, unless it has none (it is not shown: its last width is what its panel keeps to). */
+  private measureWidth(): void {
+    if (this.clientWidth > 0) {
+      this.hostWidth = this.clientWidth;
+    }
+  }
 
   /** Opens the file picker, which is an input that is not shown. */
   private readonly chooseFiles = (): void => {
@@ -1571,15 +1582,16 @@ export class KarmaniaViewer extends LitElement {
 
   /** Gives the panel the width that was asked for, as far as the window allows. */
   private readonly onResize = (event: CustomEvent<ResizeRequest>): void => {
-    this.panel = { ...this.panel, width: clampPanelWidth(event.detail.width, this.viewportWidth) };
+    this.panel = { ...this.panel, width: clampPanelWidth(event.detail.width, this.hostWidth) };
     if (this.withPanel) {
       savePanelState(browserStorage(), this.panel);
     }
   };
 
   /**
-   * Files dropped anywhere but the map area do nothing. Left alone, the browser would open the file
-   * in place of the page, so what nobody has taken is taken here, and the pointer says no.
+   * Files dropped in the viewer, anywhere but the map area, do nothing. Left alone, the browser would open the file in place of the page, so what nobody has taken
+   * is taken here, and the pointer says no. This is for the viewer's own box: what a page does with a drop outside it is the page's business (the app refuses
+   * them over its whole window, as it did when the viewer did).
    */
   private readonly refuseStrayFiles = (event: DragEvent): void => {
     if (carriesFiles(event) && !event.defaultPrevented) {
@@ -1592,8 +1604,8 @@ export class KarmaniaViewer extends LitElement {
 
   override render() {
     // The width that was asked for, or what the window allows of it.
-    const width = clampPanelWidth(this.panel.width, this.viewportWidth);
-    const limits = panelWidthLimits(this.viewportWidth);
+    const width = clampPanelWidth(this.panel.width, this.hostWidth);
+    const limits = panelWidthLimits(this.hostWidth);
     const states = this.pipeline?.states() ?? new Map();
     const layers = summariseLayers(states.values());
     const found = datasetNotices(states, this.store.getState().layers);

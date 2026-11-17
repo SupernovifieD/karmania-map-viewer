@@ -731,3 +731,81 @@ test.describe('the events of a viewer', () => {
     });
   });
 });
+
+test.describe('a viewer in a box of a page', () => {
+  test('keeps its panel to what its own box allows, and follows the box and not the window', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    // The widest panel was kept from an earlier visit; the window is 1280 wide, which would allow it (half of the window, up to 640).
+    const first = await page.evaluate(async () => {
+      localStorage.setItem(
+        'karmania.panel',
+        JSON.stringify({ collapsed: false, tab: 'legend', width: 640 }),
+      );
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 600px; height: 400px';
+      document.body.append(box);
+      window.embed.createViewer(box);
+      const element = box.querySelector('karmania-viewer');
+      await (element as InstanceType<typeof window.embed.KarmaniaViewer>).updateComplete;
+      return element?.shadowRoot?.querySelector('karmania-panel')?.getBoundingClientRect().width;
+    });
+    // At the viewer's first render already: it is not made for the window's width and then corrected.
+    expect(first).toBe(300);
+    const panel = page.locator('#box karmania-panel');
+    const width = async (): Promise<number | undefined> => (await panel.boundingBox())?.width;
+    // Half of the box.
+    await expect.poll(width).toBe(300);
+    // The box grows and the window does not: the panel may be wider, up to half of the box.
+    await page.locator('#box').evaluate((box) => {
+      box.style.width = '1000px';
+    });
+    await expect.poll(width).toBe(500);
+    // The box is narrower than the panel's least: the least wins.
+    await page.locator('#box').evaluate((box) => {
+      box.style.width = '400px';
+    });
+    await expect.poll(width).toBe(280);
+  });
+
+  test('refuses files dropped in its own box, where nothing takes them, and leaves the page outside it alone', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    await page.evaluate(() => {
+      const outside = document.createElement('div');
+      outside.id = 'outside';
+      outside.style.cssText = 'width: 100px; height: 40px';
+      const box = document.createElement('div');
+      box.id = 'box';
+      box.style.cssText = 'width: 800px; height: 500px';
+      document.body.append(outside, box);
+      window.embed.createViewer(box);
+    });
+    /** Whether a drag of a file over `selector` was taken (its default prevented), and what it said would happen. */
+    const fire = (selector: string, type: 'dragover' | 'drop') =>
+      page.locator(selector).evaluate((element, eventType) => {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(new File(['x,y\n1,2\n'], 'points.csv', { type: 'text/csv' }));
+        const event = new DragEvent(eventType, {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          dataTransfer,
+        });
+        element.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, type);
+    // In the box, off the map: refused.
+    for (const type of ['dragover', 'drop'] as const) {
+      expect(await fire('#box karmania-panel', type), `${type} on the panel`).toBe(true);
+    }
+    // Outside the box, the page's business: the viewer does not touch it.
+    for (const type of ['dragover', 'drop'] as const) {
+      expect(await fire('#outside', type), `${type} outside`).toBe(false);
+      expect(await fire('body', type), `${type} on the body`).toBe(false);
+    }
+  });
+});
