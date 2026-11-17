@@ -215,7 +215,6 @@ export class KarmaniaExportDialog extends LitElement {
         font-variant-numeric: tabular-nums;
         min-width: calc(var(--k-space-8) * 21);
         text-align: right;
-        white-space: nowrap;
       }
     `,
   ];
@@ -274,12 +273,15 @@ export class KarmaniaExportDialog extends LitElement {
     this.previewCanvas = undefined;
     this.previewState = 'working';
     this.failure = undefined;
-    this.exporting = false;
+    // A picture that was cancelled may still be winding down (it stops at its next step): it is stopped again for sure, and `exporting` stays as it is until it has ended, so that
+    // Export is not pressed against a renderer that is still busy, and its end cannot be taken for the end of a later run.
+    this.exporter?.abort(new DOMException('The dialog was opened again.', 'AbortError'));
     this.open = true;
     this.schedule(0);
   }
 
   override disconnectedCallback(): void {
+    this.open = false;
     this.stopRefresh();
     this.exporter?.abort(new DOMException('The dialog was taken out of the page.', 'AbortError'));
     super.disconnectedCallback();
@@ -488,10 +490,13 @@ export class KarmaniaExportDialog extends LitElement {
         this.failure = errorText(error);
       }
     } finally {
-      this.exporting = false;
-      this.exporter = undefined;
-      if (this.open) {
-        this.schedule(0);
+      // Only the run that is the dialog's now ends it: one that was cancelled and has wound down late must not end a later one.
+      if (this.exporter === exporter) {
+        this.exporting = false;
+        this.exporter = undefined;
+        if (this.open) {
+          this.schedule(0);
+        }
       }
     }
   };
@@ -504,13 +509,26 @@ export class KarmaniaExportDialog extends LitElement {
     return EXPORT_DPIS.map((dpi) => ({ value: String(dpi), label: DPI_LABELS[dpi] }));
   }
 
+  /**
+   * What the footer says: how far a picture is while it is made; that the last one is being stopped, when the dialog was closed or opened again while it was; why Export cannot be
+   * pressed; or nothing.
+   */
+  private statusText(blocker: string | undefined): string {
+    if (!this.exporting) {
+      return blocker ?? '';
+    }
+    return this.exporter?.signal.aborted === true
+      ? 'Stopping the last picture…'
+      : progressText(this.progress);
+  }
+
   /** The text of what the preview is not, in the frame. */
   private previewHint(): string {
     switch (this.previewState) {
       case 'working':
         return 'Making the preview…';
       case 'failed':
-        return 'The preview could not be made.';
+        return 'The preview could not be made. You can still export the picture.';
       case 'none':
         return this.problems().length > 0
           ? 'There is no preview for this size.'
@@ -522,8 +540,17 @@ export class KarmaniaExportDialog extends LitElement {
 
   /** The preview's frame: the picture, or why there is none. */
   private frame() {
-    const canvas = this.previewState === 'ready' ? this.previewCanvas : undefined;
-    return html`<div class="frame" aria-label="Preview of the picture" role="group">
+    // The picture that was made last stays while the next is being made, so that the frame does not jump to its empty size and back at every change of an option.
+    const canvas =
+      this.previewState === 'ready' || this.previewState === 'working'
+        ? this.previewCanvas
+        : undefined;
+    return html`<div
+      class="frame"
+      aria-label="Preview of the picture"
+      aria-busy=${this.previewState === 'working' ? 'true' : 'false'}
+      role="group"
+    >
       ${canvas === undefined ? html`<p class="hint">${this.previewHint()}</p>` : canvas}
     </div>`;
   }
@@ -630,9 +657,7 @@ export class KarmaniaExportDialog extends LitElement {
           </div>
         </div>
         <k-button slot="footer-start" variant="ghost" @click=${this.onClose}>Cancel</k-button>
-        <span slot="footer-note" class="status" role="status" title=${blocker ?? ''}
-          >${this.exporting ? progressText(this.progress) : ''}</span
-        >
+        <span slot="footer-note" class="status" role="status">${this.statusText(blocker)}</span>
         <k-button
           slot="footer-end"
           variant="primary"

@@ -29,6 +29,17 @@ const exportAction = (page: Page) => dialog(page).locator('k-button[slot="footer
 const cancelAction = (page: Page) => dialog(page).locator('k-button[slot="footer-start"]');
 const previewCanvas = (page: Page) => dialog(page).locator('.frame canvas');
 
+/** What a test does to the dialog's element in the page: gives it other `work` (the functions it makes pictures with) built on the real ones. */
+type Work = { plan: unknown; preview: unknown; run: unknown };
+const withWork = (page: Page, change: string) =>
+  page.evaluate(`(() => {
+    const dialog = document.querySelector('karmania-app').shadowRoot.querySelector('karmania-viewer').shadowRoot.querySelector('karmania-export-dialog');
+    const real = dialog.work;
+    const make = ${change};
+    dialog.work = make(real);
+  })()`);
+export type { Work };
+
 async function open(page: Page): Promise<void> {
   await page.goto('/?theme=light');
   await loadLegendScene(page);
@@ -65,6 +76,11 @@ test.describe('the Export PNG button', () => {
     await exportButton(page).hover({ force: true });
     await expect(toolbar(page).locator(':scope > k-tooltip')).toHaveAttribute(
       'text',
+      'There is nothing drawn on the map to export',
+    );
+    // And the words are shown, not only held: the tooltip's own box is visible with them.
+    await expect(toolbar(page).locator(':scope > k-tooltip .tip')).toBeVisible();
+    await expect(toolbar(page).locator(':scope > k-tooltip .tip')).toHaveText(
       'There is nothing drawn on the map to export',
     );
     await open(page);
@@ -354,6 +370,11 @@ test.describe('the export dialog', () => {
     page.on('download', () => {
       downloaded = true;
     });
+    // The end of the picture that is made is noted in the page, so that "no download" is asserted once it has really ended and not after a wait.
+    await withWork(
+      page,
+      `(real) => ({ ...real, run: async (o, r) => { window.__ended = false; try { return await real.run(o, r); } finally { window.__ended = true; } } })`,
+    );
     await exportAction(page).click();
     await expect(status(page)).toContainText(/Rendering… \d+ %|Writing the file… \d+ %/);
     // Nothing moved: the status is as wide as it was and Export is where it was.
@@ -362,13 +383,101 @@ test.describe('the export dialog', () => {
     await expect(exportAction(page)).toHaveAttribute('disabled', '');
     await cancelAction(page).click();
     await expect(heading(page)).toBeHidden();
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => (window as unknown as { __ended?: boolean }).__ended === true);
     expect(downloaded).toBe(false);
     // The next picture is made: nothing was left held.
     await openDialog(page);
     const again = page.waitForEvent('download');
     await exportAction(page).click();
     expect((await again).suggestedFilename()).toBe('karmania-map.png');
+  });
+
+  test('keeps Export disabled, and says the last picture is being stopped, when the dialog is opened again while a cancelled picture is still winding down; Export is enabled when it has ended', async ({
+    page,
+  }) => {
+    // A picture that does not stop when it is told to (it ends when the test lets it): what a run that is slow to wind down is.
+    await withWork(
+      page,
+      `(real) => ({ ...real, run: () => new Promise((_resolve, reject) => { window.__release = () => reject(new DOMException('Stopped', 'AbortError')); }) })`,
+    );
+    await exportAction(page).click();
+    await expect(status(page)).toContainText('Rendering…');
+    await cancelAction(page).click();
+    await expect(heading(page)).toBeHidden();
+    await exportButton(page).click();
+    await expect(heading(page)).toBeVisible();
+    // It would be enabled if opening the dialog forgot the picture that is still ending, and Export pressed then would meet a busy renderer.
+    await expect(exportAction(page)).toHaveAttribute('disabled', '');
+    await expect(status(page)).toHaveText('Stopping the last picture…');
+    await page.evaluate(() => {
+      (window as unknown as { __release: () => void }).__release();
+    });
+    await expect(exportAction(page)).not.toHaveAttribute('disabled', '');
+    await expect(status(page)).toHaveText('');
+    const download = page.waitForEvent('download');
+    await exportAction(page).click();
+    expect((await download).suggestedFilename()).toBe('karmania-map.png');
+  });
+
+  test('keeps the picture of the preview while the next one is made, so that the frame does not jump to its empty size and back at each change', async ({
+    page,
+  }) => {
+    await withWork(page, `(real) => ({ ...real, preview: () => new Promise(() => undefined) })`);
+    await chooseSize(page, 'A4 portrait');
+    await expect(dialog(page).locator('.frame')).toHaveAttribute('aria-busy', 'true');
+    await expect(previewCanvas(page)).toBeVisible();
+    await expect(dialog(page).locator('.frame .hint')).toHaveCount(0);
+  });
+
+  test('says why Export cannot be pressed, in words in the footer', async ({ page }) => {
+    await chooseSize(page, 'Custom');
+    await widthInput(page).fill('20000');
+    await expect(status(page)).toHaveText('The size is not one that can be made.');
+    await widthInput(page).fill('1000');
+    await expect(status(page)).toHaveText('');
+  });
+
+  test('names its controls for assistive technology, says a failure as an alert and lets the person try again, and gives the focus back to the button that opened it', async ({
+    page,
+  }) => {
+    const d = dialog(page);
+    for (const name of ['Size', 'Resolution']) {
+      await expect(d.getByRole('combobox', { name, exact: true })).toBeVisible();
+    }
+    for (const name of ['Width (px)', 'Height (px)', 'File name']) {
+      await expect(d.getByRole('textbox', { name, exact: true })).toBeVisible();
+    }
+    await expect(
+      d.getByRole('checkbox', { name: 'Put the legend to the right of the map' }),
+    ).toBeChecked();
+    await expect(d.getByRole('button', { name: 'Export', exact: true })).toBeEnabled();
+    await expect(d.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+    // A failure is an alert, with words, and Export can be pressed again.
+    await withWork(
+      page,
+      `(real) => ({ ...real, run: () => Promise.reject(Object.assign(new Error('x'), { name: 'ExportError', code: 'context_lost' })) })`,
+    );
+    await exportAction(page).click();
+    await expect(d.getByRole('alert')).toContainText('The graphics card stopped drawing the map');
+    await expect(exportAction(page)).not.toHaveAttribute('disabled', '');
+    // Escape closes it, and the keyboard is on the button that opened it.
+    await page.keyboard.press('Escape');
+    await expect(heading(page)).toBeHidden();
+    const focused = await page.evaluate(() => {
+      let active: Element | null = document.activeElement;
+      while (active?.shadowRoot?.activeElement) {
+        active = active.shadowRoot.activeElement;
+      }
+      // The native button inside the k-button that has it: the text is the k-button's.
+      const root = active?.getRootNode();
+      const host = root instanceof ShadowRoot ? root.host : null;
+      return {
+        tag: active?.tagName.toLowerCase(),
+        host: host?.tagName.toLowerCase(),
+        text: host?.textContent.trim(),
+      };
+    });
+    expect(focused).toEqual({ tag: 'button', host: 'k-button', text: 'Export PNG' });
   });
 
   test('closes with Escape, and with the close button, and makes nothing', async ({ page }) => {

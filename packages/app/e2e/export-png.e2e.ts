@@ -109,12 +109,13 @@ test.describe('the PNG file of the picture', () => {
         expect(second.hash).toBe(first.hash);
       }
       // A picture of another scene is another file: the hash is not a constant.
+      const framesBefore = (await stats(page))?.frames ?? 0;
       await dispatch(page, {
         type: 'setStyle',
         layerId: 'layer-1',
         patch: { colour: { mode: 'single', value: '#0072b2' } },
       });
-      await expect.poll(async () => (await drawn(page)).frames).toBeGreaterThan(0);
+      await expect.poll(async () => (await stats(page))?.frames ?? 0).toBeGreaterThan(framesBefore);
       const changed = await exportPngFile(page, { widthPx: 1100, heightPx: 700 });
       expect(changed.ok && first.ok && changed.hash !== first.hash).toBe(true);
     });
