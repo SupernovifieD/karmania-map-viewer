@@ -110,6 +110,8 @@ export function warningText(warning: ExportWarning): string {
       return 'The legend takes more than half of the width, so the map is narrow. A wider picture, or no legend, gives the map more room.';
     case 'no_room_for_map':
       return 'The legend leaves no room for the map. Make the picture wider, or leave the legend out.';
+    case 'legend_too_tall':
+      return 'The legend is taller than this picture has room for. Part of it runs past the bottom margin, and may be cut off at the bottom edge. A taller picture, or no legend, gives it room. You can still export it as it is.';
   }
 }
 

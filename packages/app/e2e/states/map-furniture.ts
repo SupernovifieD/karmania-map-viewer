@@ -343,4 +343,22 @@ export const SHOTS: Shot[] = [
       return whole(page);
     },
   },
+  {
+    // A custom size that is too short for the legend (the one line of this map's legend is 32 high, and the picture 64 less its margins of 24): said as a warning, with Export
+    // still there; the legend runs past the bottom margin.
+    name: 'map-export-dialog-short',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await exportSize(page, 'Custom');
+      await page.locator('karmania-export-dialog k-input[label="Width (px)"] input').fill('2000');
+      await page.locator('karmania-export-dialog k-input[label="Height (px)"] input').fill('64');
+      await expect(page.locator('karmania-export-dialog .notes')).toContainText(
+        'taller than this picture has room for',
+      );
+      await expect(page.locator('karmania-export-dialog .frame canvas')).toBeVisible();
+      await blur(page);
+      return whole(page);
+    },
+  },
 ];

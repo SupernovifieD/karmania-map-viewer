@@ -224,6 +224,31 @@ test.describe('the export dialog', () => {
     await expect(dialog(page).locator('.frame .hint')).toHaveCount(0);
   });
 
+  test('warns when the legend is taller than the picture, in words, and still exports it when Export is pressed: a heading is not left alone, and the legend runs past the bottom margin', async ({
+    page,
+  }) => {
+    // The strip of the owner's pictures: 8,192 by 120 with the legend. Its columns are 72 high between the margins, and a heading with its layer and first class is 88.
+    await chooseSize(page, 'Custom');
+    await widthInput(page).fill('8192');
+    await heightInput(page).fill('120');
+    await expect(notes(page)).toContainText('taller than this picture has room for');
+    await expect(notes(page)).toContainText('You can still export it as it is');
+    await expect(exportAction(page)).not.toHaveAttribute('disabled', '');
+    // Tall enough, and the words are gone; without the legend there is nothing to be tall.
+    await heightInput(page).fill('300');
+    await expect(notes(page)).not.toContainText('taller than this picture');
+    await heightInput(page).fill('120');
+    await expect(notes(page)).toContainText('taller than this picture has room for');
+    await legendBox(page).uncheck();
+    await expect(notes(page)).not.toContainText('taller than this picture');
+    await legendBox(page).check();
+    // Pressed anyway, the picture is made, 8,192 by 120.
+    const download = page.waitForEvent('download');
+    await exportAction(page).click();
+    const file = await (await download).path();
+    expect(pngSize(file)).toEqual([8192, 120]);
+  });
+
   test('says there is no room for the map, and does not export, when the legend takes the width; and that the map is narrow when it takes more than half', async ({
     page,
   }) => {
