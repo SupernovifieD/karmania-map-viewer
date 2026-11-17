@@ -2,12 +2,24 @@
  * `createViewer`: puts a viewer in an element of a page, and gives back what the page needs of it. The page owns
  * the container (its size and place); the viewer fills it.
  */
+import type { Engine } from '@karmania/engine';
 import type { Command, SceneDocument, ViewMode } from '@karmania/scene';
 import type { ExportPngOptions, ExportPngRun } from './export-compose.js';
 import './viewer.js';
 
 /** What a page can listen to: the scene (more arrive with the rest of the API). */
 export type ViewerEvent = 'scene';
+
+/** What a page can ask of the viewer it creates. */
+export interface ViewerOptions {
+  /**
+   * An engine that the viewer is to use instead of making its own, so that several viewers (or the page itself) can have the same data: the viewer shows
+   * everything the engine holds, whoever loaded it, and follows what is loaded into it and removed from it. It is the page's: `dispose()` does not
+   * dispose it. Each viewer keeps its own camera, styling and selection. Without it the viewer makes an engine of its own when the first data
+   * arrives, and disposes it with itself.
+   */
+  readonly engine?: Engine;
+}
 
 /** A viewer that has been put in a page. */
 export interface Viewer {
@@ -57,8 +69,11 @@ export interface Viewer {
  * @throws Error from `openImport`, `scene`, `dispatch`, `fit`, `setViewMode`, `exportPng`, `openExport`, `exportable`, `onExportable` and `on` if the viewer has been disposed, which is a mistake of the caller;
  * `setViewMode` also throws a RangeError for a mode that is not `2d` or `3d`. Disposing stops every listener that `on` gave.
  */
-export function createViewer(container: HTMLElement): Viewer {
+export function createViewer(container: HTMLElement, options: ViewerOptions = {}): Viewer {
   const element = document.createElement('karmania-viewer');
+  if (options.engine !== undefined) {
+    element.useEngine(options.engine);
+  }
   container.append(element);
   let disposed = false;
   /** The ways to stop the listeners that were added, which `dispose` uses: a viewer that is gone is not listened to. */

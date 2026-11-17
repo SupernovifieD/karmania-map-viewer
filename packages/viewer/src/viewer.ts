@@ -68,7 +68,7 @@ import { carriesFiles } from './drag.js';
 import { IMPORT_FILE_ACCEPT } from './import-files.js';
 import type { DatasetChoice } from './dataset-list.js';
 import type { ContoursTurnOn, LegendCommand } from './legend-tab.js';
-import { selectionAfterChange, selectionAfterRemoved } from './datasets.js';
+import { listedDatasets, selectionAfterChange, selectionAfterRemoved } from './datasets.js';
 import type { CrsLookup, RowSource } from './datasets.js';
 import './import-dialog.js';
 import type { ImportLoaded } from './import-dialog.js';
@@ -194,8 +194,73 @@ export class KarmaniaViewer extends LitElement {
     this.furniture = furnitureOf(this.store.getState(), undefined);
   }
 
-  /** The engine, which is started when the first files arrive, not before. */
+  /**
+   * The engine: the one the page gave (`useEngine`), which is the page's, or the one this viewer makes when the first files arrive, not before,
+   * which is the viewer's own.
+   */
   private engine: Engine | undefined;
+  /** Whether the viewer made its engine, which it lets go with itself; an engine that a page gave is the page's to let go. */
+  private ownsEngine = false;
+  /** Stops listening to what the engine holds. */
+  private unfollowEngine: (() => void) | undefined;
+  /** The dataset that is being removed, which is waited for: the selection that its going leaves is the one next to it. */
+  private removing: number | undefined;
+
+  /**
+   * Gives the viewer an engine that is not its own: it shows what the engine holds, and what is loaded into it or removed from it after, by
+   * whoever does it (another viewer that has the same engine, or the page), and it does not let the engine go when it is taken out of the page.
+   * It has to come before the viewer has made an engine of its own, which is when the first files arrive.
+   *
+   * @throws Error if the viewer has an engine already.
+   */
+  useEngine(engine: Engine): void {
+    if (this.engine !== undefined) {
+      throw new Error(
+        'The viewer has an engine already: give it one before anything is loaded or imported.',
+      );
+    }
+    this.engine = engine;
+    if (this.isConnected) {
+      this.follow(engine);
+    }
+  }
+
+  /** The engine of the viewer: made now, as the viewer's own, if it has none. */
+  private acquireEngine(): Engine {
+    if (this.engine === undefined) {
+      this.engine = createEngine();
+      this.ownsEngine = true;
+      this.follow(this.engine);
+    }
+    return this.engine;
+  }
+
+  /** Shows what the engine holds, and follows it. */
+  private follow(engine: Engine): void {
+    this.unfollowEngine?.();
+    this.unfollowEngine = engine.on('datasets', this.onEngineDatasets);
+    this.onEngineDatasets(engine.datasets());
+  }
+
+  /**
+   * What the engine holds has changed (something was loaded, removed, or made again by whoever did it): the layers are what it holds, and a selection
+   * that is gone is the one that takes its place. The first of what is held is selected while nothing is.
+   */
+  private readonly onEngineDatasets = (list: readonly Summary[]): void => {
+    // While the contour lines are being made the manager brings the layers to what the engine holds when it has the answer (and after the layer of the
+    // lines has taken the new lines, which keeps its style): that is what it takes from the engine, and this list with it.
+    if (this.contours?.busy() === true) {
+      return;
+    }
+    const before = this.datasets;
+    this.datasets = list;
+    syncDatasets(this.store, list);
+    const kept =
+      this.removing === undefined
+        ? selectionAfterChange(before, list, this.selected)
+        : selectionAfterRemoved(before, list, this.removing, this.selected);
+    this.selected = kept ?? listedDatasets(list)[0]?.id;
+  };
 
   /**
    * The scene: what there is to draw and how, the one place that says so. It has a layer for each dataset that is
@@ -1100,6 +1165,10 @@ export class KarmaniaViewer extends LitElement {
     window.addEventListener('drop', this.refuseStrayFiles);
     window.addEventListener('resize', this.onWindowResize);
     this.unlistenScene = this.store.subscribe(this.onScene);
+    // An engine that was given stays with the viewer while it is out of the page, and what it holds is shown again when it is put back.
+    if (this.engine !== undefined) {
+      this.follow(this.engine);
+    }
   }
 
   override disconnectedCallback(): void {
@@ -1124,10 +1193,15 @@ export class KarmaniaViewer extends LitElement {
     this.renderer?.dispose();
     this.renderer = undefined;
     this.cannotDraw = false;
-    this.engine?.dispose();
-    this.engine = undefined;
-    // What the engine held is gone with it, so the list of datasets, the selection and the layers are emptied: a viewer
-    // that is put back in a page starts again, and does not list datasets that no engine can give rows of.
+    this.unfollowEngine?.();
+    this.unfollowEngine = undefined;
+    if (this.ownsEngine) {
+      this.engine?.dispose();
+      this.engine = undefined;
+      this.ownsEngine = false;
+    }
+    // What the viewer's own engine held is gone with it (and a viewer is not in a page to show what another's holds), so the list of datasets, the
+    // selection and the layers are emptied: a viewer that is put back in a page starts again, and does not list datasets that no engine can give rows of.
     this.datasets = [];
     this.selected = undefined;
     this.names.clear();
@@ -1171,8 +1245,7 @@ export class KarmaniaViewer extends LitElement {
   private importFiles(files: readonly File[]): void {
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
     if (this.isConnected && files.length > 0 && wizard) {
-      this.engine ??= createEngine();
-      wizard.engine = this.engine;
+      wizard.engine = this.acquireEngine();
       wizard.show(files);
     }
   }
@@ -1314,7 +1387,12 @@ export class KarmaniaViewer extends LitElement {
     }
     const { id } = event.detail;
     const before = this.datasets;
-    await engine.remove(id);
+    this.removing = id;
+    try {
+      await engine.remove(id);
+    } finally {
+      this.removing = undefined;
+    }
     this.datasets = engine.datasets();
     syncDatasets(this.store, this.datasets);
     // What is selected is what it is now, and not what it was when the removal was asked for.
@@ -1352,8 +1430,7 @@ export class KarmaniaViewer extends LitElement {
     if (!this.isConnected) {
       throw new Error('The viewer is not in a page: put it in one before loading a dataset.');
     }
-    this.engine ??= createEngine();
-    const result = await this.engine.load(input, options);
+    const result = await this.acquireEngine().load(input, options);
     if (result.status === 'loaded') {
       this.adopt(result.summaries);
     }
