@@ -252,6 +252,80 @@ test.describe('the export dialog', () => {
     await expect(heading(page)).toBeHidden();
   });
 
+  test('gives a file whose size, dpi and colour space are in it, and whose legend starts level with the top of the map, as the pixels of the file say', async ({
+    page,
+  }) => {
+    await chooseSize(page, 'A4 landscape');
+    await dpiSelect(page).selectOption('150');
+    const download = page.waitForEvent('download');
+    await exportAction(page).click();
+    const file = await download;
+    const bytes = readFileSync(await file.path());
+    // The chunks: IHDR with the size, sRGB, pHYs at 150 dpi (5,906 pixels to the metre, in metres), IDAT, IEND.
+    const chunks: { type: string; data: Buffer }[] = [];
+    for (let at = 8; at < bytes.length;) {
+      const length = bytes.readUInt32BE(at);
+      chunks.push({
+        type: bytes.toString('latin1', at + 4, at + 8),
+        data: bytes.subarray(at + 8, at + 8 + length),
+      });
+      at += 12 + length;
+    }
+    expect(
+      chunks.map((c) => c.type).filter((type, k, all) => k === 0 || type !== all[k - 1]),
+    ).toEqual(['IHDR', 'sRGB', 'pHYs', 'IDAT', 'IEND']);
+    expect([chunks[0]?.data.readUInt32BE(0), chunks[0]?.data.readUInt32BE(4)]).toEqual([
+      1754, 1240,
+    ]);
+    const phys = chunks.find((c) => c.type === 'pHYs');
+    expect([phys?.data.readUInt32BE(0), phys?.data.readUInt32BE(4), phys?.data[8]]).toEqual([
+      5906, 5906, 1,
+    ]);
+    // The pixels of the file, decoded by the browser: the top of the map's line is the first row of the border colour in the middle of the left part, and the first mark of the
+    // legend (in the right fifth, where only the legend is) is in the legend's first row, which is level with it: from that row to the end of one row of 32 pixels at 96 dpi (50 at 150).
+    const rows = await page.evaluate(async (base64) => {
+      const raw = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([raw], { type: 'image/png' }), {
+        colorSpaceConversion: 'none',
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx?.drawImage(bitmap, 0, 0);
+      const data =
+        ctx?.getImageData(0, 0, bitmap.width, bitmap.height).data ?? new Uint8ClampedArray();
+      const at = (x: number, y: number): number[] => [
+        ...data.subarray((y * bitmap.width + x) * 4, (y * bitmap.width + x) * 4 + 3),
+      ];
+      let frame = -1;
+      for (let y = 0; y < bitmap.height && frame < 0; y += 1) {
+        const [r, g, b] = at(Math.floor(bitmap.width / 4), y);
+        if (
+          Math.abs((r ?? 0) - 125) <= 2 &&
+          Math.abs((g ?? 0) - 135) <= 2 &&
+          Math.abs((b ?? 0) - 148) <= 2
+        ) {
+          frame = y;
+        }
+      }
+      let legend = -1;
+      for (let y = 0; y < bitmap.height && legend < 0; y += 1) {
+        for (let x = Math.floor(bitmap.width * 0.8); x < bitmap.width && legend < 0; x += 1) {
+          const [r, g, b] = at(x, y);
+          if ((r ?? 255) < 235 || (g ?? 255) < 235 || (b ?? 255) < 235) {
+            legend = y;
+          }
+        }
+      }
+      return { frame, legend };
+    }, bytes.toString('base64'));
+    // The margin is 24 at 96 dpi: 38 at 150 (37.5 rounded).
+    expect(rows.frame).toBe(38);
+    expect(rows.legend).toBeGreaterThanOrEqual(rows.frame);
+    expect(rows.legend).toBeLessThan(rows.frame + 50);
+  });
+
   test('makes a name with no forbidden characters, and the default for none', async ({ page }) => {
     await chooseSize(page, 'Custom');
     await widthInput(page).fill('1000');
