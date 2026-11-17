@@ -28,9 +28,18 @@ function siteUnder(policy: Policy): Promise<Site> {
   return serveSite({
     pages: libraryPages('/lib/'),
     folders: { '/lib/': library.folder },
-    headers: { 'content-security-policy': policyHeader(policy) },
+    // The policy asks the browser to report what it blocks to the site, which the page's own events do not give for a worker: a violation inside the worker
+    // (the WebAssembly module that it may not make, the fetch that it may not do) is in its own global scope, not the document's. The reports are what is counted.
+    headers: { 'content-security-policy': `${policyHeader(policy)}; report-uri ${REPORTS}` },
   });
 }
+
+/** Where the browser reports what the policy blocks, from the page and from the worker alike. */
+const REPORTS = '/csp-report';
+
+/** How many reports of a violation the site has had. */
+const reportsOf = (site: Site): number =>
+  site.requests.filter((request) => request.path === REPORTS).length;
 
 /** What goes wrong, as the page and the browser say it: the errors of the page and the violations of the policy. */
 interface Trouble {
@@ -38,6 +47,8 @@ interface Trouble {
   readonly errors: string[];
   /** What the browser blocked, each as the directive and what. */
   readonly violations: () => Promise<string[]>;
+  /** How many reports of a violation the browser has sent to the site, a worker's included. */
+  readonly reports: () => number;
 }
 
 /** Opens the page of `site` in a window that has room for both viewers. */
@@ -53,7 +64,7 @@ async function open(page: Page, site: Site): Promise<Trouble> {
   });
   const violations = await blockedBy(page);
   await page.goto(`${site.origin}/`);
-  return { errors, violations };
+  return { errors, violations, reports: () => reportsOf(site) };
 }
 
 /** Makes the two viewers of the page, each with an engine of its own, and puts a dataset or two in each. */
@@ -157,7 +168,10 @@ test.describe('two viewers on a page under the smallest policy', () => {
       // The fonts that the interface is set in were loaded.
       expect(await page.evaluate(() => document.fonts.check('14px Inter'))).toBe(true);
 
+      // The reports of the browser come a moment after what they report.
+      await page.waitForTimeout(300);
       expect(await trouble.violations()).toEqual([]);
+      expect(trouble.reports(), "reports of a violation, the worker's too").toBe(0);
       expect(trouble.errors).toEqual([]);
     } finally {
       await site.close();
@@ -232,7 +246,10 @@ test.describe('two viewers on a page under the smallest policy', () => {
       );
       expect(await page.evaluate(() => window.second?.engine.datasets().length)).toBe(2);
       await expect.poll(() => page.evaluate(() => window.second?.exportable())).toBe(true);
+      // The reports of the browser come a moment after what they report.
+      await page.waitForTimeout(300);
       expect(await trouble.violations()).toEqual([]);
+      expect(trouble.reports(), "reports of a violation, the worker's too").toBe(0);
       expect(trouble.errors).toEqual([]);
     } finally {
       await site.close();
@@ -248,8 +265,10 @@ interface Outcome {
   readonly loadError: string | null;
   /** The error of making a picture, as `Name: message`, or `null` (not tried when nothing loaded). */
   readonly pictureError: string | null;
-  /** What the browser blocked. */
+  /** What the browser blocked in the document. */
   readonly violations: readonly string[];
+  /** How many reports of a violation the site had, which is how a violation inside the worker is seen. */
+  readonly reports: number;
 }
 
 /** Does what a page does with the viewer first of all, under `policy`: loads a dataset into a viewer, and makes a picture of it. */
@@ -301,7 +320,13 @@ async function outcomeUnder(page: Page, policy: Policy): Promise<Outcome> {
     }
     // The events of the browser are queued: what a blocked font or script says comes a moment after.
     await page.waitForTimeout(300);
-    return { scripted, loadError, pictureError, violations: await trouble.violations() };
+    return {
+      scripted,
+      loadError,
+      pictureError,
+      violations: await trouble.violations(),
+      reports: trouble.reports(),
+    };
   } finally {
     await site.close();
   }
@@ -324,9 +349,12 @@ const SYMPTOM: Readonly<Record<string, (outcome: Outcome) => boolean>> = {
   "script-src 'self'": (o) =>
     !o.scripted && o.violations.some((entry) => /^script-src-elem .*\/page\.js$/.test(entry)),
   // The worker cannot make the engine's WebAssembly module.
-  "script-src 'wasm-unsafe-eval'": (o) => /^EngineError: .*WebAssembly/.test(o.loadError ?? ''),
+  // (A violation inside the worker is not an event of the document: the browser's report of it to the site is what shows it.)
+  "script-src 'wasm-unsafe-eval'": (o) =>
+    /^EngineError: .*WebAssembly/.test(o.loadError ?? '') && o.reports > 0,
   // The worker cannot fetch it.
-  "connect-src 'self'": (o) => /^EngineError: Failed to fetch/.test(o.loadError ?? ''),
+  "connect-src 'self'": (o) =>
+    /^EngineError: Failed to fetch/.test(o.loadError ?? '') && o.reports > 0,
   // Neither style sheet (the library's and the page's) is applied.
   "style-src 'self'": (o) =>
     o.violations.filter((entry) => /^style-src-elem .*\.css$/.test(entry)).length === 2,
@@ -346,6 +374,7 @@ test.describe('the policy has in it only what the viewer needs: take any allowan
       loadError: null,
       pictureError: null,
       violations: [],
+      reports: 0,
     });
   });
 

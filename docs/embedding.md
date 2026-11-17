@@ -103,7 +103,7 @@ container.style.cssText = 'width: 800px; height: 500px';
 document.body.append(container);
 
 const viewer = createViewer(container, {
-  // An engine of your own, so that several viewers (or your page) can have the same data. Without it the viewer makes one when data first arrives.
+  // An engine of your own, so that several viewers (or your page) can have the same data. Without it the viewer makes one when `viewer.engine` is first read or data first arrives.
   engine: createEngine(),
   // false: no right panel; the map has the whole viewer, and your page changes layers with `dispatch`. Default true.
   panel: true,
@@ -211,12 +211,12 @@ the same bytes twice in a row in one browser. `viewer.openExport()` opens the di
 Ask for a picture when `exportable()` says that there is something to export, or from `onExportable`. Asked in the very frame in which the map is first drawn, a picture waits for the map to have a size (two seconds at the most) and rejects with `not_ready` if it has none, which is a map that is not shown.
 
 It rejects with an `Error` named `ExportError` (its `code`: `busy`, `interrupted` when the map was changed meanwhile, `context_lost`, `too_large` (the browser and the card allow up to 8,192
-pixels a side), `point_size`, `out_of_memory`, `not_ready`), `ComposeError`, `ExportFontError` (the font could not be loaded: see the policy below) or `PngError`, or with the signal's reason
+pixels a side), `point_size`, `out_of_memory`, `not_ready`, `disposed` when the viewer is taken out of the page during the export), `ComposeError`, `ExportFontError` (the font could not be loaded: see the policy below) or `PngError`, or with the signal's reason
 if it is aborted. Nothing is exported before something is drawn.
 
 ## More than one viewer
 
-Viewers on one page are independent: each has its own engine (and so its own worker and its own copy of the data), camera, styles, selection and listeners; what one does is not heard
+Viewers on one page are independent: each has its own engine (and so its own worker and its own copy of the data) unless you give them one (below), and its own camera, styles, selection and listeners; what one does is not heard
 by another's `on`, and taking one out leaves the others as they were.
 
 To have the same data in two viewers, give both an engine:
@@ -242,6 +242,8 @@ What is shared, and what you may not expect:
 - **The panel's state** (its width, whether it is folded and the tab it is on) is kept in the browser's `localStorage` under `karmania.panel`: one preference of the page's origin, which
   every viewer reads when it starts and writes when it changes. Two viewers do not follow each other live; the last to write wins at the next start. A viewer made with `panel: false`
   neither reads nor writes it.
+- **Contour lines are a viewer's.** The lines that one viewer makes for a layer are datasets of the shared engine, so another viewer on it lists them in its Data tab, but it does not draw
+  them: the contours are a setting of the layer of the viewer that turned them on.
 - **A dialog is modal to the whole page.** The import wizard, the export dialog and the coordinate-system dialog are `<dialog>` elements shown with `showModal()`: while one is open,
   everything else on the page is inert (the other viewer too).
 - **Dropping files** on a viewer's map imports them. A file dropped elsewhere in the viewer, where nothing takes it, is refused (the browser would otherwise open it in place of the page).
@@ -284,6 +286,13 @@ viewer.dispose(); // nothing happens the second time
 `dispose()` takes the viewer out of the page and frees what it made: its engine and the engine's worker (not an engine that you gave it), its WebGL context, its observers and
 listeners and its frames. Nothing else may be called after it, except `dispose` again and the function that `on` gave for stopping a listener. A test makes and disposes a viewer twice
 and counts the workers, the WebGL contexts, the animation frames, the observers and the listeners that the page has before and after.
+
+Two things that follow from it:
+
+- **Moving a viewer's container in the document takes the viewer out of the page and puts it back**, and it then starts again: its layers are made again from what its engine holds, in their
+  default styles, and a person's styling, contours and selection are not kept. Do not move the container of a viewer that is in use; make a new viewer in the new place instead.
+- **A `load` or `importFiles` that is still running when the viewer is taken out shows nothing**: with an engine that you gave, the dataset is in the engine all the same; with the viewer's own,
+  the call rejects, since the engine has been let go.
 
 ## TypeScript
 

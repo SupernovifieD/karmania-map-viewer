@@ -21,7 +21,12 @@ export default defineConfig({
     // One module of about 1 MB is what is wanted (Lit and three.js are in it, the page needs no bundler), so the warning of Vite about a large chunk is not a signal.
     chunkSizeWarningLimit: 1500,
     rolldownOptions: {
-      input: { 'karmania-viewer': new URL('./src/library.ts', import.meta.url).pathname },
+      // (`pathname` is percent-encoded, which a folder with a space in its name is not: decoded.)
+      input: {
+        'karmania-viewer': decodeURIComponent(
+          new URL('./src/library.ts', import.meta.url).pathname,
+        ),
+      },
       preserveEntrySignatures: 'strict',
       output: {
         format: 'es',

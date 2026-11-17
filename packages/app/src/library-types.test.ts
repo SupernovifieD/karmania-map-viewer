@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { build } from 'vite';
@@ -276,14 +276,28 @@ describe('the licences that go with the build', () => {
     );
   });
 
-  it('are made by the builds of the library and of the app: both call the script that copies them', () => {
+  it('are made by the builds of the library and of the app: each copies into the folder that its own build made', () => {
     for (const name of ['viewer', 'app']) {
       const scripts = (
         JSON.parse(readFileSync(join(repo, 'packages', name, 'package.json'), 'utf8')) as {
           scripts: Record<string, string>;
         }
       ).scripts;
-      expect(scripts['build'], `the build of ${name}`).toContain('scripts/copy-notices.mjs');
+      const command = (scripts['build'] ?? '')
+        .split('&&')
+        .map((part) => part.trim())
+        .find((part) => part.includes('scripts/copy-notices.mjs'));
+      expect(command, `the build of ${name} does not copy the notices`).toBeDefined();
+      // Where the script writes: the folder it is given, from the package's own, or, given none, the library's `dist`.
+      const given = /copy-notices\.mjs\s+(\S+)/.exec(command ?? '')?.[1];
+      const written =
+        given === undefined
+          ? join(repo, 'packages', 'viewer', 'dist')
+          : resolve(join(repo, 'packages', name), given);
+      // And where the build of the package puts what it makes: the `dist` of the package (Vite's, which neither config changes).
+      expect(written, `the notices of ${name} are copied to ${written}`).toBe(
+        join(repo, 'packages', name, 'dist'),
+      );
     }
   });
 });

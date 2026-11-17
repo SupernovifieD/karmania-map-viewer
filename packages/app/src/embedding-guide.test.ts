@@ -31,7 +31,9 @@ describe('the guide to embedding the viewer', () => {
     }
   });
 
-  it('names every file that the build puts in the folder, so that a developer knows what to serve', () => {
+  it('names, in its table of what the build gives, every file that the build puts in the folder (the prose may say them too, which is not the table)', () => {
+    const table = guide.slice(guide.indexOf('## What you get'), guide.indexOf('## A page'));
+    expect(table.length).toBeGreaterThan(200);
     for (const name of [
       'karmania-viewer.js',
       'style.css',
@@ -43,7 +45,23 @@ describe('the guide to embedding the viewer', () => {
       'THIRD_PARTY_NOTICES.md',
       'LICENSE',
     ]) {
-      expect(guide.includes(name), name).toBe(true);
+      expect(table.includes(name), `${name} is not in the table of the files`).toBe(true);
+    }
+  });
+
+  it('gives every code of an ExportError that the renderer has, in the guide and in the comment of exportPng, since a page that switches on the code has to know them all', () => {
+    const source = readFileSync(
+      join(repo, 'packages', 'render', 'src', 'export-render.ts'),
+      'utf8',
+    );
+    const block = /export type ExportErrorCode =([\s\S]*?);/.exec(source)?.[1] ?? '';
+    const codes = [...block.matchAll(/\|\s*'([a-z_]+)'/g)].map((match) => match[1] ?? '');
+    // A list that is found to be empty would find no fault.
+    expect(codes.length).toBeGreaterThanOrEqual(8);
+    const api = readFileSync(join(repo, 'packages', 'viewer', 'src', 'create-viewer.ts'), 'utf8');
+    for (const code of codes) {
+      expect(guide.includes(`\`${code}\``), `${code} is not in the guide`).toBe(true);
+      expect(api.includes(`\`${code}\``), `${code} is not in the comment of exportPng`).toBe(true);
     }
   });
 });

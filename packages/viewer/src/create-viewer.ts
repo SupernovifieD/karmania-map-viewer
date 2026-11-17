@@ -95,7 +95,7 @@ export interface Viewer {
    * heading and view. The same scene and options give the same bytes twice in a row, in one browser. `onProgress` says how far it is, from 0 to 1. Asked for in the frame in which the map is first drawn, when the browser has not told it its size yet, it waits for the size (two seconds at the most; `not_ready` if the map has none).
    *
    * It rejects with an `Error` named `ExportError` (its `code` says why: `busy`, `interrupted` when the map was changed meanwhile, `context_lost`, `too_large`, `point_size`,
-   * `out_of_memory`, `not_ready`), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
+   * `out_of_memory`, `not_ready`, `disposed` when the viewer is taken out of the page during the export), `ComposeError` (`no_room_for_map`: the legend takes the width), `ExportFontError`, `PngError`, or with the signal's reason if it is aborted.
    */
   exportPng(options: ExportPngOptions, run?: ExportPngRun): Promise<Blob>;
   /**
