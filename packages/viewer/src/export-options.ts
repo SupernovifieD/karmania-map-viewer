@@ -125,18 +125,19 @@ const FORBIDDEN = /[\\/:*?"<>|\u0000-\u001f]/g;
  * `etc-passwd`), a ".png" the person typed is not doubled, spaces, dots and hyphens at the ends go, it is at most `MAX_FILE_NAME` characters, a name that Windows keeps for a device (`CON`, `NUL`, `COM1`...) has an underscore put in front, and nothing is `DEFAULT_FILE_NAME`.
  */
 export function fileNameOf(typed: string): string {
-  const cleaned = typed
+  const stripped = typed
     .replace(FORBIDDEN, '-')
     .replace(/(\.png)+\s*$/i, '')
-    .replace(/^[.\s-]+|[.\s-]+$/g, '')
-    .slice(0, MAX_FILE_NAME)
-    .replace(/[.\s-]+$/g, '');
+    .replace(/^[.\s-]+|[.\s-]+$/g, '');
+  /** The first `most` characters, without the dots, spaces and hyphens that the cut may leave at the end. */
+  const upTo = (most: number): string => stripped.slice(0, most).replace(/[.\s-]+$/g, '');
+  const cleaned = upTo(MAX_FILE_NAME);
   if (cleaned === '') {
     return DEFAULT_FILE_NAME;
   }
   // Windows cannot create a file named for one of its devices (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9), with any extension after the name: `CON.png` is refused, and
-  // so is `con.txt`. A name that begins with one of them, up to its first dot, is given a mark in front.
-  return DEVICE_NAMES.test(cleaned.split('.')[0] ?? '') ? `_${cleaned}` : cleaned;
+  // so is `con.txt`. A name that begins with one of them, up to its first dot, is given a mark in front, and is cut one character shorter so that it is still no longer than the most.
+  return DEVICE_NAMES.test(cleaned.split('.')[0] ?? '') ? `_${upTo(MAX_FILE_NAME - 1)}` : cleaned;
 }
 
 /** What an export that did not come to an end says to a person, from what it rejected with: the code of an `ExportError` or a `ComposeError`, a font that did not load, anything else. */
