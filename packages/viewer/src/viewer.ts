@@ -1600,7 +1600,8 @@ export class KarmaniaViewer extends LitElement {
       throw new Error('The viewer is not in a page: put it in one before loading a dataset.');
     }
     const result = await this.acquireEngine().load(input, options);
-    if (result.status === 'loaded') {
+    // A viewer that was taken out of the page while the engine was reading has nothing to show it in, and no business writing what a person's panel is kept as.
+    if (result.status === 'loaded' && this.inPage()) {
       this.adopt(result.summaries);
     }
     return result;
@@ -1621,7 +1622,7 @@ export class KarmaniaViewer extends LitElement {
       throw new Error('The viewer is not in a page: put it in one before importing files.');
     }
     const result = await this.acquireEngine().importFiles(files, mapping, options);
-    if (result.status === 'loaded') {
+    if (result.status === 'loaded' && this.inPage()) {
       this.adopt(result.summaries);
     }
     return result;
