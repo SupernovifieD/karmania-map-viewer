@@ -1,15 +1,7 @@
 import { expect, test } from '@playwright/test';
-import type { Viewer } from '@karmania/viewer';
 import { buildLibrary, libraryPages, type BuiltLibrary } from './support/library';
 import { trackLeaks } from './support/leaks';
 import { serveSite } from './support/site';
-
-declare global {
-  interface Window {
-    /** The viewer a test made in the page of `libraryPages`. */
-    first?: Viewer;
-  }
-}
 
 /**
  * The library build of the viewer (brief 23.2), loaded as a page that is not the app's would load it: the files of the build on a server of their own, under a path

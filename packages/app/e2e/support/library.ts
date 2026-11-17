@@ -9,6 +9,9 @@ declare global {
   interface Window {
     /** `@karmania/viewer` as the page of `libraryPages` loaded it: from the files of the build, not from the sources. */
     library: typeof Viewer;
+    /** The viewers that a test made in the two places of the page (`#first`, `#second`). */
+    first?: Viewer.Viewer;
+    second?: Viewer.Viewer;
   }
 }
 
