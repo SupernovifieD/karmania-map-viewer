@@ -181,6 +181,38 @@ test.describe('the PNG file of the picture', () => {
     expect(again.ok, JSON.stringify(again)).toBe(true);
   });
 
+  test('refuses a picture larger than 8,192 pixels on a side, the whole picture and not only the map inside it, and sizes that are not sizes', async ({
+    page,
+  }) => {
+    // 8,193 across with no legend: the map inside the 24 pixel margins is 8,143 wide, which is under the limit: it is the picture that is too large.
+    expect(
+      await exportPngFile(page, { widthPx: 8193, heightPx: 200, legend: false }),
+    ).toMatchObject({
+      ok: false,
+      name: 'ExportError',
+      code: 'too_large',
+    });
+    expect(
+      await exportPngFile(page, { widthPx: 200, heightPx: 8193, legend: false }),
+    ).toMatchObject({
+      ok: false,
+      name: 'ExportError',
+      code: 'too_large',
+    });
+    // Too small and not whole numbers are mistakes of the caller.
+    expect(await exportPngFile(page, { widthPx: 10, heightPx: 10 })).toMatchObject({
+      ok: false,
+      name: 'RangeError',
+    });
+    expect(await exportPngFile(page, { widthPx: 300.5, heightPx: 400 })).toMatchObject({
+      ok: false,
+      name: 'RangeError',
+    });
+    // And what is allowed is made: 8,192 is the most.
+    const stats8192 = await exportPngFile(page, { widthPx: 2000, heightPx: 100, legend: false });
+    expect(stats8192.ok, JSON.stringify(stats8192)).toBe(true);
+  });
+
   test('refuses a legend that leaves no room for the map, a picture larger than the card draws, and an export while another is going', async ({
     page,
   }) => {

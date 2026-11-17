@@ -11,6 +11,7 @@ import type {
 import {
   DEFAULT_DISTANCE_LIMITS,
   DEFAULT_SCALE_LIMITS,
+  ExportError,
   KEY_ZOOM_FACTOR,
   attachController2d,
   attachController3d,
@@ -36,9 +37,18 @@ import {
   exportLegendLines,
   firstNumericColumn,
   legendModel,
+  maxSide,
   parseHex,
+  sizeProblems,
 } from '@karmania/scene';
-import type { Command, LegendModel, SceneDocument, SceneListener, ViewMode } from '@karmania/scene';
+import type {
+  Command,
+  LegendModel,
+  SceneDocument,
+  SceneListener,
+  Size,
+  ViewMode,
+} from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
 import { css, html, LitElement } from 'lit';
 import { CrsNames } from './crs-names.js';
@@ -374,6 +384,7 @@ export class KarmaniaViewer extends LitElement {
     if (renderer === undefined) {
       throw new Error('There is nothing to export: the map has not been drawn.');
     }
+    this.checkSize(options.size, renderer);
     const bytes = (hex: string): readonly [number, number, number] => parseHex(hex) ?? [0, 0, 0];
     return composeExport(browserEnv(this.ownerDocument), {
       ...this.pictureInput(options, renderer),
@@ -387,6 +398,31 @@ export class KarmaniaViewer extends LitElement {
       },
       ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
     });
+  }
+
+  /**
+   * Refuses a picture that cannot be made, as the dialog does before it asks: the **whole picture** is held to the most a side can be (8,192, or less where the card allows
+   * less), and not only the map inside it, which is smaller by its margins and its line.
+   *
+   * @throws RangeError for a size that is not whole pixels or is below the least (a mistake of the caller).
+   * @throws ExportError `too_large` for a side above the most this computer can draw.
+   */
+  private checkSize(size: Size, renderer: Renderer): void {
+    const limits = renderer.exportLimits();
+    const most = maxSide(limits);
+    for (const problem of sizeProblems(size, most)) {
+      if (problem.code === 'too_large') {
+        throw new ExportError(
+          'too_large',
+          `The ${problem.side} of the picture is more than this computer can draw (${String(problem.most)} pixels at most).`,
+        );
+      }
+      throw new RangeError(
+        problem.code === 'too_small'
+          ? `The ${problem.side} of the picture has to be at least ${String(problem.least)} pixels.`
+          : 'The picture has to be whole pixels.',
+      );
+    }
   }
 
   /** What the layout of a picture is worked out from, for the scene as it is now. */
