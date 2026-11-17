@@ -6,7 +6,7 @@ import type { Pick } from './support/picker.js';
 const wizard = (page: Page): Locator => page.locator('karmania-import-dialog');
 const dialog = (page: Page): Locator => wizard(page).locator('dialog');
 const toolbarImport = (page: Page): Locator =>
-  page.locator('karmania-app header.toolbar k-button button');
+  page.locator('karmania-app header.toolbar > k-button button');
 
 /** What the wizard has made of the files, as plain data. */
 interface Seen {

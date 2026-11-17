@@ -15,7 +15,7 @@ export function wizard(page: Page) {
     back: host.locator('k-button[slot="footer-end"]').nth(0),
     cancel: host.locator('k-button[slot="footer-start"]'),
     note: host.locator('span[slot="footer-note"]'),
-    importButton: page.locator('karmania-app header.toolbar k-button button'),
+    importButton: page.locator('karmania-app header.toolbar > k-button button'),
     map: page.locator('karmania-map-area k-empty-state'),
     tabs: page.locator('karmania-panel k-tabs [role="tab"]'),
   };

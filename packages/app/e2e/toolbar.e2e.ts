@@ -6,7 +6,8 @@ import { assertAligned, assertNoOverflow, assertNoOverlap, boxOf } from './suppo
 
 const toolbar = (page: Page) => page.locator('karmania-app header.toolbar');
 const wordmark = (page: Page) => toolbar(page).getByRole('heading', { name: 'Karmania' });
-const importButton = (page: Page) => toolbar(page).locator('k-button');
+const importButton = (page: Page) => toolbar(page).locator(':scope > k-button');
+const exportButton = (page: Page) => toolbar(page).locator(':scope > k-tooltip > k-button');
 const viewControl = (page: Page) => toolbar(page).locator('k-segmented');
 const exaggeration = (page: Page) => toolbar(page).locator('k-select');
 const exaggerationSelect = (page: Page) => exaggeration(page).locator('select');
@@ -40,7 +41,7 @@ test.describe('the toolbar', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
   });
 
-  test('has the name and then the Import button, and the control of the view at the right', async ({
+  test('has the name and then the Import button, the controls of the view and the Export PNG button at the right', async ({
     page,
   }) => {
     await page.goto('/');
@@ -56,6 +57,8 @@ test.describe('the toolbar', () => {
       ['h1', 'wordmark', 'Karmania'],
       ['k-button', '', 'Import'],
       ['div', 'tools', ''],
+      // The Export PNG button is in a tooltip, which says why it is disabled while nothing is drawn.
+      ['k-tooltip', '', 'Export PNG'],
     ]);
     expect(
       await toolbar(page)
@@ -104,21 +107,24 @@ test.describe('the toolbar', () => {
       await assertNoOverlap(wordmark(page), importButton(page));
       await assertNoOverflow(toolbar(page));
 
-      // At the right: the control of the view, 8 from the select of the exaggeration, which is 72 wide and 16 from the right edge; each 32 high
-      // and on the middle of the 48.
+      // At the right, from the left: the control of the view, 8 from the select of the exaggeration (72 wide), 16 from the Export PNG button, which is 16 from the right edge;
+      // each 32 high and on the middle of the 48.
       const view = await boxOf(viewControl(page), 'the control of the view');
       const select = await boxOf(exaggeration(page), 'the select of the exaggeration');
-      expect(select.x + select.width).toBe(viewport.width - 16);
+      const exporting = await boxOf(exportButton(page), 'the Export PNG button');
+      expect(exporting.x + exporting.width).toBe(viewport.width - 16);
+      expect(exporting.x - (select.x + select.width)).toBe(16);
       expect([select.width, select.height]).toEqual([72, 32]);
       expect(select.x - (view.x + view.width)).toBe(8);
       expect([view.y, view.height]).toEqual([8, 32]);
-      expect(select.y).toBe(8);
+      expect([select.y, exporting.y, exporting.height]).toEqual([8, 8, 32]);
       expect(view.x).toBeGreaterThan(button.x + button.width);
       await assertAligned(
-        [importButton(page), viewControl(page), exaggeration(page)],
+        [importButton(page), viewControl(page), exaggeration(page), exportButton(page)],
         'vertical-centre',
       );
       await assertNoOverlap(importButton(page), viewControl(page));
+      await assertNoOverlap(exaggeration(page), exportButton(page));
       await assertNoOverlap(viewControl(page), exaggeration(page));
     });
   });
