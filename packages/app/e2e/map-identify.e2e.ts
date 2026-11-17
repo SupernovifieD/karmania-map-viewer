@@ -8,7 +8,15 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { fixturePath } from './support/picker.js';
 import { importAndLoad } from './support/wizard.js';
-import { camera, dispatch, drawn, layerStatuses, selection, withData } from './support/render.js';
+import {
+  camera,
+  dispatch,
+  drawn,
+  layerStatuses,
+  selection,
+  watchPicks,
+  withData,
+} from './support/render.js';
 
 /** The points of `points.csv`: easting and northing, in the order of the file (element 0 first). */
 const POINTS = readFileSync(fixturePath('points.csv'), 'utf8')
@@ -126,6 +134,129 @@ test.describe('the identify popover', () => {
     expect(box.width).toBeLessThan(240);
     expect(box.x).toBeGreaterThanOrEqual(area.x + 16 - 1);
     expect(box.x + box.width).toBeLessThanOrEqual(area.x + area.width - 16 - 48 + 1);
+  });
+
+  test('is given the keyboard when it opens, so that a screen reader says what it is and what it says; the map’s own keys are not its keys', async ({
+    page,
+  }) => {
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeFocused();
+    // What is said: the name of the dialog, and as its description the attributes (what a screen reader reads after the name).
+    await expect(dialog(page)).toHaveAccessibleName(/^Point 3 of /);
+    const said = await rows(page);
+    expect(said.length).toBeGreaterThan(0);
+    const description = await dialog(page).evaluate((section) => {
+      const id = section.getAttribute('aria-describedby');
+      const text = id === null ? null : section.querySelector(`#${id}`)?.textContent;
+      return text === null || text === undefined ? null : text.replace(/\s+/g, ' ');
+    });
+    expect(description).not.toBeNull();
+    for (const [name, value] of said) {
+      expect(description, `the description says ${name}`).toContain(name);
+      expect(description, `the description says ${value}`).toContain(value);
+    }
+    // The arrow keys are not the map's now (they are when the map has the keyboard, which the next test shows): the camera does not move.
+    const before = await camera(page);
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowUp');
+    expect((await camera(page)).centre).toEqual(before.centre);
+  });
+
+  test('gives the keyboard back to the map with Escape, from where it was opened, and with its button', async ({
+    page,
+  }) => {
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(popover(page)).toHaveCount(0);
+    await expect(page.locator('karmania-map-area main')).toBeFocused();
+    expect(await selection(page)).toBeNull();
+    // And with its button: the map has the keyboard again and the element stays selected.
+    const again = await place(page, 4, { right: -150, up: 60 });
+    await page.mouse.click(again.x, again.y);
+    await expect(dialog(page)).toBeFocused();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(popover(page)).toHaveCount(0);
+    await expect(page.locator('karmania-map-area main')).toBeFocused();
+    expect(await selection(page)).toEqual({ layerId: 'layer-1', element: 4 });
+  });
+
+  test('has the keyboard again for a click on the point that is already open: the click gave it to the map, and the popover is told of the click again', async ({
+    page,
+  }) => {
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeFocused();
+    await page.locator('karmania-map-area main').focus();
+    await expect(dialog(page)).not.toBeFocused();
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeFocused();
+  });
+
+  test('is given the keyboard when it says what the click found, and not while it says Loading…', async ({
+    page,
+  }) => {
+    // The row of the element is held back (the engine's answer is given when the test lets it): the popover is open, with nothing to say yet.
+    await page.evaluate(() => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+        engine: { rows: (...args: unknown[]) => Promise<unknown> };
+      };
+      const original = viewer.engine.rows.bind(viewer.engine);
+      const held: (() => void)[] = [];
+      (window as unknown as { releaseRows: () => void }).releaseRows = () => {
+        held.splice(0).forEach((release) => {
+          release();
+        });
+      };
+      viewer.engine.rows = (...args) =>
+        new Promise((resolve, reject) => {
+          held.push(() => {
+            original(...args).then(resolve, reject);
+          });
+        });
+    });
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    await expect(page.locator('karmania-identify .note')).toHaveText('Loading…');
+    await expect(dialog(page)).not.toBeFocused();
+    await page.evaluate(() => {
+      (window as unknown as { releaseRows: () => void }).releaseRows();
+    });
+    await expect(page.locator('karmania-identify dl')).toBeVisible();
+    await expect(dialog(page)).toBeFocused();
+  });
+
+  test('does not take the keyboard from a person who has moved on to something else before it opens', async ({
+    page,
+  }) => {
+    // The answer of the click comes a second late, in which the keyboard is put on a button of the map.
+    await watchPicks(page, 1000);
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    const button = page.getByRole('button', { name: 'Zoom in' });
+    await button.focus();
+    await expect(button).toBeFocused();
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('karmania-identify .caption')).toHaveText('Point 3');
+    // It is open, with what it says, and the keyboard is where the person had put it.
+    await expect(button).toBeFocused();
+    await expect(dialog(page)).not.toBeFocused();
+  });
+
+  test('gives the keyboard to the map, and does not leave it nowhere, when the popover that has it is taken away', async ({
+    page,
+  }) => {
+    const at = await place(page, 2, { right: -150, up: 60 });
+    await page.mouse.click(at.x, at.y);
+    await expect(dialog(page)).toBeFocused();
+    // The selection is made another (as a row of the table does): the popover goes.
+    await dispatch(page, { type: 'setSelection', selection: { layerId: 'layer-1', element: 5 } });
+    await expect(popover(page)).toHaveCount(0);
+    await expect(page.locator('karmania-map-area main')).toBeFocused();
   });
 
   test('closes with its button and leaves the element selected, with its outline', async ({

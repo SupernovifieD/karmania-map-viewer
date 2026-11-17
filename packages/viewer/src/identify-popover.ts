@@ -213,6 +213,18 @@ export class KarmaniaIdentify extends LitElement {
     this.toggleAttribute('placed', true);
   }
 
+  /**
+   * Gives the popover the keyboard, so that a person who cannot see it is told of it: a screen reader says its name ("Point 3 of points") and what it says (the
+   * attributes), as it does for any dialog that is opened. The keys of the map are not the popover's (the map's own keys are used only when the map itself has the
+   * focus), and Escape or its button gives the focus back to the map. The viewer asks for this once, when what a click found has been read: it is not done on its own
+   * at every change of what the popover says, which a pan of the map is.
+   */
+  takeFocus(): void {
+    // It is put first: it is not visible, and so not to be focused, until it has been.
+    this.place();
+    this.renderRoot.querySelector('section')?.focus({ preventScroll: true });
+  }
+
   private close(escape: boolean): void {
     this.dispatchEvent(
       new CustomEvent<IdentifyClose>(IDENTIFY_CLOSE, {
@@ -290,6 +302,8 @@ export class KarmaniaIdentify extends LitElement {
       <section
         role="dialog"
         aria-label=${`${model.caption} of ${model.name}`}
+        aria-describedby="detail"
+        tabindex="-1"
         @keydown=${this.onKeyDown}
       >
         <header>
@@ -297,7 +311,7 @@ export class KarmaniaIdentify extends LitElement {
           ${kButton({ icon: 'x', label: 'Close', variant: 'ghost', size: 28, onClick: this.onClose })}
         </header>
         <p class="caption">${model.caption}</p>
-        <div class="body" data-scroll-region>${this.body(model)}</div>
+        <div class="body" id="detail" data-scroll-region>${this.body(model)}</div>
         <footer>
           ${kButton({ variant: 'ghost', children: 'Show in table', onClick: this.onShow })}
         </footer>
