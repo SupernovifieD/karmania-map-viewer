@@ -86,9 +86,13 @@ describe('the library build of the viewer', () => {
         .pop(),
     );
     expect(names.sort()).toEqual([
+      'ComposeError',
       'EngineDisposedError',
       'EngineError',
+      'ExportError',
+      'ExportFontError',
       'KarmaniaViewer',
+      'PngError',
       'blocks',
       'createEngine',
       'createViewer',

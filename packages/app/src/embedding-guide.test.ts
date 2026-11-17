@@ -50,10 +50,7 @@ describe('the guide to embedding the viewer', () => {
   });
 
   it('gives every code of an ExportError that the renderer has, in the guide and in the comment of exportPng, since a page that switches on the code has to know them all', () => {
-    const source = readFileSync(
-      join(repo, 'packages', 'render', 'src', 'export-render.ts'),
-      'utf8',
-    );
+    const source = readFileSync(join(repo, 'packages', 'render', 'src', 'export-error.ts'), 'utf8');
     const block = /export type ExportErrorCode =([\s\S]*?);/.exec(source)?.[1] ?? '';
     const codes = [...block.matchAll(/\|\s*'([a-z_]+)'/g)].map((match) => match[1] ?? '');
     // A list that is found to be empty would find no fault.

@@ -204,6 +204,28 @@ link.click();
 URL.revokeObjectURL(link.href);
 ```
 
+The errors that `exportPng` rejects with are exported, so that a page can tell one from another:
+
+```ts
+import { ComposeError, ExportError, ExportFontError, PngError, createViewer } from './karmania-viewer.js';
+
+declare const container: HTMLElement;
+const viewer = createViewer(container);
+
+try {
+  await viewer.exportPng({ widthPx: 20_000, heightPx: 100, dpi: 96, legend: false });
+} catch (error) {
+  if (error instanceof ExportError) {
+    // `error.code` is an `ExportErrorCode`: 'busy', 'interrupted', 'context_lost', 'disposed', 'not_ready', 'too_large', 'point_size' or 'out_of_memory'.
+    console.warn('The picture cannot be made:', error.code);
+  } else if (error instanceof ComposeError || error instanceof ExportFontError || error instanceof PngError) {
+    console.warn(error.message);
+  } else {
+    throw error; // the signal's reason, or a mistake of the page
+  }
+}
+```
+
 The picture is the map as it is on screen (the same centre, heading and view, and at least what is visible), in the light theme, with the north arrow, the scale bar in 2D and, with
 `legend`, the legend to the right. The `dpi` is written into the file and is the scale the map's points, lines and furniture are drawn at (`dpi / 96`). The same scene and options give
 the same bytes twice in a row in one browser. `viewer.openExport()` opens the dialog instead, with a preview.
@@ -297,7 +319,7 @@ Two things that follow from it:
 ## TypeScript
 
 `karmania-viewer.d.ts` has the types of everything that the module exports: `createViewer`, `Viewer`, `ViewerOptions`, `ViewerEvents`, the engine (`createEngine`, `Engine`), the builders
-(`points`, `lines`, `polygons`, `grid`, `mesh`, `blocks`) and the types of what goes in and out (`SceneDocument`, `Command`, `Summary`, `LoadResult`, and others). It needs the DOM library, and
+(`points`, `lines`, `polygons`, `grid`, `mesh`, `blocks`) and the types of what goes in and out (`SceneDocument`, `Command`, `Summary`, `LoadResult`, and others), and the errors (`EngineError`, `EngineDisposedError`, `ExportError` with its `ExportErrorCode`, `ComposeError`, `ExportFontError`, `PngError`). It needs the DOM library, and
 the types of `lit` (a dependency of the package, which your installer brings). The examples in this guide are checked against these declarations by a test, so that they do not drift.
 
 ## Licences, and the EPSG data

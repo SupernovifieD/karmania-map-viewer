@@ -43,8 +43,12 @@ function declarations(folder: string, from = ''): string[] {
 /** What a page that embeds the viewer writes: the whole of the API once, with lines that must not compile (`@ts-expect-error` fails when the line is fine, as it is when a type is `any`). */
 const consumer = `
 import {
+  ComposeError,
   EngineError,
+  ExportError,
+  ExportFontError,
   KarmaniaViewer,
+  PngError,
   createEngine,
   createViewer,
   grid,
@@ -54,6 +58,7 @@ import type {
   Command,
   DatasetInput,
   Engine,
+  ExportErrorCode,
   SceneDocument,
   SceneSelection,
   Summary,
@@ -94,12 +99,37 @@ try {
   if (!(error instanceof EngineError)) throw error;
 }
 
+// What exportPng rejects with, told apart with the package's own types.
+try {
+  await viewer.exportPng({ widthPx: 1, heightPx: 1, dpi: 96, legend: false });
+} catch (error) {
+  if (error instanceof ExportError) {
+    const code: ExportErrorCode = error.code;
+    switch (code) {
+      case 'busy':
+      case 'interrupted':
+      case 'context_lost':
+      case 'disposed':
+      case 'not_ready':
+      case 'too_large':
+      case 'point_size':
+      case 'out_of_memory':
+        break;
+    }
+  } else if (error instanceof ComposeError || error instanceof ExportFontError || error instanceof PngError) {
+    void error.message;
+  }
+}
+
 // The element is typed by its tag.
 const element: KarmaniaViewer = document.createElement('karmania-viewer');
 element.withPanel = false;
 void [engine, blob, exportable, off, stop, events];
 
 // What is not allowed.
+// @ts-expect-error not a code of an export error
+const notACode: ExportErrorCode = 'nothing';
+void notACode;
 // @ts-expect-error not an event of the viewer
 viewer.on('nothing', () => undefined);
 // @ts-expect-error panel is a boolean
