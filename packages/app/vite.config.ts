@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
-/** The pages of the app: the app itself, and the gallery that shows the components in isolation. */
+/** The pages of the app: the app itself, the gallery that shows the components in isolation, and the page that embeds the viewer as an embedder would. */
 export default defineConfig({
   // The engine's worker is a module worker (it imports other modules).
   worker: { format: 'es' },
@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         index: new URL('./index.html', import.meta.url).pathname,
         gallery: new URL('./gallery.html', import.meta.url).pathname,
+        embed: new URL('./embed.html', import.meta.url).pathname,
       },
     },
   },
