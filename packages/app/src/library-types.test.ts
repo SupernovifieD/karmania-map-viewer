@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -186,5 +187,43 @@ describe('the declarations of the library build of the viewer', () => {
     );
     const program = ts.createProgram({ rootNames: [join(out, 'consumer', 'embed.ts')], options });
     expect(diagnostics(program)).toEqual([]);
+  });
+});
+
+describe('what the package publishes', () => {
+  interface Manifest {
+    readonly dependencies?: Readonly<Record<string, string>>;
+    readonly files?: readonly string[];
+    readonly publishConfig?: {
+      readonly main?: string;
+      readonly types?: string;
+      readonly exports?: Readonly<Record<string, string | Readonly<Record<string, string>>>>;
+    };
+  }
+  const manifest = JSON.parse(readFileSync(join(viewer, 'package.json'), 'utf8')) as Manifest;
+
+  it('is the folder of the build, found by files that are in it, with the module and the style sheet as what a page can import', () => {
+    const published = manifest.publishConfig;
+    expect(manifest.files).toEqual(['dist']);
+    expect(Object.keys(published?.exports ?? {})).toEqual(['.', './style.css']);
+    const targets = [
+      published?.main,
+      published?.types,
+      ...Object.values(published?.exports ?? {}).flatMap((target) =>
+        typeof target === 'string' ? [target] : Object.values(target),
+      ),
+    ];
+    expect(targets).toHaveLength(5);
+    for (const target of targets) {
+      expect(target?.startsWith('./dist/'), `${String(target)} is not in dist`).toBe(true);
+      expect(
+        existsSync(join(out, (target ?? '').slice('./dist/'.length))),
+        `${String(target)} is not in the build`,
+      ).toBe(true);
+    }
+  });
+
+  it('needs of the workspace nothing, since the build has it all in it: a package of it that is a dependency could not be installed', () => {
+    expect(Object.keys(manifest.dependencies ?? {})).toEqual(['lit']);
   });
 });
