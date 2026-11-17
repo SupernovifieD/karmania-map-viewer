@@ -52,7 +52,7 @@ async function blocked(page: Page): Promise<void> {
   await pickFiles(
     page,
     async () => {
-      await page.locator('karmania-app header.toolbar k-button button').click();
+      await page.locator('karmania-app header.toolbar > k-button button').click();
     },
     GAP,
   );
@@ -153,7 +153,7 @@ test.describe('fixing what the Review step found, and checking again', () => {
     await pickFiles(
       page,
       async () => {
-        await page.locator('karmania-app header.toolbar k-button button').click();
+        await page.locator('karmania-app header.toolbar > k-button button').click();
       },
       GAP,
     );

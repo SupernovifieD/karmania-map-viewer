@@ -2,7 +2,7 @@
  * The app with a map in it and its furniture over the map (the north arrow, the scale bar, the navigation group, the status chip) in the
  * states that look different: the panel at its usual width, at its widest (the map at its narrowest), at its narrowest, folded away, the
  * pointer over the map, the map turned, the keyboard on a control; and the map coordinate system dialog open, empty, with a choice, and
- * with what would change. Each has what to do to the page to put it in that state. The screenshot tests photograph them
+ * with what would change; and the export dialog (default, A4 at 300 dpi, a size that cannot be made, and a legend that leaves the map narrow). Each has what to do to the page to put it in that state. The screenshot tests photograph them
  * (`map-furniture.visual.ts`) and the accessibility pass checks them (`axe-states.axe.ts`).
  */
 import { expect } from '@playwright/test';
@@ -82,6 +82,22 @@ async function blur(page: Page): Promise<void> {
 async function openDialog(page: Page): Promise<void> {
   await chip(page).click();
   await expect(dialog(page)).toBeVisible();
+}
+
+const exportDialog = (page: Page): Locator => page.locator('karmania-export-dialog dialog');
+
+/** Opens the export dialog with the toolbar's button, and waits for its preview to be made. */
+async function openExport(page: Page): Promise<void> {
+  await page.locator('karmania-app header.toolbar > k-tooltip > k-button').click();
+  await expect(exportDialog(page)).toBeVisible();
+  await expect(page.locator('karmania-export-dialog .frame canvas')).toBeVisible();
+}
+
+/** Chooses a size in the export dialog by its words. */
+async function exportSize(page: Page, label: string): Promise<void> {
+  await page
+    .locator('karmania-export-dialog k-select[label="Size"] select')
+    .selectOption({ label });
 }
 
 /** The points are drawn, and `faults`, a local grid in feet, is not: it is a dataset the dialog has something to say about. */
@@ -263,6 +279,66 @@ export const SHOTS: Shot[] = [
       await openDialog(page);
       await page.locator('karmania-map-crs-dialog .local input').first().check();
       await page.locator('karmania-map-crs-dialog .changes li').first().waitFor();
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // The export dialog as it opens: the size of the map on screen at 96 dpi, with the legend, a name and the preview.
+    name: 'map-export-dialog',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // A4 landscape at 300 dpi: the width and height are the paper's, and the caption says them.
+    name: 'map-export-dialog-a4',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await exportSize(page, 'A4 landscape');
+      await page
+        .locator('karmania-export-dialog k-select[label="Resolution"] select')
+        .selectOption('300');
+      await expect(page.locator('karmania-export-dialog .caption')).toHaveText(
+        '3,508 × 2,480 px · 300 dpi',
+      );
+      await expect(page.locator('karmania-export-dialog .frame canvas')).toBeVisible();
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // A custom size that is too large for the card: said in words, with no preview and Export disabled.
+    name: 'map-export-dialog-problem',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await exportSize(page, 'Custom');
+      await page.locator('karmania-export-dialog k-input[label="Width (px)"] input').fill('20000');
+      await expect(page.locator('karmania-export-dialog .notes')).toContainText(
+        'pixels on this computer',
+      );
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // A custom size at which the legend takes most of the width: the map is narrow, said as a warning; the picture can still be made.
+    name: 'map-export-dialog-narrow',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await exportSize(page, 'Custom');
+      await page.locator('karmania-export-dialog k-input[label="Width (px)"] input').fill('300');
+      await page.locator('karmania-export-dialog k-input[label="Height (px)"] input').fill('400');
+      await expect(page.locator('karmania-export-dialog .notes')).toContainText(
+        'takes more than half of the width',
+      );
+      await expect(page.locator('karmania-export-dialog .frame canvas')).toBeVisible();
       await blur(page);
       return whole(page);
     },

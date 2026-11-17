@@ -35,7 +35,7 @@ async function rect(locator: Locator) {
 async function open(page: Page): Promise<void> {
   // With its projection file, so that the coordinate system is known and no step stops a person.
   await pickFiles(page, async () => {
-    await page.locator('karmania-app header.toolbar k-button button').click();
+    await page.locator('karmania-app header.toolbar > k-button button').click();
   }, ['points.csv', 'points.prj']);
   await expect(parts(page).dialog).toBeVisible();
   await expect(parts(page).host.locator('karmania-file-step')).toBeVisible();
@@ -220,7 +220,7 @@ test.describe('the import dialog', () => {
     page,
   }) => {
     const p = parts(page);
-    const importButton = page.locator('karmania-app header.toolbar k-button button');
+    const importButton = page.locator('karmania-app header.toolbar > k-button button');
     await page.keyboard.press('Shift');
     await importButton.focus();
     await open(page);

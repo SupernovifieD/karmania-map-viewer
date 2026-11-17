@@ -397,7 +397,7 @@ test.describe('moving the 2D map with the keyboard', () => {
     await start(page);
     const before = await camera(page);
     // The Import button of the toolbar has the focus.
-    await page.locator('karmania-app header.toolbar k-button button').focus();
+    await page.locator('karmania-app header.toolbar > k-button button').focus();
     for (const key of ['ArrowRight', '+', '0', 'Shift+ArrowRight']) {
       await page.keyboard.press(key);
     }
@@ -451,8 +451,8 @@ test.describe('moving the 2D map with the keyboard', () => {
     page,
   }) => {
     await start(page);
-    // From the toolbar's last control (the view), the next stop is the map area.
-    await page.locator('karmania-app header.toolbar k-segmented [aria-checked="true"]').focus();
+    // From the toolbar's last control (the Export PNG button, which is at its right end and is enabled with a map drawn), the next stop is the map area.
+    await page.locator('karmania-app header.toolbar > k-tooltip > k-button button').focus();
     await page.keyboard.press('Tab');
     const ring = await page.evaluate(() => {
       let active: Element | null = document.activeElement;

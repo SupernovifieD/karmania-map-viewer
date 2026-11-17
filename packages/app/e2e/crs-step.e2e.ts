@@ -51,7 +51,7 @@ async function crsOf(page: Page, ...picks: Pick[]): Promise<void> {
   await pickFiles(
     page,
     async () => {
-      await page.locator('karmania-app header.toolbar k-button button').click();
+      await page.locator('karmania-app header.toolbar > k-button button').click();
     },
     picks,
   );
