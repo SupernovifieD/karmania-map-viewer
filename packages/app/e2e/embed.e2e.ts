@@ -1,6 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { trackLeaks } from './support/leaks';
 
+declare global {
+  interface Window {
+    /** The size of each list of datasets that the viewers of a test were told of, by viewer. */
+    heard?: { first: number[]; second: number[] };
+  }
+}
+
 /**
  * The embedding page (`embed.html`) puts viewers in itself with only what `@karmania/viewer` exports, as the page of an embedder would. These
  * are the tests of what that package gives; the tests of the options and of the API are in the files that follow.
@@ -349,6 +356,131 @@ test.describe('a viewer that is given an engine by the page', () => {
     await page.evaluate(() => window.first?.dispose());
     await expect.poll(() => page.evaluate(() => window.second?.engine.datasets().length)).toBe(0);
   });
+
+  for (const shared of [true, false]) {
+    const who = shared ? 'two viewers of one engine' : 'a viewer with an engine of its own';
+    /** The viewers of the page, and what each was told of its datasets (the size of each list it was told). */
+    const withWizard = async (
+      page: Page,
+      file = { text: 'x,y\n1,2\n3,4\n', verdict: 'Ready to load' },
+    ): Promise<Locator> => {
+      await page.goto('/embed.html');
+      await page.evaluate(
+        ([withSecond, text]) => {
+          const place = (id: string): HTMLElement => {
+            const box = document.createElement('div');
+            box.id = id;
+            box.style.cssText = 'width: 800px; height: 600px';
+            document.body.append(box);
+            return box;
+          };
+          const engine = withSecond ? window.embed.createEngine() : undefined;
+          const options = engine === undefined ? {} : { engine };
+          const first = window.embed.createViewer(place('a'), options);
+          const second = withSecond ? window.embed.createViewer(place('b'), options) : undefined;
+          window.first = first;
+          if (second !== undefined) {
+            window.second = second;
+          }
+          const heard: { first: number[]; second: number[] } = { first: [], second: [] };
+          window.heard = heard;
+          first.on('datasets', (list) => heard.first.push(list.length));
+          second?.on('datasets', (list) => heard.second.push(list.length));
+          first.openImport([new File([text], 'wells.csv', { type: 'text/csv' })]);
+        },
+        [shared, file.text] as const,
+      );
+      const wizard = page.locator('#a karmania-import-dialog');
+      const step = wizard.locator('.step');
+      for (let pressed = 0; pressed < 6; pressed += 1) {
+        const at = await step.getAttribute('data-step');
+        if (at === 'review') {
+          break;
+        }
+        if (at === 'crs') {
+          const crs = wizard.locator('karmania-crs-step');
+          await crs.locator('.choice k-select').first().locator('select').selectOption('epsg');
+          await crs.locator('k-input input').fill('32640');
+        }
+        const next = wizard.locator('k-button[slot="footer-end"]').nth(1).locator('button');
+        await expect(next).toBeEnabled();
+        await next.click();
+        await expect(step).not.toHaveAttribute('data-step', at ?? '');
+      }
+      await expect(wizard.locator('karmania-review-step .verdict')).toHaveText(file.verdict);
+      return wizard;
+    };
+    /** What the engine holds, what each viewer draws, and what each was told. */
+    const seen = (page: Page) =>
+      page.evaluate(() => ({
+        engine: window.first?.engine.datasets().length,
+        first: Object.keys(window.first?.scene().layers ?? {}).length,
+        second: Object.keys(window.second?.scene().layers ?? {}).length,
+        heard: window.heard,
+      }));
+
+    test(`${who}: do not show what the import wizard has loaded to review, nor tell of it, until it is kept`, async ({
+      page,
+    }) => {
+      const wizard = await withWizard(page);
+      // The review loads it, to say what it found: the engine holds it, and nobody has chosen it yet.
+      expect(await seen(page)).toEqual({
+        engine: 1,
+        first: 0,
+        second: 0,
+        heard: { first: [], second: [] },
+      });
+      // Kept: every viewer of the engine shows it and tells of it.
+      await wizard.locator('k-button[slot="footer-end"]').nth(1).locator('button').click();
+      await expect
+        .poll(async () => {
+          const now = await seen(page);
+          return [now.first, now.second];
+        })
+        .toEqual([1, shared ? 1 : 0]);
+      const { heard } = await seen(page);
+      expect(heard?.first.length).toBeGreaterThan(0);
+      expect(heard?.first.every((size) => size === 1)).toBe(true);
+      expect(heard?.second.every((size) => size === 1)).toBe(true);
+      expect(heard?.second.length).toBeGreaterThan(shared ? 0 : -1);
+    });
+
+    test(`${who}: show what is loaded after an import that loaded nothing, which holds nothing back for ever`, async ({
+      page,
+    }) => {
+      // A coordinate is missing in the second row: the import stops, with an error, and nothing is loaded.
+      await withWizard(page, { text: 'x,y\n1,2\n,3\n4,5\n', verdict: 'Nothing was loaded' });
+      expect((await seen(page)).engine).toBe(0);
+      await page.evaluate(async () => {
+        const { points } = window.embed;
+        await window.first?.load(
+          points({ name: 'wells', x: [1, 2], y: [3, 4], crs: { kind: 'local', units: 'm' } }),
+        );
+      });
+      await expect
+        .poll(async () => {
+          const now = await seen(page);
+          return [now.engine, now.first, now.second];
+        })
+        .toEqual([1, 1, shared ? 1 : 0]);
+    });
+
+    test(`${who}: never show what the import wizard loaded to review when it is cancelled instead`, async ({
+      page,
+    }) => {
+      const wizard = await withWizard(page);
+      expect((await seen(page)).engine).toBe(1);
+      await wizard.locator('k-button[slot="footer-start"]').locator('button').click();
+      // The wizard takes it out of the engine again; no viewer showed it, so none has anything to say.
+      await expect.poll(async () => (await seen(page)).engine).toBe(0);
+      expect(await seen(page)).toEqual({
+        engine: 0,
+        first: 0,
+        second: 0,
+        heard: { first: [], second: [] },
+      });
+    });
+  }
 
   test('does not adopt what finishes loading after it was taken out: the engine has the dataset, and the saved state of the panel is left alone', async ({
     page,
