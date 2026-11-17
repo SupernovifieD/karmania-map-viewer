@@ -440,6 +440,33 @@ describe('the contours of a layer', () => {
     expect(w.manager.state('layer-1')).toEqual({ status: 'idle' });
   });
 
+  it('bring the layers to what the engine holds when the engine fails, since what another viewer of the same engine did meanwhile was left to them', async () => {
+    const w = world();
+    w.add(summary(2, 'Other', 'points'));
+    w.contours();
+    // A job is under way, and a viewer has told the engine that dataset 2 is gone: this one, busy, did not act on it.
+    await w.engine.remove(2);
+    expect(w.adopted).toEqual([]);
+    w.pending[0]?.reject(new Error('The worker failed.'));
+    await settle();
+    expect(w.manager.state('layer-1')).toMatchObject({ status: 'failed' });
+    // It does now: the layers are what the engine holds.
+    expect(w.adopted).toEqual([[1]]);
+  });
+
+  it('do not fail for an engine that has been let go of while they were being made: there is nothing to bring the layers to', async () => {
+    const w = world();
+    w.contours();
+    const gone = new Error('The engine was disposed.');
+    w.engine.datasets = () => {
+      throw gone;
+    };
+    w.pending[0]?.reject(new Error('The worker failed.'));
+    await settle();
+    expect(w.manager.state('layer-1')).toMatchObject({ status: 'failed' });
+    expect(w.adopted).toEqual([]);
+  });
+
   it('say that the engine could not, as a fault and not a finding, unless the dataset was removed or the work stopped', async () => {
     const w = world();
     w.contours();

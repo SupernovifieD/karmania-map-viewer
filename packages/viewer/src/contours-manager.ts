@@ -286,8 +286,22 @@ export class ContoursManager {
           this.failed.set(layerId, { key, findings: [], fault: faultOf(error) });
         }
       }
+      // What the engine held changed while this was under way (a viewer that shares the engine took a dataset out, say) was left to the manager, which is what being busy
+      // is: the layers are brought to what the engine holds now, as when it has an answer.
+      this.bringToEngine();
       this.changed();
     }
+  }
+
+  /** Brings the layers to what the engine holds, unless the engine is gone (then there is nothing to bring them to). */
+  private bringToEngine(): void {
+    let held: readonly Summary[];
+    try {
+      held = this.options.engine.datasets();
+    } catch {
+      return;
+    }
+    this.options.adopt(held);
   }
 
   /** The contours of the layer are not wanted: what is under way is stopped, and the lines and their layer go. */

@@ -71,6 +71,35 @@ test.describe('a page that embeds the viewer', () => {
 const HOST = 'width: 800px; height: 500px';
 
 test.describe('a viewer that is given an engine by the page', () => {
+  test('does not adopt what finishes loading after it was taken out: the engine has the dataset, and the saved state of the panel is left alone', async ({
+    page,
+  }) => {
+    await page.goto('/embed.html');
+    const outcome = await page.evaluate(async (style) => {
+      localStorage.removeItem('karmania.panel');
+      const { createEngine, createViewer, points } = window.embed;
+      const engine = createEngine();
+      const host = document.createElement('div');
+      host.style.cssText = style;
+      document.body.append(host);
+      const viewer = createViewer(host, { engine });
+      const pending = viewer.load(
+        points({ name: 'wells', x: [1, 2], y: [3, 4], crs: { kind: 'local', units: 'm' } }),
+      );
+      // The page takes the viewer out while the engine is still reading.
+      viewer.dispose();
+      const result = await pending;
+      const outcome = {
+        status: result.status,
+        saved: localStorage.getItem('karmania.panel'),
+        held: engine.datasets().length,
+      };
+      engine.dispose();
+      return outcome;
+    }, HOST);
+    expect(outcome).toEqual({ status: 'loaded', saved: null, held: 1 });
+  });
+
   test('does not let the engine go when it is taken out of the page: the engine is the page’s', async ({
     page,
   }) => {

@@ -65,7 +65,8 @@ export interface Viewer {
    * Loads a dataset made with a builder (`points`, `lines`, `polygons`, `grid`, `mesh`, `blocks`), as a file that is imported is: it is listed in the
    * Data tab, selected, and drawn. The engine takes the input's arrays, which are empty afterwards, so an input is loaded once. Resolves with what the
    * engine says: `loaded` with the summaries, or `blocked` with the findings (a problem with the data is a result, not a rejection), and then nothing
-   * is added.
+   * is added. A viewer that is taken out while the engine is reading shows nothing of it: with an engine of the page's, the dataset is in the engine all the same; with the viewer's
+   * own, the call rejects, the engine having been let go.
    */
   load(input: DatasetInput, options?: LoadOptions): Promise<LoadResult>;
   /**
