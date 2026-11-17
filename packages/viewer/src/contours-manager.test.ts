@@ -454,6 +454,19 @@ describe('the contours of a layer', () => {
     expect(w.adopted).toEqual([[1]]);
   });
 
+  it('bring the layers to what the engine holds when they are turned off while being made for the first time, which leaves no lines to take out of the engine', async () => {
+    const w = world();
+    w.add(summary(2, 'Other', 'points'));
+    w.contours();
+    // Another viewer of the engine takes dataset 2 out while the first lines are being made: this one, busy, did not act on it.
+    await w.engine.remove(2);
+    expect(w.adopted).toEqual([]);
+    w.scene.dispatch({ type: 'setContours', layerId: 'layer-1', contours: null });
+    await settle();
+    // There were no lines, so nothing was taken out of the engine and nothing would have brought the layers to it: now it does.
+    expect(w.adopted.at(-1)).toEqual([1]);
+  });
+
   it('do not fail for an engine that has been let go of while they were being made: there is nothing to bring the layers to', async () => {
     const w = world();
     w.contours();

@@ -91,6 +91,7 @@ import type { PanelChange } from './panel.js';
 import {
   browserStorage,
   clampPanelWidth,
+  DEFAULT_PANEL_STATE,
   loadPanelState,
   PANEL_WIDTH,
   panelWidthLimits,
@@ -203,6 +204,8 @@ export class KarmaniaViewer extends LitElement {
   declare withImportUi: boolean;
   /** How the panel is: folded away or open, the tab it is on, and the width it was given. */
   declare private panel: PanelState;
+  /** Whether the panel's kept state has been read (once, when the viewer is first put in a page with a panel). */
+  private panelRead = false;
   /**
    * How wide the viewer is, which is what the panel's width is limited by (half of it, up to 640): the width of the element itself, and not of the window, since
    * a page can put the viewer in a box of any size. It is the window's width until the viewer is in a page and measured, and it follows the element's size.
@@ -226,7 +229,7 @@ export class KarmaniaViewer extends LitElement {
     super();
     this.withPanel = true;
     this.withImportUi = true;
-    this.panel = loadPanelState(browserStorage());
+    this.panel = DEFAULT_PANEL_STATE;
     this.hostWidth = document.documentElement.clientWidth;
     this.datasets = [];
     this.layerChanges = 0;
@@ -1314,6 +1317,12 @@ export class KarmaniaViewer extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    // What a person had the panel as is read when the viewer is put in a page, and only if it has a panel: `createViewer` says that it has none after the element is made, so a
+    // viewer without one must not have read it by then (the page may not want a viewer to touch the browser's storage at all).
+    if (this.withPanel && !this.panelRead) {
+      this.panelRead = true;
+      this.panel = loadPanelState(browserStorage());
+    }
     // Put back in a page, the viewer's first render has been made already.
     if (this.hasUpdated) {
       this.watchSize();
@@ -1410,6 +1419,13 @@ export class KarmaniaViewer extends LitElement {
    * the wizard of a viewer that was taken out is still in its shadow root, so one made here would never be let go.
    */
   private openWizard(files: readonly File[]): void {
+    // Asked for before the viewer has first been drawn, as a page that makes a viewer and asks at once does, there is no dialog yet: it is opened when there is.
+    if (!this.hasUpdated) {
+      void this.updateComplete.then(() => {
+        this.openWizard(files);
+      });
+      return;
+    }
     const wizard = this.renderRoot.querySelector('karmania-import-dialog');
     if (this.isConnected && files.length > 0 && wizard) {
       wizard.engine = this.acquireEngine();

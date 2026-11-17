@@ -309,7 +309,8 @@ export class ContoursManager {
     // Why the contours could not be turned on (the failure of no settings) stays, until they are turned on: it is what says why there are none.
     const failure = this.failed.get(layerId);
     const forgetsFailure = failure !== undefined && failure.key !== '';
-    const hadState = this.jobs.has(layerId) || forgetsFailure;
+    const hadJob = this.jobs.has(layerId);
+    const hadState = hadJob || forgetsFailure;
     this.jobs.get(layerId)?.controller.abort();
     this.jobs.delete(layerId);
     if (forgetsFailure) {
@@ -320,6 +321,11 @@ export class ContoursManager {
     const lines = this.takeAwayLinesLayer(doc, layerId);
     if (lines !== undefined || hadState) {
       this.removeLinesOf(doc.layers[layerId]?.datasetId, lines?.datasetId);
+    }
+    // A job that was under way is what kept the viewer from acting on the changes of its engine (a viewer that shares it took a dataset out, say), and it is over: when there
+    // were lines to take out the engine says so as they go, and when there were none nothing else would bring the layers to what it holds.
+    if (hadJob) {
+      this.bringToEngine();
     }
     if (hadState) {
       this.changed();
