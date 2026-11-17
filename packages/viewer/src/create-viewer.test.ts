@@ -8,6 +8,8 @@ function page() {
   const made: {
     openImport: ReturnType<typeof vi.fn>;
     useEngine: ReturnType<typeof vi.fn>;
+    withPanel?: boolean;
+    withImportUi?: boolean;
     remove: ReturnType<typeof vi.fn>;
     scene: ReturnType<typeof vi.fn>;
     dispatch: ReturnType<typeof vi.fn>;
@@ -75,6 +77,20 @@ describe('createViewer', () => {
     createViewer(container().element, { engine });
     expect(made[0]?.useEngine.mock.calls).toEqual([[engine]]);
     expect(steps).toEqual(['engine given', 'put in the container']);
+  });
+
+  it('has the panel and the import by default, and without either when the page says so', () => {
+    const { made, container } = page();
+    createViewer(container().element);
+    createViewer(container().element, { panel: false });
+    createViewer(container().element, { importUi: false });
+    createViewer(container().element, { panel: true, importUi: true });
+    expect(made.map((element) => [element.withPanel, element.withImportUi])).toEqual([
+      [true, true],
+      [false, true],
+      [true, false],
+      [true, true],
+    ]);
   });
 
   it('gives the viewer no engine when it was given none: the viewer makes its own', () => {

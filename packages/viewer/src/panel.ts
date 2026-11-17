@@ -47,6 +47,7 @@ export class KarmaniaPanel extends LitElement {
     rows: { attribute: false },
     crsInfo: { attribute: false },
     notices: { attribute: false },
+    importUi: { type: Boolean },
     width: { type: Number },
     min: { type: Number },
     max: { type: Number },
@@ -155,6 +156,8 @@ export class KarmaniaPanel extends LitElement {
   declare crsInfo: CrsLookup | undefined;
   /** Why each dataset that is not drawn is not, by the dataset's number, for the Data tab. */
   declare notices: ReadonlyMap<number, string>;
+  /** Whether the Data tab has an Import button when it is empty. */
+  declare importUi: boolean;
   /** How wide the panel is, and the least and most it can be, and the width it goes back to. */
   declare width: number;
   declare min: number;
@@ -175,6 +178,7 @@ export class KarmaniaPanel extends LitElement {
     this.rows = undefined;
     this.crsInfo = undefined;
     this.notices = new Map();
+    this.importUi = true;
     this.width = 0;
     this.min = 0;
     this.max = 0;
@@ -279,6 +283,7 @@ export class KarmaniaPanel extends LitElement {
                 .rows=${this.rows}
                 .crsInfo=${this.crsInfo}
                 .notices=${this.notices}
+                .importUi=${this.importUi}
               ></karmania-data-tab>
             </div>
           </k-tabs>

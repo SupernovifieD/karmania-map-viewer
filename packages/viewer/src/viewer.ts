@@ -50,7 +50,7 @@ import type {
   ViewMode,
 } from '@karmania/scene';
 import { sharedStyles } from '@karmania/ui';
-import { css, html, LitElement } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import { CrsNames } from './crs-names.js';
 import { browserEnv, composeExport, planOnly } from './export-compose.js';
 import type {
@@ -127,6 +127,8 @@ const RESET_ELEVATION = 45;
  */
 export class KarmaniaViewer extends LitElement {
   static override properties = {
+    withPanel: { attribute: false },
+    withImportUi: { attribute: false },
     panel: { state: true },
     viewportWidth: { state: true },
     datasets: { state: true },
@@ -162,9 +164,24 @@ export class KarmaniaViewer extends LitElement {
       .workspace[data-collapsed] {
         grid-template-columns: minmax(0, 1fr) var(--k-panel-rail-width);
       }
+
+      /* Without the panel the map has the whole viewer. */
+      .workspace[data-no-panel] {
+        grid-template-columns: minmax(0, 1fr);
+      }
     `,
   ];
 
+  /**
+   * Whether the viewer has its right panel (the Legend and Data tabs). Set before the viewer is put in a page, by `createViewer`'s `panel`. Without it
+   * the map has the whole viewer, and what the panel is kept in the browser is neither read nor written.
+   */
+  declare withPanel: boolean;
+  /**
+   * Whether the viewer has what brings files in: the Import buttons, dropping files on the map, and the import wizard. Set before the viewer is put in
+   * a page, by `createViewer`'s `importUi`. Without it `openImport` is a mistake; `load` still takes what a page makes with a builder.
+   */
+  declare withImportUi: boolean;
   /** How the panel is: folded away or open, the tab it is on, and the width it was given. */
   declare private panel: PanelState;
   /** How wide the window is, which limits how wide the panel can be. */
@@ -185,6 +202,8 @@ export class KarmaniaViewer extends LitElement {
 
   constructor() {
     super();
+    this.withPanel = true;
+    this.withImportUi = true;
     this.panel = loadPanelState(browserStorage());
     this.viewportWidth = document.documentElement.clientWidth;
     this.datasets = [];
@@ -1217,8 +1236,15 @@ export class KarmaniaViewer extends LitElement {
     this.renderRoot.querySelector('input')?.click();
   };
 
-  /** Opens the import wizard on `files`, or the file picker when there are none to give (no list, or an empty one). */
+  /**
+   * Opens the import wizard on `files`, or the file picker when there are none to give (no list, or an empty one).
+   *
+   * @throws Error if the viewer was made without import (`withImportUi` is false), which is a mistake of the caller.
+   */
   openImport(files?: readonly File[]): void {
+    if (!this.withImportUi) {
+      throw new Error('This viewer has no import: it was made with importUi set to false.');
+    }
     if (files === undefined || files.length === 0) {
       this.chooseFiles();
     } else {
@@ -1401,7 +1427,9 @@ export class KarmaniaViewer extends LitElement {
 
   private changePanel(change: PanelChange): void {
     this.panel = { ...this.panel, ...change };
-    savePanelState(browserStorage(), this.panel);
+    if (this.withPanel) {
+      savePanelState(browserStorage(), this.panel);
+    }
   }
 
   /**
@@ -1440,7 +1468,9 @@ export class KarmaniaViewer extends LitElement {
   /** Gives the panel the width that was asked for, as far as the window allows. */
   private readonly onResize = (event: CustomEvent<ResizeRequest>): void => {
     this.panel = { ...this.panel, width: clampPanelWidth(event.detail.width, this.viewportWidth) };
-    savePanelState(browserStorage(), this.panel);
+    if (this.withPanel) {
+      savePanelState(browserStorage(), this.panel);
+    }
   };
 
   /**
@@ -1473,11 +1503,14 @@ export class KarmaniaViewer extends LitElement {
     return html`
       <div
         class="workspace"
-        ?data-collapsed=${this.panel.collapsed}
+        ?data-collapsed=${this.panel.collapsed && this.withPanel}
+        ?data-no-panel=${!this.withPanel}
         style=${`--k-panel-width: ${String(width)}px`}
       >
         <karmania-map-area
           .datasets=${this.datasets.length}
+          .importUi=${this.withImportUi}
+          .hasLegend=${this.withPanel}
           .unavailable=${this.cannotDraw}
           .heading=${this.furniture.heading}
           .scale=${this.furniture.scale}
@@ -1499,43 +1532,56 @@ export class KarmaniaViewer extends LitElement {
           @karmania-import-request=${this.chooseFiles}
           @karmania-files-dropped=${this.onFilesDropped}
         ></karmania-map-area>
-        <karmania-panel
-          .collapsed=${this.panel.collapsed}
-          .width=${width}
-          .min=${limits.min}
-          .max=${limits.max}
-          .reset=${PANEL_WIDTH.default}
-          .tab=${this.panel.tab}
-          .legend=${legend}
-          .styles=${styles}
-          .datasets=${this.datasets}
-          .selected=${this.selected}
-          .selectedElement=${this.selectedElementOfDataset()}
-          .rows=${this.rows}
-          .crsInfo=${this.crsInfo}
-          .notices=${notices}
-          @karmania-import-request=${this.chooseFiles}
-          @karmania-legend-command=${this.onLegendCommand}
-          @karmania-contours-turn-on=${this.onContoursTurnOn}
-          @k-table-select=${this.onTableSelect}
-          @keydown=${this.onEscape}
-          @karmania-dataset-select=${this.onDatasetSelect}
-          @karmania-dataset-remove=${this.onDatasetRemove}
-          @karmania-panel-change=${this.onPanelChange}
-          @karmania-resize=${this.onResize}
-        ></karmania-panel>
+        ${
+          this.withPanel
+            ? html`
+                <karmania-panel
+                  .collapsed=${this.panel.collapsed}
+                  .width=${width}
+                  .min=${limits.min}
+                  .max=${limits.max}
+                  .reset=${PANEL_WIDTH.default}
+                  .tab=${this.panel.tab}
+                  .legend=${legend}
+                  .styles=${styles}
+                  .datasets=${this.datasets}
+                  .selected=${this.selected}
+                  .selectedElement=${this.selectedElementOfDataset()}
+                  .rows=${this.rows}
+                  .crsInfo=${this.crsInfo}
+                  .notices=${notices}
+                  .importUi=${this.withImportUi}
+                  @karmania-import-request=${this.chooseFiles}
+                  @karmania-legend-command=${this.onLegendCommand}
+                  @karmania-contours-turn-on=${this.onContoursTurnOn}
+                  @k-table-select=${this.onTableSelect}
+                  @keydown=${this.onEscape}
+                  @karmania-dataset-select=${this.onDatasetSelect}
+                  @karmania-dataset-remove=${this.onDatasetRemove}
+                  @karmania-panel-change=${this.onPanelChange}
+                  @karmania-resize=${this.onResize}
+                ></karmania-panel>
+              `
+            : nothing
+        }
       </div>
-      <input
-        type="file"
-        multiple
-        hidden
-        accept=${IMPORT_FILE_ACCEPT}
-        aria-label="Choose files to import"
-        @change=${this.onFilesChosen}
-      />
-      <karmania-import-dialog
-        @karmania-import-loaded=${this.onImportLoaded}
-      ></karmania-import-dialog>
+      ${
+        this.withImportUi
+          ? html`
+              <input
+                type="file"
+                multiple
+                hidden
+                accept=${IMPORT_FILE_ACCEPT}
+                aria-label="Choose files to import"
+                @change=${this.onFilesChosen}
+              />
+              <karmania-import-dialog
+                @karmania-import-loaded=${this.onImportLoaded}
+              ></karmania-import-dialog>
+            `
+          : nothing
+      }
       <karmania-export-dialog
         .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
       ></karmania-export-dialog>
