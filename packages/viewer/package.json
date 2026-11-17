@@ -23,7 +23,7 @@
     }
   },
   "scripts": {
-    "build": "vite build && node ../../scripts/emit-declarations.mjs",
+    "build": "vite build && node ../../scripts/emit-declarations.mjs && node ../../scripts/copy-notices.mjs",
     "prepack": "pnpm run build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

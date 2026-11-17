@@ -25,6 +25,8 @@ export default defineConfig({
       preserveEntrySignatures: 'strict',
       output: {
         format: 'es',
+        // The licence comments of three.js and Lit are kept in the code (the minifier drops them otherwise); THIRD_PARTY_NOTICES.md has the texts.
+        comments: { legal: true },
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: (asset) =>
