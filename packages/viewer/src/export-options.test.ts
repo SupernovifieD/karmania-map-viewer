@@ -135,6 +135,16 @@ describe('fileNameOf', () => {
     ]) {
       expect(fileNameOf(name), name).toBe(name);
     }
+    // The mark does not make the name longer than the most.
+    for (const long of [
+      `con.${'x'.repeat(200)}`,
+      `nul.${'y'.repeat(95)}.`,
+      `COM1.${'z'.repeat(150)}`,
+    ]) {
+      const name = fileNameOf(long);
+      expect(name.length, name).toBeLessThanOrEqual(MAX_FILE_NAME);
+      expect(name.startsWith('_'), name).toBe(true);
+    }
     // And what makes a device name after the cleaning is caught after it: `con.png` has lost its .png, `.con` its dot.
     expect(fileNameOf('con.png')).toBe('_con');
     expect(fileNameOf('.con')).toBe('_con');
