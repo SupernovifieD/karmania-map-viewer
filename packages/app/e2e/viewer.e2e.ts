@@ -69,7 +69,7 @@ test.describe('what the viewer offers a page', () => {
     expect((await kept(page)).datasets).toHaveLength(1);
   });
 
-  test('stops refusing files dropped on the page, which it does while it is in it, once it is taken out', async ({
+  test("refuses files dropped on the page while the app is in it, which is the app's and not the viewer's, and leaves nothing on the window once the app is taken out", async ({
     page,
   }) => {
     const refused = (): Promise<boolean> =>
@@ -85,11 +85,17 @@ test.describe('what the viewer offers a page', () => {
         return event.defaultPrevented;
       });
     expect(await refused()).toBe(true);
+    // The viewer only refuses files dropped in its own box (embed.e2e.ts): taking it out of the app does not change what the page does with a drop.
     await page.evaluate(() => {
       document
         .querySelector('karmania-app')
         ?.shadowRoot?.querySelector('karmania-viewer')
         ?.remove();
+    });
+    expect(await refused()).toBe(true);
+    // The app is the page, and the listeners on the window are its: when it is taken out none is left.
+    await page.evaluate(() => {
+      document.querySelector('karmania-app')?.remove();
     });
     expect(await refused()).toBe(false);
   });
