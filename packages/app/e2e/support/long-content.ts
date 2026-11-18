@@ -10,7 +10,7 @@ import { showLegend } from './legend.js';
 import { fixturePath } from './picker.js';
 import type { Sample } from './picker.js';
 import { projectionFor } from './fixtures.js';
-import { layerStatuses, withData } from './render.js';
+import { camera, drawn, layerStatuses, withData } from './render.js';
 import { goTo, importAndLoad, importAsLocalGrid, startWizard } from './wizard.js';
 
 /** A dataset name of 120 characters with nowhere to break it: the worst a name can be. */
@@ -346,4 +346,57 @@ export async function openExportWithLongThings(page: Page): Promise<void> {
   await dialog.locator('k-input[label="Height (px)"] input').fill('64');
   await dialog.locator('k-input[label="File name"] input').fill(NAME);
   await expect(dialog.locator('.notes p')).toHaveCount(2);
+}
+
+/** A value of 200 characters with spaces in it, for an attribute of the points of `loadLongPoints`. */
+export const LONG_VALUE =
+  'A value of an attribute that is much too long for any row to show whole. '
+    .repeat(3)
+    .slice(0, 200);
+
+/**
+ * Three points of a local grid at the edge of what a coordinate can look like (-99,999,999.5 east, 99,999,999.5 north), half a metre apart, under a name of 120
+ * characters, with an attribute named with 60 characters and numbers of 12 decimals, and one named with 60 and a value of 200 characters. The map is fitted to them.
+ */
+export async function loadLongPoints(page: Page): Promise<void> {
+  await page.evaluate(
+    ([column, other, name, text]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+      return viewer.load({
+        kind: 'points',
+        name,
+        crs: { kind: 'local', units: 'm' },
+        x: Float64Array.of(-99_999_999.5, -99_999_999, -99_999_998.5),
+        y: Float64Array.of(99_999_999.5, 99_999_999, 99_999_998.5),
+        columns: [
+          {
+            name: column,
+            type: 'float',
+            values: Float64Array.of(-123.456789012345, -123.456789012345, -123.456789012345),
+          },
+          { name: other, type: 'text', values: [text, text, text] },
+        ],
+      });
+    },
+    [COLUMN, `${COLUMN.slice(0, 59)}b`, NAME, LONG_VALUE] as const,
+  );
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn']);
+  await drawn(page);
+  await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+}
+
+/** The long points, and a click on the middle one, which is in the middle of the map: the identify popover is open with the long things in it. */
+export async function openIdentifyWithLongThings(page: Page): Promise<void> {
+  await loadLongPoints(page);
+  const canvas = await page.locator('karmania-map-area canvas').boundingBox();
+  if (canvas === null) {
+    throw new Error('The map is not shown.');
+  }
+  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.locator('karmania-identify[placed] dl').waitFor();
+  await page.mouse.move(0, 0);
 }

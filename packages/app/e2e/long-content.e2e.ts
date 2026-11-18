@@ -17,6 +17,7 @@ import {
   LONG_CRS_QUERY,
   LONG_ENGINE,
   LONG_REASON,
+  LONG_VALUE,
   LOCAL_GRID_NAMES,
   NAME,
   SPACED_NAME,
@@ -25,6 +26,7 @@ import {
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
   openExportWithLongThings,
+  openIdentifyWithLongThings,
   openLegendWithLongReason,
   openStyleWithLongColumns,
   openWizardCrsSearching,
@@ -382,6 +384,36 @@ for (const size of SIZES) {
       expect((await box(action)).y + (await box(action)).height).toBeLessThanOrEqual(
         frame.y + frame.height,
       );
+    });
+
+    test('the identify popover holds a layer named with 120 characters, attributes named with 60 and a value of 200, inside the map, each cut with its whole in a title', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await openIdentifyWithLongThings(page);
+      const popover = page.locator('karmania-identify section');
+      const [area, found] = [await box(page.locator('karmania-map-area')), await box(popover)];
+      expect(found.x).toBeGreaterThanOrEqual(area.x);
+      expect(found.x + found.width).toBeLessThanOrEqual(area.x + area.width);
+      expect(found.y).toBeGreaterThanOrEqual(area.y);
+      expect(found.y + found.height).toBeLessThanOrEqual(area.y + area.height);
+      await assertNoOverflow(app(page));
+      // The header is the name of the layer, cut, with the whole of it in a title.
+      const heading = popover.locator('h2');
+      await expect(heading).toHaveAttribute('title', NAME);
+      expect(await heading.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+        true,
+      );
+      // An attribute named with 60 characters and a value of 200 are each cut, with the whole in a title.
+      const name = popover.locator(`dt[title="${COLUMN}"]`);
+      const value = popover.locator(`dd[title="${LONG_VALUE}"]`);
+      await expect(name).toHaveCount(1);
+      await expect(value).toHaveCount(1);
+      for (const cut of [name, value]) {
+        expect(await cut.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+          true,
+        );
+      }
     });
 
     test('the coordinate system step of the wizard lists the longest name of the definitions without overflow, whole in a title', async ({
