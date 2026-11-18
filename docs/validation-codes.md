@@ -5,11 +5,13 @@ message template, its hint and an example. Codes are stable: never rename one or
 change its meaning; add a new code instead. Sections are sorted by code.
 
 Every finding says what the person can do about it, as a hint: even a note that needs
-nothing done says so. A test fails if a finding is made without one. The codes whose
-step is `none` are for datasets that a program builds from arrays; a person importing a
-file meets the others, and so does a person looking at a map, who is told why something is
-not drawn or not coloured (the areas `classes`, `contours`, `display` and `crs.transform`).
-A unit test in `karmania-core` fails if a registered code is
+nothing done says so. A test fails if a finding is made without one. Most of the codes
+whose step is `none` are for datasets that a program builds from arrays; a few of them a file
+import can give too (`csv.lines.scattered`, `geojson.kinds.mixed`, `values.coordinates.*`, the
+`*.offsets.*` codes of lines and polygons, and others), and they are not held to the word list
+below yet. A person importing a file meets the codes that have a step, and a person looking at
+a map meets the areas `classes`, `contours`, `display` and `crs.transform`, which are told why
+something is not drawn or not coloured. A unit test in `karmania-core` fails if a registered code is
 missing here, if its severity or step disagrees with the registry, if its hint is
 missing, says "none", or is not a sentence of some length, if a message or a hint is too
 long, or (for the codes a person can meet) uses a word a reader should not
