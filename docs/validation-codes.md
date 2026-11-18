@@ -7,11 +7,14 @@ change its meaning; add a new code instead. Sections are sorted by code.
 Every finding says what the person can do about it, as a hint: even a note that needs
 nothing done says so. A test fails if a finding is made without one. The codes whose
 step is `none` are for datasets that a program builds from arrays; a person importing a
-file meets the others. A unit test in `karmania-core` fails if a registered code is
+file meets the others, and so does a person looking at a map, who is told why something is
+not drawn or not coloured (the areas `classes`, `contours`, `display` and `crs.transform`).
+A unit test in `karmania-core` fails if a registered code is
 missing here, if its severity or step disagrees with the registry, if its hint is
 missing, says "none", or is not a sentence of some length, if a message or a hint is too
-long, or (for the codes a person with a file can meet) uses a word a reader should not
-have to know (NaN, delimiter, and the like), or if this file lists a code that is not
+long, or (for the codes a person can meet) uses a word a reader should not
+have to know (NaN, delimiter, and the like; for the areas of the map also finite, vertices,
+ring, datum, geocentric), or if this file lists a code that is not
 registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
