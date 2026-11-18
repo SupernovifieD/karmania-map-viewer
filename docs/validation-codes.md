@@ -452,16 +452,16 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: none
 - Message: Some polygons could not be filled in, so only their outlines are drawn.
-- Hint: Check that no ring crosses itself or another ring, and that each polygon has some area.
+- Hint: Check that no outline crosses itself or another, and that each polygon has some area.
 - Example: Some polygons could not be filled in, so only their outlines are drawn.
 
 ## `display.polygons.too_detailed`
 
 - Severity: warning
 - Step: none
-- Message: Some polygons are too detailed to fill in (more than {limit} vertices, or too many holes for their size), so only their outlines are drawn.
+- Message: Some polygons are too detailed to fill in (more than {limit} corners, or too many holes for their size), so only their outlines are drawn.
 - Hint: Simplify the polygons, or split them into smaller ones, to fill them in.
-- Example: Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn.
+- Example: Some polygons are too detailed to fill in (more than 100,000 corners, or too many holes for their size), so only their outlines are drawn.
 
 ## `file.empty`
 
