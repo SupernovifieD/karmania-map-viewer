@@ -415,6 +415,23 @@ mod tests {
         "projected system",
     ];
 
+    /// The areas of findings that have no wizard step and that the viewer still says to a person, about what it draws and what it makes of the data (phase 2): a
+    /// person reads them, so they are held to the plain words as the findings of the wizard are.
+    const SAID_BY_THE_VIEWER: [&str; 4] = ["classes.", "contours.", "display.", "crs.transform."];
+
+    /// Whole words, in any case, that the findings of those areas do not use: the words of arithmetic and of geometry that the findings about meshes, lines and polygons of the
+    /// first phase use for the shapes they are about, and that a message about drawing needs plainer words for ("not a number", "an outline", "corners").
+    const NOT_PLAIN_IN_THE_VIEWER: [&str; 8] = [
+        "finite",
+        "vertex",
+        "vertices",
+        "ring",
+        "rings",
+        "datum",
+        "datums",
+        "geocentric",
+    ];
+
     #[test]
     fn every_hint_is_a_sentence_and_every_text_is_plain_and_short() {
         for entry in parse_docs(DOCS) {
@@ -441,12 +458,25 @@ mod tests {
             );
             assert!(words(&entry.hint) <= 35, "{name}: the hint is too long");
             // The codes with no wizard step are for datasets that a program builds, and say `NaN` to
-            // someone who knows what it is: the others are met by a person with a file.
-            let for_a_person = entry.step != "none";
+            // someone who knows what it is, except the ones the viewer says about what it draws: the others
+            // are met by a person with a file.
+            let said_by_the_viewer = SAID_BY_THE_VIEWER
+                .iter()
+                .any(|area| entry.code.starts_with(area));
+            let for_a_person = entry.step != "none" || said_by_the_viewer;
             for text in [&entry.message, &entry.hint, &entry.example] {
                 for word in NOT_PLAIN.iter().filter(|_| for_a_person) {
                     assert!(
                         !text.contains(word),
+                        "{name}: uses \"{word}\", which a reader should not have to know: {text}"
+                    );
+                }
+                for word in text
+                    .split(|letter: char| !letter.is_alphanumeric())
+                    .filter(|_| said_by_the_viewer)
+                {
+                    assert!(
+                        !NOT_PLAIN_IN_THE_VIEWER.contains(&word.to_lowercase().as_str()),
                         "{name}: uses \"{word}\", which a reader should not have to know: {text}"
                     );
                 }
