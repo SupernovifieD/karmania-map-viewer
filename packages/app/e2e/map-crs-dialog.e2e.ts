@@ -135,7 +135,7 @@ test.describe('the map coordinate system dialog', () => {
     page,
   }) => {
     const p = await open(page);
-    await expect(p.now).toContainText('Now: EPSG 32640, WGS 84 / UTM zone 40N');
+    await expect(p.now).toContainText('Now: EPSG:32640, WGS 84 / UTM zone 40N');
     await expect(p.now).toContainText('Projected, in metres · Taken from the datasets');
   });
 
@@ -149,7 +149,7 @@ test.describe('the map coordinate system dialog', () => {
     await expect.poll(async () => (await sceneFrame(page))?.source).toBe('user');
     const p = parts(page);
     await p.chip.click();
-    await expect(p.now).toContainText('EPSG 32641, WGS 84 / UTM zone 41N');
+    await expect(p.now).toContainText('EPSG:32641, WGS 84 / UTM zone 41N');
     await expect(p.now).toContainText('Chosen by you');
   });
 
@@ -177,9 +177,9 @@ test.describe('the map coordinate system dialog', () => {
   test('finds a system by its code, first', async ({ page }) => {
     const p = await open(page);
     await p.search.fill('32641');
-    await expect(p.rows.first()).toContainText('EPSG 32641');
+    await expect(p.rows.first()).toContainText('EPSG:32641');
     await p.search.fill('EPSG:32641');
-    await expect(p.rows.first()).toContainText('EPSG 32641');
+    await expect(p.rows.first()).toContainText('EPSG:32641');
   });
 
   test('has Apply disabled, and says why, until another system is chosen', async ({ page }) => {
@@ -309,7 +309,7 @@ test.describe('the map coordinate system dialog', () => {
     await page.keyboard.press('Tab');
     await expect(p.search).toBeFocused();
     await page.keyboard.type('32641');
-    await expect(p.rows.first()).toContainText('EPSG 32641');
+    await expect(p.rows.first()).toContainText('EPSG:32641');
     await page.keyboard.press('Tab');
     await expect(p.radios.first()).toBeFocused();
     await page.keyboard.press('Space');
@@ -472,7 +472,7 @@ test.describe('the map coordinate system dialog', () => {
     /** Picks the first match for UTM zone 41, which is not the system the map is in, so that there is something to ask about. */
     async function choose(page: Page, p: ReturnType<typeof parts>): Promise<void> {
       await p.search.fill('32641');
-      await expect(p.rows.first()).toContainText('EPSG 32641');
+      await expect(p.rows.first()).toContainText('EPSG:32641');
       await p.rows.first().click();
       await expect(p.host.locator('.changes')).toContainText('No dataset would');
     }

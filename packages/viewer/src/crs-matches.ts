@@ -177,7 +177,7 @@ export class KarmaniaCrsMatches extends LitElement {
                 }}
               />
               <span class="match-name" data-truncate>${info.name}</span>
-              <span class="match-detail">EPSG ${info.code} · ${describeKind(info)}</span>
+              <span class="match-detail">EPSG:${info.code} · ${describeKind(info)}</span>
             </label>`,
         )}
       </div>

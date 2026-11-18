@@ -53,14 +53,14 @@ test.describe('the status chip: the map’s coordinate system', () => {
     await expect(button(page)).toHaveAccessibleName('Map coordinate system: EPSG:32640');
     await expect
       .poll(async () => button(page).getAttribute('aria-description'))
-      .toBe('EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)');
+      .toBe('EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)');
     await expect(button(page)).toHaveAccessibleDescription(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
     await button(page).hover();
     await expect(page.locator('karmania-status-chip k-tooltip .tip')).toBeVisible();
     await expect(page.locator('karmania-status-chip k-tooltip .tip')).toHaveText(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
     // The whole of the name is inside the tooltip's box (the chip does not wrap, and the tooltip is inside it).
     const runsOut = await page
@@ -101,7 +101,7 @@ test.describe('the status chip: the map’s coordinate system', () => {
       });
     await expect(button(page)).toHaveText('EPSG:4326');
     await expect(button(page)).toHaveAccessibleDescription(
-      'EPSG 4326, WGS 84 (longitude and latitude, in degrees)',
+      'EPSG:4326, WGS 84 (longitude and latitude, in degrees)',
     );
   });
 
@@ -115,7 +115,7 @@ test.describe('the status chip: the map’s coordinate system', () => {
     });
     await expect(button(page)).toHaveText('EPSG:999999');
     await expect(button(page)).toHaveAccessibleDescription(
-      'EPSG 999999, which is not one of the coordinate systems Karmania knows',
+      'EPSG:999999, which is not one of the coordinate systems Karmania knows',
     );
   });
 

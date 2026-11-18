@@ -18,7 +18,7 @@ const ZONE_WIDTH: f64 = 6.0;
 const ZONE_COUNT: u32 = 60;
 
 /// The WGS 84 / UTM system for a longitude and latitude in degrees: zone
-/// `floor((longitude + 180) / 6) + 1`, EPSG 326xx at the equator and north of it, 327xx south of it.
+/// `floor((longitude + 180) / 6) + 1`, EPSG:326xx at the equator and north of it, 327xx south of it.
 ///
 /// There are no special zones for Norway or Svalbard. A longitude outside -180 to 180 is wrapped
 /// round the globe, and 180 is the meridian of -180, so it is in zone 1 (never a 61st zone).

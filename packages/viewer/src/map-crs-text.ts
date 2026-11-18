@@ -10,7 +10,7 @@ import { describeNamed } from './import-crs.js';
 export interface MapCrsText {
   /** On the button: `EPSG:32640`, `Local grid, m`. */
   readonly label: string;
-  /** In the tooltip: `EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)`, `A local grid, in metres`. */
+  /** In the tooltip: `EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)`, `A local grid, in metres`. */
   readonly title: string;
 }
 
