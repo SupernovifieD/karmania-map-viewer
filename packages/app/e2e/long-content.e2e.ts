@@ -26,6 +26,7 @@ import {
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
   openExportWithLongThings,
+  loadLongPoints,
   openIdentifyWithLongThings,
   openLegendWithLongReason,
   openStyleWithLongColumns,
@@ -414,6 +415,32 @@ for (const size of SIZES) {
           true,
         );
       }
+    });
+
+    test('the status chip keeps its width and its two coordinates of 18 characters inside it, at the edge of what a coordinate can be', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await page.goto('/');
+      await loadLongPoints(page);
+      const chip = page.locator('karmania-status-chip');
+      const before = await box(chip);
+      const canvas = await box(page.locator('karmania-map-area canvas'));
+      await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+      const values = chip.locator('.value');
+      await expect(values.first()).not.toHaveText('');
+      expect((await values.first().textContent()) ?? '').toMatch(/^[−-]99,999,99/);
+      const after = await box(chip);
+      expect(after.width).toBe(before.width);
+      expect(after.x).toBe(before.x);
+      await assertNoOverflow(app(page));
+      // Both numbers are inside the chip, and the chip is inside the map.
+      const area = await box(page.locator('karmania-map-area'));
+      for (const value of await values.all()) {
+        const found = await box(value);
+        expect(found.x + found.width).toBeLessThanOrEqual(after.x + after.width);
+      }
+      expect(after.x + after.width).toBeLessThanOrEqual(area.x + area.width);
     });
 
     test('the coordinate system step of the wizard lists the longest name of the definitions without overflow, whole in a title', async ({

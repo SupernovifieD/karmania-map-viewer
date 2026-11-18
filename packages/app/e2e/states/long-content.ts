@@ -15,6 +15,7 @@ import {
   longFile,
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
+  loadLongPoints,
   openExportWithLongThings,
   openIdentifyWithLongThings,
   openLegendWithLongReason,
@@ -222,6 +223,20 @@ export const SHOTS: Shot[] = [
     show: async (page) => {
       await openIdentifyWithLongThings(page);
       return rest(page);
+    },
+  },
+  {
+    // The pointer over a map whose coordinates are -99,999,999.5 and 99,999,999.5 with decimals: the chip holds both numbers in the room it keeps for them.
+    name: 'long-status-chip',
+    show: async (page) => {
+      await loadLongPoints(page);
+      const canvas = await page.locator('karmania-map-area canvas').boundingBox();
+      if (canvas === null) {
+        throw new Error('The map is not shown.');
+      }
+      await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+      await page.evaluate(() => document.fonts.ready);
+      return [app(page)];
     },
   },
 ];
