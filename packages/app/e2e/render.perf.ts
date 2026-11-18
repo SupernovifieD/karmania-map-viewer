@@ -11,6 +11,9 @@
  *     of the main thread over 50 ms (step 20.7);
  *   - a picture of A4 landscape at 300 dpi (3,508 by 2,480) of the million points, with a legend: made and encoded as a PNG file in under 3 s, with no task of
  *     the main thread over 50 ms while it is made (step 22.11);
+ *   - the same grid and the million points are switched to 3D and back to 2D after the rest, the blocks are switched to 3D, and the longest task of the main thread
+ *     in each switch is held to 50 ms by itself (step 24.3a), as is the longest in the time from pressing Load to the first frame, which is where the data is
+ *     prepared and uploaded to the card in chunks (section 8 of the brief: "preparing, uploading, restyling, contouring or switching views");
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
  * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
@@ -96,6 +99,12 @@ interface Measured {
   };
   /** From switching to 3D (and fitting) to the first frame that has the layer in it, in 3D, ms. */
   readonly switchMs?: number;
+  /** The longest task of the main thread while the view was switched (to 3D, and for `switchView` back to 2D as well), ms. */
+  readonly switchLongestTaskMs?: number;
+  /** From switching back to 2D to the first frame that has the layer in it, in 2D, ms (`switchView` only). */
+  readonly switchBackMs?: number;
+  /** The longest task of the main thread from pressing Load to the first frame: the data is prepared and uploaded to the card in that time, ms. */
+  readonly loadLongestTaskMs: number;
   /** From asking for new classes to the picture having them. */
   readonly restyleMs?: number;
   /** Twenty levels of contour lines: from turning them on to the engine's answer (the lines made and listed), and to the lines being drawn, in ms, with how many lines and vertices. */
@@ -124,6 +133,8 @@ interface Options {
   readonly contours?: boolean;
   /** After the first frame, the view is switched to 3D, fitted, and a scripted orbit is drawn: 300 frames of the camera going round and up and down. */
   readonly orbit?: boolean;
+  /** After the rest, the view is switched to 3D (fitted) and back to 2D, and the longest task in the switches is noted. */
+  readonly switchView?: boolean;
   /** After the first frame, a picture of A4 landscape at 300 dpi with the legend is made and encoded as a PNG file (`viewer.exportPng`). */
   readonly export?: boolean;
 }
@@ -190,10 +201,11 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
 
   let frames: Measured['frames'];
   let switchMs: number | undefined;
+  let switchWindow: { from: number; to: number } | undefined;
   if (options.orbit === true) {
     // To 3D: the view is switched (the camera is made from the 2D one) and fitted to the model, and the time is from the command to the first frame
     // that has the layer in it in 3D (its programs for that view are compiled meanwhile, a layer is not drawn before).
-    switchMs = await inPage<number>(
+    const orbitSwitch = await inPage<{ at: number; done: number }>(
       page,
       `const v = perf.viewer();
        const framesBefore = v.renderStats().frames;
@@ -204,8 +216,10 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
          const stats = v.renderStats();
          return stats && stats.viewMode === '3d' && stats.frames > framesBefore && stats.layersDrawn > 0;
        }, 120000);
-       return done - at;`,
+       return { at, done };`,
     );
+    switchMs = orbitSwitch.done - orbitSwitch.at;
+    switchWindow = { from: orbitSwitch.at, to: orbitSwitch.done };
   }
   if (options.path || options.orbit === true) {
     // The path: 100 frames of pan, 100 of zoom in and out, 100 of rotate, the camera given a new place each frame, and the time between
@@ -366,6 +380,34 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     console.info(`CPU ${JSON.stringify(top)}`);
   }
 
+  let switchBackMs: number | undefined;
+  if (options.switchView === true) {
+    // To 3D, fitted, and back to 2D: each time to the first frame that has the layer in it in that view (the programs for a view are compiled when it is first
+    // shown, and a layer is not drawn before), and the window is the whole of both.
+    const both = await inPage<{ from: number; to: number; toMs: number; backMs: number }>(
+      page,
+      `const v = perf.viewer();
+       const from = performance.now();
+       const before3d = v.renderStats().frames;
+       v.setViewMode('3d');
+       v.fit();
+       const in3d = await perf.until(() => {
+         const stats = v.renderStats();
+         return stats && stats.viewMode === '3d' && stats.frames > before3d && stats.layersDrawn > 0;
+       }, 120000);
+       const before2d = v.renderStats().frames;
+       v.setViewMode('2d');
+       const in2d = await perf.until(() => {
+         const stats = v.renderStats();
+         return stats && stats.viewMode === '2d' && stats.frames > before2d && stats.layersDrawn > 0;
+       }, 120000);
+       return { from, to: in2d, toMs: in3d - from, backMs: in2d - in3d };`,
+    );
+    switchMs = both.toMs;
+    switchBackMs = both.backMs;
+    switchWindow = { from: both.from, to: both.to };
+  }
+
   let exportRun: { ms: number; bytes: number; start: number } | undefined;
   if (options.export === true) {
     // The picture and the file, through the viewer's own `exportPng` (brief 9.6: A4 landscape at 300 dpi, 3,508 by 2,480, under 3 s): the time is from asking to the Blob.
@@ -418,12 +460,37 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
       : 'unknown';
   });
   await context.close();
+  const switched = switchWindow;
   return {
     file: options.data,
     renderer,
     firstFrameMs: Math.round(first - started),
     ...(frames === undefined ? {} : { frames }),
     ...(switchMs === undefined ? {} : { switchMs: Math.round(switchMs) }),
+    ...(switchBackMs === undefined ? {} : { switchBackMs: Math.round(switchBackMs) }),
+    ...(switched === undefined
+      ? {}
+      : {
+          switchLongestTaskMs: Math.round(
+            Math.max(
+              0,
+              ...tasks
+                .filter(
+                  (task) =>
+                    task.start + task.duration >= switched.from && task.start <= switched.to,
+                )
+                .map((task) => task.duration),
+            ),
+          ),
+        }),
+    loadLongestTaskMs: Math.round(
+      Math.max(
+        0,
+        ...tasks
+          .filter((task) => task.start >= started && task.start <= first)
+          .map((task) => task.duration),
+      ),
+    ),
     ...(restyleMs === undefined ? {} : { restyleMs: Math.round(restyleMs) }),
     ...(contours === undefined ? {} : { contours }),
     ...(exportRun === undefined
@@ -485,9 +552,18 @@ test.describe('the 2D view with the large files', () => {
       sidecar: 'points-1m.prj',
       path: true,
       restyle: false,
+      switchView: true,
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
+    expect(
+      result.switchLongestTaskMs,
+      'longest task while switching to 3D and back',
+    ).toBeLessThanOrEqual(50);
     // The renderer drew a frame for each of the 300 changes of the camera: the gaps below are those of a page that draws, not of one that is idle.
     expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
     // Keeping up with the display, which is what the owner says the brief's "under 16.7 ms" means at 60 Hz (decision 16.F13): the median gap
@@ -530,10 +606,19 @@ test.describe('the 2D view with the large files', () => {
       sidecar: 'grid-4m.prj',
       path: false,
       restyle: true,
+      switchView: true,
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
     expect(result.restyleMs, 'new classes visible').toBeLessThan(300);
+    expect(
+      result.switchLongestTaskMs,
+      'longest task while switching to 3D and back',
+    ).toBeLessThanOrEqual(50);
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
 
@@ -569,6 +654,13 @@ test.describe('the 2D view with the large files', () => {
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(3000);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
+    expect(result.switchLongestTaskMs, 'longest task while switching to 3D').toBeLessThanOrEqual(
+      50,
+    );
     // The renderer drew a frame for each of the 300 changes of the camera: the gaps are those of a page that draws, not of one that is idle.
     expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
     expect(result.frames?.p95, '95th percentile frame time of the orbit').toBeLessThan(50);
