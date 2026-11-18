@@ -172,7 +172,7 @@ fn build(code: u32) -> Result<Proj, Finding> {
     if proj.is_geocent() {
         return Err(unsupported(
             code,
-            "it is geocentric, not a map coordinate system",
+            "it places positions in space and not on a map",
         ));
     }
     // Positions of a geographic system are taken to be degrees, as the rest of Karmania has them, and
@@ -190,7 +190,7 @@ fn build(code: u32) -> Result<Proj, Finding> {
 fn reason(error: &Error) -> &'static str {
     match error {
         Error::NadGridNotAvailable | Error::NadGridParentNotFound | Error::GridFileNotFound(_) => {
-            "it needs files for shifting between datums, which are not available"
+            "it needs extra files for shifting its positions, which are not available"
         }
         Error::ProjectionNotFound => "its projection is not supported",
         _ => "its definition cannot be used",
@@ -213,7 +213,7 @@ fn local_grid(code: u32) -> Finding {
     Finding::new(
         FindingCode::CrsTransformLocalGrid,
         format!(
-            "A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:{code}."
+            "A local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:{code}."
         ),
     )
     .with_hint("Draw it with other local grids, or give the data a coordinate system by its EPSG code.")
@@ -303,7 +303,7 @@ mod tests {
             assert!(
                 finding
                     .message
-                    .ends_with("converted to or from EPSG:32640."),
+                    .ends_with("converted between it and EPSG:32640."),
                 "{}",
                 finding.message
             );
@@ -343,14 +343,14 @@ mod tests {
         assert_eq!(grids.code, FindingCode::CrsTransformUnsupported);
         assert_eq!(
             grids.message,
-            "Positions cannot be converted to or from EPSG:2085: it needs files for shifting between datums, which are not available."
+            "Positions cannot be converted to or from EPSG:2085: it needs extra files for shifting its positions, which are not available."
         );
         let geocentric = failure(epsg(4978), epsg(4326));
         assert_eq!(geocentric.code, FindingCode::CrsTransformUnsupported);
         assert!(
             geocentric
                 .message
-                .ends_with("it is geocentric, not a map coordinate system."),
+                .ends_with("it places positions in space and not on a map."),
             "{}",
             geocentric.message
         );
@@ -479,10 +479,10 @@ mod tests {
             assert!(finding.hint.is_some(), "{code}");
             let reason = finding.message.rsplit(": ").next().unwrap_or_default();
             let group = match reason {
-                "it needs files for shifting between datums, which are not available." => {
-                    "datum files"
+                "it needs extra files for shifting its positions, which are not available." => {
+                    "shift files"
                 }
-                "it is geocentric, not a map coordinate system." => "geocentric",
+                "it places positions in space and not on a map." => "geocentric",
                 "its projection is not supported." => "projection",
                 "it has no definition." => "no definition",
                 "its coordinates are not in degrees." => "not degrees",
@@ -499,11 +499,11 @@ mod tests {
         assert_eq!(
             counts,
             [
-                ("datum files", 238),
                 ("geocentric", 196),
                 ("no definition", 2),
                 ("not degrees", 9),
-                ("projection", 2)
+                ("projection", 2),
+                ("shift files", 238)
             ]
         );
         assert_eq!(usable, 5_737);
@@ -513,7 +513,7 @@ mod tests {
         );
         assert_eq!(tally["projection"], [8441, 27_200]);
         assert_eq!(tally["no definition"], [22_300, 29_701]);
-        assert!(tally["datum files"].contains(&2085) && tally["geocentric"].contains(&4978));
+        assert!(tally["shift files"].contains(&2085) && tally["geocentric"].contains(&4978));
     }
 
     fn converted(from: CrsRef, to: CrsRef, xyz: &[f64]) -> (Vec<f64>, Findings) {

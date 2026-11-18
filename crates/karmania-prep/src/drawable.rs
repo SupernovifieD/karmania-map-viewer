@@ -152,19 +152,36 @@ fn local_grids_assumed(from: Units, to: Units) -> Finding {
     Finding::new(
         FindingCode::DisplayCrsLocalGridsAssumed,
         format!(
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {} to {}; heights are drawn as given.",
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {} to {}, and its heights are not.",
             units_word(from),
             units_word(to)
         ),
     )
-    .with_hint("If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.")
+    .with_hint("Check that the datasets are on the same grid. If they are not, remove one of them, or import it again with an EPSG code in the CRS step.")
+}
+
+/// `text` for the middle of a sentence, after "Not drawn: ": an ordinary word that starts it (`A local grid`, `Positions`) starts with a small letter, as the reasons of the
+/// other findings of this kind do, and a name that starts it (`EPSG:99999`: a capital after the first letter, or a digit) is left as it is.
+fn after_a_colon(text: &str) -> String {
+    let word = text.split_whitespace().next().unwrap_or_default();
+    let mut letters = word.chars();
+    let ordinary = letters.next().is_some_and(char::is_uppercase)
+        && letters.all(|letter| letter.is_lowercase());
+    if !ordinary {
+        return text.to_string();
+    }
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_lowercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 /// The reason the transformer gave, as the reason the dataset is not drawn.
 pub(crate) fn not_convertible(cause: &Finding) -> Finding {
     Finding::new(
         FindingCode::DisplayCrsNotConvertible,
-        format!("Not drawn: {}", cause.message),
+        format!("Not drawn: {}", after_a_colon(&cause.message)),
     )
     .with_hint(CHANGE_THE_MAP)
 }
@@ -231,7 +248,7 @@ mod tests {
         assert!(
             needs_files.findings[0]
                 .message
-                .contains("EPSG:2085: it needs files")
+                .contains("EPSG:2085: it needs extra files")
         );
     }
 
@@ -247,8 +264,32 @@ mod tests {
             assert!(
                 d.findings[0]
                     .message
-                    .contains("A local grid has no known place on the Earth")
+                    .contains("a local grid has no known place on the Earth")
             );
+        }
+    }
+
+    #[test]
+    fn a_reason_after_not_drawn_starts_with_a_small_letter_unless_it_starts_with_a_name() {
+        for (text, after) in [
+            (
+                "A local grid has no known place.",
+                "a local grid has no known place.",
+            ),
+            (
+                "Positions cannot be converted.",
+                "positions cannot be converted.",
+            ),
+            ("EPSG:99999 is not known.", "EPSG:99999 is not known."),
+            (
+                "a reason that is lower already",
+                "a reason that is lower already",
+            ),
+            ("A cat", "a cat"),
+            ("A", "a"),
+            ("", ""),
+        ] {
+            assert_eq!(after_a_colon(text), after, "{text}");
         }
     }
 
@@ -260,7 +301,7 @@ mod tests {
         assert_eq!(codes(&d), ["display.crs.local_grids_assumed"]);
         assert_eq!(
             d.findings[0].message,
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given."
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are not."
         );
     }
 

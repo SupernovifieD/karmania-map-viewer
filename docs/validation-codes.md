@@ -196,7 +196,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: crs
 - Message: EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
-- Hint: Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads.
+- Hint: Check the code, or choose another coordinate system in the CRS step. If the code is right, the data still loads.
 - Example: EPSG:99999 is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
 
 ## `crs.geographic.axes_swapped`
@@ -235,9 +235,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:{code}.
+- Message: A local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:{code}.
 - Hint: Draw it with other local grids, or give the data a coordinate system by its EPSG code.
-- Example: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+- Example: A local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:32640.
 
 ## `crs.transform.not_finite`
 
@@ -253,7 +253,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Step: none
 - Message: Positions cannot be converted to or from EPSG:{code}: {reason}.
 - Hint: Choose another coordinate system for the map; the positions of the data are kept as they are.
-- Example: Positions cannot be converted to or from EPSG:2085: it needs files for shifting between datums, which are not available.
+- Example: Positions cannot be converted to or from EPSG:2085: it needs extra files for shifting its positions, which are not available.
 
 ## `csv.blocks.duplicate`
 
@@ -403,9 +403,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: info
 - Step: none
-- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {units} to {map units}; heights are drawn as given.
-- Hint: If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.
-- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given.
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {units} to {map units}, and its heights are not.
+- Hint: Check that the datasets are on the same grid. If they are not, remove one of them, or import it again with an EPSG code in the CRS step.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are not.
 
 ## `display.crs.not_convertible`
 
@@ -413,7 +413,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Step: none
 - Message: Not drawn: {the reason the positions cannot be converted to the map's coordinate system}
 - Hint: Change the map's coordinate system to the one this dataset is in.
-- Example: Not drawn: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+- Example: Not drawn: a local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:32640.
 
 ## `display.extent.none`
 
