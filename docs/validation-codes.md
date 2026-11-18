@@ -139,9 +139,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The column {name} has no value that contour lines can be made from: every entry is empty or not a finite number.
+- Message: The column {name} has no value that contour lines can be made from: every entry is empty or not a number.
 - Hint: Make contour lines from another column.
-- Example: The column elevation has no value that contour lines can be made from: every entry is empty or not a finite number.
+- Example: The column elevation has no value that contour lines can be made from: every entry is empty or not a number.
 
 ## `contours.column.not_numeric`
 
@@ -155,17 +155,17 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+- Message: The mesh has no heights to make contour lines from: none of its points has a height that is a number.
 - Hint: Make contour lines from a mesh whose points have heights, or from a grid.
-- Example: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+- Example: The mesh has no heights to make contour lines from: none of its points has a height that is a number.
 
 ## `contours.interval.invalid`
 
 - Severity: error
 - Step: none
-- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
-- Hint: Give an interval above 0, and an index line at least every line.
-- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
+- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and an index line must come every 1 line or more.
+- Hint: Give an interval above 0 and a number for the base, and let an index line come every 1 line or more.
+- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and an index line must come every 1 line or more.
 
 ## `contours.kind.unsupported`
 
