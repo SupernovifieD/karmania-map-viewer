@@ -106,11 +106,11 @@ test.describe('the coordinate system step', () => {
     const p = parts(page);
     await crsOf(page, 'points.csv', 'points.prj');
     await expect(p.found).toHaveText(
-      'Found EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+      'Found EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
     );
     expect(await p.select.inputValue()).toBe('detected');
     expect(await optionsOf(p.select)).toEqual([
-      'The one found: EPSG 32640',
+      'The one found: EPSG:32640',
       'An EPSG code',
       'A local grid',
     ]);
@@ -150,7 +150,7 @@ test.describe('the coordinate system step', () => {
     const p = parts(page);
     await crsOf(page, 'mixed.geojson');
     await expect(p.found).toHaveText(
-      'Found EPSG 4326, WGS 84 (longitude and latitude, in degrees), from the GeoJSON default, which is assumed because the file names none.',
+      'Found EPSG:4326, WGS 84 (longitude and latitude, in degrees), from the GeoJSON default, which is assumed because the file names none.',
     );
     expect(await p.select.inputValue()).toBe('detected');
     await expect(p.next.locator('button')).toBeEnabled();
@@ -160,7 +160,7 @@ test.describe('the coordinate system step', () => {
     const p = parts(page);
     await crsOf(page, GEOJSON_WITH_CRS);
     await expect(p.found).toHaveText(
-      "Found EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the file's own crs member.",
+      "Found EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), from the file's own crs member.",
     );
   });
 
@@ -212,7 +212,7 @@ test.describe('the coordinate system step', () => {
     });
     // What the code stands for is said, from the engine's definitions of the EPSG codes.
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
+      'Chosen: EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
     );
   });
 
@@ -298,20 +298,20 @@ test.describe('the coordinate system step', () => {
     // And the one that was found is still there to go back to.
     await p.select.selectOption('detected');
     await expect(p.unitsSelect).toHaveCount(0);
-    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summary).toContainText('EPSG:32640');
   });
 
   test('sums up what is chosen and where it came from, as the choice changes', async ({ page }) => {
     const p = parts(page);
     await crsOf(page, 'points.csv', 'points.prj');
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+      'Chosen: EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
     );
     await p.select.selectOption('epsg');
     await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
     await p.codeInput.fill('28350');
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 28350, GDA94 / MGA zone 50 (projected, in metres), as you entered it.',
+      'Chosen: EPSG:28350, GDA94 / MGA zone 50 (projected, in metres), as you entered it.',
     );
     await p.select.selectOption('local');
     await expect(p.summary).toContainText('Chosen: a local grid, in metres');
@@ -328,7 +328,7 @@ test.describe('the coordinate system step', () => {
     await p.select.selectOption('epsg');
     await p.codeInput.fill('99999');
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
+      'Chosen: EPSG:99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
     );
     // The data can still be loaded under it: the review says what that means.
     await expect(p.next.locator('button')).toBeEnabled();
@@ -354,15 +354,15 @@ test.describe('the coordinate system step', () => {
     await expect(p.code.locator('.help')).toHaveText('2 matches.');
     expect(await textsOf(p.names)).toEqual(['WGS 84 / UTM zone 40N', 'WGS 84 / UTM zone 40S']);
     expect(await textsOf(p.details)).toEqual([
-      'EPSG 32640 · projected, in metres',
-      'EPSG 32740 · projected, in metres',
+      'EPSG:32640 · projected, in metres',
+      'EPSG:32740 · projected, in metres',
     ]);
     // A name is not a code: nothing is chosen until one is picked.
     await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
     await expect(p.next.locator('button')).toBeDisabled();
     await p.rows.nth(1).click();
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 32740, WGS 84 / UTM zone 40S (projected, in metres), from the matches.',
+      'Chosen: EPSG:32740, WGS 84 / UTM zone 40S (projected, in metres), from the matches.',
     );
     await expect(p.next.locator('button')).toBeEnabled();
     expect(await draftCrs(page)).toEqual({
@@ -384,10 +384,10 @@ test.describe('the coordinate system step', () => {
     await p.select.selectOption('epsg');
     await p.codeInput.fill('4326');
     await expect(p.names.first()).toHaveText('WGS 84');
-    await expect(p.details.first()).toHaveText('EPSG 4326 · longitude and latitude, in degrees');
+    await expect(p.details.first()).toHaveText('EPSG:4326 · longitude and latitude, in degrees');
     await expect(p.radios.first()).toBeChecked();
     await expect(p.summary).toHaveText(
-      'Chosen: EPSG 4326, WGS 84 (longitude and latitude, in degrees), as you entered it.',
+      'Chosen: EPSG:4326, WGS 84 (longitude and latitude, in degrees), as you entered it.',
     );
   });
 
@@ -514,9 +514,9 @@ test.describe('the coordinate system step', () => {
     await page.keyboard.press('ArrowDown');
     await expect(p.radios.nth(1)).toBeFocused();
     await expect(p.radios.nth(1)).toBeChecked();
-    await expect(p.summary).toContainText('EPSG 32740');
+    await expect(p.summary).toContainText('EPSG:32740');
     await page.keyboard.press('ArrowUp');
-    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summary).toContainText('EPSG:32640');
   });
 
   test('keeps the focus ring of a match whole in its box as the arrows go through all twenty, up and down', async ({
@@ -571,14 +571,14 @@ test.describe('the coordinate system step', () => {
     await crsOf(page, 'points.csv');
     await p.select.selectOption('epsg');
     await p.codeInput.fill('32640');
-    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summary).toContainText('EPSG:32640');
     await p.codeInput.fill('OSGB 1936 / British National Grid');
     await expect(p.names.first()).toContainText('British National Grid');
     // Still the one chosen, though it is not among the matches now.
-    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summary).toContainText('EPSG:32640');
     await expect(p.radios.first()).not.toBeChecked();
-    await p.rows.filter({ hasText: 'EPSG 27700' }).click();
-    await expect(p.summary).toContainText('EPSG 27700');
+    await p.rows.filter({ hasText: 'EPSG:27700' }).click();
+    await expect(p.summary).toContainText('EPSG:27700');
     // Emptying the box takes the choice away, as a code that is not there.
     await p.codeInput.fill('');
     await expect(p.summary).toHaveText('Chosen: No coordinate system is chosen yet.');
@@ -638,7 +638,7 @@ test.describe('the coordinate system step', () => {
     await expect(p.rows).toHaveCount(2);
     await expect(p.summaryIcon).toHaveAttribute('name', 'circle-alert');
     await p.rows.first().click();
-    await expect(p.summary).toContainText('EPSG 32640');
+    await expect(p.summary).toContainText('EPSG:32640');
     await expect(p.summaryIcon).toHaveAttribute('name', 'check');
     // A number that is not a code is no choice either.
     await p.codeInput.fill('0');

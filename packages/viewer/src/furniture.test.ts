@@ -71,7 +71,7 @@ describe('the furniture of the scene', () => {
   it('has what the status chip says of the map’s coordinate system', () => {
     expect(furnitureOf(scene(), UTM).crs).toEqual({
       label: 'EPSG:32640',
-      title: 'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      title: 'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     });
     expect(furnitureOf(scene({ frame: null }), undefined).crs.label).toBe('No map CRS');
   });

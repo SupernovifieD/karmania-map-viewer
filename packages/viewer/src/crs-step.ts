@@ -104,7 +104,7 @@ export class KarmaniaCrsStep extends LitElement {
          that the box under it does not move when a long name is chosen: the name, the unit and where the
          code came from fit in two lines of the dialog's width (about 650 px) for every system of the
          registry (measured by the reviews of steps 12.F17 and 12.F21: all 6,184 do, in both wordings, at 646 and at
-         631 px; the widest, EPSG 8206, is about 1,010 px on one line). Nothing is cut: a longer text,
+         631 px; the widest, EPSG:8206, is about 1,010 px on one line). Nothing is cut: a longer text,
          in a narrow window or in a registry with longer names, takes the lines it needs and moves the box. */
       .summary-text[data-two-lines] {
         min-height: 2lh;
