@@ -120,13 +120,13 @@ impl PolygonsFill {
             "Some polygons could not be filled in, so only their outlines are drawn.",
         )
         .with_hint(
-            "Check that no ring crosses itself or another ring, and that each polygon has some area.",
+            "Check that no outline crosses itself or another, and that each polygon has some area.",
         );
         unfilled.count = 0;
         let mut too_detailed = Finding::new(
             FindingCode::DisplayPolygonsTooDetailed,
             format!(
-                "Some polygons are too detailed to fill in (more than {} vertices, or too many holes for their size), so only their outlines are drawn.",
+                "Some polygons are too detailed to fill in (more than {} corners, or too many holes for their size), so only their outlines are drawn.",
                 karmania_core::text::format_count(MAX_FILLED_VERTICES as u64)
             ),
         )
@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(finding.examples[0].element, Some(1));
         assert_eq!(
             finding.message,
-            "Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn."
+            "Some polygons are too detailed to fill in (more than 100,000 corners, or too many holes for their size), so only their outlines are drawn."
         );
     }
 
