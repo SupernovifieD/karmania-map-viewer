@@ -457,9 +457,10 @@ mod tests {
                 "{name}: the message is too long"
             );
             assert!(words(&entry.hint) <= 35, "{name}: the hint is too long");
-            // The codes with no wizard step are for datasets that a program builds, and say `NaN` to
-            // someone who knows what it is, except the ones the viewer says about what it draws: the others
-            // are met by a person with a file.
+            // Most codes with no wizard step are for datasets that a program builds, and say `NaN` to
+            // someone who knows what it is; a few can come from a file import too and are not read yet
+            // (see the top of docs/validation-codes.md). The ones the viewer says about what it draws
+            // are read, and so are the ones with a step: those are met by a person with a file.
             let said_by_the_viewer = SAID_BY_THE_VIEWER
                 .iter()
                 .any(|area| entry.code.starts_with(area));
