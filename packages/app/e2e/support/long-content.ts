@@ -331,3 +331,19 @@ export async function openWizardCrsSearching(page: Page, query: string): Promise
   await step.locator('.choice k-input input').fill(query);
   await step.locator('.match').first().waitFor();
 }
+
+/**
+ * The export dialog over the points (one layer, one line of legend), with a custom size of 300 by 64 at which two warnings are made at once (the legend takes
+ * more than half of the width, and is taller than the picture) and a file name of 120 characters in its field.
+ */
+export async function openExportWithLongThings(page: Page): Promise<void> {
+  await withData(page);
+  await page.locator('karmania-app header.toolbar > k-tooltip > k-button').click();
+  const dialog = page.locator('karmania-export-dialog');
+  await dialog.locator('dialog').waitFor();
+  await dialog.locator('k-select[label="Size"] select').selectOption({ label: 'Custom' });
+  await dialog.locator('k-input[label="Width (px)"] input').fill('300');
+  await dialog.locator('k-input[label="Height (px)"] input').fill('64');
+  await dialog.locator('k-input[label="File name"] input').fill(NAME);
+  await expect(dialog.locator('.notes p')).toHaveCount(2);
+}

@@ -24,6 +24,7 @@ import {
   longFile,
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
+  openExportWithLongThings,
   openLegendWithLongReason,
   openStyleWithLongColumns,
   openWizardCrsSearching,
@@ -345,6 +346,42 @@ for (const size of SIZES) {
       const reach = await box(apply);
       expect(reach.y + reach.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
       await expect(apply.locator('button')).toBeEnabled();
+    });
+
+    test('the export dialog holds two warnings at once and a file name of 120 characters inside it, with Export in reach', async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await openExportWithLongThings(page);
+      const dialog = page.locator('karmania-export-dialog dialog');
+      const frame = await box(dialog);
+      const notes = page.locator('karmania-export-dialog .notes p');
+      for (const note of await notes.all()) {
+        const found = await box(note);
+        expect(found.x).toBeGreaterThanOrEqual(frame.x);
+        expect(found.x + found.width).toBeLessThanOrEqual(frame.x + frame.width);
+      }
+      await assertNoOverflow(app(page));
+      // The name is in its field, which keeps its width, and ".png" is after it, inside the dialog.
+      const name = page.locator('karmania-export-dialog k-input[label="File name"] input');
+      await expect(name).toHaveValue(NAME);
+      const [field, suffix] = [
+        await box(name),
+        await box(page.locator('karmania-export-dialog .suffix')),
+      ];
+      expect(field.x + field.width).toBeLessThanOrEqual(suffix.x);
+      expect(suffix.x + suffix.width).toBeLessThanOrEqual(frame.x + frame.width);
+      // The dialog is inside the window, and what is too tall for it scrolls in its body: the last warning is reached, and Export is not covered.
+      expect(frame.y + frame.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+      const body = page.locator('karmania-export-dialog dialog .body');
+      await notes.last().scrollIntoViewIfNeeded();
+      const [inside, reached] = [await box(body), await box(notes.last())];
+      expect(reached.y + reached.height).toBeLessThanOrEqual(inside.y + inside.height);
+      const action = page.locator('karmania-export-dialog k-button[slot="footer-end"]');
+      await expect(action.locator('button')).toBeEnabled();
+      expect((await box(action)).y + (await box(action)).height).toBeLessThanOrEqual(
+        frame.y + frame.height,
+      );
     });
 
     test('the coordinate system step of the wizard lists the longest name of the definitions without overflow, whole in a title', async ({
