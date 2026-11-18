@@ -151,6 +151,9 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   });
   await page.addInitScript(WATCH);
   await page.goto('/?theme=light');
+  // The first mouse event that a page gets makes macOS set up the renderer's connection to the window server, once: a frame of 100 ms or more that is the browser's
+  // and not the page's (step 17.10 of the notes). It is given here, before anything is timed.
+  await page.mouse.move(1, 1);
   const w = wizard(page);
   await inPage(
     page,
