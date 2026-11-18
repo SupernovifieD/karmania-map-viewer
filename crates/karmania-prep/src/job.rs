@@ -818,7 +818,7 @@ mod tests {
         let message = &findings.as_slice()[0].message;
         assert!(
             message.contains(
-                "horizontal positions are scaled from feet to metres, and its heights are not"
+                "horizontal positions are scaled from feet to metres, and its heights are left as they are"
             ),
             "{message}"
         );
