@@ -406,9 +406,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: info
 - Step: none
-- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {units} to {map units}, and its heights are not.
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {units} to {map units}, and its heights are left as they are.
 - Hint: Check that the datasets are on the same grid. If they are not, remove one of them, or import it again with an EPSG code in the CRS step.
-- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are not.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are left as they are.
 
 ## `display.crs.not_convertible`
 

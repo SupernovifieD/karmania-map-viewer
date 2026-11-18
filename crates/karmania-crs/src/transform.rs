@@ -172,7 +172,7 @@ fn build(code: u32) -> Result<Proj, Finding> {
     if proj.is_geocent() {
         return Err(unsupported(
             code,
-            "it places positions in space and not on a map",
+            "it measures positions from the centre of the Earth and not on a map",
         ));
     }
     // Positions of a geographic system are taken to be degrees, as the rest of Karmania has them, and
@@ -350,7 +350,7 @@ mod tests {
         assert!(
             geocentric
                 .message
-                .ends_with("it places positions in space and not on a map."),
+                .ends_with("it measures positions from the centre of the Earth and not on a map."),
             "{}",
             geocentric.message
         );
@@ -482,7 +482,9 @@ mod tests {
                 "it needs extra files for shifting its positions, which are not available." => {
                     "shift files"
                 }
-                "it places positions in space and not on a map." => "geocentric",
+                "it measures positions from the centre of the Earth and not on a map." => {
+                    "geocentric"
+                }
                 "its projection is not supported." => "projection",
                 "it has no definition." => "no definition",
                 "its coordinates are not in degrees." => "not degrees",

@@ -152,7 +152,7 @@ fn local_grids_assumed(from: Units, to: Units) -> Finding {
     Finding::new(
         FindingCode::DisplayCrsLocalGridsAssumed,
         format!(
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {} to {}, and its heights are not.",
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {} to {}, and its heights are left as they are.",
             units_word(from),
             units_word(to)
         ),
@@ -312,7 +312,7 @@ mod tests {
         assert_eq!(codes(&d), ["display.crs.local_grids_assumed"]);
         assert_eq!(
             d.findings[0].message,
-            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are not."
+            "Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are left as they are."
         );
     }
 
