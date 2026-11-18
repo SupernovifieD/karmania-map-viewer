@@ -76,7 +76,7 @@ impl ContourError {
                     match column_type {
                         ColumnType::Utf8 => "text",
                         ColumnType::Bool => "true or false",
-                        _ => "categories",
+                        _ => "made of categories",
                     }
                 ),
                 "Make contour lines from a column of numbers.",
