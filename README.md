@@ -23,7 +23,7 @@ Every dataset carries its coordinate system as a label: an EPSG code, or a local
 
 A map is drawn in one coordinate system, the map's. These rules decide it, the same way every time:
 
-- **The first dataset that can be drawn chooses.** If it is projected or a local grid, the map uses its system. If it is geographic (longitude and latitude), the map uses WGS 84 / UTM, in the zone of the centre of its extent (zone = floor((longitude + 180) / 6) + 1; EPSG:326xx north of the equator and 327xx south of it, with no special zones for Norway or Svalbard), and a note says which zone and why.
+- **The first dataset that can be drawn chooses.** If it is projected or a local grid, the map uses its system. If it is geographic (longitude and latitude), the map uses WGS 84 / UTM, in the zone of the centre of its extent (zone = floor((longitude + 180) / 6) + 1; EPSG:326xx north of the equator and 327xx south of it, with no special zones for Norway or Svalbard), and a note says which zone and why. The map keeps that system until you change it or the last dataset is removed.
 - **You can change it.** The coordinate system on the bottom left of the map opens a dialog that lists which datasets would start or stop being drawn. A geographic system can be chosen too: it is drawn as plain longitude and latitude, with no scale bar.
 - **Other datasets are converted to it before they are drawn**, in 64-bit numbers. Two EPSG systems are converted when the definitions allow it. Two local grids are taken to be the same grid (and scaled, for example from feet to metres: a note says so). A local grid and an EPSG system cannot be drawn together. A block model is drawn only in the map's own system. A grid in another system is drawn warped, so that its cells follow the system of the map.
 - **Heights are never converted.** They are drawn as given.
@@ -45,15 +45,15 @@ The rules that hold for all of them:
 
 - **Text.** UTF-8 (with or without a byte order mark) and UTF-16 are read. Text that is neither is read as Windows-1252, with a warning. A semicolon-separated file may use a decimal comma.
 - **No data.** Empty cells, `NA`, `N/A`, `null`, `NaN`, `-`, `*` and numbers such as `-999` or `-9999` can be marked as "no value" in the Nodata step. They become empty values, and are counted.
-- **Coordinates are numbers in the file's own units.** Rows with an empty or unreadable coordinate either stop the import or are skipped with a count, as you choose.
+- **Coordinates are numbers in the file's own units.** In a CSV file, rows with an empty or unreadable coordinate either stop the import or are skipped with a count, as you choose; the other formats say what they leave out.
 - **Numbering.** Anything shown to a person that numbers things starts at 1: lines of a file (the header is line 1), and the rows, lines, polygons, triangles and cells in the data table. Inside the engine everything starts at 0.
-- **Limits.** A dataset can hold up to 134,217,728 elements. Very large GeoJSON files need a lot of memory: about twenty times their size (measured in the Rust code; the memory in the browser was not measured).
+- **Limits.** A dataset can hold up to 134,217,728 elements. Very large GeoJSON files need a lot of memory, about twenty times their size (the memory in the browser was not measured).
 
 The columns that say what each row is (X, Y and Z for points, `line #` for lines, `i` and `j` for grids, and so on) come first in the data table, then the columns from the file.
 
 ## Setting up
 
-You need [Rust](https://rustup.rs) (the version is pinned in `rust-toolchain.toml`, and `rustup` installs it), Node (pinned in `.nvmrc`), pnpm (the version is in `package.json`), and [wasm-pack](https://github.com/drager/wasm-pack) (`cargo install wasm-pack`).
+You need [Rust](https://rustup.rs) (the version is pinned in `rust-toolchain.toml`, and `rustup` installs it), Node (pinned in `.nvmrc`), pnpm (the version is in `package.json`), and [wasm-pack](https://github.com/drager/wasm-pack) (version 0.15.0: `cargo install wasm-pack --version 0.15.0`).
 
 ```
 pnpm install
@@ -79,10 +79,10 @@ pnpm perf         # how long the large files take, in a browser (writes them fir
 
 Only Chromium is tested: the tests do not run in other browsers.
 
-- `pnpm check` is all that has to pass before a commit, and its steps are the ones the continuous integration on GitHub runs, which also runs the browser and accessibility tests.
+- `pnpm check` is what to run first, before a commit: most of its steps are the ones the continuous integration on GitHub runs, which also runs the browser and accessibility tests (run `pnpm test:e2e` too for a change to the page).
 - The screenshot tests use the browser in the official Playwright Docker image, so the pictures are the same on every machine. Their reference pictures are not in git (they would make the repository large): `pnpm test:visual:update` takes them on a machine that has none, and `pnpm test:visual` then compares with them. Look at new pictures before relying on them. The continuous integration does not run them. The map itself has pictures of its own (a fixed 800 x 600 canvas, light and dark) for each kind of data, view and case.
 - `pnpm perf` needs a quiet machine and a real graphics card. It uses three large files that `scripts/generate-fixtures` writes into `fixtures/generated/` (not committed): a million points, a grid of four million cells and a model of a million blocks. It measures the time to the first frame, the smoothness of panning, zooming, turning and orbiting, new classes, contour lines, switching between 2D and 3D, the export of a picture, and that the page is never held up for more than 50 ms. The maintainer keeps the results in `docs/perf.md` (not in git).
-- A few timing tests for the Rust code only run when asked for: `cargo test -p karmania-prep --release --test timing -- --ignored --nocapture` (see the tests' own comments).
+- A few timing tests for the Rust code only run when asked for, for example `cargo test -p karmania-prep --release --test timing -- --ignored --nocapture` (the other crates have theirs; see the tests' own comments).
 - The browser tests are the Playwright projects `chromium` (`pnpm test:e2e`), `visual`, `accessibility` (`pnpm test:axe`), `performance` and `render-performance` (the last two are `pnpm perf`).
 
 ## How it is built
