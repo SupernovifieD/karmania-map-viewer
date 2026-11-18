@@ -4,9 +4,14 @@
  * coordinate with 12 decimals. The long-content tests and the long-content states share them.
  */
 import { readFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { showLegend } from './legend.js';
 import { fixturePath } from './picker.js';
 import type { Sample } from './picker.js';
+import { projectionFor } from './fixtures.js';
+import { layerStatuses, withData } from './render.js';
+import { importAndLoad } from './wizard.js';
 
 /** A dataset name of 120 characters with nowhere to break it: the worst a name can be. */
 export const NAME = 'dataset_name_'.repeat(10).slice(0, 120);
@@ -18,6 +23,11 @@ export const COLUMN = 'column_name_'.repeat(6).slice(0, 60);
 export const COORDINATE = '-123.456789012345';
 export const COUNT = 10_000_000;
 export const COUNT_TEXT = '10,000,000';
+/** What an engine that fails says, in 400 characters with spaces in them: the longest reason a layer can have. */
+export const LONG_REASON =
+  'The engine could not make this dataset ready for the map because of something long. '
+    .repeat(5)
+    .slice(0, 400);
 
 /** A dataset, as the engine describes one, with the long things in it. */
 export function longDataset(id: number, name: string): Record<string, unknown> {
@@ -189,3 +199,79 @@ export const LONG_ENGINE = `(() => {
   window.fake = control;
   return engine;
 })()`;
+
+/** The viewer of the page, in what the helpers below ask of it. */
+type Viewer = {
+  load(input: unknown): Promise<unknown>;
+  engine: Record<string, (...args: unknown[]) => Promise<unknown>>;
+};
+
+/** A group of the Legend is being renamed (the keyboard is on its row, and F2 is pressed), with a name of 120 characters typed in the field. */
+export async function renameGroupLong(page: Page): Promise<void> {
+  await page.locator('karmania-legend-tab .row[data-group="group-1"]').focus();
+  await page.keyboard.press('F2');
+  const field = page.locator('karmania-legend-tab input.rename');
+  await field.waitFor();
+  await field.fill(SPACED_NAME);
+}
+
+/**
+ * A grid of 4 by 4 cells with two columns of numbers, each named with 60 characters (`COLUMN`, and the same with a b at the end): the
+ * Legend is open on its style, with Show contours on, so that both selects that list the columns are shown.
+ */
+export async function openStyleWithLongColumns(page: Page): Promise<void> {
+  await page.evaluate(
+    ([first, second]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+      const cells = (scale: number): Float64Array =>
+        Float64Array.from({ length: 16 }, (_, at) => (at + 1) * scale);
+      return viewer.load({
+        kind: 'grid',
+        name: 'Grid with long columns',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [500000, 2765000, 0],
+        spacing: [10, 10, 1],
+        dims: [4, 4, 1],
+        columns: [
+          { name: first, type: 'float', values: cells(1) },
+          { name: second, type: 'float', values: cells(2) },
+        ],
+      });
+    },
+    [COLUMN, `${COLUMN.slice(0, 59)}b`] as const,
+  );
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn']);
+  await showLegend(page);
+  await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+  await page
+    .locator('karmania-legend-tab #legend-style-layer-1 [aria-label="Contours"] k-checkbox input')
+    .check();
+  await page
+    .locator('karmania-legend-tab #legend-style-layer-1 k-select[label="Contour column"]')
+    .waitFor();
+}
+
+/**
+ * A layer that the engine cannot make ready, with a reason of 400 characters: `layer-1` (the points) is drawn, and `layer-2` (the lines, loaded after the
+ * engine's `prepare` was made to fail) is not. The Legend is open on the row of `layer-2`, opened on the reason.
+ */
+export async function openLegendWithLongReason(page: Page): Promise<void> {
+  await withData(page);
+  await page.evaluate((reason) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+    viewer.engine['prepare'] = () => Promise.reject(new Error(reason));
+  }, LONG_REASON);
+  await importAndLoad(page, 'lines.csv', projectionFor('lines.prj'));
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn', 'failed']);
+  await showLegend(page);
+  await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+  await page.locator('karmania-legend-tab #legend-reason-layer-2').waitFor();
+}
