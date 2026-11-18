@@ -15,6 +15,7 @@ import {
   longFile,
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
+  openExportWithLongThings,
   openLegendWithLongReason,
   openStyleWithLongColumns,
   openWizardCrsSearching,
@@ -204,6 +205,14 @@ export const SHOTS: Shot[] = [
     show: async (page) => {
       await openWizardCrsSearching(page, LONG_CRS_QUERY);
       return [wizard(page).dialog];
+    },
+  },
+  {
+    // The export dialog with a custom size at which two warnings are made at once, and a file name of 120 characters in its field.
+    name: 'long-export-dialog',
+    show: async (page) => {
+      await openExportWithLongThings(page);
+      return rest(page);
     },
   },
 ];
