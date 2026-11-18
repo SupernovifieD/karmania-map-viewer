@@ -107,6 +107,9 @@ for (const size of SIZES) {
       await expect(column.locator('.name')).toHaveAttribute('title', COLUMN);
       // The warning says what it says, and wraps.
       await expect(summary).toContainText(COLUMN);
+      // Under it, what to do about it, and how often it happened and where first, in the same box, whole.
+      await expect(summary.locator('.hint').first()).toContainText(`Check ${COLUMN} in the file.`);
+      await expect(summary.locator('.occurrences').first()).toContainText(COUNT_TEXT);
     });
 
     test('asking to remove a dataset with a long name keeps the question in its box, with the name whole in it', async ({
