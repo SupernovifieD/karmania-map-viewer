@@ -160,13 +160,19 @@ fn local_grids_assumed(from: Units, to: Units) -> Finding {
     .with_hint("Check that the datasets are on the same grid. If they are not, remove one of them, or import it again with an EPSG code in the CRS step.")
 }
 
-/// `text` for the middle of a sentence, after "Not drawn: ": an ordinary word that starts it (`A local grid`, `Positions`) starts with a small letter, as the reasons of the
-/// other findings of this kind do, and a name that starts it (`EPSG:99999`: a capital after the first letter, or a digit) is left as it is.
+/// `text` for the middle of a sentence, after "Not drawn: ": an ordinary word that starts it (`A local grid`, `Positions,`) starts with a small letter, as the reasons of the
+/// other findings of this kind do, and a name that starts it (`EPSG:99999`: a capital after the first letter, or a number; `Karmania`) is left as it is. A word is read by its
+/// letters alone, so that a comma or a hyphen after it does not make it a name.
 fn after_a_colon(text: &str) -> String {
     let word = text.split_whitespace().next().unwrap_or_default();
-    let mut letters = word.chars();
-    let ordinary = letters.next().is_some_and(char::is_uppercase)
-        && letters.all(|letter| letter.is_lowercase());
+    let letters: Vec<char> = word
+        .chars()
+        .filter(|letter| letter.is_alphabetic())
+        .collect();
+    let ordinary = word.trim_end_matches(|c: char| !c.is_alphanumeric()) != "Karmania"
+        && letters.split_first().is_some_and(|(first, rest)| {
+            first.is_uppercase() && rest.iter().all(|letter| letter.is_lowercase())
+        });
     if !ordinary {
         return text.to_string();
     }
@@ -286,6 +292,11 @@ mod tests {
                 "a reason that is lower already",
             ),
             ("A cat", "a cat"),
+            ("Positions, then", "positions, then"),
+            ("Local-grid positions", "local-grid positions"),
+            ("Karmania knows", "Karmania knows"),
+            ("Karmania, then", "Karmania, then"),
+            ("32640 is", "32640 is"),
             ("A", "a"),
             ("", ""),
         ] {
