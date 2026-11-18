@@ -16,6 +16,7 @@ import {
   openCrsDialogSearching,
   openCrsDialogWithLongChanges,
   openExportWithLongThings,
+  openIdentifyWithLongThings,
   openLegendWithLongReason,
   openStyleWithLongColumns,
   openWizardCrsSearching,
@@ -212,6 +213,14 @@ export const SHOTS: Shot[] = [
     name: 'long-export-dialog',
     show: async (page) => {
       await openExportWithLongThings(page);
+      return rest(page);
+    },
+  },
+  {
+    // A click on a point of a layer named with 120 characters, with attributes named with 60 and a value of 200: the popover cuts each, inside the map.
+    name: 'long-identify',
+    show: async (page) => {
+      await openIdentifyWithLongThings(page);
       return rest(page);
     },
   },
