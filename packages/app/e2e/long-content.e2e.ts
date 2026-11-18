@@ -408,6 +408,14 @@ for (const size of SIZES) {
       expect(await heading.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
         true,
       );
+      // A name of 60 characters does not take the row from its value: both are on it, side by side, and the value has room to be read.
+      const [names, values] = [popover.locator('dt'), popover.locator('dd')];
+      expect(await names.count()).toBe(2);
+      for (let row = 0; row < 2; row += 1) {
+        const [left, right] = [await box(names.nth(row)), await box(values.nth(row))];
+        expect(left.x + left.width).toBeLessThanOrEqual(right.x);
+        expect(right.width).toBeGreaterThanOrEqual(100);
+      }
       // An attribute named with 60 characters and a value of 200 are each cut, with the whole in a title.
       const name = popover.locator(`dt[title="${COLUMN}"]`);
       const value = popover.locator(`dd[title="${LONG_VALUE}"]`);
