@@ -5,12 +5,16 @@
  * (`long-content.visual.ts`) and the accessibility pass checks them (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
+import { loadLegendScene } from '../support/legend.js';
 import {
   LONG_ENGINE,
   NAME,
   SPACED_NAME,
   longDataset,
   longFile,
+  openLegendWithLongReason,
+  openStyleWithLongColumns,
+  renameGroupLong,
   setDatasets,
 } from '../support/long-content.js';
 import type { Shot } from '../support/screenshots.js';
@@ -137,6 +141,33 @@ export const SHOTS: Shot[] = [
       );
       await wizard(page).host.locator('karmania-review-step .verdict').waitFor();
       return [wizard(page).dialog];
+    },
+  },
+  {
+    // A group renamed with a name of 120 characters: the field keeps the row and the end of the name is in view.
+    name: 'long-legend-rename',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await renameGroupLong(page);
+      await page.evaluate(() => document.fonts.ready);
+      await page.mouse.move(0, 0);
+      return [app(page)];
+    },
+  },
+  {
+    // A grid whose two columns have names of 60 characters: Colour by and the Contour column, with the contours on.
+    name: 'long-legend-columns',
+    show: async (page) => {
+      await openStyleWithLongColumns(page);
+      return rest(page);
+    },
+  },
+  {
+    // A layer that could not be made ready, for a reason of 400 characters: the opened row says it, wrapped.
+    name: 'long-legend-reason',
+    show: async (page) => {
+      await openLegendWithLongReason(page);
+      return rest(page);
     },
   },
 ];

@@ -8,15 +8,20 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { assertNoOverflow } from './support/layout.js';
+import { groupRow, layerRow, legend, loadLegendScene } from './support/legend.js';
 import {
   COLUMN,
   COORDINATE,
   COUNT_TEXT,
   LONG_ENGINE,
+  LONG_REASON,
   NAME,
   SPACED_NAME,
   longDataset,
   longFile,
+  openLegendWithLongReason,
+  openStyleWithLongColumns,
+  renameGroupLong,
   setDatasets,
 } from './support/long-content.js';
 import { goTo, startWizard, wizard } from './support/wizard.js';
@@ -209,6 +214,70 @@ for (const size of SIZES) {
         `Preparing ${COUNT_TEXT} layers…`,
       );
       await assertNoOverflow(app(page));
+    });
+
+    test('the field that renames a group keeps its row, and holds a name of 120 characters that is cut with its whole in a title once it is kept', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await loadLegendScene(page);
+      const row = groupRow(page, 'group-1');
+      const before = await box(row);
+      await renameGroupLong(page);
+      const field = legend(page).locator('input.rename');
+      await expect(field).toHaveValue(SPACED_NAME);
+      const [after, inside] = [await box(row), await box(field)];
+      expect(after.height).toBe(before.height);
+      expect(inside.x).toBeGreaterThanOrEqual(after.x);
+      expect(inside.x + inside.width).toBeLessThanOrEqual(after.x + after.width);
+      await assertNoOverflow(app(page));
+      await field.press('Enter');
+      const name = row.locator('.name');
+      await expect(name).toHaveAttribute('title', SPACED_NAME);
+      expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+        true,
+      );
+      await assertNoOverflow(app(page));
+    });
+
+    test('the style editor and its contours part hold columns of 60 characters inside the panel, with each select as wide as its field', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await openStyleWithLongColumns(page);
+      const editor = legend(page).locator('#legend-style-layer-1');
+      const fields = await editor.locator('k-select').all();
+      expect(fields.length).toBeGreaterThanOrEqual(2);
+      const room = await box(editor);
+      for (const field of fields) {
+        const found = await box(field);
+        expect(found.x).toBeGreaterThanOrEqual(room.x);
+        expect(found.x + found.width).toBeLessThanOrEqual(room.x + room.width);
+      }
+      // Both selects name the column of 60 characters that colours the layer and the one that makes its lines, and the text is in the select, cut.
+      await expect(editor.locator('k-select[label="Contour column"] select')).toContainText(COLUMN);
+      await assertNoOverflow(app(page));
+    });
+
+    test('a reason of 400 characters in the opened row and in the tooltip of the icon stays inside the panel and the window', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await openLegendWithLongReason(page);
+      const reason = legend(page).locator('#legend-reason-layer-2');
+      await expect(reason).toContainText(LONG_REASON.slice(0, 80));
+      const [room, found] = [await box(legend(page)), await box(reason)];
+      expect(found.x).toBeGreaterThanOrEqual(room.x);
+      expect(found.x + found.width).toBeLessThanOrEqual(room.x + room.width);
+      await assertNoOverflow(app(page));
+      await layerRow(page, 'layer-2').locator('.notice k-icon').hover();
+      const tip = legend(page).locator('k-tooltip .tip').first();
+      await expect(tip).toBeVisible();
+      const shown = await box(tip);
+      const window = page.viewportSize();
+      expect(shown.x).toBeGreaterThanOrEqual(0);
+      expect(shown.x + shown.width).toBeLessThanOrEqual(window?.width ?? 0);
+      expect(shown.y + shown.height).toBeLessThanOrEqual(window?.height ?? 0);
     });
   });
 }
