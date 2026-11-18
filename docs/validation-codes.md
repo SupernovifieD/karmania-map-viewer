@@ -166,9 +166,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and an index line must come every 1 line or more.
-- Hint: Give an interval above 0 and a number for the base, and let an index line come every 1 line or more.
-- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and an index line must come every 1 line or more.
+- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and “Index line every” must be 1 or more.
+- Hint: Give an interval above 0, a number for the base, and 1 or more for “Index line every” (a thicker line every that many levels).
+- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and “Index line every” must be 1 or more.
 
 ## `contours.kind.unsupported`
 
