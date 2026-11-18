@@ -14,7 +14,17 @@
  *   - the same grid and the million points are switched to 3D and back to 2D after the rest, the blocks are switched to 3D, and the longest task of the main thread
  *     in each switch is held to 50 ms by itself (step 24.3a), as is the longest in the time from pressing Load to the first frame, which is where the data is
  *     prepared and uploaded to the card in chunks (section 8 of the brief: "preparing, uploading, restyling, contouring or switching views");
+ *   - the start of the page: five fresh pages, the longest task of the main thread of each from the navigation to two seconds after the map area is there, held to
+ *     50 ms (step 24.3d; the owner asked for it after the measurement of step 17.10);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
+ *
+ * Known, not met, and for the owner (step 24.3d, 2026-11-19): **the start of the page is a task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five fresh pages, two
+ * runs: 107 to 150), one task made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody has
+ * opened (about 50, of which the first number of the export dialog's caption starts the browser's number formatting: 15 ms). Option (b) of 17.10 was tried and **not kept**:
+ * the three dialogs made in later tasks and `<karmania-app>` defined a task after the modules brought the longest task to 49 to 67 ms (53 to 77 with one dialog in each task),
+ * which is under 50 in some pages and not in all, because the shell's own first draw is 55 to 75 ms and cannot be split without leaving out something that is on the screen at
+ * the start; and it broke three tests of the embedded viewer that look for the dialogs at once. What would bring it under is (a) of 17.10: not drawing at the start what is not seen
+ * (the tab of the panel that is not open, among others), which changes what the first draw makes. The patch of the attempt is in the notes. This test is not made easier.
  *
  * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
  * a task over 50 ms, which these tests then report as a failure: in the gate of M22 a callback of 197 ms in the export and one of 1,195 ms in the first draw of the
@@ -544,6 +554,38 @@ test.describe('the 2D view with the large files', () => {
     mkdirSync(folder, { recursive: true });
     writeFileSync(`${folder}render-performance.json`, JSON.stringify(RESULTS, null, 2));
     console.info(`PERF-RENDER ${JSON.stringify(RESULTS)}`);
+  });
+
+  test('the start of the page: the first render, in tasks of the main thread of at most 50 ms', async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    // Five fresh pages (a new context each, so the engine has compiled nothing of the page yet): the longest task of each from the start of the navigation to two
+    // seconds of quiet after the map area is there. No mouse is moved: the first mouse event of a page is the browser's own cost (step 17.10), not the page's.
+    const longest: number[] = [];
+    for (let run = 0; run < 5; run += 1) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.addInitScript(WATCH);
+      await page.goto('/?theme=light');
+      await inPage(
+        page,
+        `await perf.until(() => document.querySelector('karmania-app')?.shadowRoot?.querySelector('karmania-viewer')?.shadowRoot?.querySelector('karmania-map-area'), 30000);`,
+      );
+      await page.waitForTimeout(2000);
+      const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
+      longest.push(Math.round(Math.max(0, ...tasks.map((task) => task.duration))));
+      const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
+      if (slow.length > 0) {
+        console.info(`SLOW start-up ${JSON.stringify(slow)}`);
+      }
+      await context.close();
+    }
+    console.info(`PERF-START ${JSON.stringify(longest)}`);
+    expect(
+      Math.max(...longest),
+      'longest task of the start of the page, of five',
+    ).toBeLessThanOrEqual(50);
   });
 
   test('1,000,000 points: the first frame, and the frames of a pan, a zoom and a rotation', async ({
