@@ -326,7 +326,7 @@ fn not_numeric(column: &Column) -> Finding {
     let kind = match column.column_type() {
         ColumnType::Utf8 => "text",
         ColumnType::Bool => "true or false",
-        _ => "categories",
+        _ => "made of categories",
     };
     Finding::new(
         FindingCode::ClassesColumnNotNumeric,
