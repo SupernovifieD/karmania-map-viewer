@@ -18,8 +18,8 @@
  *     50 ms (step 24.3d; the owner asked for it after the measurement of step 17.10);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
- * Known, not met, and for the owner (step 24.3d, 2026-11-19): **the start of the page is a task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five fresh pages, two
- * runs: 107 to 150), one task made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody has
+ * Known, not met, and for the owner (step 24.3d, 2026-11-19): **the start of the page is a task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five fresh pages in each of two
+ * runs: 80 to 150), one task made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody has
  * opened (about 50, of which the first number of the export dialog's caption starts the browser's number formatting: 15 ms). Option (b) of 17.10 was tried and **not kept**:
  * the three dialogs made in later tasks and `<karmania-app>` defined a task after the modules brought the longest task to 49 to 67 ms (53 to 77 with one dialog in each task),
  * which is under 50 in some pages and not in all, because the shell's own first draw is 55 to 75 ms and cannot be split without leaving out something that is on the screen at
