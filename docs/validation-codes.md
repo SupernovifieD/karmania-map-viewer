@@ -91,9 +91,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The column {name} has no value that can be put in a class: every entry is empty or not a finite number.
+- Message: The column {name} has no value that can be put in a class: every entry is empty or not a number.
 - Hint: Colour by another column, or draw the layer in a single colour.
-- Example: The column grade has no value that can be put in a class: every entry is empty or not a finite number.
+- Example: The column grade has no value that can be put in a class: every entry is empty or not a number.
 
 ## `classes.column.not_numeric`
 
@@ -108,7 +108,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: none
 - Message: The column {name} has more than {limit} different values, so they cannot be shown as categories.
-- Hint: Divide the column into ranges instead.
+- Hint: Colour by another column, or draw the layer in a single colour. A column of numbers can also be divided into ranges.
 - Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
 
 ## `contours.base.too_far`
