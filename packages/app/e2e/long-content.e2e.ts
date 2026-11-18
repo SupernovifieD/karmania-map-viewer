@@ -267,8 +267,13 @@ for (const size of SIZES) {
         expect(found.x).toBeGreaterThanOrEqual(room.x);
         expect(found.x + found.width).toBeLessThanOrEqual(room.x + room.width);
       }
-      // Both selects name the column of 60 characters that colours the layer and the one that makes its lines, and the text is in the select, cut.
-      await expect(editor.locator('k-select[label="Contour column"] select')).toContainText(COLUMN);
+      // Both selects have the column of 60 characters chosen (the one that colours the layer, and the one that makes its lines): the option that is selected, not any of them.
+      const chosen = (label: string): Promise<string> =>
+        editor
+          .locator(`k-select[label="${label}"] select`)
+          .evaluate((element) => (element as HTMLSelectElement).selectedOptions[0]?.text ?? '');
+      expect(await chosen('Colour by')).toBe(COLUMN);
+      expect(await chosen('Contour column')).toBe(COLUMN);
       await assertNoOverflow(app(page));
     });
 
@@ -439,8 +444,7 @@ for (const size of SIZES) {
       const canvas = await box(page.locator('karmania-map-area canvas'));
       await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
       const values = chip.locator('.value');
-      await expect(values.first()).not.toHaveText('');
-      expect((await values.first().textContent()) ?? '').toMatch(/^[−-]99,999,99/);
+      await expect(values.first()).toHaveText(/^[−-]99,999,99/);
       const after = await box(chip);
       expect(after.width).toBe(before.width);
       expect(after.x).toBe(before.x);
