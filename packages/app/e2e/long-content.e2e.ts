@@ -13,14 +13,20 @@ import {
   COLUMN,
   COORDINATE,
   COUNT_TEXT,
+  LONG_CRS_NAME,
+  LONG_CRS_QUERY,
   LONG_ENGINE,
   LONG_REASON,
+  LOCAL_GRID_NAMES,
   NAME,
   SPACED_NAME,
   longDataset,
   longFile,
+  openCrsDialogSearching,
+  openCrsDialogWithLongChanges,
   openLegendWithLongReason,
   openStyleWithLongColumns,
+  openWizardCrsSearching,
   renameGroupLong,
   setDatasets,
 } from './support/long-content.js';
@@ -278,6 +284,78 @@ for (const size of SIZES) {
       expect(shown.x).toBeGreaterThanOrEqual(0);
       expect(shown.x + shown.width).toBeLessThanOrEqual(window?.width ?? 0);
       expect(shown.y + shown.height).toBeLessThanOrEqual(window?.height ?? 0);
+    });
+
+    test('the map coordinate system dialog cuts the longest name of the definitions with its whole in a title, and keeps 20 matches in a box that scrolls', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await openCrsDialogSearching(page, LONG_CRS_QUERY);
+      const dialog = page.locator('karmania-map-crs-dialog dialog');
+      const rows = page.locator('karmania-map-crs-dialog karmania-crs-matches .match');
+      await expect(rows.filter({ hasText: LONG_CRS_NAME })).toHaveCount(1);
+      await expect(rows.filter({ hasText: LONG_CRS_NAME })).toHaveAttribute('title', LONG_CRS_NAME);
+      // The name is cut with an ellipsis, in one line, and the whole of it is the title above.
+      const cut = rows.filter({ hasText: LONG_CRS_NAME }).locator('.match-name');
+      await expect(cut).toHaveCSS('text-overflow', 'ellipsis');
+      expect(await cut.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+      await assertNoOverflow(app(page));
+      const [frame, first] = [await box(dialog), await box(rows.first())];
+      expect(first.x).toBeGreaterThanOrEqual(frame.x);
+      expect(first.x + first.width).toBeLessThanOrEqual(frame.x + frame.width);
+      await page.locator('karmania-map-crs-dialog k-input input').fill('utm zone');
+      await expect(rows).toHaveCount(20);
+      const matches = page.locator('karmania-map-crs-dialog karmania-crs-matches .matches');
+      const room = await matches.evaluate((element) => [
+        element.clientHeight,
+        element.scrollHeight,
+      ]);
+      expect(room[1]).toBeGreaterThan(room[0] ?? 0);
+      await assertNoOverflow(app(page));
+      const [after, footer] = [
+        await box(dialog),
+        await box(page.locator('karmania-map-crs-dialog footer')),
+      ];
+      expect(after.y + after.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+      expect(footer.y + footer.height).toBeLessThanOrEqual(after.y + after.height);
+    });
+
+    test('what changes in the map coordinate system dialog keeps five names of 120 characters inside it, with Apply in reach', async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await openCrsDialogWithLongChanges(page);
+      const dialog = page.locator('karmania-map-crs-dialog dialog');
+      const items = page.locator('karmania-map-crs-dialog .changes li');
+      const frame = await box(dialog);
+      for (const item of await items.all()) {
+        const found = await box(item);
+        expect(found.x).toBeGreaterThanOrEqual(frame.x);
+        expect(found.x + found.width).toBeLessThanOrEqual(frame.x + frame.width);
+      }
+      await expect(items.nth(1)).toContainText(LOCAL_GRID_NAMES[0] ?? '');
+      await assertNoOverflow(app(page));
+      // What is too tall for the window scrolls in the body of the dialog: the last line is reached by scrolling, and then it is inside the body.
+      const body = page.locator('karmania-map-crs-dialog dialog .body');
+      await items.last().scrollIntoViewIfNeeded();
+      const [inside, reached] = [await box(body), await box(items.last())];
+      expect(reached.y).toBeGreaterThanOrEqual(inside.y);
+      expect(reached.y + reached.height).toBeLessThanOrEqual(inside.y + inside.height);
+      const apply = page.locator('karmania-map-crs-dialog k-button[slot="footer-end"]');
+      const reach = await box(apply);
+      expect(reach.y + reach.height).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+      await expect(apply.locator('button')).toBeEnabled();
+    });
+
+    test('the coordinate system step of the wizard lists the longest name of the definitions without overflow, whole in a title', async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await openWizardCrsSearching(page, LONG_CRS_QUERY);
+      const row = page.locator('karmania-crs-step .match').filter({ hasText: LONG_CRS_NAME });
+      await expect(row).toHaveCount(1);
+      await expect(row).toHaveAttribute('title', LONG_CRS_NAME);
+      await assertNoOverflow(app(page));
     });
   });
 }

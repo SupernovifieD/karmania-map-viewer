@@ -11,7 +11,7 @@ import { fixturePath } from './picker.js';
 import type { Sample } from './picker.js';
 import { projectionFor } from './fixtures.js';
 import { layerStatuses, withData } from './render.js';
-import { importAndLoad } from './wizard.js';
+import { goTo, importAndLoad, importAsLocalGrid, startWizard } from './wizard.js';
 
 /** A dataset name of 120 characters with nowhere to break it: the worst a name can be. */
 export const NAME = 'dataset_name_'.repeat(10).slice(0, 120);
@@ -274,4 +274,60 @@ export async function openLegendWithLongReason(page: Page): Promise<void> {
   await showLegend(page);
   await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
   await page.locator('karmania-legend-tab #legend-reason-layer-2').waitFor();
+}
+
+/** The longest name that the definitions have (73 characters): four systems have it with a unit, and a search for this finds them. */
+export const LONG_CRS_QUERY = 'WISCRS Calumet';
+export const LONG_CRS_NAME =
+  'NAD83(2011) / WISCRS Calumet, Fond du Lac, Outagamie and Winnebago (ftUS)';
+
+/** The map coordinate system dialog, opened over the points, with `query` typed in its search, and its matches shown. */
+export async function openCrsDialogSearching(page: Page, query: string): Promise<void> {
+  await withData(page);
+  await page.locator('karmania-status-chip button.crs').click();
+  await page.locator('karmania-map-crs-dialog dialog').waitFor();
+  await page.locator('karmania-map-crs-dialog k-input input').fill(query);
+  await page.locator('karmania-map-crs-dialog karmania-crs-matches .match').first().waitFor();
+}
+
+/** The names of four local grids that are not drawn (the points are), each 120 characters with nothing to break at, or with spaces. */
+export const LOCAL_GRID_NAMES = [
+  `a${NAME.slice(1)}`,
+  `b${NAME.slice(1)}`,
+  `c${SPACED_NAME.slice(1)}`,
+  `d${SPACED_NAME.slice(1)}`,
+];
+
+/**
+ * The points are drawn, and four local grids with names of 120 characters are not: the map coordinate system dialog is open with the local
+ * grid chosen, so that what changes is five datasets, the points stopping and the grids starting, each by its long name.
+ */
+export async function openCrsDialogWithLongChanges(page: Page): Promise<void> {
+  await withData(page);
+  for (const name of LOCAL_GRID_NAMES) {
+    await importAsLocalGrid(page, 'ft', {
+      name: `${name}.csv`,
+      mimeType: 'text/csv',
+      buffer: Buffer.from('x,y\n1,2\n3,4\n'),
+    });
+  }
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn', 'not_drawn', 'not_drawn', 'not_drawn', 'not_drawn']);
+  await page.locator('karmania-status-chip button.crs').click();
+  await page.locator('karmania-map-crs-dialog dialog').waitFor();
+  await page.locator('karmania-map-crs-dialog .local input').first().check();
+  await expect(page.locator('karmania-map-crs-dialog .changes li')).toHaveCount(5);
+}
+
+/** The wizard on the points, at the coordinate system step, with a system chosen by `query`: the matches are shown. */
+export async function openWizardCrsSearching(page: Page, query: string): Promise<void> {
+  await startWizard(page, 'points.csv');
+  for (const step of ['mapping', 'nodata', 'crs']) {
+    await goTo(page, step);
+  }
+  const step = page.locator('karmania-import-dialog karmania-crs-step');
+  await step.locator('.choice k-select').first().locator('select').selectOption('epsg');
+  await step.locator('.choice k-input input').fill(query);
+  await step.locator('.match').first().waitFor();
 }
