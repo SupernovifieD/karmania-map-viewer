@@ -7,13 +7,17 @@
 import type { Locator, Page } from '@playwright/test';
 import { loadLegendScene } from '../support/legend.js';
 import {
+  LONG_CRS_QUERY,
   LONG_ENGINE,
   NAME,
   SPACED_NAME,
   longDataset,
   longFile,
+  openCrsDialogSearching,
+  openCrsDialogWithLongChanges,
   openLegendWithLongReason,
   openStyleWithLongColumns,
+  openWizardCrsSearching,
   renameGroupLong,
   setDatasets,
 } from '../support/long-content.js';
@@ -168,6 +172,38 @@ export const SHOTS: Shot[] = [
     show: async (page) => {
       await openLegendWithLongReason(page);
       return rest(page);
+    },
+  },
+  {
+    // The map coordinate system dialog with a search that finds the longest names of the definitions (73 characters): each is cut, with its whole in a title.
+    name: 'long-crs-dialog-names',
+    show: async (page) => {
+      await openCrsDialogSearching(page, LONG_CRS_QUERY);
+      return rest(page);
+    },
+  },
+  {
+    // A search that has more than 20 matches: the first 20, in a box that scrolls, and the help that says so.
+    name: 'long-crs-dialog-many',
+    show: async (page) => {
+      await openCrsDialogSearching(page, 'utm zone');
+      return rest(page);
+    },
+  },
+  {
+    // The local grid chosen while the points are drawn and four local grids with names of 120 characters are not: five lines of what changes.
+    name: 'long-crs-dialog-changes',
+    show: async (page) => {
+      await openCrsDialogWithLongChanges(page);
+      return rest(page);
+    },
+  },
+  {
+    // The wizard's coordinate system step with the same search: the longest names in its list.
+    name: 'long-wizard-crs-search',
+    show: async (page) => {
+      await openWizardCrsSearching(page, LONG_CRS_QUERY);
+      return [wizard(page).dialog];
     },
   },
 ];
