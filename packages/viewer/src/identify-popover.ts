@@ -106,7 +106,8 @@ export class KarmaniaIdentify extends LitElement {
       dl {
         column-gap: var(--k-space-12);
         display: grid;
-        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+        /* A name is as wide as it is, to half the row at most: a name too long for that is cut and leaves the other half to its value. */
+        grid-template-columns: fit-content(50%) minmax(0, 1fr);
         margin: 0;
         row-gap: var(--k-space-4);
       }
