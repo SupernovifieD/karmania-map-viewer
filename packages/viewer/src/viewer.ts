@@ -704,6 +704,14 @@ export class KarmaniaViewer extends LitElement {
   private showExportDialog(renderer: Renderer): void {
     const dialog = this.renderRoot.querySelector('karmania-export-dialog');
     if (dialog === null) {
+      // Not drawn yet (a page that loads and asks to export in the same turn): it is drawn, and then it opens.
+      if (!this.dialogsWanted) {
+        this.dialogsWanted = true;
+        this.requestUpdate();
+        void this.updateComplete.then(() => {
+          this.showExportDialog(renderer);
+        });
+      }
       return;
     }
     const screen = renderer.stats();
@@ -1578,7 +1586,14 @@ export class KarmaniaViewer extends LitElement {
 
   /** The status chip's button was pressed: the dialog for the map's coordinate system opens, with nothing chosen. */
   private readonly onMapCrsRequest = (): void => {
-    this.renderRoot.querySelector('karmania-map-crs-dialog')?.show();
+    const dialog = this.renderRoot.querySelector('karmania-map-crs-dialog');
+    if (dialog !== null) {
+      dialog.show();
+    } else if (!this.dialogsWanted) {
+      this.dialogsWanted = true;
+      this.requestUpdate();
+      void this.updateComplete.then(this.onMapCrsRequest);
+    }
   };
 
   /**
@@ -1712,6 +1727,18 @@ export class KarmaniaViewer extends LitElement {
     }
   };
 
+  /**
+   * Whether the export dialog and the map's coordinate system dialog are in the viewer: they are drawn when there is data, since nothing can be exported or changed before,
+   * and they are part of the first draw that nobody sees (step 24.R2). Once drawn they stay.
+   */
+  private dialogsWanted = false;
+
+  protected override willUpdate(): void {
+    if (!this.dialogsWanted && this.datasets.length > 0) {
+      this.dialogsWanted = true;
+    }
+  }
+
   override render() {
     // The width that was asked for, or what the window allows of it.
     const width = clampPanelWidth(this.panel.width, this.hostWidth);
@@ -1808,16 +1835,22 @@ export class KarmaniaViewer extends LitElement {
             `
           : nothing
       }
-      <karmania-export-dialog
-        .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
-      ></karmania-export-dialog>
-      <karmania-map-crs-dialog
-        @karmania-map-crs-apply=${this.onMapCrsApply}
-        .engine=${this.engine}
-        .frame=${this.store.getState().frame}
-        .info=${this.mapCrsInfo()}
-        .datasets=${this.datasets}
-      ></karmania-map-crs-dialog>
+      ${
+        this.dialogsWanted
+          ? html`
+              <karmania-export-dialog
+                .canLegend=${exportLegendLines(this.currentLegend()).length > 0}
+              ></karmania-export-dialog>
+              <karmania-map-crs-dialog
+                @karmania-map-crs-apply=${this.onMapCrsApply}
+                .engine=${this.engine}
+                .frame=${this.store.getState().frame}
+                .info=${this.mapCrsInfo()}
+                .datasets=${this.datasets}
+              ></karmania-map-crs-dialog>
+            `
+          : nothing
+      }
     `;
   }
 }

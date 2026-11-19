@@ -18,13 +18,15 @@
  *     50 ms (step 24.3d; the owner asked for it after the measurement of step 17.10);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
  *
- * Known, not met, and for the owner (step 24.3d, 2026-11-19): **the start of the page is a task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five fresh pages in each of two
- * runs: 80 to 150), one task made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody has
- * opened (about 50, of which the first number of the export dialog's caption starts the browser's number formatting: 15 ms). Option (b) of 17.10 was tried and **not kept**:
- * the three dialogs made in later tasks and `<karmania-app>` defined a task after the modules brought the longest task to 49 to 67 ms (53 to 77 with one dialog in each task),
- * which is under 50 in some pages and not in all, because the shell's own first draw is 55 to 75 ms and cannot be split without leaving out something that is on the screen at
- * the start; and it broke three tests of the embedded viewer that look for the dialogs at once. What would bring it under is (a) of 17.10: not drawing at the start what is not seen
- * (the tab of the panel that is not open, among others), which changes what the first draw makes. The patch of the attempt is in the notes. This test is not made easier.
+ * Known, improved and still not always met (steps 24.3d and 24.R2, 2026-11-19): **the start of the page was one task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five
+ * fresh pages in each of two runs), made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody
+ * has opened (about 50, of which the first number of the export dialog's caption starts the browser's number formatting: 15 ms). The owner answered that what is not seen is not
+ * to be drawn at the start (when nothing is loaded there is nothing to show, and what data can use is drawn when there is data), and that is what the viewer does now: the export
+ * dialog and the map's coordinate system dialog are drawn when there is data, the Data tab when it is chosen or there is data, the rail of a collapsed panel when the panel is
+ * collapsed, and `<karmania-app>` is defined a task after the modules are evaluated (`defineApp`, called from `main.ts`), so that evaluating and drawing are two tasks. Measured after
+ * (three runs of five pages, on a machine that was still busy: load 4 to 7): 8 of 15 pages had no task over 50 ms, and the others 50 to 67 ms. The test is not made easier: it can
+ * still fail on this laptop. (An earlier try that moved the dialogs to later tasks with a timer, and no lazy tab, reached 49 to 67 ms and broke three tests of the embedded viewer;
+ * it was not kept.)
  *
  * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
  * a task over 50 ms, which these tests then report as a failure: in the gate of M22 a callback of 197 ms in the export and one of 1,195 ms in the first draw of the
