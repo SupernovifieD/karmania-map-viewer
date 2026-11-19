@@ -327,7 +327,7 @@ impl<'a> LinesAcc<'a> {
         file_name: Option<&str>,
         findings: &mut Findings,
     ) -> Option<Dataset> {
-        let positions = self.coords.finish("vertices", findings)?;
+        let positions = self.coords.finish("points", findings)?;
         let mut columns = property_columns(&self.features, &self.rows, findings);
         columns.insert(0, feature_id_column(&self.features, &self.rows, &columns));
         let attributes = Table::from_columns(columns, findings)?;
@@ -368,9 +368,9 @@ impl<'a> PolygonsAcc<'a> {
             not_closed: Tally::new(
                 Finding::new(
                     FindingCode::GeojsonRingNotClosed,
-                    "Some polygon rings do not end where they start; they were closed.",
+                    "Some polygon outlines do not end where they start; they were closed.",
                 )
-                .with_hint("In GeoJSON the last position of a ring repeats the first."),
+                .with_hint("In GeoJSON the last position of an outline repeats the first."),
             ),
         }
     }
@@ -412,7 +412,7 @@ impl<'a> PolygonsAcc<'a> {
         file_name: Option<&str>,
         findings: &mut Findings,
     ) -> Option<Dataset> {
-        let positions = self.coords.finish("vertices", findings)?;
+        let positions = self.coords.finish("corners", findings)?;
         if let Some(finding) = self.not_closed.into_finding() {
             findings.add(finding);
         }

@@ -97,23 +97,23 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
     let mut vertex_invalid = Tally::new(
         Finding::new(
             FindingCode::ObjVertexInvalid,
-            "Some vertex lines do not have three numbers.",
+            "Some \"v\" lines (the points of the mesh) do not have three numbers.",
         )
-        .with_hint("Each vertex line is \"v\" followed by x, y and z."),
+        .with_hint("Each \"v\" line is \"v\" followed by x, y and z."),
     );
     let mut extra_values = Tally::new(
         Finding::new(
             FindingCode::ObjVertexExtraValues,
-            "Some vertices have more than three numbers (a weight or a colour); only the first three were used.",
+            "Some points have more than three numbers (a weight or a colour); only the first three were used.",
         )
         .with_hint("Only X, Y and Z are used. Nothing needs fixing."),
     );
     let mut face_invalid = Tally::new(
         Finding::new(
             FindingCode::ObjFaceInvalid,
-            "Some faces have fewer than three corners or a vertex number that cannot be used, so they were left out.",
+            "Some faces have fewer than three corners or a point number that cannot be used, so they were left out.",
         )
-        .with_hint("Vertex numbers count from 1, or from the end if negative."),
+        .with_hint("Point numbers count from 1, or from the end if negative."),
     );
     let mut triangulated = Tally::new(
         Finding::new(
@@ -125,7 +125,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
     let mut unsupported = Tally::new(
         Finding::new(
             FindingCode::ObjRecordsUnsupported,
-            "Some lines are not vertices or faces (lines, points, curves or unknown records), so they were left out.",
+            "Some lines are not points or faces of a mesh (they are lines, points, curves or unknown records), so they were left out.",
         )
         .with_hint("Only triangle meshes can be imported."),
     );
@@ -196,7 +196,7 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
             _ => unsupported.hit(at()),
         }
         // Stop early rather than hold a file far over the limit.
-        if !check_size(Some(x.len() as u64), "vertices", findings)
+        if !check_size(Some(x.len() as u64), "points", findings)
             || !check_size(Some(indices.len() as u64 / 3), "triangles", findings)
         {
             return None;
@@ -221,10 +221,10 @@ fn read(text: &str, file_name: Option<&str>, findings: &mut Findings) -> Option<
         findings.add(
             Finding::new(
                 FindingCode::ObjMeshEmpty,
-                "The file has no vertices and faces to build a mesh from.",
+                "The file has no points and faces to build a mesh from.",
             )
             .with_hint(
-                "A mesh file needs \"v\" lines for the vertices and \"f\" lines for the faces.",
+                "A mesh file needs \"v\" lines for the points and \"f\" lines for the faces.",
             ),
         );
         return None;

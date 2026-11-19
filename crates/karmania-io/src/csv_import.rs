@@ -439,7 +439,7 @@ impl<'a> CsvImport<'a> {
         let lines = text_ref.lines().filter(|l| !l.trim().is_empty()).count() as u64;
         let data_rows = lines.saturating_sub(u64::from(options.has_header));
         let things = match mapping_ref.kind {
-            Kind::Lines => "vertices",
+            Kind::Lines => "points",
             Kind::Blocks => "blocks",
             _ => "points",
         };
