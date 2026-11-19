@@ -2,7 +2,7 @@
  * The words the viewer writes itself to a person (step 24.4g): why a layer is not on the map, what a coordinate system would change, and what the export says (its
  * warnings, its size problems, its failures, its progress), held to the rules that the findings of the engine are held to in `docs/validation-codes.md` and the registry
  * test of `karmania-core`: each is a sentence, and none uses a word a reader should not have to know. The words are the same lists as the Rust test's
- * (`NOT_PLAIN`, and for the areas of the map `NOT_PLAIN_IN_THE_VIEWER`); a word added there is added here.
+ * (`NOT_PLAIN` and `NOT_PLAIN_WORDS`); a word added there is added here.
  *
  * The raw text that an engine fault carries (the layer's `failed` hint quotes what the program said) is not words of the viewer's: only what the viewer writes is read.
  */
@@ -17,7 +17,7 @@ import { whatChanges } from './what-changes.js';
 /** Words a person should not have to know, as substrings (as `NOT_PLAIN` of `crates/karmania-core/src/codes.rs`). */
 const NOT_PLAIN = ['NaN', 'delimiter', 'kernel', 'u32', 'i32', 'f64', 'WKT', 'projected system'];
 
-/** Whole words, in any case (as `NOT_PLAIN_IN_THE_VIEWER` of the same file). */
+/** Whole words, in any case (as `NOT_PLAIN_WORDS` of the same file). */
 const NOT_PLAIN_WORDS = [
   'finite',
   'vertex',

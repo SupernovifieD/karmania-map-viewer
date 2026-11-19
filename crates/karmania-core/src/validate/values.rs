@@ -17,7 +17,7 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_duplicate_points(dataset, findings);
     check_table(&dataset.attributes, "column", findings);
     if let Some(table) = &dataset.vertex_attributes {
-        check_table(table, "per-vertex column", findings);
+        check_table(table, "per-point column", findings);
     }
 }
 
@@ -452,7 +452,7 @@ mod tests {
         let f = run(check, &d);
         assert_eq!(
             f.as_slice()[0].message,
-            "The per-vertex column \"z\" has no values: every entry is empty."
+            "The per-point column \"z\" has no values: every entry is empty."
         );
     }
 

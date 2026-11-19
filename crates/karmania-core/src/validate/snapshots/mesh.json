@@ -6,16 +6,16 @@
         {
           "code": "mesh.indices.incomplete",
           "severity": "error",
-          "message": "The triangle list ends with an incomplete triangle: it has 10 vertex numbers, which is not a multiple of 3.",
-          "hint": "Give three vertex numbers for every triangle.",
+          "message": "The triangle list ends with an incomplete triangle: it has 10 point numbers, which is not a multiple of 3.",
+          "hint": "Give three point numbers for every triangle.",
           "count": 1,
           "examples": []
         },
         {
           "code": "mesh.indices.out_of_range",
           "severity": "error",
-          "message": "Some triangles use vertex numbers that do not exist: the mesh has 5 vertices.",
-          "hint": "Vertex numbers start at 0 and must be lower than the number of vertices.",
+          "message": "Some triangles use point numbers that do not exist: the mesh has 5 points.",
+          "hint": "Point numbers start at 0 and must be lower than the number of points.",
           "count": 1,
           "examples": [
             {
@@ -39,7 +39,7 @@
         {
           "code": "mesh.vertices.unused",
           "severity": "info",
-          "message": "Some vertices are not used by any triangle.",
+          "message": "Some points of the mesh are not used by any triangle.",
           "hint": "They do no harm. Remove them if you do not need them.",
           "count": 1,
           "examples": [

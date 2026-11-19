@@ -20,7 +20,7 @@ pub(super) struct OffsetsSpec {
     pub list: &'static str,
     /// What the list divides up, singular: "line".
     pub item: &'static str,
-    /// What the list points into, plural: "vertices".
+    /// What the list points into, plural: "points".
     pub target: &'static str,
 }
 
