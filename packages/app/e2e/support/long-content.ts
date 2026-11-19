@@ -4,9 +4,14 @@
  * coordinate with 12 decimals. The long-content tests and the long-content states share them.
  */
 import { readFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { showLegend } from './legend.js';
 import { fixturePath } from './picker.js';
 import type { Sample } from './picker.js';
+import { projectionFor } from './fixtures.js';
+import { camera, drawn, layerStatuses, withData } from './render.js';
+import { goTo, importAndLoad, importAsLocalGrid, startWizard } from './wizard.js';
 
 /** A dataset name of 120 characters with nowhere to break it: the worst a name can be. */
 export const NAME = 'dataset_name_'.repeat(10).slice(0, 120);
@@ -18,6 +23,11 @@ export const COLUMN = 'column_name_'.repeat(6).slice(0, 60);
 export const COORDINATE = '-123.456789012345';
 export const COUNT = 10_000_000;
 export const COUNT_TEXT = '10,000,000';
+/** What an engine that fails says, in 400 characters with spaces in them: the longest reason a layer can have. */
+export const LONG_REASON =
+  'The engine could not make this dataset ready for the map because of something long. '
+    .repeat(5)
+    .slice(0, 400);
 
 /** A dataset, as the engine describes one, with the long things in it. */
 export function longDataset(id: number, name: string): Record<string, unknown> {
@@ -189,3 +199,204 @@ export const LONG_ENGINE = `(() => {
   window.fake = control;
   return engine;
 })()`;
+
+/** The viewer of the page, in what the helpers below ask of it. */
+type Viewer = {
+  load(input: unknown): Promise<unknown>;
+  engine: Record<string, (...args: unknown[]) => Promise<unknown>>;
+};
+
+/** A group of the Legend is being renamed (the keyboard is on its row, and F2 is pressed), with a name of 120 characters typed in the field. */
+export async function renameGroupLong(page: Page): Promise<void> {
+  await page.locator('karmania-legend-tab .row[data-group="group-1"]').focus();
+  await page.keyboard.press('F2');
+  const field = page.locator('karmania-legend-tab input.rename');
+  await field.waitFor();
+  await field.fill(SPACED_NAME);
+}
+
+/**
+ * A grid of 4 by 4 cells with two columns of numbers, each named with 60 characters (`COLUMN`, and the same with a b at the end): the
+ * Legend is open on its style, with Show contours on, so that both selects that list the columns are shown.
+ */
+export async function openStyleWithLongColumns(page: Page): Promise<void> {
+  await page.evaluate(
+    ([first, second]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+      const cells = (scale: number): Float64Array =>
+        Float64Array.from({ length: 16 }, (_, at) => (at + 1) * scale);
+      return viewer.load({
+        kind: 'grid',
+        name: 'Grid with long columns',
+        crs: { kind: 'epsg', code: 32640 },
+        origin: [500000, 2765000, 0],
+        spacing: [10, 10, 1],
+        dims: [4, 4, 1],
+        columns: [
+          { name: first, type: 'float', values: cells(1) },
+          { name: second, type: 'float', values: cells(2) },
+        ],
+      });
+    },
+    [COLUMN, `${COLUMN.slice(0, 59)}b`] as const,
+  );
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn']);
+  await showLegend(page);
+  await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+  await page
+    .locator('karmania-legend-tab #legend-style-layer-1 [aria-label="Contours"] k-checkbox input')
+    .check();
+  await page
+    .locator('karmania-legend-tab #legend-style-layer-1 k-select[label="Contour column"]')
+    .waitFor();
+}
+
+/**
+ * A layer that the engine cannot make ready, with a reason of 400 characters: `layer-1` (the points) is drawn, and `layer-2` (the lines, loaded after the
+ * engine's `prepare` was made to fail) is not. The Legend is open on the row of `layer-2`, opened on the reason.
+ */
+export async function openLegendWithLongReason(page: Page): Promise<void> {
+  await withData(page);
+  await page.evaluate((reason) => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+    viewer.engine['prepare'] = () => Promise.reject(new Error(reason));
+  }, LONG_REASON);
+  await importAndLoad(page, 'lines.csv', projectionFor('lines.prj'));
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn', 'failed']);
+  await showLegend(page);
+  await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+  await page.locator('karmania-legend-tab #legend-reason-layer-2').waitFor();
+}
+
+/** The longest name that the definitions have (73 characters): four systems have it with a unit, and a search for this finds them. */
+export const LONG_CRS_QUERY = 'WISCRS Calumet';
+export const LONG_CRS_NAME =
+  'NAD83(2011) / WISCRS Calumet, Fond du Lac, Outagamie and Winnebago (ftUS)';
+
+/** The map coordinate system dialog, opened over the points, with `query` typed in its search, and its matches shown. */
+export async function openCrsDialogSearching(page: Page, query: string): Promise<void> {
+  await withData(page);
+  await page.locator('karmania-status-chip button.crs').click();
+  await page.locator('karmania-map-crs-dialog dialog').waitFor();
+  await page.locator('karmania-map-crs-dialog k-input input').fill(query);
+  await page.locator('karmania-map-crs-dialog karmania-crs-matches .match').first().waitFor();
+}
+
+/** The names of four local grids that are not drawn (the points are), each 120 characters with nothing to break at, or with spaces. */
+export const LOCAL_GRID_NAMES = [
+  `a${NAME.slice(1)}`,
+  `b${NAME.slice(1)}`,
+  `c${SPACED_NAME.slice(1)}`,
+  `d${SPACED_NAME.slice(1)}`,
+];
+
+/**
+ * The points are drawn, and four local grids with names of 120 characters are not: the map coordinate system dialog is open with the local
+ * grid chosen, so that what changes is five datasets, the points stopping and the grids starting, each by its long name.
+ */
+export async function openCrsDialogWithLongChanges(page: Page): Promise<void> {
+  await withData(page);
+  for (const name of LOCAL_GRID_NAMES) {
+    await importAsLocalGrid(page, 'ft', {
+      name: `${name}.csv`,
+      mimeType: 'text/csv',
+      buffer: Buffer.from('x,y\n1,2\n3,4\n'),
+    });
+  }
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn', 'not_drawn', 'not_drawn', 'not_drawn', 'not_drawn']);
+  await page.locator('karmania-status-chip button.crs').click();
+  await page.locator('karmania-map-crs-dialog dialog').waitFor();
+  await page.locator('karmania-map-crs-dialog .local input').first().check();
+  await expect(page.locator('karmania-map-crs-dialog .changes li')).toHaveCount(5);
+}
+
+/** The wizard on the points, at the coordinate system step, with a system chosen by `query`: the matches are shown. */
+export async function openWizardCrsSearching(page: Page, query: string): Promise<void> {
+  await startWizard(page, 'points.csv');
+  for (const step of ['mapping', 'nodata', 'crs']) {
+    await goTo(page, step);
+  }
+  const step = page.locator('karmania-import-dialog karmania-crs-step');
+  await step.locator('.choice k-select').first().locator('select').selectOption('epsg');
+  await step.locator('.choice k-input input').fill(query);
+  await step.locator('.match').first().waitFor();
+}
+
+/**
+ * The export dialog over the points (one layer, one line of legend), with a custom size of 300 by 64 at which two warnings are made at once (the legend takes
+ * more than half of the width, and is taller than the picture) and a file name of 120 characters in its field.
+ */
+export async function openExportWithLongThings(page: Page): Promise<void> {
+  await withData(page);
+  await page.locator('karmania-app header.toolbar > k-tooltip > k-button').click();
+  const dialog = page.locator('karmania-export-dialog');
+  await dialog.locator('dialog').waitFor();
+  await dialog.locator('k-select[label="Size"] select').selectOption({ label: 'Custom' });
+  await dialog.locator('k-input[label="Width (px)"] input').fill('300');
+  await dialog.locator('k-input[label="Height (px)"] input').fill('64');
+  await dialog.locator('k-input[label="File name"] input').fill(NAME);
+  await expect(dialog.locator('.notes p')).toHaveCount(2);
+}
+
+/** A value of 200 characters with spaces in it, for an attribute of the points of `loadLongPoints`. */
+export const LONG_VALUE =
+  'A value of an attribute that is much too long for any row to show whole. '
+    .repeat(3)
+    .slice(0, 200);
+
+/**
+ * Three points of a local grid at the edge of what a coordinate can look like (-99,999,999.5 east, 99,999,999.5 north), half a metre apart, under a name of 120
+ * characters, with an attribute named with 60 characters and numbers of 12 decimals, and one named with 60 and a value of 200 characters. The map is fitted to them.
+ */
+export async function loadLongPoints(page: Page): Promise<void> {
+  await page.evaluate(
+    ([column, other, name, text]) => {
+      const viewer = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer') as unknown as Viewer;
+      return viewer.load({
+        kind: 'points',
+        name,
+        crs: { kind: 'local', units: 'm' },
+        x: Float64Array.of(-99_999_999.5, -99_999_999, -99_999_998.5),
+        y: Float64Array.of(99_999_999.5, 99_999_999, 99_999_998.5),
+        columns: [
+          {
+            name: column,
+            type: 'float',
+            values: Float64Array.of(-123.456789012345, -123.456789012345, -123.456789012345),
+          },
+          { name: other, type: 'text', values: [text, text, text] },
+        ],
+      });
+    },
+    [COLUMN, `${COLUMN.slice(0, 59)}b`, NAME, LONG_VALUE] as const,
+  );
+  await expect
+    .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+    .toEqual(['drawn']);
+  await drawn(page);
+  await expect.poll(async () => (await camera(page)).unitsPerPixel).not.toBe(1);
+}
+
+/** The long points, and a click on the middle one, which is in the middle of the map: the identify popover is open with the long things in it. */
+export async function openIdentifyWithLongThings(page: Page): Promise<void> {
+  await loadLongPoints(page);
+  const canvas = await page.locator('karmania-map-area canvas').boundingBox();
+  if (canvas === null) {
+    throw new Error('The map is not shown.');
+  }
+  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.locator('karmania-identify[placed] dl').waitFor();
+  await page.mouse.move(0, 0);
+}

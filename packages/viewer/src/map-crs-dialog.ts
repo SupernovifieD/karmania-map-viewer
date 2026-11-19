@@ -265,10 +265,10 @@ export class KarmaniaMapCrsDialog extends LitElement {
       mapCrs.kind === 'local'
         ? `A local grid, in ${UNIT_WORDS[mapCrs.units]}`
         : info === undefined
-          ? `EPSG ${String(mapCrs.code)}`
+          ? `EPSG:${String(mapCrs.code)}`
           : info === null
-            ? `EPSG ${String(mapCrs.code)}, which is not one of the coordinate systems Karmania knows`
-            : `EPSG ${String(mapCrs.code)}, ${info.name}`;
+            ? `EPSG:${String(mapCrs.code)}, which is not one of the coordinate systems Karmania knows`
+            : `EPSG:${String(mapCrs.code)}, ${info.name}`;
     const detail = [
       mapCrs.kind === 'epsg' && info !== undefined && info !== null
         ? describeKind(info)

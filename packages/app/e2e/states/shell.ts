@@ -169,4 +169,20 @@ export const SHOTS: Shot[] = [
       return wholeApp(page);
     },
   },
+  {
+    // Nothing is drawn, so Export PNG is disabled, and the pointer over it says why.
+    name: 'shell-export-tooltip',
+    show: async (page) => {
+      await startWith(page);
+      await page
+        .locator('karmania-app header.toolbar > k-tooltip > k-button')
+        .hover({ force: true });
+      await page
+        .locator(
+          'karmania-app header.toolbar > k-tooltip[text="There is nothing drawn on the map to export"] .tip',
+        )
+        .waitFor({ state: 'visible' });
+      return wholeApp(page);
+    },
+  },
 ];

@@ -6,8 +6,8 @@
         {
           "code": "polygons.ring.too_short",
           "severity": "error",
-          "message": "Some rings have fewer than 3 vertices, so they cannot enclose an area.",
-          "hint": "Remove those rings or add the missing vertices.",
+          "message": "Some outlines have fewer than 3 corners, so they cannot enclose an area.",
+          "hint": "Remove those outlines or add the missing corners.",
           "count": 2,
           "examples": [
             {
@@ -21,8 +21,8 @@
         {
           "code": "polygons.polygon.no_rings",
           "severity": "error",
-          "message": "Some polygons have no rings, so they have no outline.",
-          "hint": "Remove those polygons or give each one an outer ring.",
+          "message": "Some polygons have no outline at all, so they cannot be drawn.",
+          "hint": "Remove those polygons or give each one an outline.",
           "count": 1,
           "examples": [
             {

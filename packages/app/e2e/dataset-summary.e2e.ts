@@ -88,7 +88,7 @@ const WARNING = {
 const NOTE = {
   code: 'geojson.crs.assumed',
   severity: 'info',
-  message: 'The file names no coordinate system, so EPSG 4326 was assumed.',
+  message: 'The file names no coordinate system, so EPSG:4326 was assumed.',
   count: 1,
   examples: [],
 };
@@ -106,10 +106,10 @@ test.describe('the summary of the selected dataset', () => {
     await importAndLoad(page, 'points.csv', 'points.prj');
     await expect(p.fact('Kind')).toHaveText('Points');
     await expect(p.fact('Size')).toHaveText('8 points');
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 32640, WGS 84 / UTM zone 40N, metres');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG:32640, WGS 84 / UTM zone 40N, metres');
     await expect(p.fact('Coordinates')).toHaveAttribute(
       'title',
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
     await expect(p.fact('Heights')).toHaveText('Yes (Z)');
     await expect(p.fact('X')).toHaveText('500010.5 to 500185.5');
@@ -144,20 +144,20 @@ test.describe('the summary of the selected dataset', () => {
     const p = parts(page);
     // With no engine to ask, the code is shown as it is.
     await setDatasets(page, [crafted({ crs: { kind: 'epsg', code: 4326 } })]);
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 4326');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG:4326');
     await answerCodesWith(
       page,
       "async (code) => ({ code, name: 'WGS 84', kind: 'geographic', units: 'degree' })",
     );
     await setDatasets(page, [crafted({ id: 2, crs: { kind: 'epsg', code: 4326 } })]);
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 4326, WGS 84, degrees');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG:4326, WGS 84, degrees');
     await expect(p.fact('Coordinates')).toHaveAttribute(
       'title',
-      'EPSG 4326, WGS 84 (longitude and latitude, in degrees)',
+      'EPSG:4326, WGS 84 (longitude and latitude, in degrees)',
     );
     await answerCodesWith(page, 'async () => undefined');
     await setDatasets(page, [crafted({ id: 3, crs: { kind: 'epsg', code: 99999 } })]);
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 99999, not one Karmania knows');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG:99999, not one Karmania knows');
     await setDatasets(page, [crafted({ id: 4, crs: { kind: 'local', units: 'ft' } })]);
     await expect(p.fact('Coordinates')).toHaveText('Local grid, feet');
   });
@@ -177,7 +177,7 @@ test.describe('the summary of the selected dataset', () => {
         crafted({ id, elementCount: id * 100, crs: { kind: 'epsg', code: 32640 } }),
       ]);
       await expect(p.fact('Size')).toHaveText(`${String(id * 100)} points`);
-      await expect(p.fact('Coordinates')).toHaveText('EPSG 32640');
+      await expect(p.fact('Coordinates')).toHaveText('EPSG:32640');
     }
   });
 
@@ -220,7 +220,7 @@ test.describe('the summary of the selected dataset', () => {
       `(code) => Promise.resolve({ code, name: 'WGS 84 / UTM zone 40N', kind: 'projected', units: 'm' })`,
     );
     await setDatasets(page, [crafted({ crs: { kind: 'epsg', code: 32640 } })]);
-    await expect(p.fact('Coordinates')).toHaveText('EPSG 32640, WGS 84 / UTM zone 40N, metres');
+    await expect(p.fact('Coordinates')).toHaveText('EPSG:32640, WGS 84 / UTM zone 40N, metres');
     // Nothing is cut: what is said is what is there.
     expect(
       await p
@@ -339,7 +339,7 @@ test.describe('the summary of the selected dataset', () => {
     await expect(warning).toContainText('Remove the repeated points if they are mistakes.');
     await expect(warning).toContainText('Seen 12 times: row 3, row 6, row 10 and 9 more.');
     await expect(p.summary.locator('.group[data-severity="info"] li')).toContainText(
-      'EPSG 4326 was assumed',
+      'EPSG:4326 was assumed',
     );
   });
 

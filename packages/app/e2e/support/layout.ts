@@ -35,7 +35,8 @@ export interface OverflowOptions {
  *   same for height), unless it is marked `data-scroll-region` (it is meant to scroll) or
  *   `data-truncate` (it cuts its text with an ellipsis);
  * - an element that is visible and sticks out of the window (see `options.window`), unless it is
- *   inside a scroll region, where what is scrolled out of sight is out of sight on purpose.
+ *   inside a scroll region (or slotted into one), where what is scrolled out of sight is out of
+ *   sight on purpose.
  *
  * Elements that are not shown are ignored, and so are the document itself and the native
  * controls that scroll their own text.
@@ -110,7 +111,10 @@ export async function assertNoOverflow(
         }
       }
       for (const child of [...(node.shadowRoot?.children ?? []), ...node.children]) {
-        visit(child, inRegion || isRegion);
+        // What is slotted into a scroll region of the component's own tree (the body of a dialog) scrolls with it, though in the DOM it is the
+        // component's child: what is scrolled out of sight is out of sight on purpose.
+        const slotted = child.assignedSlot?.closest('[data-scroll-region]') != null;
+        visit(child, inRegion || isRegion || slotted);
       }
     };
 

@@ -12,8 +12,10 @@ export function said(finding: Finding | undefined, otherwise: string): string {
 
 /**
  * A reason without the engine's own opening `Not drawn: `, for the places that have said already that something is not drawn (the summary's
- * heading, "would stop being drawn").
+ * heading, "would stop being drawn"). What is left starts a sentence there, and the engine's words start with a small letter after the colon
+ * (`a local grid has no known place`): it is given a capital.
  */
 export function withoutNotDrawn(reason: string): string {
-  return reason.replace(/^Not drawn:\s*/, '');
+  const rest = reason.replace(/^Not drawn:\s*/, '');
+  return rest === reason ? reason : `${rest.charAt(0).toUpperCase()}${rest.slice(1)}`;
 }

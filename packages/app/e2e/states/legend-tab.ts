@@ -7,6 +7,7 @@ import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { dispatch, layerStatuses, withData } from '../support/render.js';
 import { loadGrid, loadLegendScene, loadMany, showLegend } from '../support/legend.js';
+import { projectionFor } from '../support/fixtures.js';
 import { importAndLoad, importAsLocalGrid } from '../support/wizard.js';
 import type { Shot } from '../support/screenshots.js';
 
@@ -195,6 +196,44 @@ export const SHOTS: Shot[] = [
       await page
         .locator('karmania-legend-tab #legend-style-layer-2 .status[role="alert"]')
         .scrollIntoViewIfNeeded();
+      return rest(page);
+    },
+  },
+  {
+    // The Contours part while the engine is still making the lines: Show contours is ticked and the status says so (the engine's answer is held back).
+    name: 'legend-tab-contours-making',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await page.evaluate(() => {
+        const viewer = document
+          .querySelector('karmania-app')
+          ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+          engine: { contours: (...args: unknown[]) => Promise<unknown> };
+        };
+        viewer.engine.contours = () => new Promise(() => undefined);
+      });
+      await page.locator('karmania-legend-tab .row[data-layer="layer-2"] .open').click();
+      await page
+        .locator(
+          'karmania-legend-tab #legend-style-layer-2 [aria-label="Contours"] k-checkbox input',
+        )
+        .check();
+      const status = page.locator('karmania-legend-tab #legend-style-layer-2 .status');
+      await expect(status).toHaveText('Making the contour lines…');
+      await status.scrollIntoViewIfNeeded();
+      return rest(page);
+    },
+  },
+  {
+    // A layer of lines opened on its style: Opacity and Line width, and no Point size.
+    name: 'legend-tab-lines',
+    show: async (page) => {
+      await importAndLoad(page, 'lines.csv', projectionFor('lines.prj'));
+      await showLegend(page);
+      await page.locator('karmania-legend-tab .row[data-layer="layer-1"] .open').click();
+      await page
+        .locator('karmania-legend-tab #legend-style-layer-1 k-input[label="Line width (px)"] input')
+        .waitFor();
       return rest(page);
     },
   },

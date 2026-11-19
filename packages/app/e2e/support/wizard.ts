@@ -84,8 +84,18 @@ export function kept(page: Page): Promise<Kept> {
   });
 }
 
-/** Presses Import, chooses `picks` in the picker, and waits for the wizard to have looked at them. */
-export async function startWizard(page: Page, ...picks: Pick[]): Promise<void> {
+/** The longest a wait of the import is given for a file of hundreds of thousands of rows on a machine that is busy: the usual 5 s is not enough there (step 24.3c). */
+export const SLOW_WAIT = 30_000;
+
+/** The options of a wait that lasts `timeout` ms, or none, which is the usual wait. */
+const lasting = (timeout: number | undefined): { timeout?: number } =>
+  timeout === undefined ? {} : { timeout };
+
+async function startWizardWithin(
+  page: Page,
+  timeout: number | undefined,
+  picks: readonly Pick[],
+): Promise<void> {
   const w = wizard(page);
   await pickFiles(
     page,
@@ -94,15 +104,20 @@ export async function startWizard(page: Page, ...picks: Pick[]): Promise<void> {
     },
     picks,
   );
-  await expect(w.host.locator('karmania-file-step')).toBeVisible();
+  await expect(w.host.locator('karmania-file-step')).toBeVisible(lasting(timeout));
 }
 
-/** Presses Next, and waits for the step that follows to be shown. */
-export async function goTo(page: Page, step: string): Promise<void> {
+/** Presses Import, chooses `picks` in the picker, and waits for the wizard to have looked at them. */
+export async function startWizard(page: Page, ...picks: Pick[]): Promise<void> {
+  await startWizardWithin(page, undefined, picks);
+}
+
+/** Presses Next, and waits for the step that follows to be shown (for as long as `timeout` ms when it is given). */
+export async function goTo(page: Page, step: string, timeout?: number): Promise<void> {
   const w = wizard(page);
-  await expect(w.next.locator('button')).toBeEnabled();
+  await expect(w.next.locator('button')).toBeEnabled(lasting(timeout));
   await w.next.click();
-  await expect(w.step).toHaveAttribute('data-step', step);
+  await expect(w.step).toHaveAttribute('data-step', step, lasting(timeout));
 }
 
 /** The text of each element, with the white space of the markup gone. */
@@ -162,14 +177,30 @@ export async function openWithFakeEngine(page: Page): Promise<void> {
  * block model, are not for this.
  */
 export async function importAndLoad(page: Page, ...picks: Pick[]): Promise<void> {
+  await importWithin(page, undefined, picks);
+}
+
+/** `importAndLoad` for a file of hundreds of thousands of rows: every wait of it lasts `SLOW_WAIT` and not the usual 5 s. Nothing else differs. */
+export async function importAndLoadSlowly(page: Page, ...picks: Pick[]): Promise<void> {
+  await importWithin(page, SLOW_WAIT, picks);
+}
+
+async function importWithin(
+  page: Page,
+  timeout: number | undefined,
+  picks: readonly Pick[],
+): Promise<void> {
   const w = wizard(page);
-  await startWizard(page, ...picks);
+  await startWizardWithin(page, timeout, picks);
   for (const step of ['mapping', 'nodata', 'crs', 'review']) {
-    await goTo(page, step);
+    await goTo(page, step, timeout);
   }
-  await expect(w.host.locator('karmania-review-step .verdict')).toHaveText('Ready to load');
+  await expect(w.host.locator('karmania-review-step .verdict')).toHaveText(
+    'Ready to load',
+    lasting(timeout),
+  );
   await w.next.click();
-  await expect(w.dialog).toBeHidden();
+  await expect(w.dialog).toBeHidden(lasting(timeout));
 }
 
 /**

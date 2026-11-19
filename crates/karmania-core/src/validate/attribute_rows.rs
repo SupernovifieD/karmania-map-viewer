@@ -38,12 +38,12 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
                     Finding::new(
                         FindingCode::DatasetVertexAttributesRowsMismatch,
                         format!(
-                            "The per-vertex table has {} rows, but the dataset has {} vertices.",
+                            "The per-point table has {} rows, but the dataset has {} points.",
                             format_count(found),
                             format_count(expected)
                         ),
                     )
-                    .with_hint("Give every vertex exactly one value in each column."),
+                    .with_hint("Give every point exactly one value in each column."),
                 );
             }
         }
@@ -51,7 +51,7 @@ pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
             findings.add(
                 Finding::new(
                     FindingCode::DatasetVertexAttributesUnsupported,
-                    format!("Per-vertex attributes are only used for lines and meshes, so they are ignored for {things}."),
+                    format!("Per-point attributes are only used for lines and meshes, so they are ignored for {things}."),
                 )
                 .with_hint("Move those values to the attribute table, or remove them."),
             );
@@ -142,7 +142,7 @@ mod tests {
         assert_eq!(codes(&bad), ["dataset.vertex_attributes.rows_mismatch"]);
         assert_eq!(
             bad.as_slice()[0].message,
-            "The per-vertex table has 3 rows, but the dataset has 4 vertices."
+            "The per-point table has 3 rows, but the dataset has 4 points."
         );
         let bad_mesh = run(check, &with_vertex_rows(mesh(5, &[0, 1, 2]), 6));
         assert_eq!(

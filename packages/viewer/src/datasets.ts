@@ -120,20 +120,20 @@ export function selectionAfterChange(
   return listedDatasets(after)[0]?.id;
 }
 
-/** The coordinate system of a dataset in a few words: `EPSG 32640`, or `Local grid, metres`. */
+/** The coordinate system of a dataset in a few words: `EPSG:32640`, or `Local grid, metres`. */
 export function crsLabel(crs: Summary['crs']): string {
   if (crs === undefined) {
     return 'Not set';
   }
   if (crs.kind === 'epsg') {
-    return `EPSG ${String(crs.code)}`;
+    return `EPSG:${String(crs.code)}`;
   }
   const units = { m: 'metres', ft: 'feet', us_ft: 'US survey feet' }[crs.units];
   return `Local grid, ${units}`;
 }
 
 /**
- * The coordinate system of a dataset with its name and unit, for the summary: `EPSG 32640, WGS 84 / UTM zone
+ * The coordinate system of a dataset with its name and unit, for the summary: `EPSG:32640, WGS 84 / UTM zone
  * 40N, metres`. `info` is what the definitions say of the code: the system, `null` if the code is not in
  * them, `undefined` if nobody has asked, or if the system is a local grid, which they know nothing of; then
  * it is `crsLabel`.
@@ -143,8 +143,8 @@ export function crsLabelNamed(crs: Summary['crs'], info: CrsInfo | null | undefi
     return crsLabel(crs);
   }
   return info === null
-    ? `EPSG ${String(crs.code)}, not one Karmania knows`
-    : `EPSG ${String(crs.code)}, ${info.name}, ${describeUnits(info.units)}`;
+    ? `EPSG:${String(crs.code)}, not one Karmania knows`
+    : `EPSG:${String(crs.code)}, ${info.name}, ${describeUnits(info.units)}`;
 }
 
 /** What the tooltip of that label says: the same, with what kind of system it is. */
@@ -153,8 +153,8 @@ export function crsTitleNamed(crs: Summary['crs'], info: CrsInfo | null | undefi
     return crsLabel(crs);
   }
   return info === null
-    ? `EPSG ${String(crs.code)} is not one of the coordinate systems Karmania knows`
-    : `EPSG ${String(crs.code)}, ${describeInfo(info)}`;
+    ? `EPSG:${String(crs.code)} is not one of the coordinate systems Karmania knows`
+    : `EPSG:${String(crs.code)}, ${describeInfo(info)}`;
 }
 
 /** The most decimals a coordinate is shown with; the whole of it is in the title. */

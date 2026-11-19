@@ -114,6 +114,33 @@ export async function drawn(page: Page): Promise<Stats> {
 }
 
 /**
+ * What the extension of the browser that takes a context away and gives it back is asked to do, on the map's canvas. A context
+ * that is lost does not hand out its extensions, so the page keeps the one it got while the context was there.
+ */
+export function contextCard(page: Page, what: 'lose' | 'restore'): Promise<void> {
+  return page.evaluate((action) => {
+    const holder = window as unknown as { loseContext?: WEBGL_lose_context };
+    if (holder.loseContext === undefined) {
+      const canvas = document
+        .querySelector('karmania-app')
+        ?.shadowRoot?.querySelector('karmania-viewer')
+        ?.shadowRoot?.querySelector('karmania-map-area')
+        ?.shadowRoot?.querySelector('canvas');
+      const extension = canvas?.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+      if (extension === null || extension === undefined) {
+        throw new Error('The browser has no WEBGL_lose_context.');
+      }
+      holder.loseContext = extension;
+    }
+    if (action === 'lose') {
+      holder.loseContext.loseContext();
+    } else {
+      holder.loseContext.restoreContext();
+    }
+  }, what);
+}
+
+/**
  * Loads a file, which gives the scene its first layer, and so the viewer its renderer and its pipeline; waits for the first frame, for
  * the layer to be prepared, and for the camera to be fitted to it (the pipeline's first view), so that nothing changes after.
  */

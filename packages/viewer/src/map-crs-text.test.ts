@@ -19,21 +19,21 @@ describe('what the status chip says of the map’s coordinate system', () => {
   it('has the code on the button, and the name and what it is in the tooltip', () => {
     expect(mapCrsText(epsg(32640), UTM)).toEqual({
       label: 'EPSG:32640',
-      title: 'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      title: 'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     });
   });
 
   it('has the code alone in the tooltip until the definitions have been asked', () => {
     expect(mapCrsText(epsg(32640), undefined)).toEqual({
       label: 'EPSG:32640',
-      title: 'EPSG 32640',
+      title: 'EPSG:32640',
     });
   });
 
   it('says so when the code is not one of the definitions’', () => {
     expect(mapCrsText(epsg(999_999), null)).toEqual({
       label: 'EPSG:999999',
-      title: 'EPSG 999999, which is not one of the coordinate systems Karmania knows',
+      title: 'EPSG:999999, which is not one of the coordinate systems Karmania knows',
     });
   });
 
@@ -62,7 +62,7 @@ describe('what the status chip says of the map’s coordinate system', () => {
   it('names a geographic system by its degrees', () => {
     const wgs84: CrsInfo = { code: 4326, name: 'WGS 84', kind: 'geographic', units: 'degree' };
     expect(mapCrsText(epsg(4326), wgs84).title).toBe(
-      'EPSG 4326, WGS 84 (longitude and latitude, in degrees)',
+      'EPSG:4326, WGS 84 (longitude and latitude, in degrees)',
     );
   });
 });

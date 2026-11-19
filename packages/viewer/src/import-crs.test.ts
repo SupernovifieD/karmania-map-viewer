@@ -139,7 +139,7 @@ describe('what keeps a person from going on', () => {
 
 describe('writing a coordinate system for people', () => {
   it('gives the code as it is, and a local grid with its units', () => {
-    expect(describeCrs({ kind: 'epsg', code: 32640 })).toBe('EPSG 32640');
+    expect(describeCrs({ kind: 'epsg', code: 32640 })).toBe('EPSG:32640');
     expect(describeCrs({ kind: 'local', units: 'm' })).toBe('a local grid, in metres');
     expect(describeCrs({ kind: 'local', units: 'us_ft' })).toBe('a local grid, in US survey feet');
   });
@@ -154,25 +154,25 @@ describe('writing a coordinate system for people', () => {
   it('sums up what was chosen, and says when nothing was', () => {
     const base = { epsg: '', query: '', units: 'm' as const };
     expect(summarizeCrs({ ...base, mode: 'detected' }, fromPrj, 'points.prj')).toBe(
-      'EPSG 32640, from the .prj file points.prj.',
+      'EPSG:32640, from the .prj file points.prj.',
     );
     expect(summarizeCrs({ ...base, mode: 'detected' }, guessed, undefined)).toContain(
-      'EPSG 4326, from the GeoJSON default',
+      'EPSG:4326, from the GeoJSON default',
     );
     expect(summarizeCrs({ ...base, mode: 'epsg', epsg: '28350' }, undefined, undefined)).toBe(
-      'EPSG 28350, as you entered it.',
+      'EPSG:28350, as you entered it.',
     );
     // A code that is typed is the text as well; one that is picked from the matches of a name is not.
     expect(
       summarizeCrs({ ...base, mode: 'epsg', epsg: '28350', query: '28350' }, undefined, undefined),
-    ).toBe('EPSG 28350, as you entered it.');
+    ).toBe('EPSG:28350, as you entered it.');
     expect(
       summarizeCrs(
         { ...base, mode: 'epsg', epsg: '32740', query: 'WGS 84 / UTM zone 40' },
         undefined,
         undefined,
       ),
-    ).toBe('EPSG 32740, from the matches.');
+    ).toBe('EPSG:32740, from the matches.');
     expect(summarizeCrs({ ...base, mode: 'local', units: 'ft' }, undefined, undefined)).toContain(
       'a local grid, in feet',
     );
@@ -212,32 +212,32 @@ describe('writing what the definitions say of a code', () => {
   it('gives a code with its name when it has one, and says so when it is not known', () => {
     const code = { kind: 'epsg', code: 32640 } as const;
     expect(describeNamed(code, utm)).toBe(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
     expect(describeNamed(code, null)).toBe(
-      'EPSG 32640, which is not one of the coordinate systems Karmania knows',
+      'EPSG:32640, which is not one of the coordinate systems Karmania knows',
     );
     // Not asked yet, or a local grid, which the definitions know nothing of.
-    expect(describeNamed(code, undefined)).toBe('EPSG 32640');
+    expect(describeNamed(code, undefined)).toBe('EPSG:32640');
     expect(describeNamed({ kind: 'local', units: 'm' }, utm)).toBe('a local grid, in metres');
   });
 
   it('puts the name into what the step says is chosen, and leaves the rest as it was', () => {
     const draft = { mode: 'detected' as const, epsg: '', query: '', units: 'm' as const };
     expect(summarizeCrs(draft, fromPrj, 'points.prj', utm)).toBe(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), from the .prj file points.prj.',
     );
     expect(summarizeCrs({ ...draft, mode: 'epsg', epsg: '32640' }, undefined, undefined, utm)).toBe(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), as you entered it.',
     );
     expect(
       summarizeCrs({ ...draft, mode: 'epsg', epsg: '99999' }, undefined, undefined, null),
     ).toBe(
-      'EPSG 99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
+      'EPSG:99999, which is not one of the coordinate systems Karmania knows, as you entered it.',
     );
     // With nothing known of the code the sentence is the one of phase 1.
     expect(summarizeCrs(draft, fromPrj, 'points.prj')).toBe(
-      'EPSG 32640, from the .prj file points.prj.',
+      'EPSG:32640, from the .prj file points.prj.',
     );
     expect(summarizeCrs({ ...draft, mode: 'local', units: 'ft' }, undefined, undefined, utm)).toBe(
       'a local grid, in feet: the coordinates are not tied to a place on the Earth, only to each other.',

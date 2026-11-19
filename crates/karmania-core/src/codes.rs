@@ -415,6 +415,19 @@ mod tests {
         "projected system",
     ];
 
+    /// Whole words, in any case, that a reader should not have to know either, in any finding: the words of arithmetic and of geometry that have plainer ones ("not a number",
+    /// "an outline", "corners", "points"). (A word of a file format that a person sees in the file, such as the "v" of an OBJ line, is not on the list.)
+    const NOT_PLAIN_WORDS: [&str; 8] = [
+        "finite",
+        "vertex",
+        "vertices",
+        "ring",
+        "rings",
+        "datum",
+        "datums",
+        "geocentric",
+    ];
+
     #[test]
     fn every_hint_is_a_sentence_and_every_text_is_plain_and_short() {
         for entry in parse_docs(DOCS) {
@@ -440,13 +453,18 @@ mod tests {
                 "{name}: the message is too long"
             );
             assert!(words(&entry.hint) <= 35, "{name}: the hint is too long");
-            // The codes with no wizard step are for datasets that a program builds, and say `NaN` to
-            // someone who knows what it is: the others are met by a person with a file.
-            let for_a_person = entry.step != "none";
+            // Every finding is read by a person: one that a program's builder makes is shown in the
+            // Data tab and the Legend like the others, so no code is left out of the plain words.
             for text in [&entry.message, &entry.hint, &entry.example] {
-                for word in NOT_PLAIN.iter().filter(|_| for_a_person) {
+                for word in NOT_PLAIN {
                     assert!(
                         !text.contains(word),
+                        "{name}: uses \"{word}\", which a reader should not have to know: {text}"
+                    );
+                }
+                for word in text.split(|letter: char| !letter.is_alphanumeric()) {
+                    assert!(
+                        !NOT_PLAIN_WORDS.contains(&word.to_lowercase().as_str()),
                         "{name}: uses \"{word}\", which a reader should not have to know: {text}"
                     );
                 }

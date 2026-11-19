@@ -255,7 +255,7 @@ describe('how a derived dataset says it was made', () => {
 
 describe('the coordinate system of a dataset', () => {
   it('is the code as given, or a local grid with its units', () => {
-    expect(crsLabel({ kind: 'epsg', code: 32640 })).toBe('EPSG 32640');
+    expect(crsLabel({ kind: 'epsg', code: 32640 })).toBe('EPSG:32640');
     expect(crsLabel({ kind: 'local', units: 'm' })).toBe('Local grid, metres');
     expect(crsLabel({ kind: 'local', units: 'ft' })).toBe('Local grid, feet');
     expect(crsLabel({ kind: 'local', units: 'us_ft' })).toBe('Local grid, US survey feet');
@@ -273,9 +273,9 @@ describe('the coordinate system of a dataset', () => {
 
   it('has its name and unit when the definitions have been asked and know the code', () => {
     expect(crsLabelNamed(epsg(32640), { ...utm, metresPerUnit: 1 })).toBe(
-      'EPSG 32640, WGS 84 / UTM zone 40N, metres',
+      'EPSG:32640, WGS 84 / UTM zone 40N, metres',
     );
-    expect(crsLabelNamed(epsg(4326), wgs84)).toBe('EPSG 4326, WGS 84, degrees');
+    expect(crsLabelNamed(epsg(4326), wgs84)).toBe('EPSG:4326, WGS 84, degrees');
     expect(
       crsLabelNamed(epsg(2229), {
         code: 2229,
@@ -284,12 +284,12 @@ describe('the coordinate system of a dataset', () => {
         units: 'us_ft',
         metresPerUnit: 1200 / 3937,
       }),
-    ).toBe('EPSG 2229, NAD83 / California zone 5 (ftUS), US survey feet');
+    ).toBe('EPSG:2229, NAD83 / California zone 5 (ftUS), US survey feet');
   });
 
   it('says that a code is not one that is known, and is as it was before anyone asked', () => {
-    expect(crsLabelNamed(epsg(99999), null)).toBe('EPSG 99999, not one Karmania knows');
-    expect(crsLabelNamed(epsg(32640), undefined)).toBe('EPSG 32640');
+    expect(crsLabelNamed(epsg(99999), null)).toBe('EPSG:99999, not one Karmania knows');
+    expect(crsLabelNamed(epsg(32640), undefined)).toBe('EPSG:32640');
     // A local grid has no definition to ask for, whatever is given.
     expect(crsLabelNamed({ kind: 'local', units: 'm' }, { ...utm, metresPerUnit: 1 })).toBe(
       'Local grid, metres',
@@ -299,15 +299,15 @@ describe('the coordinate system of a dataset', () => {
 
   it('has, in its tooltip, what kind of system it is', () => {
     expect(crsTitleNamed(epsg(32640), { ...utm, metresPerUnit: 1 })).toBe(
-      'EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres)',
+      'EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres)',
     );
     expect(crsTitleNamed(epsg(4326), wgs84)).toBe(
-      'EPSG 4326, WGS 84 (longitude and latitude, in degrees)',
+      'EPSG:4326, WGS 84 (longitude and latitude, in degrees)',
     );
     expect(crsTitleNamed(epsg(99999), null)).toBe(
-      'EPSG 99999 is not one of the coordinate systems Karmania knows',
+      'EPSG:99999 is not one of the coordinate systems Karmania knows',
     );
-    expect(crsTitleNamed(epsg(32640), undefined)).toBe('EPSG 32640');
+    expect(crsTitleNamed(epsg(32640), undefined)).toBe('EPSG:32640');
   });
 });
 

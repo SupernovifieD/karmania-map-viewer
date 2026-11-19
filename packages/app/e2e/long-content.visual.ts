@@ -9,6 +9,8 @@ import { photograph } from './support/screenshots.js';
 import { PATH, SHOTS } from './states/long-content.js';
 
 test.use({ reducedMotion: 'reduce' });
+// Some states load several files at each of six window sizes and themes (the map coordinate system dialog with five datasets), which takes more than the usual minute on a slow machine.
+test.setTimeout(150_000);
 
 for (const each of SHOTS) {
   test(`the state "${each.name}", at every window size in both themes`, async ({ page }) => {

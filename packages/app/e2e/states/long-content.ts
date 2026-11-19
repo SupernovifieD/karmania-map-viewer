@@ -5,12 +5,23 @@
  * (`long-content.visual.ts`) and the accessibility pass checks them (`axe-states.axe.ts`).
  */
 import type { Locator, Page } from '@playwright/test';
+import { loadLegendScene } from '../support/legend.js';
 import {
+  LONG_CRS_QUERY,
   LONG_ENGINE,
   NAME,
   SPACED_NAME,
   longDataset,
   longFile,
+  openCrsDialogSearching,
+  openCrsDialogWithLongChanges,
+  loadLongPoints,
+  openExportWithLongThings,
+  openIdentifyWithLongThings,
+  openLegendWithLongReason,
+  openStyleWithLongColumns,
+  openWizardCrsSearching,
+  renameGroupLong,
   setDatasets,
 } from '../support/long-content.js';
 import type { Shot } from '../support/screenshots.js';
@@ -137,6 +148,95 @@ export const SHOTS: Shot[] = [
       );
       await wizard(page).host.locator('karmania-review-step .verdict').waitFor();
       return [wizard(page).dialog];
+    },
+  },
+  {
+    // A group renamed with a name of 120 characters: the field keeps the row and the end of the name is in view.
+    name: 'long-legend-rename',
+    show: async (page) => {
+      await loadLegendScene(page);
+      await renameGroupLong(page);
+      await page.evaluate(() => document.fonts.ready);
+      await page.mouse.move(0, 0);
+      return [app(page)];
+    },
+  },
+  {
+    // A grid whose two columns have names of 60 characters: Colour by and the Contour column, with the contours on.
+    name: 'long-legend-columns',
+    show: async (page) => {
+      await openStyleWithLongColumns(page);
+      return rest(page);
+    },
+  },
+  {
+    // A layer that could not be made ready, for a reason of 400 characters: the opened row says it, wrapped.
+    name: 'long-legend-reason',
+    show: async (page) => {
+      await openLegendWithLongReason(page);
+      return rest(page);
+    },
+  },
+  {
+    // The map coordinate system dialog with a search that finds the longest names of the definitions (73 characters): each is cut, with its whole in a title.
+    name: 'long-crs-dialog-names',
+    show: async (page) => {
+      await openCrsDialogSearching(page, LONG_CRS_QUERY);
+      return rest(page);
+    },
+  },
+  {
+    // A search that has more than 20 matches: the first 20, in a box that scrolls, and the help that says so.
+    name: 'long-crs-dialog-many',
+    show: async (page) => {
+      await openCrsDialogSearching(page, 'utm zone');
+      return rest(page);
+    },
+  },
+  {
+    // The local grid chosen while the points are drawn and four local grids with names of 120 characters are not: five lines of what changes.
+    name: 'long-crs-dialog-changes',
+    show: async (page) => {
+      await openCrsDialogWithLongChanges(page);
+      return rest(page);
+    },
+  },
+  {
+    // The wizard's coordinate system step with the same search: the longest names in its list.
+    name: 'long-wizard-crs-search',
+    show: async (page) => {
+      await openWizardCrsSearching(page, LONG_CRS_QUERY);
+      return [wizard(page).dialog];
+    },
+  },
+  {
+    // The export dialog with a custom size at which two warnings are made at once, and a file name of 120 characters in its field.
+    name: 'long-export-dialog',
+    show: async (page) => {
+      await openExportWithLongThings(page);
+      return rest(page);
+    },
+  },
+  {
+    // A click on a point of a layer named with 120 characters, with attributes named with 60 and a value of 200: the popover cuts each, inside the map.
+    name: 'long-identify',
+    show: async (page) => {
+      await openIdentifyWithLongThings(page);
+      return rest(page);
+    },
+  },
+  {
+    // The pointer over a map whose coordinates are -99,999,999.5 and 99,999,999.5 with decimals: the chip holds both numbers in the room it keeps for them.
+    name: 'long-status-chip',
+    show: async (page) => {
+      await loadLongPoints(page);
+      const canvas = await page.locator('karmania-map-area canvas').boundingBox();
+      if (canvas === null) {
+        throw new Error('The map is not shown.');
+      }
+      await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+      await page.evaluate(() => document.fonts.ready);
+      return [app(page)];
     },
   },
 ];

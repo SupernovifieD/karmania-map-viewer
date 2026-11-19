@@ -52,7 +52,7 @@ test.describe('the tooltip', () => {
       const holder = document.createElement('div');
       holder.style.cssText = 'position: fixed; left: 300px; top: 300px; white-space: nowrap;';
       holder.innerHTML =
-        '<k-tooltip id="nowrap" text="EPSG 32640, WGS 84 / UTM zone 40N (projected, in metres), the whole of a name that is a good deal longer than a tooltip is wide"><k-button icon="x" label="Close"></k-button></k-tooltip>';
+        '<k-tooltip id="nowrap" text="EPSG:32640, WGS 84 / UTM zone 40N (projected, in metres), the whole of a name that is a good deal longer than a tooltip is wide"><k-button icon="x" label="Close"></k-button></k-tooltip>';
       document.body.append(holder);
       await document.querySelector<HTMLElementTagNameMap['k-tooltip']>('#nowrap')?.updateComplete;
     });

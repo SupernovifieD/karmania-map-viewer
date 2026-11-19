@@ -1,6 +1,6 @@
 /**
- * axe over every state that is photographed, in both themes, and the app's at the smallest window
- * as well, where panels and dialogs scroll. Nothing is allowed through: a violation of any kind,
+ * axe over every state that is photographed, in both themes, at the usual window and at the smallest,
+ * where panels and dialogs scroll. Nothing is allowed through: a violation of any kind,
  * serious or not, fails the state and says which rule, where, and in which theme and window.
  *
  * It takes a few minutes, so it is its own project and is not part of `pnpm test:e2e`:
@@ -84,26 +84,38 @@ test('the gallery page as a whole has nothing wrong, in either theme', async ({ 
   expect(found).toEqual([]);
 });
 
-/** The states of the gallery, each checked in its own section, at the usual window. */
+/** The states of the gallery, each checked in its own section, at the usual window and at the smallest. */
 for (const shot of GALLERY) {
-  test(`gallery: the state "${shot.name}" has nothing wrong, in either theme`, async ({ page }) => {
-    test.setTimeout(120_000);
-    await page.setViewportSize(VIEWPORTS[1]);
+  test(`gallery: the state "${shot.name}" has nothing wrong, in either theme and window`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
     const found: Found[] = [];
-    for (const theme of THEMES) {
-      await page.goto(`${GALLERY_PATH}?theme=${theme}`);
-      await page.evaluate(() => document.fonts.ready);
-      const targets = await shot.show(page);
-      const names = new Set<string>();
-      for (const target of targets) {
-        const name = await sectionOf(target);
-        if (name !== null) {
-          names.add(name);
+    for (const viewport of [VIEWPORTS[1], VIEWPORTS[0]]) {
+      await page.setViewportSize(viewport);
+      for (const theme of THEMES) {
+        await page.goto(`${GALLERY_PATH}?theme=${theme}`);
+        await page.evaluate(() => document.fonts.ready);
+        const targets = await shot.show(page);
+        const names = new Set<string>();
+        for (const target of targets) {
+          const name = await sectionOf(target);
+          if (name !== null) {
+            names.add(name);
+          }
         }
+        found.push(
+          ...(await check(
+            page,
+            {
+              state: shot.name,
+              theme,
+              window: `${String(viewport.width)}x${String(viewport.height)}`,
+            },
+            [...names],
+          )),
+        );
       }
-      found.push(
-        ...(await check(page, { state: shot.name, theme, window: '1440x900' }, [...names])),
-      );
     }
     expect(found).toEqual([]);
   });

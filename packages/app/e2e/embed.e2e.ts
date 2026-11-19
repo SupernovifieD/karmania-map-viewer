@@ -970,7 +970,7 @@ test.describe('the API of a viewer', () => {
           host.style.cssText = style;
           document.body.append(host);
           const viewer = window.embed.createViewer(host);
-          // The dialog is in the viewer once it has been drawn: before that, there is nothing to open, whatever the viewer holds.
+          // The dialog is drawn once there is data (step 24.R2): before that it is not in the viewer, and there is nothing to open, whatever the viewer holds.
           const element = host.querySelector('karmania-viewer');
           await element?.updateComplete;
           if (load) {
@@ -987,7 +987,7 @@ test.describe('the API of a viewer', () => {
           await element?.updateComplete;
           const dialog = element?.shadowRoot?.querySelector('karmania-map-crs-dialog');
           await dialog?.updateComplete;
-          const open = dialog?.open;
+          const open = dialog?.open ?? false;
           viewer.dispose();
           return open;
         },

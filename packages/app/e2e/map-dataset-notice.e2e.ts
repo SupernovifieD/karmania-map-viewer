@@ -55,7 +55,7 @@ test.describe('a dataset that is not drawn, in the Data tab', () => {
   test('is not said of a dataset that is drawn', async ({ page }) => {
     await withANotDrawnDataset(page);
     await row(page, 'points').click();
-    await expect(summary(page).locator('dl')).toContainText('EPSG 32640');
+    await expect(summary(page).locator('dl')).toContainText('EPSG:32640');
     await expect(notice(page)).toHaveCount(0);
     await row(page, 'faults').click();
     await expect(notice(page)).toBeVisible();

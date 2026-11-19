@@ -326,7 +326,7 @@ fn not_numeric(column: &Column) -> Finding {
     let kind = match column.column_type() {
         ColumnType::Utf8 => "text",
         ColumnType::Bool => "true or false",
-        _ => "categories",
+        _ => "made of categories",
     };
     Finding::new(
         FindingCode::ClassesColumnNotNumeric,
@@ -347,14 +347,16 @@ fn too_many_values(column: &Column) -> Finding {
             karmania_core::text::format_count(DISTINCT_LIMIT as u64)
         ),
     )
-    .with_hint("Divide the column into ranges instead.")
+    .with_hint(
+        "Colour by another column, or draw the layer in a single colour. A column of numbers can also be divided into ranges.",
+    )
 }
 
 fn no_values(column: &Column) -> Finding {
     Finding::new(
         FindingCode::ClassesColumnNoValues,
         format!(
-            "The column {} has no value that can be put in a class: every entry is empty or not a finite number.",
+            "The column {} has no value that can be put in a class: every entry is empty or not a number.",
             column.name()
         ),
     )
@@ -483,6 +485,56 @@ mod tests {
             ranges(&floats(&many), Method::Equal, 10_000).1.len(),
             MAX_CLASSES
         );
+    }
+
+    const DOCS: &str = include_str!("../../../docs/validation-codes.md");
+
+    /// A field of the documented finding of a code (`Message` or `Hint`), with its `{name}`s still in it.
+    fn documented(code: &str, field: &str) -> String {
+        let section = DOCS
+            .split("\n## `")
+            .find(|section| section.starts_with(&format!("{code}`")))
+            .unwrap_or_else(|| panic!("{code} is not in docs/validation-codes.md"));
+        section
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("- {field}: ")))
+            .unwrap_or_else(|| panic!("{code} has no {field}"))
+            .to_string()
+    }
+
+    #[test]
+    fn every_finding_of_classes_says_what_the_docs_say() {
+        let text = Column::without_nulls("rock", ColumnData::Utf8(vec!["a".into()]));
+        let nothing = Column::without_nulls("grade", ColumnData::Float64(vec![f64::NAN]));
+        let ids = Column::without_nulls("sample_id", ColumnData::Int64((0..10_001).collect()));
+        let cases: [(Finding, &[(&str, &str)]); 4] = [
+            (column_missing("grade"), &[("{name}", "grade")]),
+            (
+                classify(&text, Method::Equal, 5).unwrap_err(),
+                &[("{name}", "rock"), ("{type}", "text")],
+            ),
+            (
+                classify(&nothing, Method::Quantile, 5).unwrap_err(),
+                &[("{name}", "grade")],
+            ),
+            (
+                classify(&ids, Method::Categories, 5).unwrap_err(),
+                &[("{name}", "sample_id"), ("{limit}", "10,000")],
+            ),
+        ];
+        for (finding, fills) in cases {
+            let code = finding.code.as_str();
+            let (mut message, hint) = (documented(code, "Message"), documented(code, "Hint"));
+            for (name, value) in fills {
+                message = message.replace(name, value);
+            }
+            assert!(
+                !message.contains('{'),
+                "{code}: a name is not filled: {message}"
+            );
+            assert_eq!(finding.message, message, "{code}");
+            assert_eq!(finding.hint.as_deref(), Some(hint.as_str()), "{code}");
+        }
     }
 
     #[test]

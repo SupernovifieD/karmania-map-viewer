@@ -5,7 +5,7 @@ import { expectNoSeriousViolations } from './support/axe.js';
 import { assertNoOverflow } from './support/layout.js';
 import { fixturePath } from './support/picker.js';
 import type { Sample } from './support/picker.js';
-import { importAndLoad } from './support/wizard.js';
+import { SLOW_WAIT, importAndLoad, importAndLoadSlowly } from './support/wizard.js';
 
 const ROW = 28;
 
@@ -204,9 +204,11 @@ test.describe('the table of the Data tab', () => {
   }) => {
     test.setTimeout(150_000);
     const p = parts(page);
-    await importAndLoad(page, ...coordinatesFile('huge', 400_000));
-    await expect(p.viewport).toHaveAttribute('aria-rowcount', '400001');
-    await expect(p.rows.first()).toBeVisible();
+    // Every wait of this test lasts 30 s and not the usual 5: a file of 400,000 rows takes longer than that to import on a machine that is busy (step 24.3c).
+    const slowly = expect.configure({ timeout: SLOW_WAIT });
+    await importAndLoadSlowly(page, ...coordinatesFile('huge', 400_000));
+    await slowly(p.viewport).toHaveAttribute('aria-rowcount', '400001');
+    await slowly(p.rows.first()).toBeVisible();
     // 400,000 rows of 28 are 11.2 million pixels: the box is made as tall as is allowed, not that.
     expect(await p.viewport.evaluate((element) => element.scrollHeight)).toBe(32 + 8_000_000);
     expect((await drawn(p.rows))[0]).toEqual(shownCoordinates(0));
@@ -214,7 +216,7 @@ test.describe('the table of the Data tab', () => {
       await p.viewport.evaluate((element, f) => {
         element.scrollTo(0, f * (element.scrollHeight - element.clientHeight));
       }, fraction);
-      await expect
+      await slowly
         .poll(async () => Number((await drawn(p.rows))[0]?.[0]))
         .toBeGreaterThan(fraction * 400_000 - 200);
       for (const cells of await drawn(p.rows)) {
@@ -222,7 +224,7 @@ test.describe('the table of the Data tab', () => {
       }
     }
     await scrollTo(p.viewport, 1e12);
-    await expect.poll(async () => (await drawn(p.rows)).at(-1)?.[0]).toBe('400000');
+    await slowly.poll(async () => (await drawn(p.rows)).at(-1)?.[0]).toBe('400000');
     expect((await drawn(p.rows)).at(-1)).toEqual(shownCoordinates(399_999));
     const bottom = await p.viewport.evaluate((element) => {
       const box = element.getBoundingClientRect();
