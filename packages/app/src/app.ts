@@ -252,7 +252,13 @@ export class KarmaniaApp extends LitElement {
   }
 }
 
-customElements.define('karmania-app', KarmaniaApp);
+/**
+ * Makes `<karmania-app>` an element, which is when the element in the page is made and drawn: the page's `main.ts` calls it a task after its modules were evaluated, so
+ * that the evaluation and the first draw of the shell are two tasks and not one (step 24.R2).
+ */
+export function defineApp(): void {
+  customElements.define('karmania-app', KarmaniaApp);
+}
 
 declare global {
   interface HTMLElementTagNameMap {

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { pickFiles } from './support/picker.js';
+import { withData } from './support/render.js';
 import { importAndLoad, kept } from './support/wizard.js';
 
 /** What the viewer element offers a page, reached as the tests reach it: through the app's shadow root. */
@@ -98,6 +99,35 @@ test.describe('what the viewer offers a page', () => {
       document.querySelector('karmania-app')?.remove();
     });
     expect(await refused()).toBe(false);
+  });
+
+  test('draws the Data tab, the collapsed rail and the export and coordinate system dialogs only when they are needed, and keeps them once drawn (step 24.R2)', async ({
+    page,
+  }) => {
+    const [tab, rail, exporting, system] = [
+      page.locator('karmania-data-tab'),
+      page.locator('karmania-panel .rail'),
+      page.locator('karmania-export-dialog'),
+      page.locator('karmania-map-crs-dialog'),
+    ];
+    // The first draw has the map area and the panel with its Legend tab, and nothing of what no one can see or use yet.
+    await expect(page.locator('karmania-map-area')).toBeVisible();
+    await expect(page.locator('karmania-legend-tab')).toBeVisible();
+    for (const none of [tab, rail, exporting, system]) {
+      await expect(none).toHaveCount(0);
+    }
+    await page.getByRole('tab', { name: 'Data', exact: true }).click();
+    await expect(tab).toHaveCount(1);
+    await page.getByRole('button', { name: 'Collapse panel' }).click();
+    await expect(rail).toHaveCount(1);
+    await page.getByRole('button', { name: 'Expand panel' }).click();
+    await expect(exporting).toHaveCount(0);
+    // With data the two dialogs are drawn, and the Data tab and the rail are there as they were left.
+    await withData(page);
+    await expect(exporting).toHaveCount(1);
+    await expect(system).toHaveCount(1);
+    await expect(tab).toHaveCount(1);
+    await expect(rail).toHaveCount(1);
   });
 
   test('opens the wizard on the files it is given', async ({ page }) => {
