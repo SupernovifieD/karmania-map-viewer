@@ -118,6 +118,44 @@ test.describe('assertNoOverflow', () => {
     await expect(assertNoOverflow(root)).rejects.toThrow(/div#cell/);
   });
 
+  test('takes what is slotted into a scroll region of a component as inside it, and still fails what is slotted outside one', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    const injectHost = async (shadow: string): Promise<Locator> => {
+      const root = await inject(page, '<div id="host"></div>');
+      await page.evaluate(
+        ([markup]) => {
+          const host = document.querySelector('#host');
+          if (host === null) {
+            return;
+          }
+          const tall = document.createElement('div');
+          tall.id = 'tall';
+          tall.style.height = '300px';
+          host.append(tall);
+          (host as HTMLElement).style.cssText =
+            'position: fixed; left: 10px; top: 550px; width: 100px';
+          host.attachShadow({ mode: 'open' }).innerHTML = markup ?? '';
+        },
+        [shadow],
+      );
+      return root;
+    };
+    // The component scrolls what is slotted into it (as a dialog's body does): out of sight on purpose.
+    await assertNoOverflow(
+      await injectHost(
+        '<div data-scroll-region style="height: 40px; overflow: auto"><slot></slot></div>',
+      ),
+    );
+    // The same component without a scroll region: the tall child sticks out of the window.
+    await expect(
+      assertNoOverflow(
+        await injectHost('<div style="height: 40px; overflow: hidden"><slot></slot></div>'),
+      ),
+    ).rejects.toThrow(/div#tall.*past the bottom edge/s);
+  });
+
   test('fails an element outside the window, and says which edge', async ({ page }) => {
     const past = await inject(
       page,

@@ -10,6 +10,22 @@ use crate::findings::{Finding, Findings, Location};
 use crate::limits::check_size;
 use crate::text::format_count;
 
+/// A number as a person reads it in a message: a number that is not one says so, and an infinite one says that.
+fn in_words(value: f64) -> String {
+    if value.is_nan() {
+        "not a number".to_string()
+    } else if value.is_infinite() {
+        if value > 0.0 {
+            "infinite"
+        } else {
+            "minus infinite"
+        }
+        .to_string()
+    } else {
+        value.to_string()
+    }
+}
+
 /// Runs the structure checks.
 pub(super) fn check(dataset: &Dataset, findings: &mut Findings) {
     check_not_empty(dataset, findings);
@@ -100,7 +116,10 @@ fn check_lattice(dataset: &Dataset, findings: &mut Findings) {
             Finding::new(
                 FindingCode::LatticeOriginNotFinite,
                 format!(
-                    "The position of the {what} must be made of numbers, but its corner is {ox}, {oy}, {oz}."
+                    "The position of the {what} must be made of numbers, but its corner is {}, {}, {}.",
+                    in_words(ox),
+                    in_words(oy),
+                    in_words(oz)
                 ),
             )
             .with_hint("Give the X, Y and Z of the grid's lower corner."),
@@ -168,7 +187,7 @@ fn check_mesh_triangles(dataset: &Dataset, findings: &mut Findings) {
     }
     let mut unused = Finding::new(
         FindingCode::MeshVerticesUnused,
-        "Some vertices are not used by any triangle.",
+        "Some points of the mesh are not used by any triangle.",
     )
     .with_hint("They do no harm. Remove them if you do not need them.");
     unused.count = 0;
@@ -223,22 +242,22 @@ fn check_mesh_indices(dataset: &Dataset, findings: &mut Findings) {
             Finding::new(
                 FindingCode::MeshIndicesIncomplete,
                 format!(
-                    "The triangle list ends with an incomplete triangle: it has {} vertex numbers, which is not a multiple of 3.",
+                    "The triangle list ends with an incomplete triangle: it has {} point numbers, which is not a multiple of 3.",
                     format_count(count as u64)
                 ),
             )
-            .with_hint("Give three vertex numbers for every triangle."),
+            .with_hint("Give three point numbers for every triangle."),
         );
     }
     let vertices = mesh.vertex_count();
     let mut outside = Finding::new(
         FindingCode::MeshIndicesOutOfRange,
         format!(
-            "Some triangles use vertex numbers that do not exist: the mesh has {} vertices.",
+            "Some triangles use point numbers that do not exist: the mesh has {} points.",
             format_count(vertices as u64)
         ),
     )
-    .with_hint("Vertex numbers start at 0 and must be lower than the number of vertices.");
+    .with_hint("Point numbers start at 0 and must be lower than the number of points.");
     outside.count = 0;
     for (i, &index) in mesh.indices.iter().enumerate() {
         if usize::try_from(index).is_ok_and(|v| v < vertices) {
@@ -267,9 +286,9 @@ fn check_polygon_offsets(dataset: &Dataset, findings: &mut Findings) {
             bad_end: FindingCode::PolygonsRingOffsetsBadEnd,
             decreasing: FindingCode::PolygonsRingOffsetsDecreasing,
         },
-        list: "The list that says where each ring starts",
-        item: "ring",
-        target: "vertices",
+        list: "The list that says where each outline starts",
+        item: "outline",
+        target: "corners",
     };
     offset_lists::check(
         &polygons.ring_offsets,
@@ -284,9 +303,9 @@ fn check_polygon_offsets(dataset: &Dataset, findings: &mut Findings) {
             bad_end: FindingCode::PolygonsPolygonOffsetsBadEnd,
             decreasing: FindingCode::PolygonsPolygonOffsetsDecreasing,
         },
-        list: "The list that says which rings belong to each polygon",
+        list: "The list that says which outlines belong to each polygon",
         item: "polygon",
-        target: "rings",
+        target: "outlines",
     };
     let ring_count = polygons.ring_count().unwrap_or(0);
     offset_lists::check(
@@ -305,9 +324,9 @@ fn check_polygon_rings(dataset: &Dataset, findings: &mut Findings) {
     };
     let mut short = Finding::new(
         FindingCode::PolygonsRingTooShort,
-        "Some rings have fewer than 3 vertices, so they cannot enclose an area.",
+        "Some outlines have fewer than 3 corners, so they cannot enclose an area.",
     )
-    .with_hint("Remove those rings or add the missing vertices.");
+    .with_hint("Remove those outlines or add the missing corners.");
     short.count = 0;
     for index in 0..polygons.ring_count().unwrap_or(0) {
         if polygons.vertex_range(index).is_some_and(|r| r.len() < 3) {
@@ -320,9 +339,9 @@ fn check_polygon_rings(dataset: &Dataset, findings: &mut Findings) {
     }
     let mut bare = Finding::new(
         FindingCode::PolygonsPolygonNoRings,
-        "Some polygons have no rings, so they have no outline.",
+        "Some polygons have no outline at all, so they cannot be drawn.",
     )
-    .with_hint("Remove those polygons or give each one an outer ring.");
+    .with_hint("Remove those polygons or give each one an outline.");
     bare.count = 0;
     for index in 0..polygons.polygon_count().unwrap_or(0) {
         if polygons.ring_range(index).is_some_and(|r| r.is_empty()) {
@@ -343,9 +362,9 @@ fn check_short_lines(dataset: &Dataset, findings: &mut Findings) {
     };
     let mut short = Finding::new(
         FindingCode::LinesLineTooShort,
-        "Some lines have fewer than 2 vertices, so they cannot be drawn.",
+        "Some lines have fewer than 2 points, so they cannot be drawn.",
     )
-    .with_hint("Remove those lines or add the missing vertices.");
+    .with_hint("Remove those lines or add the missing points.");
     short.count = 0;
     for index in 0..lines.line_count().unwrap_or(0) {
         if lines.vertex_range(index).is_some_and(|r| r.len() < 2) {
@@ -372,7 +391,7 @@ fn check_line_offsets(dataset: &Dataset, findings: &mut Findings) {
         },
         list: "The list that says where each line starts",
         item: "line",
-        target: "vertices",
+        target: "points",
     };
     offset_lists::check(&lines.offsets, lines.vertex_count(), &spec, findings);
 }
@@ -461,7 +480,7 @@ mod tests {
         assert_eq!(codes(&found), ["lines.offsets.empty"]);
         assert_eq!(
             found.as_slice()[0].message,
-            "The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3)."
+            "The list that says where each line starts is empty. It must start with 0 and end with the number of points (3)."
         );
     }
 
@@ -478,7 +497,7 @@ mod tests {
         );
         assert_eq!(
             found.as_slice()[1].message,
-            "The list that says where each line starts must end with the number of vertices (5), but it ends with 4."
+            "The list that says where each line starts must end with the number of points (5), but it ends with 4."
         );
     }
 
@@ -572,7 +591,7 @@ mod tests {
         );
         assert_eq!(
             found.as_slice()[3].message,
-            "The list that says which rings belong to each polygon must end with the number of rings (2), but it ends with 1."
+            "The list that says which outlines belong to each polygon must end with the number of outlines (2), but it ends with 1."
         );
     }
 
@@ -587,7 +606,10 @@ mod tests {
             .find(|f| f.code.as_str() == "polygons.polygon_offsets.decreasing");
         assert_eq!(ring.map(|f| f.count), Some(1));
         assert_eq!(polygon.map(|f| f.count), Some(1));
-        assert_eq!(ring.unwrap().message, "Some rings end before they start.");
+        assert_eq!(
+            ring.unwrap().message,
+            "Some outlines end before they start."
+        );
     }
 
     #[test]
@@ -626,7 +648,7 @@ mod tests {
         assert_eq!(codes(&found), ["mesh.indices.incomplete"]);
         assert_eq!(
             found.as_slice()[0].message,
-            "The triangle list ends with an incomplete triangle: it has 5 vertex numbers, which is not a multiple of 3."
+            "The triangle list ends with an incomplete triangle: it has 5 point numbers, which is not a multiple of 3."
         );
     }
 
@@ -637,7 +659,7 @@ mod tests {
         let f = &found.as_slice()[0];
         assert_eq!(
             f.message,
-            "Some triangles use vertex numbers that do not exist: the mesh has 3 vertices."
+            "Some triangles use point numbers that do not exist: the mesh has 3 points."
         );
         assert_eq!(f.count, 3);
         let at: Vec<_> = f.examples.iter().map(|l| (l.element, l.vertex)).collect();

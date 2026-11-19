@@ -111,10 +111,10 @@ const UNIT_WORDS: Readonly<Record<Units, string>> = {
   us_ft: 'US survey feet',
 };
 
-/** A coordinate system in a few words: `EPSG 32640`, or `a local grid, in metres`. */
+/** A coordinate system in a few words: `EPSG:32640`, or `a local grid, in metres`. */
 export function describeCrs(crs: CrsRef): string {
   return crs.kind === 'epsg'
-    ? `EPSG ${String(crs.code)}`
+    ? `EPSG:${String(crs.code)}`
     : `a local grid, in ${UNIT_WORDS[crs.units]}`;
 }
 

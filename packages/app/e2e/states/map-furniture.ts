@@ -2,13 +2,21 @@
  * The app with a map in it and its furniture over the map (the north arrow, the scale bar, the navigation group, the status chip) in the
  * states that look different: the panel at its usual width, at its widest (the map at its narrowest), at its narrowest, folded away, the
  * pointer over the map, the map turned, the keyboard on a control; and the map coordinate system dialog open, empty, with a choice, and
- * with what would change; and the export dialog (default, A4 at 300 dpi, a size that cannot be made, and a legend that leaves the map narrow). Each has what to do to the page to put it in that state. The screenshot tests photograph them
+ * with what would change; and the export dialog (default, A4 at 300 dpi, a size that cannot be made, a legend that leaves the map narrow, a picture being made, one that failed, and every layer hidden); the states the empty map and the transient notices have (nothing can be drawn, the map being redrawn, the popover loading); and the keyboard in the dialogs and on the north arrow. Each has what to do to the page to put it in that state. The screenshot tests photograph them
  * (`map-furniture.visual.ts`) and the accessibility pass checks them (`axe-states.axe.ts`).
  */
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import type { Shot } from '../support/screenshots.js';
-import { camera, dispatch, drawn, layerStatuses, stats, withData } from '../support/render.js';
+import {
+  camera,
+  contextCard,
+  dispatch,
+  drawn,
+  layerStatuses,
+  stats,
+  withData,
+} from '../support/render.js';
 import { importAsLocalGrid } from '../support/wizard.js';
 
 const KEY = 'karmania.panel';
@@ -48,8 +56,8 @@ async function in3d(page: Page): Promise<void> {
 /** The third point of `points.csv` (easting, northing): the one that the states of the selection are of (element 2). */
 const THIRD_POINT = [500060.5, 2765071.0] as const;
 
-/** Clicks the third point of the map, where the first view put it, which selects it and opens the identify popover; waits for the popover to be put, with its row. */
-async function identifyThirdPoint(page: Page): Promise<void> {
+/** Clicks the third point of the map, where the first view put it, which selects it and asks for the popover. */
+async function clickThirdPoint(page: Page): Promise<void> {
   const view = await camera(page);
   const box = await canvas(page).boundingBox();
   if (box === null) {
@@ -59,9 +67,26 @@ async function identifyThirdPoint(page: Page): Promise<void> {
     box.x + box.width / 2 + (THIRD_POINT[0] - view.centre[0]) / view.unitsPerPixel,
     box.y + box.height / 2 - (THIRD_POINT[1] - view.centre[1]) / view.unitsPerPixel,
   );
+}
+
+/** Clicks the third point, and waits for the popover to be put, with its row. */
+async function identifyThirdPoint(page: Page): Promise<void> {
+  await clickThirdPoint(page);
   await expect(page.locator('karmania-identify[placed] section')).toBeVisible();
   await expect(page.locator('karmania-identify dl')).toBeVisible();
   await page.mouse.move(0, 0);
+}
+
+/** The engine's rows are never given, so that the popover of a click has nothing to say yet (the test of its keyboard holds them back the same way). */
+async function holdRows(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const viewer = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer') as unknown as {
+      engine: { rows: (...args: unknown[]) => Promise<unknown> };
+    };
+    viewer.engine.rows = () => new Promise(() => undefined);
+  });
 }
 
 /** The whole window is what is photographed. */
@@ -98,6 +123,46 @@ async function exportSize(page: Page, label: string): Promise<void> {
   await page
     .locator('karmania-export-dialog k-select[label="Size"] select')
     .selectOption({ label });
+}
+
+/** What the export dialog makes a picture with, as the tests of the dialog change it: a picture that is being made, or one that failed, cannot be waited for. */
+type Run = (options: unknown, run: { onProgress?: (done: number) => void }) => Promise<Blob>;
+
+/** Gives the dialog a `run` that has made 40 % of the picture and never ends. */
+async function stallExport(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const dialog = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer')
+      ?.shadowRoot?.querySelector('karmania-export-dialog') as unknown as {
+      work: Record<string, unknown>;
+    };
+    const run: Run = (_options, progress) => {
+      progress.onProgress?.(0.4);
+      return new Promise<Blob>(() => undefined);
+    };
+    dialog.work = { ...dialog.work, run };
+  });
+}
+
+/** Gives the dialog a `run` that fails as the export does when the graphics card stops drawing the map. */
+async function failExport(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const dialog = document
+      .querySelector('karmania-app')
+      ?.shadowRoot?.querySelector('karmania-viewer')
+      ?.shadowRoot?.querySelector('karmania-export-dialog') as unknown as {
+      work: Record<string, unknown>;
+    };
+    const run: Run = () =>
+      Promise.reject(
+        Object.assign(new Error('The graphics card stopped.'), {
+          name: 'ExportError',
+          code: 'context_lost',
+        }),
+      );
+    dialog.work = { ...dialog.work, run };
+  });
 }
 
 /** The points are drawn, and `faults`, a local grid in feet, is not: it is a dataset the dialog has something to say about. */
@@ -357,6 +422,139 @@ export const SHOTS: Shot[] = [
         'taller than this picture has room for',
       );
       await expect(page.locator('karmania-export-dialog .frame canvas')).toBeVisible();
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // The points are drawn in a system the map is not in: nothing can be drawn, and the empty state says why, with its button to the Legend.
+    name: 'map-nothing-drawn',
+    show: async (page) => {
+      await mapWith(page);
+      await dispatch(page, {
+        type: 'setFrame',
+        frame: { mapCrs: { kind: 'local', units: 'm' }, origin: [0, 0, 0], source: 'user' },
+      });
+      await expect
+        .poll(async () => (await layerStatuses(page)).map(([, status]) => status))
+        .toEqual(['not_drawn']);
+      await expect(page.locator('karmania-map-area k-empty-state .heading')).toHaveText(
+        'Nothing can be drawn yet',
+      );
+      await page.mouse.move(0, 0);
+      return whole(page);
+    },
+  },
+  {
+    // The graphics card has taken the context away: the map is not drawn, and a notice says that it is being redrawn.
+    name: 'map-redrawing',
+    show: async (page) => {
+      await mapWith(page);
+      await contextCard(page, 'lose');
+      await expect.poll(async () => (await stats(page))?.contextLost).toBe(true);
+      await expect(page.locator('karmania-map-area .notice')).toHaveText('Redrawing the map…');
+      return whole(page);
+    },
+  },
+  {
+    // A click, and the popover is open with nothing to say yet: Loading…, with the name of the layer and the number of the point.
+    name: 'map-identify-loading',
+    show: async (page) => {
+      await mapWith(page);
+      await holdRows(page);
+      await clickThirdPoint(page);
+      await expect(page.locator('karmania-identify .note')).toHaveText('Loading…');
+      await page.mouse.move(0, 0);
+      return whole(page);
+    },
+  },
+  {
+    // The keyboard on the north arrow: its ring, and its tooltip.
+    name: 'map-north-arrow-focus',
+    show: async (page) => {
+      await mapWith(page);
+      await page.keyboard.press('Shift');
+      await page.locator('karmania-north-arrow button').focus();
+      await page
+        .locator('karmania-north-arrow k-tooltip[text="Reset to north"] .tip')
+        .waitFor({ state: 'visible' });
+      return whole(page);
+    },
+  },
+  {
+    // A search that finds nothing: the note says so, and Apply cannot be pressed.
+    name: 'map-crs-dialog-none',
+    show: async (page) => {
+      await mapWith(page);
+      await openDialog(page);
+      await page.locator('karmania-map-crs-dialog k-input input').fill('zzzzqq');
+      await expect(page.locator('karmania-map-crs-dialog .matches-note')).toHaveText(
+        'No coordinate system matches zzzzqq.',
+      );
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // The keyboard in the map coordinate system dialog, on its Cancel button: the ring inside the footer.
+    name: 'map-crs-dialog-focus',
+    show: async (page) => {
+      await mapWith(page);
+      await openDialog(page);
+      await page.keyboard.press('Shift');
+      await page.locator('karmania-map-crs-dialog k-button[slot="footer-start"]').focus();
+      return whole(page);
+    },
+  },
+  {
+    // The keyboard in the export dialog, on the size: the ring round the select.
+    name: 'map-export-dialog-focus',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await page.keyboard.press('Shift');
+      await page.locator('karmania-export-dialog k-select[label="Size"] select').focus();
+      return whole(page);
+    },
+  },
+  {
+    // A picture being made: the status says how far it is (40 %) in the room kept for it, Export is disabled, and Cancel stops it.
+    name: 'map-export-dialog-progress',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await stallExport(page);
+      await page.locator('karmania-export-dialog k-button[slot="footer-end"]').click();
+      await expect(page.locator('karmania-export-dialog .status')).toContainText(
+        /Rendering… \d+ %/,
+      );
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // A picture that could not be made: the failure is an alert with words, and Export can be pressed again.
+    name: 'map-export-dialog-failed',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await failExport(page);
+      await page.locator('karmania-export-dialog k-button[slot="footer-end"]').click();
+      await expect(page.locator('karmania-export-dialog').getByRole('alert')).toContainText(
+        'The graphics card stopped drawing the map',
+      );
+      await blur(page);
+      return whole(page);
+    },
+  },
+  {
+    // Every layer is hidden while the dialog is open: the legend's checkbox and Export are disabled, and the footer says why.
+    name: 'map-export-dialog-no-layer',
+    show: async (page) => {
+      await mapWith(page);
+      await openExport(page);
+      await dispatch(page, { type: 'setVisible', layerId: 'layer-1', visible: false });
+      await expect(page.locator('karmania-export-dialog k-checkbox input')).toBeDisabled();
       await blur(page);
       return whole(page);
     },

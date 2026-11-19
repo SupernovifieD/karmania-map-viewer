@@ -13,7 +13,7 @@ import { importAsLocalGrid } from './support/wizard.js';
  */
 
 const MESSAGE =
-  'Not drawn: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.';
+  'Not drawn: a local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:32640.';
 const HINT = "Change the map's coordinate system to the one this dataset is in.";
 
 const statuses = async (page: Page): Promise<string[]> =>

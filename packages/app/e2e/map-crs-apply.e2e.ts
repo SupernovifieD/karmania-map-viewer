@@ -17,7 +17,7 @@ async function applyCode(page: Page, code: number): Promise<void> {
   await chip(page).click();
   await expect(dialog(page)).toBeVisible();
   await search(page).fill(String(code));
-  await expect(rows(page).first()).toContainText(`EPSG ${String(code)}`);
+  await expect(rows(page).first()).toContainText(`EPSG:${String(code)}`);
   await rows(page).first().click();
   await apply(page).click();
   await expect(dialog(page)).toBeHidden();

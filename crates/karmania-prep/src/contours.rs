@@ -76,7 +76,7 @@ impl ContourError {
                     match column_type {
                         ColumnType::Utf8 => "text",
                         ColumnType::Bool => "true or false",
-                        _ => "categories",
+                        _ => "made of categories",
                     }
                 ),
                 "Make contour lines from a column of numbers.",
@@ -88,12 +88,12 @@ impl ContourError {
             ),
             Self::NoValues(name) => (
                 FindingCode::ContoursColumnNoValues,
-                format!("The column {name} has no value that contour lines can be made from: every entry is empty or not a finite number."),
+                format!("The column {name} has no value that contour lines can be made from: every entry is empty or not a number."),
                 "Make contour lines from another column.",
             ),
             Self::NoHeights => (
                 FindingCode::ContoursHeightsNone,
-                "The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.".to_string(),
+                "The mesh has no heights to make contour lines from: none of its points has a height that is a number.".to_string(),
                 "Make contour lines from a mesh whose points have heights, or from a grid.",
             ),
             Self::Levels(LevelsError::TooFar) => (
@@ -103,8 +103,8 @@ impl ContourError {
             ),
             Self::Levels(LevelsError::Invalid) => (
                 FindingCode::ContoursIntervalInvalid,
-                "The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.".to_string(),
-                "Give an interval above 0, and an index line at least every line.",
+                "The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and “Index line every” must be 1 or more.".to_string(),
+                "Give an interval above 0, a number for the base, and 1 or more for “Index line every” (a thicker line every that many levels).",
             ),
             Self::Levels(LevelsError::TooMany { count }) => (
                 FindingCode::ContoursLevelsTooMany,
@@ -1011,16 +1011,16 @@ mod tests {
     /// A reason for no contours, the code of its finding, and the values of the names in the documented message.
     type Case<'a> = (ContourError, &'a str, &'a [(&'a str, &'a str)]);
 
-    /// The documented message of a code, with its `{name}`s still in it.
-    fn documented(code: &str) -> String {
+    /// A field of the documented finding of a code (`Message` or `Hint`), with its `{name}`s still in it.
+    fn documented(code: &str, field: &str) -> String {
         let section = DOCS
             .split("\n## `")
             .find(|section| section.starts_with(&format!("{code}`")))
             .unwrap_or_else(|| panic!("{code} is not in docs/validation-codes.md"));
         section
             .lines()
-            .find_map(|line| line.strip_prefix("- Message: "))
-            .unwrap_or_else(|| panic!("{code} has no message"))
+            .find_map(|line| line.strip_prefix(&format!("- {field}: ")))
+            .unwrap_or_else(|| panic!("{code} has no {field}"))
             .to_string()
     }
 
@@ -1089,7 +1089,7 @@ mod tests {
         for (error, code, fills) in cases {
             let finding = error.finding();
             assert_eq!(finding.code.as_str(), code);
-            let mut template = documented(code);
+            let mut template = documented(code, "Message");
             for (name, value) in fills {
                 template = template.replace(name, value);
             }
@@ -1098,11 +1098,9 @@ mod tests {
                 "{code}: a name is not filled: {template}"
             );
             assert_eq!(finding.message, template, "{code}");
-            assert!(
-                finding
-                    .hint
-                    .as_deref()
-                    .is_some_and(|hint| hint.split_whitespace().count() >= 4),
+            assert_eq!(
+                finding.hint.as_deref(),
+                Some(documented(code, "Hint").as_str()),
                 "{code}"
             );
         }

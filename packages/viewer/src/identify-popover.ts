@@ -106,7 +106,8 @@ export class KarmaniaIdentify extends LitElement {
       dl {
         column-gap: var(--k-space-12);
         display: grid;
-        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+        /* A name is as wide as it is, to half the row at most: a name too long for that is cut and leaves the other half to its value. */
+        grid-template-columns: fit-content(50%) minmax(0, 1fr);
         margin: 0;
         row-gap: var(--k-space-4);
       }
@@ -275,8 +276,13 @@ export class KarmaniaIdentify extends LitElement {
       <dl>
         ${model.rows.map(
           (row) => html`
-            <dt title=${row.name}>${row.name}</dt>
-            <dd title=${row.value} ?data-numeric=${row.numeric} ?data-null=${row.isNull}>
+            <dt title=${row.name} data-truncate>${row.name}</dt>
+            <dd
+              title=${row.value}
+              data-truncate
+              ?data-numeric=${row.numeric}
+              ?data-null=${row.isNull}
+            >
               ${row.value}
             </dd>
           `,
@@ -307,7 +313,7 @@ export class KarmaniaIdentify extends LitElement {
         @keydown=${this.onKeyDown}
       >
         <header>
-          <h2 title=${model.name}>${model.name}</h2>
+          <h2 title=${model.name} data-truncate>${model.name}</h2>
           ${kButton({ icon: 'x', label: 'Close', variant: 'ghost', size: 28, onClick: this.onClose })}
         </header>
         <p class="caption">${model.caption}</p>

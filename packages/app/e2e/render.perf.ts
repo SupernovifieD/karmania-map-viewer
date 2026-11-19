@@ -11,7 +11,22 @@
  *     of the main thread over 50 ms (step 20.7);
  *   - a picture of A4 landscape at 300 dpi (3,508 by 2,480) of the million points, with a legend: made and encoded as a PNG file in under 3 s, with no task of
  *     the main thread over 50 ms while it is made (step 22.11);
+ *   - the same grid and the million points are switched to 3D and back to 2D after the rest, the blocks are switched to 3D, and the longest task of the main thread
+ *     in each switch is held to 50 ms by itself (step 24.3a), as is the longest in the time from pressing Load to the first frame, which is where the data is
+ *     prepared and uploaded to the card in chunks (section 8 of the brief: "preparing, uploading, restyling, contouring or switching views");
+ *   - the start of the page: five fresh pages, the longest task of the main thread of each from the navigation to two seconds after the map area is there, held to
+ *     50 ms (step 24.3d; the owner asked for it after the measurement of step 17.10);
  *   - no task on the main thread over 50 ms in any of them, which for the blocks includes the switch to 3D.
+ *
+ * Known, improved and still not always met (steps 24.3d and 24.R2, 2026-11-19): **the start of the page was one task of 80 to 150 ms on the development laptop** (a 1.1 GHz CPU; five
+ * fresh pages in each of two runs), made of the evaluation of the modules (about 23 ms), the first draw of the shell (55 to 75) and the first draw of the three dialogs that nobody
+ * has opened (about 50, of which the first number of the export dialog's caption starts the browser's number formatting: 15 ms). The owner answered that what is not seen is not
+ * to be drawn at the start (when nothing is loaded there is nothing to show, and what data can use is drawn when there is data), and that is what the viewer does now: the export
+ * dialog and the map's coordinate system dialog are drawn when there is data, the Data tab when it is chosen or there is data, the rail of a collapsed panel when the panel is
+ * collapsed, and `<karmania-app>` is defined a task after the modules are evaluated (`defineApp`, called from `main.ts`), so that evaluating and drawing are two tasks. Measured after
+ * (three runs of five pages, on a machine that was still busy: load 4 to 7): 8 of 15 pages had no task over 50 ms, and the others 50 to 67 ms. The test is not made easier: it can
+ * still fail on this laptop. (An earlier try that moved the dialogs to later tasks with a timer, and no lazy tab, reached 49 to 67 ms and broke three tests of the embedded viewer;
+ * it was not kept.)
  *
  * Known, and left as it is by the owner's decision (M22, 2026-11-17): the first run after the machine has been left alone (the graphics driver's cache is cold) can have
  * a task over 50 ms, which these tests then report as a failure: in the gate of M22 a callback of 197 ms in the export and one of 1,195 ms in the first draw of the
@@ -96,6 +111,12 @@ interface Measured {
   };
   /** From switching to 3D (and fitting) to the first frame that has the layer in it, in 3D, ms. */
   readonly switchMs?: number;
+  /** The longest task of the main thread while the view was switched (to 3D, and for `switchView` back to 2D as well), ms. */
+  readonly switchLongestTaskMs?: number;
+  /** From switching back to 2D to the first frame that has the layer in it, in 2D, ms (`switchView` only). */
+  readonly switchBackMs?: number;
+  /** The longest task of the main thread from pressing Load to the first frame: the data is prepared and uploaded to the card in that time, ms. */
+  readonly loadLongestTaskMs: number;
   /** From asking for new classes to the picture having them. */
   readonly restyleMs?: number;
   /** Twenty levels of contour lines: from turning them on to the engine's answer (the lines made and listed), and to the lines being drawn, in ms, with how many lines and vertices. */
@@ -124,6 +145,8 @@ interface Options {
   readonly contours?: boolean;
   /** After the first frame, the view is switched to 3D, fitted, and a scripted orbit is drawn: 300 frames of the camera going round and up and down. */
   readonly orbit?: boolean;
+  /** After the rest, the view is switched to 3D (fitted) and back to 2D, and the longest task in the switches is noted. */
+  readonly switchView?: boolean;
   /** After the first frame, a picture of A4 landscape at 300 dpi with the legend is made and encoded as a PNG file (`viewer.exportPng`). */
   readonly export?: boolean;
 }
@@ -140,6 +163,9 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
   });
   await page.addInitScript(WATCH);
   await page.goto('/?theme=light');
+  // The first mouse event that a page gets makes macOS set up the renderer's connection to the window server, once: a frame of 100 ms or more that is the browser's
+  // and not the page's (step 17.10 of the notes). It is given here, before anything is timed.
+  await page.mouse.move(1, 1);
   const w = wizard(page);
   await inPage(
     page,
@@ -190,10 +216,11 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
 
   let frames: Measured['frames'];
   let switchMs: number | undefined;
+  let switchWindow: { from: number; to: number } | undefined;
   if (options.orbit === true) {
     // To 3D: the view is switched (the camera is made from the 2D one) and fitted to the model, and the time is from the command to the first frame
     // that has the layer in it in 3D (its programs for that view are compiled meanwhile, a layer is not drawn before).
-    switchMs = await inPage<number>(
+    const orbitSwitch = await inPage<{ at: number; done: number }>(
       page,
       `const v = perf.viewer();
        const framesBefore = v.renderStats().frames;
@@ -204,8 +231,10 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
          const stats = v.renderStats();
          return stats && stats.viewMode === '3d' && stats.frames > framesBefore && stats.layersDrawn > 0;
        }, 120000);
-       return done - at;`,
+       return { at, done };`,
     );
+    switchMs = orbitSwitch.done - orbitSwitch.at;
+    switchWindow = { from: orbitSwitch.at, to: orbitSwitch.done };
   }
   if (options.path || options.orbit === true) {
     // The path: 100 frames of pan, 100 of zoom in and out, 100 of rotate, the camera given a new place each frame, and the time between
@@ -366,6 +395,34 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
     console.info(`CPU ${JSON.stringify(top)}`);
   }
 
+  let switchBackMs: number | undefined;
+  if (options.switchView === true) {
+    // To 3D, fitted, and back to 2D: each time to the first frame that has the layer in it in that view (the programs for a view are compiled when it is first
+    // shown, and a layer is not drawn before), and the window is the whole of both.
+    const both = await inPage<{ from: number; to: number; toMs: number; backMs: number }>(
+      page,
+      `const v = perf.viewer();
+       const from = performance.now();
+       const before3d = v.renderStats().frames;
+       v.setViewMode('3d');
+       v.fit();
+       const in3d = await perf.until(() => {
+         const stats = v.renderStats();
+         return stats && stats.viewMode === '3d' && stats.frames > before3d && stats.layersDrawn > 0;
+       }, 120000);
+       const before2d = v.renderStats().frames;
+       v.setViewMode('2d');
+       const in2d = await perf.until(() => {
+         const stats = v.renderStats();
+         return stats && stats.viewMode === '2d' && stats.frames > before2d && stats.layersDrawn > 0;
+       }, 120000);
+       return { from, to: in2d, toMs: in3d - from, backMs: in2d - in3d };`,
+    );
+    switchMs = both.toMs;
+    switchBackMs = both.backMs;
+    switchWindow = { from: both.from, to: both.to };
+  }
+
   let exportRun: { ms: number; bytes: number; start: number } | undefined;
   if (options.export === true) {
     // The picture and the file, through the viewer's own `exportPng` (brief 9.6: A4 landscape at 300 dpi, 3,508 by 2,480, under 3 s): the time is from asking to the Blob.
@@ -418,12 +475,37 @@ async function measure(browser: Browser, options: Options): Promise<Measured> {
       : 'unknown';
   });
   await context.close();
+  const switched = switchWindow;
   return {
     file: options.data,
     renderer,
     firstFrameMs: Math.round(first - started),
     ...(frames === undefined ? {} : { frames }),
     ...(switchMs === undefined ? {} : { switchMs: Math.round(switchMs) }),
+    ...(switchBackMs === undefined ? {} : { switchBackMs: Math.round(switchBackMs) }),
+    ...(switched === undefined
+      ? {}
+      : {
+          switchLongestTaskMs: Math.round(
+            Math.max(
+              0,
+              ...tasks
+                .filter(
+                  (task) =>
+                    task.start + task.duration >= switched.from && task.start <= switched.to,
+                )
+                .map((task) => task.duration),
+            ),
+          ),
+        }),
+    loadLongestTaskMs: Math.round(
+      Math.max(
+        0,
+        ...tasks
+          .filter((task) => task.start >= started && task.start <= first)
+          .map((task) => task.duration),
+      ),
+    ),
     ...(restyleMs === undefined ? {} : { restyleMs: Math.round(restyleMs) }),
     ...(contours === undefined ? {} : { contours }),
     ...(exportRun === undefined
@@ -476,6 +558,38 @@ test.describe('the 2D view with the large files', () => {
     console.info(`PERF-RENDER ${JSON.stringify(RESULTS)}`);
   });
 
+  test('the start of the page: the first render, in tasks of the main thread of at most 50 ms', async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    // Five fresh pages (a new context each, so the engine has compiled nothing of the page yet): the longest task of each from the start of the navigation to two
+    // seconds of quiet after the map area is there. No mouse is moved: the first mouse event of a page is the browser's own cost (step 17.10), not the page's.
+    const longest: number[] = [];
+    for (let run = 0; run < 5; run += 1) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.addInitScript(WATCH);
+      await page.goto('/?theme=light');
+      await inPage(
+        page,
+        `await perf.until(() => document.querySelector('karmania-app')?.shadowRoot?.querySelector('karmania-viewer')?.shadowRoot?.querySelector('karmania-map-area'), 30000);`,
+      );
+      await page.waitForTimeout(2000);
+      const tasks = await inPage<{ start: number; duration: number }[]>(page, 'return perf.long;');
+      longest.push(Math.round(Math.max(0, ...tasks.map((task) => task.duration))));
+      const slow = await inPage<{ start: number }[]>(page, 'return perf.slow;');
+      if (slow.length > 0) {
+        console.info(`SLOW start-up ${JSON.stringify(slow)}`);
+      }
+      await context.close();
+    }
+    console.info(`PERF-START ${JSON.stringify(longest)}`);
+    expect(
+      Math.max(...longest),
+      'longest task of the start of the page, of five',
+    ).toBeLessThanOrEqual(50);
+  });
+
   test('1,000,000 points: the first frame, and the frames of a pan, a zoom and a rotation', async ({
     browser,
   }) => {
@@ -485,9 +599,18 @@ test.describe('the 2D view with the large files', () => {
       sidecar: 'points-1m.prj',
       path: true,
       restyle: false,
+      switchView: true,
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
+    expect(
+      result.switchLongestTaskMs,
+      'longest task while switching to 3D and back',
+    ).toBeLessThanOrEqual(50);
     // The renderer drew a frame for each of the 300 changes of the camera: the gaps below are those of a page that draws, not of one that is idle.
     expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
     // Keeping up with the display, which is what the owner says the brief's "under 16.7 ms" means at 60 Hz (decision 16.F13): the median gap
@@ -530,10 +653,19 @@ test.describe('the 2D view with the large files', () => {
       sidecar: 'grid-4m.prj',
       path: false,
       restyle: true,
+      switchView: true,
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(1500);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
     expect(result.restyleMs, 'new classes visible').toBeLessThan(300);
+    expect(
+      result.switchLongestTaskMs,
+      'longest task while switching to 3D and back',
+    ).toBeLessThanOrEqual(50);
     expect(result.longestTaskMs, 'longest task of the main thread').toBeLessThanOrEqual(50);
   });
 
@@ -569,6 +701,13 @@ test.describe('the 2D view with the large files', () => {
     });
     RESULTS.push(result);
     expect(result.firstFrameMs, 'loaded to first frame').toBeLessThan(3000);
+    expect(
+      result.loadLongestTaskMs,
+      'longest task while it is prepared and uploaded',
+    ).toBeLessThanOrEqual(50);
+    expect(result.switchLongestTaskMs, 'longest task while switching to 3D').toBeLessThanOrEqual(
+      50,
+    );
     // The renderer drew a frame for each of the 300 changes of the camera: the gaps are those of a page that draws, not of one that is idle.
     expect(result.frames?.drawn, 'frames the renderer drew').toBeGreaterThanOrEqual(290);
     expect(result.frames?.p95, '95th percentile frame time of the orbit').toBeLessThan(50);

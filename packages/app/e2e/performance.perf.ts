@@ -135,6 +135,9 @@ async function measure(page: Page, data: string, sidecar: string): Promise<Measu
   });
   await page.addInitScript(WATCH);
   await page.goto('/');
+  // The first mouse event that a page gets makes macOS set up the renderer's connection to the window server, once: a frame of 100 ms or more that is the browser's
+  // and not the page's (step 17.10 of the notes). It is given here, before anything is timed.
+  await page.mouse.move(1, 1);
   const w = wizard(page);
 
   // The watch is tried before it is trusted: a task that blocks the page for 150 ms has to be seen.

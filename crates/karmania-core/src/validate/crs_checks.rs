@@ -38,7 +38,7 @@ fn check_known(code: u32, geography: CrsGeography, kinds: &dyn CrsKinds, finding
                 "EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code."
             ),
         )
-        .with_hint("Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads."),
+        .with_hint("Check the code, or choose another coordinate system in the CRS step. If the code is right, the data still loads."),
     );
 }
 

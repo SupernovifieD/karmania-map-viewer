@@ -158,6 +158,13 @@ export class KarmaniaPanel extends LitElement {
   declare notices: ReadonlyMap<number, string>;
   /** Whether the Data tab has an Import button when it is empty. */
   declare importUi: boolean;
+  /**
+   * What has been drawn of the parts that are not seen at the start (step 24.R2): the Data tab is drawn when it is chosen or when there is data (nothing is in it before),
+   * and the rail that a collapsed panel shows when the panel is collapsed. Once drawn they stay, so what is in them keeps its state.
+   */
+  private dataTabMade = false;
+  private railMade = false;
+
   /** How wide the panel is, and the least and most it can be, and the width it goes back to. */
   declare width: number;
   declare min: number;
@@ -238,6 +245,15 @@ export class KarmaniaPanel extends LitElement {
     await this.renderRoot.querySelector('karmania-data-tab')?.showRow(row);
   }
 
+  protected override willUpdate(): void {
+    if (!this.dataTabMade && (this.tab === 'data' || this.datasets.length > 0)) {
+      this.dataTabMade = true;
+    }
+    if (!this.railMade && this.collapsed) {
+      this.railMade = true;
+    }
+  }
+
   override render() {
     return html`
       <aside aria-label="Side panel">
@@ -276,53 +292,61 @@ export class KarmaniaPanel extends LitElement {
               ></karmania-legend-tab>
             </div>
             <div slot="data" class="body flush" data-scroll-region>
-              <karmania-data-tab
-                .datasets=${this.datasets}
-                .selected=${this.selected}
-                .selectedElement=${this.selectedElement}
-                .rows=${this.rows}
-                .crsInfo=${this.crsInfo}
-                .notices=${this.notices}
-                .importUi=${this.importUi}
-              ></karmania-data-tab>
+              ${
+                this.dataTabMade
+                  ? html` <karmania-data-tab
+                      .datasets=${this.datasets}
+                      .selected=${this.selected}
+                      .selectedElement=${this.selectedElement}
+                      .rows=${this.rows}
+                      .crsInfo=${this.crsInfo}
+                      .notices=${this.notices}
+                      .importUi=${this.importUi}
+                    ></karmania-data-tab>`
+                  : nothing
+              }
             </div>
           </k-tabs>
         </div>
-        <div class="rail" ?hidden=${!this.collapsed}>
-          <k-tooltip text="Expand panel" placement="left">
-            ${kButton({
-              icon: 'chevrons-left',
-              label: 'Expand panel',
-              variant: 'ghost',
-              expanded: false,
-              onClick: () => {
-                this.ask({ collapsed: false }, 'collapse');
-              },
-            })}
-          </k-tooltip>
-          <k-tooltip text="Legend" placement="left">
-            ${kButton({
-              icon: 'layers',
-              label: 'Legend',
-              variant: 'ghost',
-              expanded: false,
-              onClick: () => {
-                this.ask({ collapsed: false, tab: 'legend' }, 'tab');
-              },
-            })}
-          </k-tooltip>
-          <k-tooltip text="Data" placement="left">
-            ${kButton({
-              icon: 'table',
-              label: 'Data',
-              variant: 'ghost',
-              expanded: false,
-              onClick: () => {
-                this.ask({ collapsed: false, tab: 'data' }, 'tab');
-              },
-            })}
-          </k-tooltip>
-        </div>
+        ${
+          this.railMade
+            ? html` <div class="rail" ?hidden=${!this.collapsed}>
+                <k-tooltip text="Expand panel" placement="left">
+                  ${kButton({
+                    icon: 'chevrons-left',
+                    label: 'Expand panel',
+                    variant: 'ghost',
+                    expanded: false,
+                    onClick: () => {
+                      this.ask({ collapsed: false }, 'collapse');
+                    },
+                  })}
+                </k-tooltip>
+                <k-tooltip text="Legend" placement="left">
+                  ${kButton({
+                    icon: 'layers',
+                    label: 'Legend',
+                    variant: 'ghost',
+                    expanded: false,
+                    onClick: () => {
+                      this.ask({ collapsed: false, tab: 'legend' }, 'tab');
+                    },
+                  })}
+                </k-tooltip>
+                <k-tooltip text="Data" placement="left">
+                  ${kButton({
+                    icon: 'table',
+                    label: 'Data',
+                    variant: 'ghost',
+                    expanded: false,
+                    onClick: () => {
+                      this.ask({ collapsed: false, tab: 'data' }, 'tab');
+                    },
+                  })}
+                </k-tooltip>
+              </div>`
+            : nothing
+        }
       </aside>
     `;
   }

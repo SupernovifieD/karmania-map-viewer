@@ -6,12 +6,13 @@ change its meaning; add a new code instead. Sections are sorted by code.
 
 Every finding says what the person can do about it, as a hint: even a note that needs
 nothing done says so. A test fails if a finding is made without one. The codes whose
-step is `none` are for datasets that a program builds from arrays; a person importing a
-file meets the others. A unit test in `karmania-core` fails if a registered code is
+step is `none` are mostly for datasets that a program builds from arrays, but they are shown
+to a person like the others, and so every code is held to the same rules. A unit test in `karmania-core` fails if a registered code is
 missing here, if its severity or step disagrees with the registry, if its hint is
 missing, says "none", or is not a sentence of some length, if a message or a hint is too
-long, or (for the codes a person with a file can meet) uses a word a reader should not
-have to know (NaN, delimiter, and the like), or if this file lists a code that is not
+long, or uses a word a reader should not
+have to know (NaN, delimiter, and the like, and the whole words finite, vertex, vertices, ring,
+rings, datum, datums, geocentric), or if this file lists a code that is not
 registered. In message templates, `{name}` marks a value filled in at
 runtime. Numbers in messages use thousands separators (1,203).
 
@@ -91,9 +92,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The column {name} has no value that can be put in a class: every entry is empty or not a finite number.
+- Message: The column {name} has no value that can be put in a class: every entry is empty or not a number.
 - Hint: Colour by another column, or draw the layer in a single colour.
-- Example: The column grade has no value that can be put in a class: every entry is empty or not a finite number.
+- Example: The column grade has no value that can be put in a class: every entry is empty or not a number.
 
 ## `classes.column.not_numeric`
 
@@ -108,7 +109,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: none
 - Message: The column {name} has more than {limit} different values, so they cannot be shown as categories.
-- Hint: Divide the column into ranges instead.
+- Hint: Colour by another column, or draw the layer in a single colour. A column of numbers can also be divided into ranges.
 - Example: The column sample_id has more than 10,000 different values, so they cannot be shown as categories.
 
 ## `contours.base.too_far`
@@ -139,9 +140,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The column {name} has no value that contour lines can be made from: every entry is empty or not a finite number.
+- Message: The column {name} has no value that contour lines can be made from: every entry is empty or not a number.
 - Hint: Make contour lines from another column.
-- Example: The column elevation has no value that contour lines can be made from: every entry is empty or not a finite number.
+- Example: The column elevation has no value that contour lines can be made from: every entry is empty or not a number.
 
 ## `contours.column.not_numeric`
 
@@ -155,17 +156,17 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+- Message: The mesh has no heights to make contour lines from: none of its points has a height that is a number.
 - Hint: Make contour lines from a mesh whose points have heights, or from a grid.
-- Example: The mesh has no heights to make contour lines from: its points have no Z, or none that is a finite number.
+- Example: The mesh has no heights to make contour lines from: none of its points has a height that is a number.
 
 ## `contours.interval.invalid`
 
 - Severity: error
 - Step: none
-- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
-- Hint: Give an interval above 0, and an index line at least every line.
-- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base a number, and an index line comes every 1 line or more.
+- Message: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and “Index line every” must be 1 or more.
+- Hint: Give an interval above 0, a number for the base, and 1 or more for “Index line every” (a thicker line every that many levels).
+- Example: The settings of the contour lines cannot be used: the interval must be a number above 0, the base must be a number, and “Index line every” must be 1 or more.
 
 ## `contours.kind.unsupported`
 
@@ -196,7 +197,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: crs
 - Message: EPSG:{code} is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
-- Hint: Check the code, or choose another coordinate system in the coordinate step. If the code is right, the data still loads.
+- Hint: Check the code, or choose another coordinate system in the CRS step. If the code is right, the data still loads.
 - Example: EPSG:99999 is not one of the coordinate systems Karmania knows, so its positions cannot be checked, and the data can only be drawn on a map that uses the same code.
 
 ## `crs.geographic.axes_swapped`
@@ -235,9 +236,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:{code}.
+- Message: A local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:{code}.
 - Hint: Draw it with other local grids, or give the data a coordinate system by its EPSG code.
-- Example: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+- Example: A local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:32640.
 
 ## `crs.transform.not_finite`
 
@@ -253,7 +254,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Step: none
 - Message: Positions cannot be converted to or from EPSG:{code}: {reason}.
 - Hint: Choose another coordinate system for the map; the positions of the data are kept as they are.
-- Example: Positions cannot be converted to or from EPSG:2085: it needs files for shifting between datums, which are not available.
+- Example: Positions cannot be converted to or from EPSG:2085: it needs extra files for shifting its positions, which are not available.
 
 ## `csv.blocks.duplicate`
 
@@ -379,17 +380,17 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: The per-vertex table has {rows} rows, but the dataset has {count} vertices.
-- Hint: Give every vertex exactly one value in each column.
-- Example: The per-vertex table has 3 rows, but the dataset has 4 vertices.
+- Message: The per-point table has {rows} rows, but the dataset has {count} points.
+- Hint: Give every point exactly one value in each column.
+- Example: The per-point table has 3 rows, but the dataset has 4 points.
 
 ## `dataset.vertex_attributes.unsupported`
 
 - Severity: warning
 - Step: none
-- Message: Per-vertex attributes are only used for lines and meshes, so they are ignored for {things}.
+- Message: Per-point attributes are only used for lines and meshes, so they are ignored for {things}.
 - Hint: Move those values to the attribute table, or remove them.
-- Example: Per-vertex attributes are only used for lines and meshes, so they are ignored for points.
+- Example: Per-point attributes are only used for lines and meshes, so they are ignored for points.
 
 ## `display.blocks.other_crs`
 
@@ -403,9 +404,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: info
 - Step: none
-- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from {units} to {map units}; heights are drawn as given.
-- Hint: If they are different grids, their positions will not line up, and if its heights are in the same units, they will look stretched.
-- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's, and its horizontal positions are scaled from feet to metres; heights are drawn as given.
+- Message: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from {units} to {map units}, and its heights are left as they are.
+- Hint: Check that the datasets are on the same grid. If they are not, remove one of them, or import it again with an EPSG code in the CRS step.
+- Example: Local grids have no place on the Earth, so this one is taken to be the same grid as the map's: its horizontal positions are scaled from feet to metres, and its heights are left as they are.
 
 ## `display.crs.not_convertible`
 
@@ -413,7 +414,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Step: none
 - Message: Not drawn: {the reason the positions cannot be converted to the map's coordinate system}
 - Hint: Change the map's coordinate system to the one this dataset is in.
-- Example: Not drawn: A local grid has no known place on the Earth, so its positions cannot be converted to or from EPSG:32640.
+- Example: Not drawn: a local grid has no known place on the Earth, so positions cannot be converted between it and EPSG:32640.
 
 ## `display.extent.none`
 
@@ -452,16 +453,16 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: warning
 - Step: none
 - Message: Some polygons could not be filled in, so only their outlines are drawn.
-- Hint: Check that no ring crosses itself or another ring, and that each polygon has some area.
+- Hint: Check that no outline crosses itself or another, and that each polygon has some area.
 - Example: Some polygons could not be filled in, so only their outlines are drawn.
 
 ## `display.polygons.too_detailed`
 
 - Severity: warning
 - Step: none
-- Message: Some polygons are too detailed to fill in (more than {limit} vertices, or too many holes for their size), so only their outlines are drawn.
+- Message: Some polygons are too detailed to fill in (more than {limit} corners, or too many holes for their size), so only their outlines are drawn.
 - Hint: Simplify the polygons, or split them into smaller ones, to fill them in.
-- Example: Some polygons are too detailed to fill in (more than 100,000 vertices, or too many holes for their size), so only their outlines are drawn.
+- Example: Some polygons are too detailed to fill in (more than 100,000 corners, or too many holes for their size), so only their outlines are drawn.
 
 ## `file.empty`
 
@@ -603,9 +604,9 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: file
-- Message: Some polygon rings do not end where they start; they were closed.
-- Hint: In GeoJSON the last position of a ring repeats the first.
-- Example: Some polygon rings do not end where they start; they were closed.
+- Message: Some polygon outlines do not end where they start; they were closed.
+- Hint: In GeoJSON the last position of a outline repeats the first.
+- Example: Some polygon outlines do not end where they start; they were closed.
 
 ## `geojson.structure.invalid`
 
@@ -653,7 +654,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Step: none
 - Message: The position of the {grid or block model} must be made of numbers, but its corner is {x}, {y}, {z}.
 - Hint: Give the X, Y and Z of the grid's lower corner.
-- Example: The position of the grid must be made of numbers, but its corner is 0, NaN, 0.
+- Example: The position of the grid must be made of numbers, but its corner is 0, not a number, 0.
 
 ## `lattice.rotation.not_finite`
 
@@ -675,24 +676,24 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: none
-- Message: Some lines have fewer than 2 vertices, so they cannot be drawn.
-- Hint: Remove those lines or add the missing vertices.
-- Example: Some lines have fewer than 2 vertices, so they cannot be drawn.
+- Message: Some lines have fewer than 2 points, so they cannot be drawn.
+- Hint: Remove those lines or add the missing points.
+- Example: Some lines have fewer than 2 points, so they cannot be drawn.
 
 ## `lines.offsets.bad_end`
 
 - Severity: error
 - Step: none
-- Message: The list that says where each line starts must end with the number of vertices ({expected}), but it ends with {actual}.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: The list that says where each line starts must end with the number of vertices (5), but it ends with 4.
+- Message: The list that says where each line starts must end with the number of points ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of points, and never go backwards.
+- Example: The list that says where each line starts must end with the number of points (5), but it ends with 4.
 
 ## `lines.offsets.bad_start`
 
 - Severity: error
 - Step: none
 - Message: The list that says where each line starts must start with 0, but it starts with {actual}.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Hint: Start with 0, end with the number of points, and never go backwards.
 - Example: The list that says where each line starts must start with 0, but it starts with 1.
 
 ## `lines.offsets.decreasing`
@@ -700,16 +701,16 @@ runtime. Numbers in messages use thousands separators (1,203).
 - Severity: error
 - Step: none
 - Message: Some lines end before they start.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
+- Hint: Start with 0, end with the number of points, and never go backwards.
 - Example: Some lines end before they start.
 
 ## `lines.offsets.empty`
 
 - Severity: error
 - Step: none
-- Message: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices ({expected}).
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: The list that says where each line starts is empty. It must start with 0 and end with the number of vertices (3).
+- Message: The list that says where each line starts is empty. It must start with 0 and end with the number of points ({expected}).
+- Hint: Start with 0, end with the number of points, and never go backwards.
+- Example: The list that says where each line starts is empty. It must start with 0 and end with the number of points (3).
 
 ## `mapping.block_size.invalid`
 
@@ -787,17 +788,17 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: The triangle list ends with an incomplete triangle: it has {count} vertex numbers, which is not a multiple of 3.
-- Hint: Give three vertex numbers for every triangle.
-- Example: The triangle list ends with an incomplete triangle: it has 5 vertex numbers, which is not a multiple of 3.
+- Message: The triangle list ends with an incomplete triangle: it has {count} point numbers, which is not a multiple of 3.
+- Hint: Give three point numbers for every triangle.
+- Example: The triangle list ends with an incomplete triangle: it has 5 point numbers, which is not a multiple of 3.
 
 ## `mesh.indices.out_of_range`
 
 - Severity: error
 - Step: none
-- Message: Some triangles use vertex numbers that do not exist: the mesh has {count} vertices.
-- Hint: Vertex numbers start at 0 and must be lower than the number of vertices.
-- Example: Some triangles use vertex numbers that do not exist: the mesh has 3 vertices.
+- Message: Some triangles use point numbers that do not exist: the mesh has {count} points.
+- Hint: Point numbers start at 0 and must be lower than the number of points.
+- Example: Some triangles use point numbers that do not exist: the mesh has 3 points.
 
 ## `mesh.triangle.degenerate`
 
@@ -811,17 +812,17 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: info
 - Step: none
-- Message: Some vertices are not used by any triangle.
+- Message: Some points of the mesh are not used by any triangle.
 - Hint: They do no harm. Remove them if you do not need them.
-- Example: Some vertices are not used by any triangle.
+- Example: Some points of the mesh are not used by any triangle.
 
 ## `obj.face.invalid`
 
 - Severity: warning
 - Step: file
-- Message: Some faces have fewer than three corners or a vertex number that cannot be used, so they were left out.
-- Hint: Vertex numbers count from 1, or from the end if negative.
-- Example: Some faces have fewer than three corners or a vertex number that cannot be used, so they were left out.
+- Message: Some faces have fewer than three corners or a point number that cannot be used, so they were left out.
+- Hint: Point numbers count from 1, or from the end if negative.
+- Example: Some faces have fewer than three corners or a point number that cannot be used, so they were left out.
 
 ## `obj.faces.triangulated`
 
@@ -835,113 +836,113 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: file
-- Message: The file has no vertices and faces to build a mesh from.
-- Hint: A mesh file needs "v" lines for the vertices and "f" lines for the faces.
-- Example: The file has no vertices and faces to build a mesh from.
+- Message: The file has no points and faces to build a mesh from.
+- Hint: A mesh file needs "v" lines for the points and "f" lines for the faces.
+- Example: The file has no points and faces to build a mesh from.
 
 ## `obj.records.unsupported`
 
 - Severity: warning
 - Step: file
-- Message: Some lines are not vertices or faces (lines, points, curves or unknown records), so they were left out.
+- Message: Some lines are not points or faces of a mesh (they are lines, points, curves or unknown records), so they were left out.
 - Hint: Only triangle meshes can be imported.
-- Example: Some lines are not vertices or faces (lines, points, curves or unknown records), so they were left out.
+- Example: Some lines are not points or faces of a mesh (they are lines, points, curves or unknown records), so they were left out.
 
 ## `obj.vertex.extra_values`
 
 - Severity: info
 - Step: none
-- Message: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
+- Message: Some points have more than three numbers (a weight or a colour); only the first three were used.
 - Hint: Only X, Y and Z are used. Nothing needs fixing.
-- Example: Some vertices have more than three numbers (a weight or a colour); only the first three were used.
+- Example: Some points have more than three numbers (a weight or a colour); only the first three were used.
 
 ## `obj.vertex.invalid`
 
 - Severity: error
 - Step: file
-- Message: Some vertex lines do not have three numbers.
-- Hint: Each vertex line is "v" followed by x, y and z.
-- Example: Some vertex lines do not have three numbers.
+- Message: Some "v" lines (the points of the mesh) do not have three numbers.
+- Hint: Each "v" line is "v" followed by x, y and z.
+- Example: Some "v" lines (the points of the mesh) do not have three numbers.
 
 ## `polygons.polygon.no_rings`
 
 - Severity: error
 - Step: none
-- Message: Some polygons have no rings, so they have no outline.
-- Hint: Remove those polygons or give each one an outer ring.
-- Example: Some polygons have no rings, so they have no outline.
+- Message: Some polygons have no outline at all, so they cannot be drawn.
+- Hint: Remove those polygons or give each one an outline.
+- Example: Some polygons have no outline at all, so they cannot be drawn.
 
 ## `polygons.polygon_offsets.bad_end`
 
 - Severity: error
 - Step: none
-- Message: The list that says which rings belong to each polygon must end with the number of rings ({expected}), but it ends with {actual}.
-- Hint: Start with 0, end with the number of rings, and never go backwards.
-- Example: The list that says which rings belong to each polygon must end with the number of rings (2), but it ends with 1.
+- Message: The list that says which outlines belong to each polygon must end with the number of outlines ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of outlines, and never go backwards.
+- Example: The list that says which outlines belong to each polygon must end with the number of outlines (2), but it ends with 1.
 
 ## `polygons.polygon_offsets.bad_start`
 
 - Severity: error
 - Step: none
-- Message: The list that says which rings belong to each polygon must start with 0, but it starts with {actual}.
-- Hint: Start with 0, end with the number of rings, and never go backwards.
-- Example: The list that says which rings belong to each polygon must start with 0, but it starts with 1.
+- Message: The list that says which outlines belong to each polygon must start with 0, but it starts with {actual}.
+- Hint: Start with 0, end with the number of outlines, and never go backwards.
+- Example: The list that says which outlines belong to each polygon must start with 0, but it starts with 1.
 
 ## `polygons.polygon_offsets.decreasing`
 
 - Severity: error
 - Step: none
 - Message: Some polygons end before they start.
-- Hint: Start with 0, end with the number of rings, and never go backwards.
+- Hint: Start with 0, end with the number of outlines, and never go backwards.
 - Example: Some polygons end before they start.
 
 ## `polygons.polygon_offsets.empty`
 
 - Severity: error
 - Step: none
-- Message: The list that says which rings belong to each polygon is empty. It must start with 0 and end with the number of rings ({expected}).
-- Hint: Start with 0, end with the number of rings, and never go backwards.
-- Example: The list that says which rings belong to each polygon is empty. It must start with 0 and end with the number of rings (2).
+- Message: The list that says which outlines belong to each polygon is empty. It must start with 0 and end with the number of outlines ({expected}).
+- Hint: Start with 0, end with the number of outlines, and never go backwards.
+- Example: The list that says which outlines belong to each polygon is empty. It must start with 0 and end with the number of outlines (2).
 
 ## `polygons.ring.too_short`
 
 - Severity: error
 - Step: none
-- Message: Some rings have fewer than 3 vertices, so they cannot enclose an area.
-- Hint: Remove those rings or add the missing vertices.
-- Example: Some rings have fewer than 3 vertices, so they cannot enclose an area.
+- Message: Some outlines have fewer than 3 corners, so they cannot enclose an area.
+- Hint: Remove those outlines or add the missing corners.
+- Example: Some outlines have fewer than 3 corners, so they cannot enclose an area.
 
 ## `polygons.ring_offsets.bad_end`
 
 - Severity: error
 - Step: none
-- Message: The list that says where each ring starts must end with the number of vertices ({expected}), but it ends with {actual}.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: The list that says where each ring starts must end with the number of vertices (9), but it ends with 7.
+- Message: The list that says where each outline starts must end with the number of corners ({expected}), but it ends with {actual}.
+- Hint: Start with 0, end with the number of corners, and never go backwards.
+- Example: The list that says where each outline starts must end with the number of corners (9), but it ends with 7.
 
 ## `polygons.ring_offsets.bad_start`
 
 - Severity: error
 - Step: none
-- Message: The list that says where each ring starts must start with 0, but it starts with {actual}.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: The list that says where each ring starts must start with 0, but it starts with 1.
+- Message: The list that says where each outline starts must start with 0, but it starts with {actual}.
+- Hint: Start with 0, end with the number of corners, and never go backwards.
+- Example: The list that says where each outline starts must start with 0, but it starts with 1.
 
 ## `polygons.ring_offsets.decreasing`
 
 - Severity: error
 - Step: none
-- Message: Some rings end before they start.
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: Some rings end before they start.
+- Message: Some outlines end before they start.
+- Hint: Start with 0, end with the number of corners, and never go backwards.
+- Example: Some outlines end before they start.
 
 ## `polygons.ring_offsets.empty`
 
 - Severity: error
 - Step: none
-- Message: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices ({expected}).
-- Hint: Start with 0, end with the number of vertices, and never go backwards.
-- Example: The list that says where each ring starts is empty. It must start with 0 and end with the number of vertices (3).
+- Message: The list that says where each outline starts is empty. It must start with 0 and end with the number of corners ({expected}).
+- Hint: Start with 0, end with the number of corners, and never go backwards.
+- Example: The list that says where each outline starts is empty. It must start with 0 and end with the number of corners (3).
 
 ## `prj.unrecognized`
 
@@ -955,7 +956,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: warning
 - Step: nodata
-- Message: The {column or per-vertex column} "{name}" has no values: every entry is empty.
+- Message: The {column or per-point column} "{name}" has no values: every entry is empty.
 - Hint: Ignore this column, or check which values you marked as no data.
 - Example: The column "ag" has no values: every entry is empty.
 
@@ -963,7 +964,7 @@ runtime. Numbers in messages use thousands separators (1,203).
 
 - Severity: error
 - Step: none
-- Message: Some values in the {column or per-vertex column} "{name}" refer to categories that do not exist.
+- Message: Some values in the {column or per-point column} "{name}" refer to categories that do not exist.
 - Hint: Every category code must point at one of the listed category names.
 - Example: Some values in the column "rock" refer to categories that do not exist.
 
