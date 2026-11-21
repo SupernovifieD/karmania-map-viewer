@@ -8,7 +8,7 @@ This release completes Phase 2: drawing maps. You can bring in files, see them o
 
 ### What it does
 
-- **Coordinate systems.** The import wizard finds an EPSG code by its number or its name, and the Data tab shows the name and unit with the code. Coordinates that could not be longitudes and latitudes are reported. A map is drawn in one coordinate system, chosen by the first dataset that can be drawn (a geographic dataset gets the WGS 84 / UTM zone of its centre, and a note says which). You can change it from the bottom left of the map, and the dialog lists what would start or stop being drawn. Other datasets are converted to it first. Heights are never converted.
+- **Coordinate systems.** The import wizard finds an EPSG code by its number or its name, and the Data tab shows the name and unit with the code. Coordinates that could not be longitudes and latitudes are reported. A map is drawn in one coordinate system, chosen by the first dataset that can be drawn (a geographic dataset gets the WGS 84 / UTM zone of its centre, and a note says which). You can change it from the bottom left of the map, and the dialog lists what would start or stop being drawn. Other datasets are converted to it first, where that can be done (see the limits below). Heights are never converted.
 - **Maps in 2D and 3D.** Points, lines, polygons, meshes, grids (each cell drawn on its own, never blurred into its neighbours) and block models. The 2D view looks straight down: pan, zoom and turn, nothing tilts. The 3D view is a perspective view you can orbit, pan and zoom, with the heights exaggerated 2, 3, 5 or 10 times if you want (a choice in the app's toolbar). There is a north arrow that turns with the map (a click puts north up), a scale bar in 2D (not on a map in longitude and latitude), zoom buttons, and, in 2D, the place under the pointer with the map's coordinate system. The map, the legend and the dialogs can all be used with the keyboard.
 - **Legend.** Layers in an order you choose (the top of the list is drawn on top), in groups, shown or hidden. A layer is one colour, or coloured by a column in classes (equal intervals, quantiles, natural breaks or categories) with a colour ramp you choose, and has its own opacity, point size or line width. A layer that cannot be drawn says why and what to do.
 - **Contours.** Contour lines from a grid (by a column) or from a mesh (by its heights), at an interval you choose. They are a dataset of their own: under their source in the Data tab, and in the legend as a layer just above it, drawn over it.
@@ -36,7 +36,7 @@ Measured in a real browser, on a Mac with Intel Iris Plus graphics, on the files
 | Model of 1,000,000 blocks: orbiting in 3D | 95th percentile 17.3 to 18.7 ms |
 | Export at A4, 300 dpi (3,508 x 2,480) | 0.71 to 0.88 s |
 
-Details, and the three places where a goal was missed, are in `docs/perf.md` and under "Limits to know about".
+The three places where a goal was missed are under "Limits to know about".
 
 ### Checked by
 
