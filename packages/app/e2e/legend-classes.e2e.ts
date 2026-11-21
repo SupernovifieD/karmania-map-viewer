@@ -243,11 +243,9 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     expect(note).toMatch(
       /^Natural breaks, found from an evenly spaced sample of [\d,]+ of the 10,201 values\. The counts are of every value\.$/,
     );
-    // The sample is part of the values, and no more than natural breaks take.
+    // The sample is the 10,000 values that natural breaks are found from (an evenly strided one, so the same every time), out of the 10,201 there are.
     const used = Number(/sample of ([\d,]+) of/.exec(note ?? '')?.[1]?.replace(/,/g, ''));
-    expect(used).toBeGreaterThan(0);
-    expect(used).toBeLessThanOrEqual(10_000);
-    expect(used).toBeLessThan(10_201);
+    expect(used).toBe(10_000);
     // A screen reader gets the same words, and the counts are of every value, as the note says.
     await expect(group).toHaveAttribute('aria-description', note ?? '');
     expect((await counts(page, 'layer-1')).reduce((sum, n) => sum + n, 0)).toBe(10_201);
