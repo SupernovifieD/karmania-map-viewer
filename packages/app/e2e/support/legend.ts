@@ -23,17 +23,18 @@ export const groupRow = (page: Page, id: string): Locator =>
 export const showLegend = (page: Page): Promise<void> =>
   page.getByRole('tab', { name: 'Legend', exact: true }).click();
 
-/** A grid of 4 by 4 cells with the values 1 to 16 (or `values`, a NaN being a cell with no value). */
+/** A grid of 4 by 4 cells with the values 1 to 16 (or `values`, a NaN being a cell with no value), or of `side` by `side` cells with the values 1 to their number. */
 function gridSpec(
   name: string,
   values: readonly number[] = Array.from({ length: 16 }, (_, i) => i + 1),
+  side = 4,
 ): LatticeSpec {
   return {
     name,
     crs: { kind: 'epsg', code: 32640 },
     origin: [EAST, NORTH, 0],
     spacing: [10, 10, 1],
-    dims: [4, 4, 1],
+    dims: [side, side, 1],
     values,
   };
 }
@@ -60,6 +61,21 @@ export async function loadGrid(
   values?: readonly number[],
 ): Promise<void> {
   await loadLattice(page, 'grid', gridSpec(name, values));
+  await untilDrawn(page, count);
+}
+
+/**
+ * A grid of `side` by `side` cells with the values 1 to `side * side`, for a test that needs more values than the engine takes all of for natural breaks
+ * (10,000: a `side` of 101 has 10,201). Waits until `count` layers are drawn.
+ */
+export async function loadLargeGrid(
+  page: Page,
+  name: string,
+  count: number,
+  side: number,
+): Promise<void> {
+  const values = Array.from({ length: side * side }, (_, i) => i + 1);
+  await loadLattice(page, 'grid', gridSpec(name, values, side));
   await untilDrawn(page, count);
 }
 

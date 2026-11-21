@@ -958,6 +958,8 @@ export class KarmaniaLegendTab extends LitElement {
                 role="group"
                 id=${classes}
                 aria-label=${`Classes of ${layer.name}`}
+                aria-description=${layer.classesNote ?? nothing}
+                title=${layer.classesNote ?? nothing}
                 data-level=${String(level)}
               >
                 ${layer.classes.map((entry) => this.entry(entry))}

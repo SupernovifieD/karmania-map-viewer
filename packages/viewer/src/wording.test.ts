@@ -6,9 +6,10 @@
  *
  * The raw text that an engine fault carries (the layer's `failed` hint quotes what the program said) is not words of the viewer's: only what the viewer writes is read.
  */
-import type { DrawableEntry, FrameChoice } from '@karmania/engine/display';
+import type { ClassBreaks, DrawableEntry, FrameChoice } from '@karmania/engine/display';
 import type { CrsRef, Finding } from '@karmania/engine/types';
 import type { Summary } from '@karmania/engine';
+import { classesNote } from '@karmania/scene';
 import { describe, expect, it } from 'vitest';
 import { errorText, problemText, progressText, warningText } from './export-options.js';
 import { layerNotice } from './layer-notice.js';
@@ -144,5 +145,19 @@ describe('the words of the export dialog', () => {
   it('says how far the picture is in a plain status', () => {
     plain(progressText(0.4));
     plain(progressText(0.9));
+  });
+});
+
+describe('the words of the legend', () => {
+  it('has a plain sentence for the note under natural breaks that were found from a sample', () => {
+    const breaks: ClassBreaks = {
+      kind: 'ranges',
+      column: 'z',
+      bounds: [0, 4, 9],
+      counts: [60_000, 1_144_000],
+      nulls: 7,
+      sampled: 10_000,
+    };
+    plain(classesNote(breaks));
   });
 });
