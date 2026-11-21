@@ -5,7 +5,7 @@
  */
 import type { ClassBreaks, DrawableEntry } from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
-import { classColours, classEntries, type ClassEntry } from './class-entries.js';
+import { classColours, classEntries, classesNote, type ClassEntry } from './class-entries.js';
 import { rampById, sampleRamp } from './ramps.js';
 import type { Layer, LayerId, SceneDocument } from './types.js';
 
@@ -48,6 +48,8 @@ export interface LegendLayerEntry {
   readonly swatch: LayerSwatch;
   /** The lines under the layer: only for a layer that is coloured by classes, is drawn and has been classified. */
   readonly classes: readonly ClassEntry[];
+  /** Present when the lines were found from a sample of the values, and then only as the lines are: the Legend tab shows it as a tooltip on them. */
+  readonly classesNote?: string;
 }
 
 /** Whether all, some or none of the layers of a group are on. A group with no layers has `none`. */
@@ -114,11 +116,13 @@ function layerEntry(layer: Layer, inputs: LegendInputs): LegendLayerEntry {
   const colour = layer.style.colour;
   let swatch: LayerSwatch;
   let classes: readonly ClassEntry[] = [];
+  let note: string | undefined;
   if (colour.mode === 'single') {
     swatch = { kind: 'colour', colour: colour.value };
   } else if (breaks !== undefined) {
     swatch = { kind: 'ramp', colours: classColours(colour, breaks) };
     classes = drawn ? classEntries(colour, breaks) : [];
+    note = drawn ? classesNote(breaks) : undefined;
   } else {
     const ramp = rampById(colour.ramp);
     if (ramp === undefined) {
@@ -135,7 +139,11 @@ function layerEntry(layer: Layer, inputs: LegendInputs): LegendLayerEntry {
     swatch,
     classes,
   };
-  return notice === undefined ? entry : { ...entry, notice };
+  return {
+    ...entry,
+    ...(notice === undefined ? {} : { notice }),
+    ...(note === undefined ? {} : { classesNote: note }),
+  };
 }
 
 function visibilityOf(layers: readonly LegendLayerEntry[]): GroupVisibility {

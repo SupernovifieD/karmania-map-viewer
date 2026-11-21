@@ -63,6 +63,7 @@ export {
   classColours,
   classCount,
   classEntries,
+  classesNote,
 } from './class-entries.js';
 export type { ClassEntry } from './class-entries.js';
 export { BOUND_DASH, MINUS, formatBounds, formatCount, formatNumber } from './numbers.js';
