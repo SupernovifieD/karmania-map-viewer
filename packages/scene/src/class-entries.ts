@@ -82,3 +82,16 @@ export function classEntries(colour: ClassColour, breaks: ClassBreaks): readonly
   }
   return entries;
 }
+
+/**
+ * What the legend says under the lines of natural breaks that were found from a sample of the values (the engine says so with `sampled`, and only for a
+ * column of more than 10,000 values): how many they were found from, of how many there are, and that the counts are of every value. Nothing for classes
+ * that were found from every value, and for categories.
+ */
+export function classesNote(breaks: ClassBreaks): string | undefined {
+  if (breaks.kind !== 'ranges' || breaks.sampled === undefined) {
+    return undefined;
+  }
+  const values = breaks.counts.reduce((sum, count) => sum + count, 0);
+  return `Natural breaks, found from an evenly spaced sample of ${formatCount(breaks.sampled)} of the ${formatCount(values)} values. The counts are of every value.`;
+}

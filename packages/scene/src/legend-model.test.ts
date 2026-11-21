@@ -1,7 +1,7 @@
 import type { ClassBreaks, DrawableEntry } from '@karmania/engine/display';
 import type { Finding } from '@karmania/engine/types';
 import { describe, expect, it } from 'vitest';
-import { classColours } from './class-entries.js';
+import { classColours, classesNote } from './class-entries.js';
 import { removeLayersOfDataset, setVisible } from './commands-layers.js';
 import { setGroupCollapsed } from './commands-legend.js';
 import { emptyScene } from './empty.js';
@@ -165,6 +165,21 @@ describe('legendModel: the swatch and the lines under a layer', () => {
       ['50 – 100', '70', colours[1]],
       ['No value', '4', null],
     ]);
+  });
+
+  it('carries the note of natural breaks that were found from a sample, for a layer that is drawn, and has none for other classes or for a layer that is not drawn', () => {
+    const sampled: ClassBreaks = { ...breaks, sampled: 10_000 };
+    const note = layer(legendModel(sampleScene(), { breaks: { 'layer-1': sampled } }), 'layer-1');
+    expect(note.classesNote).toBe(classesNote(sampled));
+    expect(note.classesNote).toContain('10,000 of the 100 values');
+    const plain = layer(legendModel(sampleScene(), { breaks: { 'layer-1': breaks } }), 'layer-1');
+    expect(plain).not.toHaveProperty('classesNote');
+    const drawable = [entry(1, 'not_drawn', [finding('warning', 'Not drawn.', 'Change it.')])];
+    const hidden = legendModel(sampleScene(), { breaks: { 'layer-1': sampled }, drawable });
+    expect(layer(hidden, 'layer-1')).not.toHaveProperty('classesNote');
+    // A layer in one colour has no classes, so it has no note even if the engine gave breaks for it.
+    const single = legendModel(sampleScene(), { breaks: { 'layer-2': sampled } });
+    expect(layer(single, 'layer-2')).not.toHaveProperty('classesNote');
   });
 
   it('is not fooled by a layer id that is a name every object has, or by no breaks at all', () => {
