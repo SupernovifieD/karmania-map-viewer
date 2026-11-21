@@ -1,7 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { expectNoSeriousViolations } from './support/axe.js';
-import { groupRow, layerRow, legend, loadGrid, showLegend } from './support/legend.js';
+import {
+  groupRow,
+  layerRow,
+  legend,
+  loadGrid,
+  loadLargeGrid,
+  showLegend,
+} from './support/legend.js';
 import { dispatch } from './support/render.js';
 
 /**
@@ -205,6 +212,50 @@ test.describe('the class lines of a layer in the Legend tab', () => {
     await dispatch(page, style(5));
     await expect.poll(() => lines(page, 'layer-1').count()).toBe(5);
     await expect(layerRow(page, 'layer-1')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('says in a tooltip of its lines, and to a screen reader, that natural breaks were found from a sample (how many values of how many), and says nothing when every value was used', async ({
+    page,
+  }) => {
+    await page.goto('/?theme=light');
+    // 101 by 101 cells: 10,201 values, which is more than the 10,000 that natural breaks are found from.
+    await loadLargeGrid(page, 'Seismic', 1, 101);
+    await showLegend(page);
+    const by = (method: string, classesWanted: number) => ({
+      type: 'setStyle',
+      layerId: 'layer-1',
+      patch: {
+        colour: {
+          mode: 'classes',
+          column: 'value',
+          method,
+          classes: classesWanted,
+          ramp: 'viridis',
+          reverse: false,
+        },
+      },
+    });
+    await dispatch(page, by('jenks', 5));
+    await opener(layerRow(page, 'layer-1')).click();
+    await expect.poll(() => lines(page, 'layer-1').count()).toBe(5);
+    const group = classes(page, 'layer-1');
+    const note = await group.getAttribute('title');
+    expect(note).toMatch(
+      /^Natural breaks, found from an evenly spaced sample of [\d,]+ of the 10,201 values\. The counts are of every value\.$/,
+    );
+    // The sample is part of the values, and no more than natural breaks take.
+    const used = Number(/sample of ([\d,]+) of/.exec(note ?? '')?.[1]?.replace(/,/g, ''));
+    expect(used).toBeGreaterThan(0);
+    expect(used).toBeLessThanOrEqual(10_000);
+    expect(used).toBeLessThan(10_201);
+    // A screen reader gets the same words, and the counts are of every value, as the note says.
+    await expect(group).toHaveAttribute('aria-description', note ?? '');
+    expect((await counts(page, 'layer-1')).reduce((sum, n) => sum + n, 0)).toBe(10_201);
+    // Equal intervals are found from every value: the note goes with the natural breaks.
+    await dispatch(page, by('equal', 4));
+    await expect.poll(() => lines(page, 'layer-1').count()).toBe(4);
+    await expect(group).not.toHaveAttribute('title', /./);
+    await expect(group).not.toHaveAttribute('aria-description', /./);
   });
 
   test('has no serious accessibility violation with two layers open, one with a "No value" line, and a row that has the keyboard', async ({

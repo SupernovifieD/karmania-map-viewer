@@ -1,6 +1,12 @@
 import type { ClassBreaks } from '@karmania/engine/display';
 import { describe, expect, it } from 'vitest';
-import { OTHER_COLOUR, classColours, classCount, classEntries } from './class-entries.js';
+import {
+  OTHER_COLOUR,
+  classColours,
+  classCount,
+  classEntries,
+  classesNote,
+} from './class-entries.js';
 import { MINUS } from './numbers.js';
 import { contrastOnMaps } from './palettes.js';
 import { rampById, sampleRamp } from './ramps.js';
@@ -177,5 +183,34 @@ describe('the lines under a layer, by categories', () => {
       nulls: 0,
     });
     expect(entries.map((e) => e.label)).toEqual(['a']);
+  });
+});
+
+describe('the note under classes that were found from a sample', () => {
+  it('says how many values the natural breaks were found from, of how many there are, and that the counts are of every value', () => {
+    const sampled: ClassBreaks = {
+      kind: 'ranges',
+      column: 'z',
+      bounds: [0, 4, 9],
+      counts: [60_000, 1_144_000],
+      nulls: 7,
+      sampled: 10_000,
+    };
+    expect(classesNote(sampled)).toBe(
+      'Natural breaks, found from an evenly spaced sample of 10,000 of the 1,204,000 values. The counts are of every value.',
+    );
+  });
+
+  it('is nothing when every value was used, and for categories, which are never found from a sample', () => {
+    expect(classesNote(ranges([0, 4, 9], [3, 5], 1))).toBeUndefined();
+    expect(
+      classesNote({
+        kind: 'categories',
+        column: 'r',
+        values: ['a'],
+        counts: [4],
+        nulls: 0,
+      }),
+    ).toBeUndefined();
   });
 });
