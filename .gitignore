@@ -37,3 +37,5 @@ blob-report/
 !/docs/design-tokens.md
 !/docs/dependencies.md
 !/docs/embedding.md
+# The pictures the README shows (small JPEGs; keep them small, they stay in history for good)
+!/docs/images/
