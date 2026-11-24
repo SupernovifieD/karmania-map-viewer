@@ -2,6 +2,38 @@
 
 What changed in each release, newest first. The notes of a release on GitHub are its entry here.
 
+## 0.2.1 - 2026-11-24
+
+A small release on top of 0.2.0: one fix to the interface, and a README that shows the app. How data is read, checked, drawn and exported has not changed.
+
+### What changed
+
+- **The icon of an icon-only button is now in the middle of it.** A button that has an icon and no words (the four navigation buttons at the bottom right of the map, the button that collapses the panel, and the others like them) drew its icon 4 px to the left of the middle: the empty text of the button was hidden but still took the 8 px gap beside the icon. It is taken out of the row now. Two browser tests measure it: one over every icon-only button of the component gallery, in every variant and size, and one over the four navigation buttons. Both fail without the fix.
+- **The README shows the app.** It opens with a picture of a 3D block model and four more, each saying what it shows and what it is for (block models, meshes, contour lines, and a PNG export), and it has a new section, "Try it with sample data". The sample is **Synthetic mountains**, a made-up region of 30 km by 30 km with a block model, rivers, a terrain mesh and two grids (14 MB), in a repository of its own, [karmania-map-viewer-sample-datasets](https://github.com/SupernovifieD/karmania-map-viewer-sample-datasets), with a README that says how to bring each file into Karmania. It is kept apart so that this repository stays small.
+
+### Repository
+
+The history of this repository was rewritten on 2026-11-24 to take out the reference pictures of the screenshot tests and the maintainer's working notes, which had been committed for a while and removed later but stayed in the history (the repository was about 62 MB; a clone is now about 5 MB, with the pictures of the README). The code did not change, but every commit has a new hash, and the tags `v0.1.0` and `v0.2.0` point at the rewritten commits. If you cloned it before, clone it again rather than pulling into the old clone.
+
+### Formats
+
+The same as 0.2.0.
+
+### Checked by
+
+903 Rust tests, 1,980 unit tests of the packages, 1,386 browser tests (two more than in 0.2.0: the two that measure the icons) and 175 accessibility checks (axe) with nothing allowed through, all passing in the continuous integration on GitHub, and `pnpm check` on this machine on the code of this release.
+
+### Limits to know about
+
+- The limits of 0.2.0, below, still hold.
+- **The screenshot tests were not run for this release.** They need Docker, which was not running, and the continuous integration does not run them. Their reference pictures are kept on each machine, and none has been compared with the centred icons: every picture that has an icon-only button changes by 4 px, so take them again (`pnpm test:visual:update`) and look at them before relying on them.
+
+### Running it
+
+The same as 0.2.0: see "Setting up" in the README.
+
+Licence: Apache 2.0. The code and data that Karmania includes have licences of their own, listed in `THIRD_PARTY_NOTICES.md`.
+
 ## 0.2.0 - 2026-11-21
 
 This release completes Phase 2: drawing maps. You can bring in files, see them on a map in 2D or 3D, colour and order the layers, make contour lines, click a feature to see what it is, and export the map as a PNG picture with its legend. The viewer can also be put in another page. As before, Karmania never invents a value: everything on the map is a value it was given, or one converted, triangulated, contoured or sorted into classes from it.
