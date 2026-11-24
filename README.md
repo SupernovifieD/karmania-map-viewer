@@ -48,7 +48,7 @@ The pictures are Karmania itself, in the browser (the toolbar on top with Import
     <td width="50%" valign="top">
       <img src="docs/images/terrain-surface.jpg" alt="The terrain of the synthetic region as a mesh in 3D in Karmania, with its rivers, and the layer's colour settings in the Legend" width="100%">
       <br>
-      <sub>The terrain of the same region as a mesh of 80,000 triangles, with the rivers.</sub>
+      <sub>The same region's terrain as a mesh of 80,000 triangles.</sub>
       <h3>Meshes: terrain and other surfaces</h3>
       A mesh is a surface of triangles, read from an OBJ file. Karmania draws it shaded by the light, in the colour you choose, and each layer has its own colour, opacity and settings in the Legend, as you see on the right of the picture. Heights are drawn as given and never converted, so what you see is what the file holds.
     </td>
