@@ -1,6 +1,85 @@
-# karmania-map-viewer
+<h1 align="center">Karmania</h1>
+
+<p align="center">
+  <b>An open-source engine for geoscience map data.</b><br>
+  Bring in points, lines, polygons, meshes, grids and block models, check them,<br>
+  and draw them in 2D and 3D, with a legend, contours and PNG export.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="Apache 2.0 licence" src="https://img.shields.io/github/license/SupernovifieD/karmania-map-viewer?style=flat-square"></a>
+  <a href="https://github.com/SupernovifieD/karmania-map-viewer/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/SupernovifieD/karmania-map-viewer?style=flat-square"></a>
+  <a href="https://github.com/SupernovifieD/karmania-map-viewer/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/SupernovifieD/karmania-map-viewer/ci.yml?branch=main&style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="#what-it-looks-like"><b>What it looks like</b></a> ·
+  <a href="#try-it-with-sample-data">Sample data</a> ·
+  <a href="#setting-up">Setting up</a> ·
+  <a href="docs/embedding.md">Embedding</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="Karmania showing a geology block model of a synthetic mountain region in 3D, with a river drawn on it, and the Legend panel beside it" width="100%">
+  <br>
+  <sub>A synthetic geology block model (248,507 blocks) and its river in Karmania's 3D view, heights exaggerated five times.<br><i>Invented data: not a real place.</i></sub>
+</p>
+
+<br>
 
 Karmania is an open-source engine for geoscience map data: a reusable core that other software can embed. It takes data in six standard shapes (points, lines, polygons, meshes, regular grids and block models), checks it, does a small amount of deterministic processing, and draws 2D and 3D maps with map furniture, which it can export as PNG images. It never invents values: every number it shows is either one it was given or a deterministic restatement of one (converted to another coordinate system, triangulated, contoured, or sorted into classes for display).
+
+## What it looks like
+
+The pictures are Karmania itself, in the browser (the toolbar on top with Import, 2D or 3D, the exaggeration of heights and Export PNG, then the map, and the panel with the Legend and the Data tab), and one of the pictures it exports.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/block-model-dark.jpg" alt="The synthetic block model in 3D in Karmania's dark theme, with the Legend listing the rivers and the block model" width="100%">
+      <br>
+      <sub>The synthetic block model and its rivers, in the dark theme.</sub>
+      <h3>Block models in 3D</h3>
+      A block model is a volume of boxes, each with its own values. Here it is the rock of every block, six units from the ground down to −1,800 m. Karmania draws the volume in a perspective view that you can orbit, pan and zoom, and exaggerates the heights 2, 3, 5 or 10 times, so that a region 30 km wide whose ground rises about 2.4 km does not look flat. The layers are in the Legend, in an order you choose, and the interface comes in a light and a dark theme.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/terrain-surface.jpg" alt="The terrain of the synthetic region as a mesh in 3D in Karmania, with its rivers, and the layer's colour settings in the Legend" width="100%">
+      <br>
+      <sub>The terrain of the same region as a mesh of 80,000 triangles, with the rivers.</sub>
+      <h3>Meshes: terrain and other surfaces</h3>
+      A mesh is a surface of triangles, read from an OBJ file. Karmania draws it shaded by the light, in the colour you choose, and each layer has its own colour, opacity and settings in the Legend, as you see on the right of the picture. Heights are drawn as given and never converted, so what you see is what the file holds.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/terrain-contours.jpg" alt="The terrain mesh with brown contour lines drawn over it in Karmania, and the settings of the contour layer in the Legend" width="100%">
+      <br>
+      <sub>Contour lines made by Karmania from the terrain mesh above.</sub>
+      <h3>Contour lines, made from a mesh or a grid</h3>
+      Contour lines are made from a grid (by a column) or from a mesh (by its heights), at an interval you choose. They become a dataset of their own: under their source in the Data tab, and in the Legend as a layer just above it, drawn over it, with its own colour, opacity and line width (brown and 2 px in the picture).
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/export-sweden-minerals.png" alt="A map of the mineral occurrences of Sweden as orange points, exported as a PNG with its legend, a north arrow and a scale bar" width="100%">
+      <br>
+      <sub>Mineral occurrences of Sweden, as exported. Data: the Geological Survey of Sweden (SGU).</sub>
+      <h3>Export a map as a picture</h3>
+      <i>Export PNG</i> writes the map with its legend beside it, the north arrow and, in 2D, the scale bar, at a size you choose (the map as it is on screen, A4, A3 or your own) and at 96, 150 or 300 dpi, which is written into the file. This picture is such an export of a 2D map of points. A picture too large for the computer is refused, with the reason.
+    </td>
+  </tr>
+</table>
+
+<br>
+
+## Try it with sample data
+
+[**karmania-map-viewer-sample-datasets**](https://github.com/SupernovifieD/karmania-map-viewer-sample-datasets) is a repository of data to try in Karmania. Each sample is a folder with its files, a README that says what each file is and how to bring it in, and, for invented data, the script that made it. The first sample is **Synthetic mountains**, the data of most of the pictures above: a made-up region of 30 km by 30 km with a block model, rivers (lines), a terrain mesh and two grids, all in one coordinate system, 14 MB in all.
+
+1. Run Karmania (see [Setting up](#setting-up); there is no hosted version yet).
+2. Get the files of the sample: clone the sample repository, or download the files of its folder.
+3. Press **Import** and choose a data file together with the `.prj` of the same name. The wizard suggests what each column is, and says what it found before anything is loaded.
 
 ## Where it stands
 
