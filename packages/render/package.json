@@ -1,6 +1,6 @@
 {
   "name": "@karmania/render",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Karmania render: the three.js renderer of the map, its cameras and controllers, behind one small interface",
   "type": "module",

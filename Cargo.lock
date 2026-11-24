@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "libm",
  "serde",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-crs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "crs-definitions",
  "karmania-core",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-io"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "csv",
  "karmania-core",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-prep"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "earcut",
  "karmania-core",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "karmania-wasm"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "js-sys",
  "karmania-core",
