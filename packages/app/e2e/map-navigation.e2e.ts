@@ -68,6 +68,23 @@ test.describe('the navigation group', () => {
     });
   });
 
+  test('has the icon of each button in the middle of its 32 by 32, both ways', async ({ page }) => {
+    await start(page);
+    const offsets = await page.locator('karmania-nav-group k-button').evaluateAll((buttons) =>
+      buttons.map((element) => {
+        const button = element.shadowRoot?.querySelector('button')?.getBoundingClientRect();
+        const icon = element.shadowRoot?.querySelector('k-icon')?.getBoundingClientRect();
+        return button && icon
+          ? {
+              x: icon.left + icon.width / 2 - (button.left + button.width / 2),
+              y: icon.top + icon.height / 2 - (button.top + button.height / 2),
+            }
+          : { x: Number.NaN, y: Number.NaN };
+      }),
+    );
+    expect(offsets).toEqual(NAMES.map(() => ({ x: 0, y: 0 })));
+  });
+
   test('has the four buttons in the order of the brief, each with its name', async ({ page }) => {
     await start(page);
     await expect(group(page)).toHaveAccessibleName('Map navigation');

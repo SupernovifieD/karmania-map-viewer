@@ -62,6 +62,24 @@ test.describe('the button', () => {
     expect(gap).toBe(8);
   });
 
+  test('centers the icon of an icon-only button in its box, both ways', async ({ page }) => {
+    for (const variant of VARIANTS) {
+      for (const size of SIZES) {
+        const centers = await cell(page, variant, size, 'icon-only').evaluate((element) => {
+          const button = element.shadowRoot?.querySelector('button')?.getBoundingClientRect();
+          const icon = element.shadowRoot?.querySelector('k-icon')?.getBoundingClientRect();
+          return button && icon
+            ? {
+                x: icon.left + icon.width / 2 - (button.left + button.width / 2),
+                y: icon.top + icon.height / 2 - (button.top + button.height / 2),
+              }
+            : { x: Number.NaN, y: Number.NaN };
+        });
+        expect(centers, `${variant} ${size}`).toEqual({ x: 0, y: 0 });
+      }
+    }
+  });
+
   test('draws its variants with the colors of the tokens (light theme)', async ({ page }) => {
     const primary = await colors(cell(page, 'primary', '32', 'text'));
     expect(primary).toEqual({

@@ -85,6 +85,12 @@ export class KButton extends LitElement {
         white-space: nowrap;
       }
 
+      /* The rule above beats the browser's own for the hidden attribute: without this the empty
+         text of an icon alone stays in the row, and the gap beside it pushes the icon off center. */
+      .text[hidden] {
+        display: none;
+      }
+
       :host([size='28']) button {
         --_height: var(--k-control-height-compact);
       }
